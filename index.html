@@ -3,22 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HMS · Corporate New Business — Lo-Fi Wireframe Prototype</title>
-  <link rel="stylesheet" href="assets/wireframe.css" />
+  <title>HMS3 · Corporate New Business</title>
+  <meta name="description" content="HMS3 Corporate New Business — a calm, guided workflow from franchise creation to account activation and handover." />
+  <link rel="stylesheet" href="assets/theme.css" />
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to main content</a>
-  <div id="protobar">
-    <span class="pb-tag">LO-FI WIREFRAME · MODERATED TEST BUILD</span>
-    <span class="pb-spacer"></span>
-    <a href="#/start" class="pb-link" data-nav="#/start">Test intro</a>
-    <a href="#/end" class="pb-link" data-nav="#/end">End / feedback</a>
-    <a href="#" class="pb-link" data-act="reset">Reset prototype</a>
-  </div>
-  <div id="app" aria-live="polite"></div>
-  <script src="assets/data.js"></script>
-  <script src="assets/components.js"></script>
-  <script src="assets/screens.js"></script>
-  <script src="assets/app.js"></script>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div id="root"></div>
+  <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="assets/model.js"></script>
+  <script src="assets/ui.js"></script>
+  <script src="assets/views.js"></script>
+  <script src="assets/router.js"></script>
 </body>
 </html>

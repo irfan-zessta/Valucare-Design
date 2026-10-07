@@ -1,13 +1,15 @@
-# HMS · Corporate New Business — Lo-Fi UX Wireframe Prototype
+# HMS3 · Corporate New Business — High-Fidelity Clickable Mockup
 
-A low-fidelity, grayscale, **clickable** desktop wireframe for moderated user testing of the
-**Corporate Sales — New Business** journey (intake → activation) in an HMS application.
+A premium, full-colour, **clickable** UX mockup of the complete **HMS3 Corporate New Business**
+process — from creating a new franchise all the way to **account activation and operational
+handover** — all inside **one connected case**.
 
-The goal of the test: can a Sales user run the whole journey inside **one case**, without separate
-spreadsheets, email trackers, quotation trackers, or manual status reports?
+The design goal: the clarity, calm and restraint of a premium consumer product, kept original.
+Someone with **no HMS knowledge** should be able to complete the whole process without training,
+always knowing *where they are, what's done, what to do next, who's responsible, and what's blocking*.
 
-> Intentionally unpolished: boxes, placeholder text, grayscale status pills. No branding,
-> illustrations, animations, gradients, or custom icons. No real client/member data.
+> No spreadsheets, email trackers, external quotation trackers, duplicate folders, or repeated
+> data entry — the case is the single source of truth.
 
 ## Run it
 
@@ -18,69 +20,65 @@ python3 -m http.server 4173 --bind 127.0.0.1
 # then open http://127.0.0.1:4173/index.html
 ```
 
-(Figma Make will auto-run `.figma/make/dev`, which does the same thing.)
+(Figma Make auto-runs `.figma/make/dev`, which does the same thing.)
 
-Open at **`#/start`** for the moderated-test intro. "Reset prototype" (top bar) clears state.
+Open at **`#/home`**. **"Reset demo"** (top bar) clears state and returns to a fresh start.
 
 ## Structure
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Shell + prototype bar |
-| `assets/wireframe.css` | Grayscale lo-fi styling |
-| `assets/data.js` | **Single source of truth** — one case (`CNB-2026-00482 · Northwind Manufacturing`) drives every screen |
-| `assets/components.js` | State store (localStorage) + UI helpers (pills, tables, timeline…) |
-| `assets/screens.js` | All screen renderers |
-| `assets/app.js` | Hash router, app chrome, interaction handlers |
+| `index.html` | Shell: skip link, mount point, live-region for toasts |
+| `assets/theme.css` | Premium design system — colour tokens, type, cards, buttons, status pills, banners, stages, responsive, focus states |
+| `assets/model.js` | **Single source of truth** — one case driven by ordered milestone flags; derives the 7-stage indicator, the next step, and History |
+| `assets/ui.js` | Inline SVG icons + markup helpers (pills, banners, fields, checklists, toast) — every meaningful icon paired with text |
+| `assets/views.js` | All screens: Home, New Business, Franchise wizard, 12 case sections, My Tasks, Approvals |
+| `assets/router.js` | Hash routing, app chrome, case layout, and the action state-machine (flags → History → persist → re-render) |
+
+> The earlier grayscale lo-fi wireframe files (`wireframe.css`, `data.js`, `components.js`,
+> `screens.js`, `app.js`) remain on disk but are **no longer referenced** by `index.html`.
+
+## Colour system (WCAG AA)
+
+Primary `#2563EB` · soft blue `#EFF6FF` · success `#15803D` / `#F0FDF4` · attention `#B45309` /
+`#FFFBEB` · error `#B91C1C` / `#FEF2F2` · text `#172033` / `#667085` · page `#F7F8FA` ·
+border `#E4E7EC` · surface `#FFFFFF`. Status is **always colour + icon + text** — never colour alone.
 
 ## Navigation
 
-Designed to feel like a **simplified, improved HMS3** — not a replacement product.
+**Primary:** Home · New Business · My Tasks · Approvals (profile holds the secondary items).
+**Case sections:** Summary · Franchise · Requirements · Eligibility · Quotation · Proposal ·
+Account Setup · Plan Codes & SOB · Contract · Billing & Membership · Activation · History.
 
-**Main (HMS3 shell):** Home · New Business · My Tasks · Approvals · User profile
-**Case:** Summary · Company / Franchise · Requirements · Eligibility · Quotation · Proposal ·
-Account Setup (incl. **Plan codes & SOB**) · Contract · Activation · History
+**Global 7-stage indicator:** 1 Franchise · 2 Requirements · 3 Eligibility and Quotation ·
+4 Proposal and Decision · 5 Account and Benefit Setup · 6 Contract and Billing ·
+7 Activation and Handover — each with plain-language status, owner and next action
+(no progress-percentage as the primary cue).
 
-Status is always shown as **glyph + text** (never colour alone). Plain-language vocabularies:
-- Quotation: Preparing request · Submitted · Clarification required · Pricing in progress · Awaiting approval · Approved · Released to Sales
-- Eligibility outcome: Eligible · Eligible with review · More information required · Not eligible
-- Contract: Contract requested · Draft prepared · Under review · Sent to client · Client comments received · Signed · Notarized · Completed
+## The connected flow (clickable, end-to-end)
 
-Accessibility (WCAG 2.2 AA): skip link, semantic landmarks, visible focus, focus moves to
-main content on navigation, keyboard-operable links/buttons, and structured tables used only
-for comparing records (e.g. SOB vs the accepted proposal).
+Create Franchise (3-step wizard) → franchise requirements → approval → **create account**
+(`CNB-2026-00482`) → account requirements → **Member Data** (upload, validate, accept) →
+eligibility → quotation (submit → clarification → approved, two priced options) →
+proposal (generate → send → decision) → account record → plan codes → SOB → member setup →
+contract & DSA (8 statuses) → billing → activation readiness → **activate** → operational handover.
 
-## Flows covered (1–17)
+Each screen follows the same calm pattern: a clear title, supporting text, a grouped body
+(cards / checklist / steps / comparison), and **one primary action**. Entered information is
+reused, never re-asked.
 
-My Work dashboard · Create opportunity (with existing-record / duplicate search) · Franchise & authority
-(Direct + Agent/Broker variants) · Requirements checklist · Census & document validation · Eligibility & risk ·
-Quotation readiness / submit / tracking + clarifications / approved · Proposal generation / negotiation / decision ·
-Account & plan setup · Contract & DSA · Operational handover · Activation checklist.
+## Built-in exception paths (no dead ends)
 
-## Built-in test paths (no dead ends)
+- **Member Data validation error** — 3 records missing a field; fix in-case, then accept.
+- **Eligibility with review** — quotable, with a note carried to Actuarial.
+- **Actuarial clarification loop** — answer in-case; status resumes automatically.
+- **Proposal declined** — case paused, nothing lost, **reopen** to continue.
+- **Contract comments** — client-comment step surfaced before signing.
+- **Activation blocker** — readiness checklist disables activation until every owner is done.
 
-- **Happy path**, clickable end-to-end.
-- Incomplete-requirement path · census-error path · risk-review path.
-- Actuarial **clarification loop** (answer in-case, status resumes).
-- Proposal **revision loop** (shows what approval the change triggers; keeps version history).
-- **Activation blocker** clearly surfaced (the one item preventing go-live).
-- User vs **automated HMS** actions are labelled throughout (see Activity History legend).
+## Accessibility (WCAG 2.2 AA)
 
-### Facilitator shortcuts
-A couple of "Facilitator:" buttons (on Quotation ▸ Readiness and ▸ Approved) fast-forward the
-mandatory block / approval so the happy path can be demonstrated in one sitting.
-
-## Maps to the 12 testing tasks
-
-1. Create opportunity + reuse existing company → **Create**
-2. Find missing docs + send request → **Requirements**
-3. Census errors + assign correction → **Requirements ▸ Census validation**
-4. Why not ready for quotation → **Quotation ▸ Readiness**
-5. Submit without reattaching files → **Quotation ▸ Submit**
-6. Find & answer Actuarial clarification → **Quotation ▸ Tracking**
-7. Who owns the quotation & why pending → **Quotation ▸ Tracking**
-8. Generate proposal from approved quote → **Proposal ▸ Generate**
-9. Record benefit revision → **Proposal ▸ Negotiation**
-10. Record acceptance vs correct version → **Proposal ▸ Decision**
-11. Status of Account Services / MDA / Billing / Legal → **Activation ▸ Operational handover**
-12. The item blocking activation → **Activation ▸ Activation checklist**
+Semantic landmarks and headings, **skip to main content**, focus moved to `<main>` on navigation,
+visible focus rings, keyboard-operable controls, min 44×44px primary controls, status conveyed in
+text (not colour alone), labelled icons, comparison tables used only for genuine comparisons,
+responsive layout with a horizontal case menu on narrow screens, and reduced-motion support.
