@@ -15,55 +15,57 @@
   var lastFocusId = null;           // for dialog focus return
   var dialogOnConfirm = null;
 
-  /* ---------- grouped primary navigation ----------
-     Home is a standalone link; everything else lives in a
-     collapsible group. Only the group containing the current
-     route is expanded. No Renewal / IFG items — Corporate New
-     Business only. New Business stages are not flat top-level
-     items; they live inside the Sales group. */
+  /* ---------- Commercial Sales primary navigation ----------
+     Built for the Commercial / Sales user — NOT a flat list of every
+     department's internal activity. It answers: Where is my work? How do
+     I start New Business? Where's an existing case? What needs me? Where
+     can I check account / SOB / Plan Code info?
+
+     Home is a standalone link; a "Create New Business" quick action sits
+     near the top; everything else lives in collapsible groups ordered by
+     frequency of use. Only one group is expanded at a time. The ten
+     back-office stages (Account Setup, SOB validation, Plan Code maker-
+     checker, Member Data, Billing, …) are NOT sidebar items — Sales sees
+     those inside the case as statuses, tasks, blockers and handoffs.
+     Corporate New Business only — no Renewal / IFG / ACUSA / MDA / Claims
+     departmental menus. */
   var NAV_HOME = { hash: "#/home", label: "Home", icon: "home" };
   var NAV_GROUPS = [
     { id: "mywork", label: "My Work", icon: "briefcase", items: [
-      { hash: "#/cases",         label: "My Cases",      icon: "briefcase" },
-      { hash: "#/tasks",         label: "My Tasks",      icon: "tasks" },
-      { hash: "#/approvals",     label: "Approvals",     icon: "approvals" },
-      { hash: "#/notifications", label: "Notifications", icon: "bell" }
+      { hash: "#/sales-tracker", label: "Sales Tracker",          icon: "layers" },
+      { hash: "#/cases",         label: "My New Business Cases",   icon: "briefcase" },
+      { hash: "#/tasks",         label: "My Tasks",                icon: "tasks",     countKey: "tasks" },
+      { hash: "#/approvals",     label: "Approvals",               icon: "approvals", countKey: "approvals", badgeTone: "attention" },
+      { hash: "#/notifications", label: "Notifications",           icon: "bell" }
     ]},
-    { id: "sales", label: "Sales", icon: "handshake", items: [
-      { hash: "#/franchise-list",     label: "Franchise",                icon: "building" },
-      { hash: "#/franchise-list",     label: "Franchise List",           icon: "layers" },
-      { hash: "#/add-franchise",      label: "Add Franchise",            icon: "plus" },
-      { hash: "#/case/franchise",     label: "Franchise Enrollment",     icon: "edit" },
-      { hash: "#/approvals",          label: "Franchise Approvals",      icon: "approvals" },
-      { hash: "#/new",                label: "Corporate New Business",   icon: "briefcase" },
-      { hash: "#/new",                label: "Account Enrollment — New", icon: "flag" },
-      { hash: "#/case/quotation",     label: "Quotation",                icon: "calc" },
-      { hash: "#/case/proposal",      label: "Proposal and Negotiation", icon: "handshake" },
-      { hash: "#/case/contract",      label: "Contract and KYC",         icon: "gavel" },
-      { hash: "#/case/onboarding",    label: "Account Setup",            icon: "shieldCheck" },
-      { hash: "#/case/sob",           label: "SOB and Benefits",         icon: "layers" },
-      { hash: "#/case/plancodes",     label: "Plan Codes",               icon: "calc" },
-      { hash: "#/case/memberdata",    label: "Member Data",              icon: "users" },
-      { hash: "#/case/billing",       label: "Billing",                  icon: "receipt" },
-      { hash: "#/case/activation",    label: "Activation and Handover",  icon: "rocket" }
+    { id: "newbiz", label: "New Business", icon: "flag", items: [
+      { hash: "#/franchise-list",  label: "Franchise List",           icon: "layers" },
+      { hash: "#/add-franchise",   label: "Add Franchise",            icon: "plus" },
+      { hash: "#/new",             label: "Account Enrollment — New", icon: "flag" },
+      { hash: "#/work/quotation",  label: "Quotations",               icon: "calc" },
+      { hash: "#/work/proposal",   label: "Proposals and Negotiations", icon: "handshake" },
+      { hash: "#/work/contract",   label: "Contracts and KYC",        icon: "gavel" },
+      { hash: "#/work/activation", label: "Activation and Handover",  icon: "rocket" }
     ]},
-    { id: "maintenance", label: "Maintenance", icon: "shield", items: [
-      { hash: "#/module/account-maintenance", label: "Account Maintenance",      icon: "building" },
-      { hash: "#/module/agent-broker",        label: "Agent/Broker Maintenance", icon: "users" },
-      { hash: "#/module/eligibility",         label: "Eligibility",              icon: "shieldCheck" },
-      { hash: "#/module/rates",               label: "Rate's Creation",          icon: "calc" },
-      { hash: "#/module/plan-types",          label: "Plan Type Management",     icon: "layers" }
+    { id: "accounts", label: "Accounts", icon: "building", sepBefore: true, items: [
+      { hash: "#/module/account-maintenance",  label: "Account Maintenance", icon: "building" },
+      { hash: "#/module/additional-affiliates", label: "Additional Affiliates", icon: "users" },
+      { hash: "#/search",                      label: "Accounts Inquiry",    icon: "search" }
     ]},
-    { id: "inquiry", label: "Inquiry", icon: "search", items: [
-      { hash: "#/search",                  label: "Accounts Inquiry", icon: "search" },
-      { hash: "#/module/plan-code-viewer", label: "Plan Code Viewer", icon: "calc" },
-      { hash: "#/module/sob-viewing",      label: "SOB Viewing",      icon: "layers" },
-      { hash: "#/case/history",            label: "Activity History", icon: "history" }
+    { id: "salestools", label: "Sales Tools", icon: "calc", items: [
+      { hash: "#/module/agent-broker",     label: "Agent/Broker Maintenance", icon: "users" },
+      { hash: "#/module/eligibility",      label: "Eligibility",              icon: "shieldCheck" },
+      { hash: "#/module/rates",            label: "Rate Creation",            icon: "calc" },
+      { hash: "#/module/sob-viewing",      label: "SOB Viewer",               icon: "layers" },
+      { hash: "#/module/plan-code-viewer", label: "Plan Code Viewer",         icon: "calc" },
+      { hash: "#/module/plan-types",       label: "Plan Type Management",     icon: "layers" }
     ]},
     { id: "reports", label: "Reports", icon: "doc", items: [
-      { hash: "#/franchise-list",             label: "Franchise List",     icon: "layers" },
-      { hash: "#/report/franchise-by-agent",  label: "Franchise by Agent", icon: "doc" },
-      { hash: "#/report/franchise-by-sales",  label: "Franchise by Sales", icon: "doc" }
+      { hash: "#/report/pipeline",               label: "New Business Pipeline",       icon: "layers" },
+      { hash: "#/franchise-list",                label: "Franchise List",              icon: "doc" },
+      { hash: "#/report/franchise-by-sales",     label: "Franchise by Sales",          icon: "doc" },
+      { hash: "#/report/franchise-by-agent",     label: "Franchise by Agent",          icon: "doc" },
+      { hash: "#/report/approaching-effectivity", label: "Accounts Approaching Effectivity", icon: "rocket" }
     ]}
   ];
 
@@ -75,11 +77,35 @@
         if (g.items[j].hash === hash) return g.id;
       }
     }
-    if (hash.indexOf("#/case/") === 0) return "sales";   // any case section → Sales
-    if (hash.indexOf("#/module/") === 0) return "maintenance";
+    if (hash.indexOf("#/case/") === 0) return "newbiz";    // any case section → New Business
+    if (hash.indexOf("#/work/") === 0) return "newbiz";    // Sales-owned work queues
+    if (hash.indexOf("#/sample/") === 0) return "mywork";  // a case the user owns
     if (hash.indexOf("#/report/") === 0) return "reports";
+    if (hash.indexOf("#/module/") === 0) return "accounts";
     return null;
   }
+
+  /* Pending counts for the sidebar badges — mirror My Tasks / Approvals. */
+  function taskCount(c) {
+    var n = 0;
+    if ((c.flags.leadCaptured || c.meta.caseNo) && !c.flags.handoverComplete) n++;
+    M.SAMPLE_CASES.forEach(function (sx) { if (sx.owner === "A. Reyes") n++; });
+    return n;
+  }
+  function approvalCount(c) {
+    var n = 0, f = c.flags;
+    if (f.franchiseCreated && !f.franchiseApproved) n++;
+    if (f.rateSheetReceived && !f.pricingApproved) n++;
+    if (c.planCodes && c.planCodes.generated && !f.planCodesApproved) n++;
+    return n;
+  }
+
+  /* Remembered last-expanded group (persists across sessions). Default
+     "mywork" so the Commercial user lands with My Work expanded. */
+  var NAV_PREF_KEY = "hms3_nav_group";
+  function loadNavPref() { try { return global.localStorage.getItem(NAV_PREF_KEY) || "mywork"; } catch (e) { return "mywork"; } }
+  function saveNavPref(g) { try { global.localStorage.setItem(NAV_PREF_KEY, g); } catch (e) {} }
+  var navPref = loadNavPref();
   var CASE_SECTIONS = [
     { id: "summary", label: "Summary", icon: "home", view: "caseSummary", stage: null },
     { id: "lead", label: "Lead", icon: "flag", view: "caseLead", stage: 1 },
@@ -102,32 +128,58 @@
   /* ============================================================
      App chrome
      ============================================================ */
-  function navItem(it, activeHash, expanded) {
+  // A nav row: icon (left) · label (middle, may wrap) · count/arrow (right).
+  // `counts` resolves dynamic badges; collapsed rows expose label + count
+  // through title/aria so nothing is an unexplained dot.
+  function navItem(it, activeHash, expanded, counts) {
     var active = it.hash === activeHash;
+    var n = it.countKey && counts ? (counts[it.countKey] || 0) : 0;
+    var attn = it.badgeTone === "attention";
+    var badge = n > 0 ? '<span class="nav-badge' + (attn ? " attention" : "") + '" aria-hidden="true">' + n + '</span>' : "";
+    var pip = n > 0 ? '<span class="nav-pip' + (attn ? " attention" : "") + '" aria-hidden="true"></span>' : "";
+    var full = it.label + (n > 0 ? " (" + n + (attn ? " awaiting approval" : " pending") + ")" : "");
     return '<a class="nav-link' + (active ? " active" : "") + '" href="' + it.hash + '"' +
-      (active ? ' aria-current="page"' : "") + (expanded ? "" : ' tabindex="-1"') + '>' +
-      icon(it.icon, 18) + '<span class="lbl">' + esc(it.label) + '</span></a>';
+      (active ? ' aria-current="page"' : "") + (expanded ? "" : ' tabindex="-1"') +
+      ' title="' + esc(full) + '"' + (n > 0 ? ' aria-label="' + esc(full) + '"' : "") + '>' +
+      icon(it.icon, 18) + '<span class="lbl">' + esc(it.label) + '</span>' + badge + pip + '</a>';
+  }
+
+  // Which group is open: an explicit toggle this render wins; otherwise the
+  // group owning the route; otherwise the remembered preference (My Work).
+  function expandedGroup(hash) {
+    if (ui.navGroup !== null) return ui.navGroup;
+    var g = groupForHash(hash);
+    return g || navPref;
   }
 
   function sidebar(activeHash) {
-    var expandedId = ui.navGroup !== null ? ui.navGroup : groupForHash(activeHash);
+    var expandedId = expandedGroup(activeHash);
+    if (expandedId) { navPref = expandedId; saveNavPref(expandedId); }   // remember last-expanded
+    var counts = { tasks: taskCount(C), approvals: approvalCount(C) };
 
     var homeActive = activeHash === NAV_HOME.hash;
     var homeLink = '<a class="nav-link nav-home' + (homeActive ? " active" : "") + '" href="' +
-      NAV_HOME.hash + '"' + (homeActive ? ' aria-current="page"' : "") + '>' +
+      NAV_HOME.hash + '"' + (homeActive ? ' aria-current="page"' : "") + ' title="Home">' +
       icon(NAV_HOME.icon, 18) + '<span class="lbl">' + esc(NAV_HOME.label) + '</span></a>';
+
+    // Commercial quick action — always visible, identifiable even collapsed.
+    var createActive = activeHash === "#/new";
+    var createBtn = '<a class="nav-create' + (createActive ? " active" : "") + '" href="#/new"' +
+      ' aria-label="Create New Business" title="Create New Business">' +
+      icon("plus", 18) + '<span class="lbl">Create New Business</span></a>';
 
     var groups = NAV_GROUPS.map(function (g) {
       var open = g.id === expandedId;
       var panelId = "navgrp-" + g.id;
+      var sep = g.sepBefore ? '<div class="nav-sep" role="separator" aria-hidden="true"></div>' : "";
       var header = '<button type="button" class="nav-group-h" data-ui="navgroup:' + g.id + '"' +
-        ' aria-expanded="' + (open ? "true" : "false") + '" aria-controls="' + panelId + '">' +
+        ' aria-expanded="' + (open ? "true" : "false") + '" aria-controls="' + panelId + '" title="' + esc(g.label) + '">' +
         icon(g.icon, 18) + '<span class="lbl">' + esc(g.label) + '</span>' +
         '<span class="nav-caret' + (open ? " open" : "") + '" aria-hidden="true">' + icon("chevron", 16) + '</span>' +
         '</button>';
       var items = '<div class="nav-group-items" id="' + panelId + '"' + (open ? "" : " hidden") + '>' +
-        g.items.map(function (it) { return navItem(it, activeHash, open); }).join("") + '</div>';
-      return '<div class="nav-group' + (open ? " open" : "") + '">' + header + items + '</div>';
+        g.items.map(function (it) { return navItem(it, activeHash, open, counts); }).join("") + '</div>';
+      return sep + '<div class="nav-group' + (open ? " open" : "") + '">' + header + items + '</div>';
     }).join("");
 
     var moreMenu = ui.menu
@@ -147,7 +199,7 @@
           (collapsed ? "Expand sidebar" : "Collapse sidebar") + '" aria-pressed="' + (collapsed ? "true" : "false") + '">' +
           icon("chevron", 18) + '</button>' +
       '</div>' +
-      '<div class="nav">' + homeLink + groups + '</div>' +
+      '<div class="nav">' + homeLink + createBtn + groups + '</div>' +
       '<div class="spacer"></div>' +
       '<div class="notif-wrap" style="position:relative">' + moreMenu +
         '<div class="profile" data-ui="more" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="' + (ui.menu ? "true" : "false") + '">' +
@@ -190,6 +242,32 @@
       '</div></div>';
   }
 
+  /* Case progress component — the Commercial user's at-a-glance read on an
+     open case: current stage, owner, next action, due, waiting party and
+     blocker, with the plain-language status. Back-office work shows here as
+     status/owner/waiting — Sales tracks it, another team owns it. */
+  function caseProgress(c) {
+    var cur = M.currentStage(c), ns = M.nextStep(c);
+    var st = cur.statusText;
+    var waiting = st.indexOf("client") >= 0 ? "Client"
+      : st.indexOf("another team") >= 0 ? (ns.owner || "Another team") : "—";
+    var blocker = st === "Blocked" ? (c.declined ? "Client declined — reopen in Negotiation" : "See current stage")
+      : (c.declined ? "Client declined — paused" : "None");
+    function cell(label, val, tone) {
+      return '<div class="cp-cell"><div class="cp-l">' + esc(label) + '</div>' +
+        '<div class="cp-v"' + (tone ? ' style="color:var(--' + tone + ')"' : "") + '>' + val + '</div></div>';
+    }
+    return '<section class="caseprog" aria-label="Case progress">' +
+      cell("Current stage", '<b>Stage ' + cur.stage.id + ' of 7</b> — ' + esc(cur.stage.name)) +
+      cell("Current owner", esc(cur.stage.owner)) +
+      cell("Next action", esc(ns.title)) +
+      cell("Due", esc(V.fmtDate(c.meta.effectivity))) +
+      cell("Waiting on", esc(waiting), waiting !== "—" ? "amber" : null) +
+      cell("Blocker", blocker === "None" ? '<span class="muted">None</span>' : esc(blocker), blocker === "None" ? null : "amber") +
+      '<div class="cp-status">' + U.statusPill(st) + '</div>' +
+      '</section>';
+  }
+
   /* ============================================================
      Case layout (stage chips + 14-section menu + body)
      ============================================================ */
@@ -222,7 +300,8 @@
       }).join("") + '</nav>';
 
     var body = '<div class="case-body">' + V[sec.view](C) + '</div>';
-    var content = '<div class="stagebar" style="margin-bottom:var(--s5)">' + chips + '</div>' +
+    var content = caseProgress(C) +
+      '<div class="stagebar" style="margin-bottom:var(--s5)">' + chips + '</div>' +
       '<div class="case">' + menu + body + '</div>';
 
     var crumbs = '<b>' + esc(C.meta.tradeName) + '</b><span class="sep">/</span><span>' + esc(sec.label) + '</span>';
@@ -249,6 +328,9 @@
         var scId = decodeURIComponent(hash.slice("#/sample/".length));
         var sc = V.sampleCase(C, scId);
         content = sc.body; crumbs = '<b>My Cases</b><span class="sep">/</span><span>' + esc(sc.title) + '</span>'; title = sc.title + " · HMS3";
+      } else if (hash.indexOf("#/work/") === 0) {
+        var wk = V.workQueue(C, hash.slice("#/work/".length));
+        content = wk.body; crumbs = '<b>New Business</b><span class="sep">/</span><span>' + esc(wk.title) + '</span>'; title = wk.title + " · HMS3";
       } else if (hash.indexOf("#/module/") === 0) {
         var mod = V.modulePage(C, hash.slice("#/module/".length));
         content = mod.body; crumbs = '<b>' + esc(mod.title) + '</b>'; title = mod.title + " · HMS3";
@@ -257,7 +339,8 @@
         content = rep.body; crumbs = '<b>Reports</b><span class="sep">/</span><span>' + esc(rep.title) + '</span>'; title = rep.title + " · HMS3";
       } else switch (hash) {
         case "#/new": content = V.newBusiness(C); crumbs = '<b>New Business</b>'; title = "New Business · HMS3"; break;
-        case "#/cases": content = V.myCases(C); crumbs = '<b>My Cases</b>'; title = "My Cases · HMS3"; break;
+        case "#/sales-tracker": content = V.salesTracker(C); crumbs = '<b>Sales Tracker</b>'; title = "Sales Tracker · HMS3"; break;
+        case "#/cases": content = V.myCases(C); crumbs = '<b>My New Business Cases</b>'; title = "My New Business Cases · HMS3"; break;
         case "#/search": content = V.searchPage(C); crumbs = '<b>Accounts Inquiry</b>'; title = "Accounts Inquiry · HMS3"; break;
         case "#/tasks": content = V.tasks(C); crumbs = '<b>My Tasks</b>'; title = "My Tasks · HMS3"; break;
         case "#/approvals": content = V.approvals(C); crumbs = '<b>Approvals</b>'; title = "Approvals · HMS3"; break;

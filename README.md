@@ -46,24 +46,40 @@ border `#E4E7EC` · surface `#FFFFFF`. Status is **always colour + icon + text**
 
 ## Navigation
 
-A **collapsible left sidebar** (not a top-heavy bar) with **Home** plus five groups that
-expand one at a time; the group holding the current page auto-expands, and the active item is
-highlighted (`aria-current="page"`). Every item is text + a simple icon, fully keyboard-operable
-with a visible focus ring; collapsed items are removed from the tab order.
+The sidebar is built for the **Commercial / Sales** user — a cleaner evolution of the familiar
+HMS3 Sales workspace, not a list of every back-office team's internal activity. It is a
+**collapsible left sidebar** with **Home**, a always-visible **Create New Business** quick action,
+and five groups that expand one at a time; the group holding the current page auto-expands, the
+active item shows a blue background + left indicator (`aria-current="page"`), and the **last
+expanded group is remembered** (defaults to **My Work**). Rows are three-column (icon · label ·
+count/arrow), min 44px tall, with neutral count badges (and amber for approvals) that **only show
+when non-zero**. Collapsed, the rail keeps recognizable icons, tooltips, Create, and small pips.
 
 - **Home**
-- **My Work** — My Cases · My Tasks · Approvals · Notifications
-- **Sales** — Franchise · Franchise List · Add Franchise · Franchise Enrollment ·
-  Franchise Approvals · Corporate New Business · Account Enrollment — New · Quotation ·
-  Proposal and Negotiation · Contract and KYC · Account Setup · SOB and Benefits · Plan Codes ·
-  Member Data · Billing · Activation and Handover
-- **Maintenance** — Account Maintenance · Agent/Broker Maintenance · Eligibility ·
-  Rate's Creation · Plan Type Management
-- **Inquiry** — Accounts Inquiry · Plan Code Viewer · SOB Viewing · Activity History
-- **Reports** — Franchise List · Franchise by Agent · Franchise by Sales
+- **Create New Business** — the one quick action; starts find-company → resolve duplicates →
+  add/select franchise → verified HMS3 data → upload requirements → save/submit
+- **My Work** — Sales Tracker · My New Business Cases · My Tasks · Approvals · Notifications
+- **New Business** — Franchise List · Add Franchise · Account Enrollment — New · Quotations ·
+  Proposals and Negotiations · Contracts and KYC · Activation and Handover
+- **Accounts** — Account Maintenance · Additional Affiliates · Accounts Inquiry
+- **Sales Tools** — Agent/Broker Maintenance · Eligibility · Rate Creation · SOB Viewer ·
+  Plan Code Viewer · Plan Type Management
+- **Reports** — New Business Pipeline · Franchise List · Franchise by Sales · Franchise by Agent ·
+  Accounts Approaching Effectivity
 
-New Business stages are reached **inside the case**, not as permanent flat menu items. The scope is
-**Corporate New Business only** — no Renewal, IFG, or Unverified-team items appear anywhere.
+The **Quotations / Proposals and Negotiations / Contracts and KYC / Activation and Handover** items
+are cross-case **Sales work queues** — entry points into cases at that stage, not duplicates of the
+in-case stage editor (each row opens the real case). Back-office work owned by other teams
+(Actuarial/ACCUSA pricing, Legal, Account Services, SOB validation, Plan Code maker-checker, Member
+Data, Billing) is **never** a primary Commercial menu item — Sales sees it only *inside the case* as
+a stage status, task, blocker or handoff, with no edit controls for another team's work. The scope
+is **Corporate New Business only** — no Renewal, IFG, or Unverified-team items appear anywhere.
+Modules a Sales role can't access (ACUSA, MDA, CCD, Network Provider, Claims, Billing, ICT, Logs,
+Roles and Permissions) are removed.
+
+When a case is open, a **case progress strip** sits above the workspace showing current stage,
+current owner, next action, due date, waiting party and any blocker — the ten internal stages are
+*not* duplicated as expanded sidebar items.
 
 **Case sections (14):** Summary · Lead · Franchise · Quotation · Proposal · Negotiation ·
 Contract · Onboarding · SOB and Benefits · Plan Codes · Member Data · Billing · Activation · History.

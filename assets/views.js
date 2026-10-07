@@ -1212,16 +1212,162 @@
   }
 
   /* ============================================================
+     SALES TRACKER + NEW-BUSINESS WORK QUEUES (Commercial workspaces)
+     ============================================================ */
+  // Normalise the live case + the demo reference cases into one list the
+  // tracker and queues can read. waiting: "client" | "team" | null.
+  function collectCases(c) {
+    var list = [];
+    if (c.flags.leadCaptured || c.meta.caseNo) {
+      var cur = M.currentStage(c), ns = M.nextStep(c), st = cur.statusText;
+      var waiting = st.indexOf("client") >= 0 ? "client" : st.indexOf("another team") >= 0 ? "team" : null;
+      list.push({
+        live: true, caseNo: c.meta.caseNo || "Draft", client: c.meta.client,
+        channel: c.meta.channel || "Channel not set", stageId: cur.stage.id, stageName: cur.stage.name,
+        status: st, owner: ns.owner, due: c.meta.taskDue, effectivity: c.meta.effectivity,
+        blocker: st === "Blocked" ? (c.declined ? "Client declined — paused" : "See current stage") : (c.declined ? "Client declined — paused" : null),
+        waiting: waiting, next: ns.title, route: "#/case/summary", readonly: false,
+        done: c.flags.handoverComplete
+      });
+    }
+    M.SAMPLE_CASES.forEach(function (sx) {
+      list.push({
+        live: false, caseNo: sx.caseNo, client: sx.client, channel: sx.channel,
+        stageId: sx.stageId, stageName: sx.stage, status: sx.status, owner: sx.owner,
+        due: sx.due, effectivity: sx.effectivity, blocker: sx.blocker, waiting: sx.waiting,
+        next: sx.next, route: "#/sample/" + encodeURIComponent(sx.caseNo), readonly: true, done: false
+      });
+    });
+    return list;
+  }
+  // One compact row used by the tracker + queues.
+  function caseRow(x, iconName, tone) {
+    return '<div class="task"><span class="c-ico" style="color:var(--' + (tone || "blue") + ')">' + icon(iconName || "briefcase", 22) + '</span>' +
+      '<div class="t-main"><div class="t-name">' + esc(x.next) + '</div>' +
+      '<div class="t-reason">' + esc(x.client) + ' · ' + esc(x.caseNo) +
+      (x.blocker ? ' · <span style="color:var(--red)">Blocker: ' + esc(x.blocker) + '</span>' : '') +
+      (x.waiting === "team" ? ' · <span style="color:var(--amber)">Waiting on ' + esc(x.owner) + '</span>' : '') +
+      (x.waiting === "client" ? ' · <span style="color:var(--amber)">Waiting on client</span>' : '') + '</div>' +
+      '<div class="t-meta"><span>Owner <b>' + esc(x.owner) + '</b></span><span>Due <b>' + fmtDate(x.due) + '</b></span>' + pill(x.status) + '</div></div>' +
+      btn(x.readonly ? "View case" : "Open case", { size: "sm", iconRight: "arrowRight", nav: x.route }) + '</div>';
+  }
+
+  function salesTracker(c) {
+    var list = collectCases(c).filter(function (x) { return !x.done; });
+    var withClient = list.filter(function (x) { return x.waiting === "client"; });
+    var withTeam = list.filter(function (x) { return x.waiting === "team"; });
+    var blocked = list.filter(function (x) { return x.status === "Blocked"; });
+    var needs = list.filter(function (x) { return !x.waiting && x.status !== "Blocked"; });
+
+    var stats = '<div class="grid-4">' +
+      statCard(list.length, "Active cases") +
+      statCard(needs.length, "Need your action", needs.length ? "amber" : "gray") +
+      statCard(withClient.length, "With the client", withClient.length ? "amber" : "gray") +
+      statCard(withTeam.length, "With other teams", withTeam.length ? "blue" : "gray") +
+      '</div>';
+
+    // Pipeline by stage — how work is distributed across the 7 stages.
+    var byStage = {};
+    M.STAGES.forEach(function (s) { byStage[s.id] = 0; });
+    list.forEach(function (x) { byStage[x.stageId] = (byStage[x.stageId] || 0) + 1; });
+    var maxN = Math.max(1, Math.max.apply(null, M.STAGES.map(function (s) { return byStage[s.id]; })));
+    var pipeline = card(head("Pipeline by stage", '<span class="tiny">' + list.length + ' active · Corporate New Business</span>') +
+      '<div class="stack-3">' + M.STAGES.map(function (s) {
+        var n = byStage[s.id];
+        return '<div class="pl-row"><span class="pl-stage"><b>' + s.id + '</b> ' + esc(s.name) + '</span>' +
+          '<span class="pl-bar"><span class="pl-fill" style="width:' + Math.round((n / maxN) * 100) + '%;opacity:' + (n ? 1 : .25) + '"></span></span>' +
+          '<span class="pl-n' + (n ? "" : " zero") + '">' + n + '</span></div>';
+      }).join("") + '</div>');
+
+    var attention = blocked.concat(needs);
+    var attentionCard = card(head("Needs your attention", pill(attention.length ? "Action required" : "Completed", attention.length ? "warn" : "success")) +
+      (attention.length
+        ? '<div class="stack-3">' + attention.map(function (x) {
+            return caseRow(x, x.status === "Blocked" ? "alert" : "tasks", x.status === "Blocked" ? "red" : "blue");
+          }).join("") + '</div>'
+        : '<div class="muted">Nothing needs your action right now.</div>'));
+
+    var waitingCard = '<div class="grid-2">' +
+      card(head("Waiting for the client") + (withClient.length
+        ? '<div class="stack-3">' + withClient.map(function (x) { return caseRow(x, "clock", "amber"); }).join("") + '</div>'
+        : '<div class="muted">Nothing is with a client.</div>')) +
+      card(head("Waiting for another team") + (withTeam.length
+        ? '<div class="stack-3">' + withTeam.map(function (x) { return caseRow(x, "users", "blue"); }).join("") + '</div>'
+        : '<div class="muted">Nothing is with another team.</div>')) +
+      '</div>';
+
+    var effSorted = list.slice().sort(function (a, b) { return String(a.effectivity) < String(b.effectivity) ? -1 : 1; }).slice(0, 3);
+    var effCard = card(head("Approaching effectivity") +
+      (effSorted.length
+        ? '<div class="stack-3">' + effSorted.map(function (x) {
+            return '<div class="task"><span class="c-ico" style="color:var(--blue)">' + icon("rocket", 22) + '</span>' +
+              '<div class="t-main"><div class="t-name">Target effectivity ' + fmtDate(x.effectivity) + '</div>' +
+              '<div class="t-reason">' + esc(x.client) + ' · ' + esc(x.caseNo) + ' · Stage ' + x.stageId + ' — ' + esc(x.stageName) + '</div></div>' +
+              btn(x.readonly ? "View case" : "Open case", { size: "sm", nav: x.route }) + '</div>';
+          }).join("") + '</div>'
+        : '<div class="muted">No upcoming effectivity dates.</div>'));
+
+    return '<div class="stack-6">' +
+      U.pageHead("Sales Tracker", "Your Corporate New Business pipeline at a glance — what's moving, what's waiting, and what needs you.") +
+      '<div class="row between"><span class="muted" style="font-size:13.5px">' + list.length + ' active case' + (list.length === 1 ? "" : "s") + '</span>' +
+      '<a href="#/new" class="btn btn-primary btn-sm">' + icon("plus", 16) + '<span>Create New Business</span></a></div>' +
+      stats + pipeline + attentionCard + waitingCard + effCard +
+      '<p class="tiny muted">All displayed client data is fictional, for demonstration only.</p></div>';
+  }
+
+  // Cross-case Sales-owned queues. These are entry points into work, NOT a
+  // duplicate of the in-case stage editor — each row opens the real case.
+  var WORK_QUEUES = {
+    quotation:  { title: "Quotations", stageId: 2, icon: "calc",
+      sub: "Cases in quotation — requirements, actuarial pricing (ACCUSA) and internal pricing approval.",
+      note: "Actuarial computes rates; you track the request, answer clarifications and approve pricing here." },
+    proposal:   { title: "Proposals and Negotiations", stageId: 3, icon: "handshake",
+      sub: "Proposals out with clients and active negotiations.",
+      note: "You own the proposal and the client conversation. Every revision is versioned in the case." },
+    contract:   { title: "Contracts and KYC", stageId: 4, icon: "gavel",
+      sub: "Contracts with Legal and KYC / compliance clearance.",
+      note: "Legal drafts and closes the contract; Compliance clears KYC. You track status — you don't edit their work." },
+    activation: { title: "Activation and Handover", stageId: 7, icon: "rocket",
+      sub: "Cases approaching go-live and operational handover.",
+      note: "Account Services activates once every control passes. You confirm readiness and hand over." }
+  };
+  function workQueue(c, key) {
+    var q = WORK_QUEUES[key];
+    if (!q) return { title: "Work queue", body: sectionShell("Not found", "That work queue doesn't exist.",
+      actionbar(btn("Back to Sales Tracker", { variant: "primary", nav: "#/sales-tracker" }))) };
+    var rows = collectCases(c).filter(function (x) { return !x.done && x.stageId === q.stageId; });
+    // Map a matched live case to its real section so "Open" lands in context.
+    var section = ({ quotation: "quotation", proposal: "proposal", contract: "contract", activation: "activation" })[key];
+
+    var body = '<div class="stack-6">' +
+      U.pageHead(q.title, q.sub) +
+      banner("info", "How this works for Sales", q.note + " Open any case to view details; editing depends on your role.") +
+      card(head(q.title + " (" + rows.length + ")", pill(rows.length ? "In progress" : "Not started", rows.length ? "info" : "neutral")) +
+        (rows.length
+          ? '<div class="stack-3">' + rows.map(function (x) {
+              var r = Object.assign ? Object.assign({}, x) : x;
+              if (x.live && section) r.route = "#/case/" + section;
+              return caseRow(r, q.icon, x.status === "Blocked" ? "red" : "blue");
+            }).join("") + '</div>'
+          : '<div class="muted">No cases are in ' + esc(q.title.toLowerCase()) + ' right now. New Business you start will appear here as it reaches this stage.</div>')) +
+      actionbar(btn("Create New Business", { variant: "primary", icon: "plus", nav: "#/new" }),
+        btn("Back to Sales Tracker", { variant: "ghost", icon: "arrowLeft", nav: "#/sales-tracker" })) +
+      '<p class="tiny muted">All displayed client data is fictional, for demonstration only.</p></div>';
+    return { title: q.title, body: body };
+  }
+
+  /* ============================================================
      MODULE + REPORT placeholders (honest, navigable, never dead)
      ============================================================ */
   var MODULES = {
-    "account-maintenance": { title: "Account Maintenance", icon: "building", desc: "Maintain existing corporate accounts — company details, contacts and status.", scope: "Part of HMS3 Maintenance. Represented here for navigation; out of scope for the Corporate New Business flow." },
-    "agent-broker": { title: "Agent/Broker Maintenance", icon: "users", desc: "Maintain intermediaries, AOR/BOR authority and commission setup.", scope: "Part of HMS3 Maintenance. Represented here for navigation." },
-    "eligibility": { title: "Eligibility", icon: "shieldCheck", desc: "Maintain eligibility rules used across accounts.", scope: "Part of HMS3 Maintenance. Represented here for navigation." },
-    "rates": { title: "Rate's Creation", icon: "calc", desc: "Create and maintain the rate tables actuarial pricing draws from.", scope: "Part of HMS3 Maintenance. Represented here for navigation." },
-    "plan-types": { title: "Plan Type Management", icon: "layers", desc: "Define and maintain plan types available to new business.", scope: "Part of HMS3 Maintenance. Represented here for navigation." },
-    "plan-code-viewer": { title: "Plan Code Viewer", icon: "calc", desc: "Look up approved plan codes across accounts.", scope: "Part of HMS3 Inquiry. Plan codes for the active case live in the case's Plan Codes section." },
-    "sob-viewing": { title: "SOB Viewing", icon: "layers", desc: "View schedules of benefits across accounts.", scope: "Part of HMS3 Inquiry. The active case's SOB lives in its SOB and Benefits section." }
+    "account-maintenance": { title: "Account Maintenance", icon: "building", desc: "Maintain existing corporate accounts — company details, contacts and status.", scope: "Part of HMS3 Accounts. Represented here for navigation; out of scope for the Corporate New Business flow." },
+    "additional-affiliates": { title: "Additional Affiliates", icon: "users", desc: "Add affiliate / sub-accounts to an existing corporate account.", scope: "Part of HMS3 Accounts. For a case in progress, affiliates are added inside the case's Account Setup section (separate or shared SOB, billing and Plan Codes)." },
+    "agent-broker": { title: "Agent/Broker Maintenance", icon: "users", desc: "Maintain intermediaries, AOR/BOR authority and commission setup.", scope: "Part of HMS3 Sales Tools. Represented here for navigation." },
+    "eligibility": { title: "Eligibility", icon: "shieldCheck", desc: "Maintain eligibility rules used across accounts.", scope: "Part of HMS3 Sales Tools. Represented here for navigation." },
+    "rates": { title: "Rate Creation", icon: "calc", desc: "Create and maintain the rate tables actuarial pricing draws from.", scope: "Part of HMS3 Sales Tools (legacy “Rate's Creation”). Represented here for navigation." },
+    "plan-types": { title: "Plan Type Management", icon: "layers", desc: "Define and maintain plan types available to new business.", scope: "Part of HMS3 Sales Tools. Represented here for navigation." },
+    "plan-code-viewer": { title: "Plan Code Viewer", icon: "calc", desc: "Look up approved plan codes across accounts.", scope: "Part of HMS3 Sales Tools. Plan codes for the active case live in the case's Plan Codes section." },
+    "sob-viewing": { title: "SOB Viewer", icon: "layers", desc: "View schedules of benefits across accounts (legacy “SOB Viewing (Finalize)”).", scope: "Part of HMS3 Sales Tools. The active case's SOB lives in its SOB and Benefits section." }
   };
   function modulePage(c, key) {
     var m = MODULES[key] || { title: "Module", icon: "circle", desc: "This module is represented for navigation.", scope: "Out of scope for the Corporate New Business prototype." };
@@ -1234,6 +1380,46 @@
   }
 
   function reportPage(c, key) {
+    // --- New Business Pipeline: live view over active cases by stage ---
+    if (key === "pipeline") {
+      var plist = collectCases(c).filter(function (x) { return !x.done; });
+      var byStage = {};
+      M.STAGES.forEach(function (s) { byStage[s.id] = 0; });
+      plist.forEach(function (x) { byStage[x.stageId] = (byStage[x.stageId] || 0) + 1; });
+      var pbody = '<div class="stack-6">' + U.pageHead("New Business Pipeline", "Every active Corporate New Business case, grouped by stage.") +
+        '<div class="grid-4">' + statCard(plist.length, "Active cases") +
+          statCard(plist.filter(function (x) { return x.waiting === "client"; }).length, "With the client", "amber") +
+          statCard(plist.filter(function (x) { return x.waiting === "team"; }).length, "With other teams") +
+          statCard(plist.filter(function (x) { return x.status === "Blocked"; }).length, "Blocked", "red") + '</div>' +
+        card(head("By stage") + '<div class="stack-3">' + M.STAGES.map(function (s) {
+          return '<div class="pl-row"><span class="pl-stage"><b>' + s.id + '</b> ' + esc(s.name) + '</span>' +
+            '<span class="pl-n' + (byStage[s.id] ? "" : " zero") + '">' + byStage[s.id] + '</span></div>';
+        }).join("") + '</div>') +
+        card(head("All active cases (" + plist.length + ")") +
+          '<div class="table-wrap"><table class="dtable"><thead><tr>' +
+          '<th scope="col">Case</th><th scope="col">Client</th><th scope="col">Stage</th><th scope="col">Owner</th><th scope="col">Status</th></tr></thead><tbody>' +
+          plist.map(function (x) {
+            return '<tr><td style="font-weight:600">' + esc(x.caseNo) + '</td><td>' + esc(x.client) + '</td><td>' + x.stageId + ' — ' + esc(x.stageName) + '</td><td>' + esc(x.owner) + '</td><td>' + pill(x.status) + '</td></tr>';
+          }).join("") + '</tbody></table></div>') +
+        '<p class="tiny muted">All displayed client data is fictional, for demonstration only.</p></div>';
+      return { title: "New Business Pipeline", body: pbody };
+    }
+    // --- Accounts Approaching Effectivity: soonest go-live first ---
+    if (key === "approaching-effectivity") {
+      var elist = collectCases(c).filter(function (x) { return !x.done; })
+        .sort(function (a, b) { return String(a.effectivity) < String(b.effectivity) ? -1 : 1; });
+      var ebody = '<div class="stack-6">' + U.pageHead("Accounts Approaching Effectivity", "Cases ordered by target effectivity date — soonest go-live first.") +
+        card(head("Upcoming effectivity (" + elist.length + ")") +
+          (elist.length
+            ? '<div class="table-wrap"><table class="dtable"><thead><tr>' +
+              '<th scope="col">Effectivity</th><th scope="col">Case</th><th scope="col">Client</th><th scope="col">Stage</th><th scope="col">Status</th></tr></thead><tbody>' +
+              elist.map(function (x) {
+                return '<tr><td style="font-weight:600">' + fmtDate(x.effectivity) + '</td><td>' + esc(x.caseNo) + '</td><td>' + esc(x.client) + '</td><td>' + x.stageId + ' — ' + esc(x.stageName) + '</td><td>' + pill(x.status) + '</td></tr>';
+              }).join("") + '</tbody></table></div>'
+            : '<div class="muted">No active cases with a target effectivity date.</div>')) +
+        '<p class="tiny muted">All displayed client data is fictional, for demonstration only.</p></div>';
+      return { title: "Accounts Approaching Effectivity", body: ebody };
+    }
     var title = key === "franchise-by-agent" ? "Franchise by Agent"
       : key === "franchise-by-sales" ? "Franchise by Sales" : "Franchise List";
     // Real summary over the fictional franchise register — count by status.
@@ -1265,6 +1451,7 @@
     caseProposal: caseProposal, caseNegotiation: caseNegotiation, caseContract: caseContract,
     caseOnboarding: caseOnboarding, caseSob: caseSob, casePlanCodes: casePlanCodes, caseMemberData: caseMemberData,
     caseBilling: caseBilling, caseActivation: caseActivation, caseHistory: caseHistory,
+    salesTracker: salesTracker, workQueue: workQueue,
     stageIcon: stageIcon, fmtDate: fmtDate
   };
 })(window);
