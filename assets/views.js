@@ -1,8 +1,9 @@
 /* ============================================================
-   HMS3 · Corporate New Business — screens
-   Each screen: a clear title + supporting text, a calm body
-   (cards / checklist / steps), and ONE primary action.
-   Case sections use progressive disclosure keyed off flags.
+   HMS3 · Corporate New Business — screens (Lead → Handover)
+   Each screen: clear title + supporting text, a calm grouped
+   body (cards / checklist / steps / comparison), and ONE
+   primary action. Case sections use progressive disclosure
+   keyed off milestone flags. Complexity lives in the system.
    ============================================================ */
 (function (global) {
   "use strict";
@@ -10,756 +11,894 @@
   var U = global.UI, M = global.HMS;
   var icon = U.icon, btn = U.btn, pill = U.statusPill, banner = U.banner, esc = U.esc;
 
-  /* ---------- small local helpers ---------- */
+  /* ---------- local helpers ---------- */
   function card(inner, cls) { return '<section class="card ' + (cls || "") + '">' + inner + '</section>'; }
   function actionbar(primary, secondary) {
     return '<div class="actionbar">' + (secondary || "") + '<span class="spacer"></span>' + primary + '</div>';
   }
   function owner(name) { return '<span class="muted">Owner: <b style="color:var(--text)">' + esc(name) + '</b></span>'; }
+  function head(title, inner) { return '<div class="card-head"><h3>' + esc(title) + '</h3>' + (inner || "") + '</div>'; }
+  function sectionShell(title, sub, body) {
+    return '<div class="stack-5"><header class="stack-2"><h1 class="page-title">' + esc(title) + '</h1>' +
+      (sub ? '<p class="page-sub">' + sub + '</p>' : '') + '</header>' + body + '</div>';
+  }
+  function statCard(n, label, tone) {
+    var color = tone === "green" ? "var(--green)" : tone === "amber" ? "var(--amber)" : tone === "red" ? "var(--red)" : "var(--text)";
+    return '<div class="card soft" style="text-align:center;padding:18px"><div style="font-size:30px;font-weight:700;letter-spacing:-.02em;color:' + color + '">' +
+      esc(String(n)) + '</div><div class="muted" style="font-size:13px;margin-top:2px">' + esc(label) + '</div></div>';
+  }
+  function choice(id, title, desc, selected) {
+    return '<div class="choice' + (selected ? " selected" : "") + '" data-choice="' + id + '" role="button" tabindex="0" aria-pressed="' + (selected ? "true" : "false") + '">' +
+      '<span class="radio"></span><span><span class="c-title">' + esc(title) + '</span>' +
+      '<span class="c-desc">' + esc(desc) + '</span></span></div>';
+  }
+  function comparisonTable(headers, rows) {
+    return '<table class="ctable"><thead><tr>' + headers.map(function (h) { return '<th scope="col">' + esc(h) + '</th>'; }).join("") +
+      '</tr></thead><tbody>' + rows.map(function (r) {
+        return '<tr' + (r.flag ? ' class="diff"' : '') + '><th scope="row" style="font-weight:600">' + esc(r[0]) + '</th>' +
+          '<td>' + esc(r[1]) + '</td>' +
+          '<td>' + (r.flag ? '<span class="tor-flag">' + icon("alert", 13) + ' ' + esc(r[2]) + '</span>'
+            : '<span class="match">' + icon("check", 14) + ' ' + esc(r[2]) + '</span>') + '</td></tr>';
+      }).join("") + '</tbody></table>';
+  }
+  function reveal(label, inner) {
+    return '<details class="reveal"><summary>' + icon("info", 18) + esc(label) +
+      '<span class="chev">' + icon("chevron", 16) + '</span></summary><div class="reveal-body">' + inner + '</div></details>';
+  }
 
   /* ============================================================
-     HOME
+     HOME / MY WORK
      ============================================================ */
   function home(c) {
     var ns = M.nextStep(c);
-    var started = c.flags.franchiseCreated;
+    var started = c.flags.leadCaptured || c.meta.caseNo;
     var cur = M.currentStage(c);
 
     var continueCard = started
-      ? '<a class="card card-link" href="' + ns.route + '">' +
-          '<div class="row between"><div class="eyebrow">Continue where you left off</div>' +
-          pill(cur.statusText) + '</div>' +
-          '<div class="row mt-3" style="gap:14px">' + U.medallion("briefcase", "blue") +
-            '<div><div class="section-title">' + esc(c.meta.client) + '</div>' +
-            '<div class="muted" style="font-size:13.5px">' + esc(c.meta.accountRef || c.meta.franchiseRef || "New franchise") +
-            ' · Stage ' + cur.stage.id + ' of 7 — ' + esc(cur.stage.name) + '</div></div></div>' +
+      ? '<a class="card card-link" href="' + ns.route + '"><div class="row between">' +
+          '<div class="eyebrow">Continue where you left off</div>' + pill(cur.statusText) + '</div>' +
+          '<div class="row mt-3" style="gap:14px">' + U.medallion(stageIcon(cur.stage.id), "blue") +
+          '<div><div class="section-title">' + esc(c.meta.client) + '</div>' +
+          '<div class="muted" style="font-size:13.5px">' + esc(c.meta.caseNo || "New case") + ' · Stage ' + cur.stage.id +
+          ' of 7 — ' + esc(cur.stage.name) + '</div></div></div>' +
           '<div class="banner info mt-4"><span class="b-body"><b>Next:</b> ' + esc(ns.title) +
-            ' — <span class="muted" style="color:#2C56A6">' + esc(ns.desc) + '</span></span></div>' +
-        '</a>'
+          ' — <span style="color:#2C56A6">' + esc(ns.desc) + '</span></span></div></a>'
       : '<section class="card"><div class="row" style="gap:14px">' + U.medallion("sparkle", "blue") +
-          '<div><div class="section-title">Start a new corporate account</div>' +
-          '<div class="muted" style="font-size:14px">Create a franchise, then run the whole process — quotation, proposal, setup, contract and activation — inside one connected case.</div></div></div>' +
-          actionbar(btn("Create New Franchise", { variant: "primary", icon: "plus", nav: "#/franchise/new" })) +
-        '</section>';
+          '<div><div class="section-title">Start a New Business case</div>' +
+          '<div class="muted" style="font-size:14px">Run the whole journey — lead, quotation, proposal, contract, onboarding and activation — inside one connected case.</div></div></div>' +
+          actionbar(btn("Create New Business case", { variant: "primary", icon: "plus", nav: "#/new" })) + '</section>';
 
-    /* items requiring action — built from the live case + samples */
-    var actionItems = [];
-    if (started && ns.owner.indexOf("Sales") >= 0 || (started && ns.cta))
-      actionItems.push({ client: c.meta.client, ref: c.meta.accountRef || c.meta.franchiseRef,
-        text: ns.title, due: c.meta.effectivity, status: cur.statusText, route: ns.route });
-    M.SAMPLE_CASES.filter(function (s) { return s.status === "Action required"; }).forEach(function (s) {
-      actionItems.push({ client: s.client, ref: s.ref, text: s.next, due: s.due, status: s.status, route: "#/home" });
+    function group(title, rows, emptyMsg, iconName, tone) {
+      return card(head(title) + (rows.length
+        ? '<div class="stack-3">' + rows.map(function (r) {
+            return '<div class="task"><span class="c-ico" style="color:var(--' + (tone || "blue") + ')">' + icon(iconName, 22) + '</span>' +
+              '<div class="t-main"><div class="t-name">' + esc(r.text) + '</div>' +
+              '<div class="t-reason">' + esc(r.client) + ' · ' + esc(r.ref || "—") + (r.blocker ? ' · <span style="color:var(--amber)">Blocker: ' + esc(r.blocker) + '</span>' : '') + '</div>' +
+              '<div class="t-meta"><span>Due <b>' + fmtDate(r.due) + '</b></span>' + pill(r.status) + '</div></div>' +
+              btn("Open case", { size: "sm", nav: r.route || "#/home" }) + '</div>';
+          }).join("") + '</div>'
+        : '<div class="muted">' + esc(emptyMsg) + '</div>'));
+    }
+
+    var actionRows = [], clientRows = [], teamRows = [], effRows = [];
+    if (started && !c.flags.handoverComplete) {
+      var row = { text: ns.title, client: c.meta.client, ref: c.meta.caseNo, due: c.meta.effectivity, status: cur.statusText, route: ns.route };
+      if (cur.statusText === "Waiting for client") clientRows.push(row);
+      else if (cur.statusText.indexOf("another team") >= 0) teamRows.push(row);
+      else actionRows.push(row);
+    }
+    M.SAMPLE_CASES.forEach(function (sx) {
+      var r = { text: sx.next, client: sx.client, ref: sx.caseNo, due: sx.due, status: sx.status, blocker: sx.blocker, route: "#/home" };
+      if (sx.waiting === "client") clientRows.push(r);
+      else if (sx.waiting === "team") teamRows.push(r);
+      else actionRows.push(r);
+      effRows.push({ text: "Target effectivity " + fmtDate(sx.effectivity), client: sx.client, ref: sx.caseNo, due: sx.effectivity, status: sx.status, route: "#/home" });
     });
+    if (started) effRows.unshift({ text: "Target effectivity " + fmtDate(c.meta.effectivity), client: c.meta.client, ref: c.meta.caseNo, due: c.meta.effectivity, status: cur.statusText, route: "#/case/summary" });
 
-    var actionList = actionItems.length
-      ? actionItems.map(function (it) {
-          return '<div class="task"><span class="c-ico" style="color:var(--amber)">' + icon("alert", 22) + '</span>' +
-            '<div class="t-main"><div class="t-name">' + esc(it.text) + '</div>' +
-            '<div class="t-reason">' + esc(it.client) + ' · ' + esc(it.ref || "—") + '</div>' +
-            '<div class="t-meta"><span>Due <b>' + fmtDate(it.due) + '</b></span>' + pill(it.status) + '</div></div>' +
-            btn("Open", { size: "sm", nav: it.route }) + '</div>';
-        }).join("")
-      : '<div class="muted">Nothing needs your attention right now.</div>';
-
-    var sampleCards = M.SAMPLE_CASES.map(function (s) {
+    var sampleCards = M.SAMPLE_CASES.map(function (sx) {
       return '<a class="card card-link" href="#/home"><div class="row between">' +
-        '<div class="eyebrow" style="color:var(--text-3)">' + esc(s.ref) + '</div>' + pill(s.status) + '</div>' +
-        '<div class="section-title mt-2">' + esc(s.client) + '</div>' +
-        '<div class="muted" style="font-size:13.5px;margin-top:2px">Stage — ' + esc(s.stage) + '</div>' +
-        '<div class="mt-4" style="font-size:13.5px"><span class="muted">Next:</span> ' + esc(s.next) + '</div>' +
-        '<div class="t-meta mt-3"><span class="tiny">' + icon("user", 13) + ' ' + esc(s.owner) + '</span>' +
-          '<span class="tiny">' + icon("clock", 13) + ' Due ' + fmtDate(s.due) + '</span></div></a>';
+        '<div class="eyebrow" style="color:var(--text-3)">' + esc(sx.caseNo) + '</div>' + pill(sx.status) + '</div>' +
+        '<div class="section-title mt-2">' + esc(sx.client) + '</div>' +
+        '<div class="muted" style="font-size:13px;margin-top:2px">' + esc(sx.channel) + ' · ' + esc(sx.stage) + '</div>' +
+        '<div class="mt-4" style="font-size:13.5px"><span class="muted">Next:</span> ' + esc(sx.next) + '</div>' +
+        '<div class="t-meta mt-3"><span class="tiny">' + icon("user", 13) + ' ' + esc(sx.owner) + '</span>' +
+        '<span class="tiny">' + icon("clock", 13) + ' Due ' + fmtDate(sx.due) + '</span></div></a>';
     }).join("");
 
     return '<div class="stack-6">' +
-      U.pageHead("Welcome back, A. Reyes",
-        "Here's where your corporate new-business work stands today. Pick up where you left off, or start something new.") +
+      U.pageHead("Welcome back, A. Reyes", "Here's your corporate new-business work. Pick up where you left off, or start something new.") +
       continueCard +
-      card('<div class="card-head"><h3>Items requiring your action</h3>' +
-        '<a href="#/tasks" class="btn btn-ghost btn-sm">View all</a></div>' +
-        '<div class="stack-3">' + actionList + '</div>') +
-      '<div><div class="row between mt-2" style="margin-bottom:12px"><h3 class="section-title">Recently updated cases</h3>' +
-        '<a href="#/new" class="btn btn-ghost btn-sm">' + icon("plus", 16) + '<span>New franchise</span></a></div>' +
+      group("Tasks requiring your action", actionRows, "Nothing needs your action right now.", "alert", "amber") +
+      '<div class="grid-2">' +
+        group("Waiting for the client", clientRows, "Nothing is with a client.", "clock", "amber") +
+        group("Waiting for another team", teamRows, "Nothing is with another team.", "users", "blue") +
+      '</div>' +
+      group("Cases approaching effectivity", effRows.slice(0, 3), "No upcoming effectivity dates.", "rocket", "blue") +
+      '<div><div class="row between" style="margin-bottom:12px"><h3 class="section-title">Recently updated cases</h3>' +
+        '<a href="#/new" class="btn btn-ghost btn-sm">' + icon("plus", 16) + '<span>New Business case</span></a></div>' +
         '<div class="grid-3">' + sampleCards + '</div></div>' +
       '</div>';
   }
 
   /* ============================================================
-     NEW BUSINESS — search for existing company (exception: found)
+     GLOBAL SEARCH / NEW BUSINESS ENTRY (duplicate checking)
      ============================================================ */
+  function searchResults(query) {
+    return '<div class="stack-3">' +
+      resultRow("building", "blue", "Northwind Manufacturing Corporation", "Existing company · TIN 009-842-337-000", "No active account", "Possible duplicate",
+        btn("Use existing company", { size: "sm", act: "lead:usecompany" })) +
+      resultRow("flag", "amber", "Northwind Mfg. Corp.", "Existing franchise FR-2025-00981 · Expired", "Franchise expired 2025-12-01", "No conflict", "") +
+      resultRow("briefcase", "gray", "Northstar Industrial (different TIN)", "Different legal entity", "Unrelated", "No conflict",
+        btn("Confirm different entity", { size: "sm", variant: "ghost", act: "noop" })) +
+    '</div>';
+  }
+  function resultRow(ic, tone, title, sub, detail, tag, action) {
+    var tagKind = tag === "Possible duplicate" ? "warn" : tag === "No conflict" ? "success" : "neutral";
+    return '<div class="task"><span class="medallion ' + tone + '" style="width:40px;height:40px">' + icon(ic, 20) + '</span>' +
+      '<div class="t-main"><div class="t-name">' + esc(title) + ' ' + pill(tag, tagKind) + '</div>' +
+      '<div class="t-reason">' + esc(sub) + '</div>' +
+      '<div class="t-meta"><span>' + esc(detail) + '</span></div></div>' + (action || "") + '</div>';
+  }
+
   function newBusiness(c) {
-    return '<div class="stack-6">' +
-      U.pageHead("New Business", "Before creating a franchise, check whether the company already exists in HMS3 so you don't duplicate records.", "Step 1 of the process") +
+    var has = c.meta.caseNo;
+    return sectionShell("New Business", "Before creating a case, search for existing company, franchise, account, affiliate or intermediary records so you never duplicate.",
       card(
-        '<label class="field" style="margin:0"><span style="font-weight:600">Search for a company</span>' +
+        '<label class="field" style="margin:0"><span style="font-weight:600">Search company, TIN, franchise, account, affiliate or Agent/Broker</span>' +
         '<div class="search-wrap mt-2">' + icon("search", 20) +
-        '<input class="input input-lg" id="coSearch" placeholder="Company name, e.g. Northwind" value="Northwind" />' +
-        '</div><span class="help mt-2">We check existing franchises so you can reuse a record instead of starting over.</span></label>' +
+        '<input class="input input-lg" id="coSearch" placeholder="e.g. Northwind, TIN, FR-…, ACC-…" value="Northwind" aria-describedby="coSearch_h" /></div>' +
+        '<span class="help mt-2" id="coSearch_h">We check existing records so you can reuse them instead of starting over. Results appear in under two seconds.</span></label>' +
         '<div class="divider"></div>' +
-        banner("info", "No existing franchise found for “Northwind”",
-          "You can create a new franchise for this company. If a match appears later, you'll be able to link to it.") +
-        actionbar(btn("Create New Franchise", { variant: "primary", icon: "plus", nav: "#/franchise/new" }),
+        '<div class="row between" style="margin-bottom:12px"><h3 style="font-size:15px;font-weight:650">3 possible matches</h3><span class="tiny">Found in 0.4s</span></div>' +
+        searchResults("Northwind") +
+        banner("warn", "Possible duplicate found", "A company with this name exists but has no active account. Reuse it, or confirm this is a different legal entity before creating a new company.") +
+        actionbar(
+          has ? btn("Continue current case", { variant: "primary", iconRight: "arrowRight", nav: "#/case/summary" })
+              : btn("Create New Business case", { variant: "primary", icon: "plus", act: "case:create" }),
           btn("Back to Home", { variant: "ghost", icon: "arrowLeft", nav: "#/home" }))
-      ) +
-      '</div>';
+      ));
+  }
+
+  function searchPage(c) {
+    return sectionShell("Search", "Find any company, franchise, account, affiliate or Agent/Broker across HMS3.",
+      card(
+        '<label class="field" style="margin:0"><span style="font-weight:600">Search</span>' +
+        '<div class="search-wrap mt-2">' + icon("search", 20) +
+        '<input class="input input-lg" placeholder="Company, TIN, registration, franchise, account, affiliate, Agent/Broker" value="Northwind" /></div></label>' +
+        '<div class="divider"></div>' + searchResults("Northwind")
+      ));
   }
 
   /* ============================================================
-     FRANCHISE — create wizard (3 steps)  #/franchise/new/{step}
-     ============================================================ */
-  function franchiseNew(c, step) {
-    step = step || "company";
-    var labels = ["Company", "Sales details", "Review"];
-    var idx = step === "company" ? 0 : step === "sales" ? 1 : 2;
-    var body;
-
-    if (step === "company") {
-      body = card(
-        U.wizardSteps(labels, 0) +
-        '<h2 class="section-title">Company details</h2>' +
-        '<p class="muted mt-2" style="margin-bottom:20px">Tell us who the client is. You only enter this once — it carries through the whole process.</p>' +
-        U.field({ label: "Registered company name", value: c.meta.client, required: true, help: "The legal name as registered." }) +
-        U.field({ label: "Trade name", value: c.meta.tradeName, help: "Optional — the name people know them by." }) +
-        '<div class="grid-2 mt-4" style="margin-top:0">' +
-          U.field({ label: "Industry", type: "select", value: c.meta.industry,
-            options: ["Manufacturing", "Logistics", "Retail", "Technology", "Healthcare", "Other"] }) +
-          U.field({ label: "Estimated members", type: "number", value: c.meta.members, help: "Rough headcount is fine for now." }) +
-        '</div>' +
-        actionbar(btn("Continue", { variant: "primary", iconRight: "arrowRight", nav: "#/franchise/new/sales" }),
-          btn("Cancel", { variant: "ghost", nav: "#/home" }))
-      );
-    } else if (step === "sales") {
-      body = card(
-        U.wizardSteps(labels, 1) +
-        '<h2 class="section-title">Sales details</h2>' +
-        '<p class="muted mt-2" style="margin-bottom:20px">How is this account being sold, and who do we talk to?</p>' +
-        '<div class="field"><label>Sales channel</label>' +
-        '<div class="stack-3 mt-2">' +
-          choice("ch-direct", "Direct", "Sold directly by Corporate Sales.", c.meta.channel === "Direct") +
-          choice("ch-broker", "Agent / Broker", "Sold through an accredited intermediary.", c.meta.channel !== "Direct") +
-        '</div></div>' +
-        '<div class="divider"></div>' +
-        U.field({ label: "Primary contact name", value: c.meta.contactName, required: true }) +
-        '<div class="grid-2" style="margin-top:0">' +
-          U.field({ label: "Contact email", type: "email", value: c.meta.contactEmail, required: true }) +
-          U.field({ label: "Contact phone", value: c.meta.contactPhone }) +
-        '</div>' +
-        actionbar(btn("Review", { variant: "primary", iconRight: "arrowRight", nav: "#/franchise/new/review" }),
-          btn("Back", { variant: "ghost", icon: "arrowLeft", nav: "#/franchise/new/company" }))
-      );
-    } else {
-      body = card(
-        U.wizardSteps(labels, 2) +
-        '<h2 class="section-title">Review and create</h2>' +
-        '<p class="muted mt-2" style="margin-bottom:20px">Check the details below. You can edit anything before creating the franchise.</p>' +
-        U.dl([
-          ["Company", c.meta.client],
-          ["Trade name", c.meta.tradeName],
-          ["Industry", c.meta.industry],
-          ["Estimated members", String(c.meta.members)],
-          ["Sales channel", c.meta.channel],
-          ["Primary contact", c.meta.contactName + " · " + c.meta.contactEmail]
-        ]) +
-        actionbar(btn("Create franchise", { variant: "primary", icon: "check", act: "franchise:create" }),
-          btn("Back", { variant: "ghost", icon: "arrowLeft", nav: "#/franchise/new/sales" }))
-      );
-    }
-
-    return '<div class="stack-5">' +
-      U.pageHead("Create a franchise", "A short, three-step form. We only ask for what we need.") +
-      body + '</div>';
-  }
-
-  function choice(id, title, desc, selected) {
-    return '<label class="choice' + (selected ? " selected" : "") + '" data-choice="' + id + '">' +
-      '<span class="radio"></span><span><span class="c-title">' + esc(title) + '</span>' +
-      '<span class="c-desc">' + esc(desc) + '</span></span></label>';
-  }
-
-  /* ============================================================
-     CASE · SUMMARY  (home of the case + 7-stage indicator)
+     CASE · SUMMARY
      ============================================================ */
   function caseSummary(c) {
-    var ns = M.nextStep(c);
-    var stages = M.stageSummary(c);
-    var cur = M.currentStage(c);
+    var ns = M.nextStep(c), cur = M.currentStage(c), stages = M.stageSummary(c);
+    var blocker = cur.statusText === "Blocked" ? "See the current stage" : (c.declined ? "Client declined — reopen in Negotiation" : "None");
 
-    var hero =
-      '<div class="hero"><span class="medallion blue" style="width:52px;height:52px">' + icon(stageIcon(cur.stage.id), 26) + '</span>' +
-      '<div><div class="h-eyebrow">Your next step</div><h2>' + esc(ns.title) + '</h2>' +
+    var hero = '<div class="hero"><span class="medallion blue" style="width:52px;height:52px">' + icon(stageIcon(cur.stage.id), 26) + '</span>' +
+      '<div><div class="h-eyebrow">Action required · what must happen next</div><h2>' + esc(ns.title) + '</h2>' +
       '<p>' + esc(ns.desc) + '</p>' +
       '<div class="h-meta"><span>' + icon("user", 14) + ' Owner <b>' + esc(ns.owner) + '</b></span>' +
-        '<span>' + icon("clock", 14) + ' Effectivity <b>' + fmtDate(c.meta.effectivity) + '</b></span></div></div>' +
-      (ns.cta ? btn(ns.cta, { variant: "primary", iconRight: "arrowRight", nav: ns.route }) : "") +
-      '</div>';
+      '<span>' + icon("clock", 14) + ' Due <b>' + fmtDate(c.meta.effectivity) + '</b></span>' +
+      '<span>' + icon("flag", 14) + ' Stage <b>' + cur.stage.id + ' of 7</b></span></div></div>' +
+      (ns.cta ? btn(ns.cta, { variant: "primary", iconRight: "arrowRight", nav: ns.route }) : "") + '</div>';
 
     var stageList = '<ol class="stages">' + stages.map(function (o, i) {
       var isLast = i === stages.length - 1;
       var node = o.state === "done" ? icon("check", 16) : '<span style="font-weight:700;font-size:13px">' + o.stage.id + '</span>';
-      return '<li class="stage ' + o.state + '">' +
-        '<div class="s-rail"><span class="s-node">' + node + '</span>' + (isLast ? '' : '<span class="s-line"></span>') + '</div>' +
-        '<div class="s-main"><div class="s-top"><span class="s-name">' + esc(o.stage.name) + '</span>' +
-        pill(o.statusText) + '</div>' +
+      return '<li class="stage ' + o.state + '"><div class="s-rail"><span class="s-node">' + node + '</span>' +
+        (isLast ? '' : '<span class="s-line"></span>') + '</div>' +
+        '<div class="s-main"><div class="s-top"><span class="s-name">' + esc(o.stage.name) + '</span>' + pill(o.statusText) + '</div>' +
         '<div class="s-meta"><span>Owner <b>' + esc(o.stage.owner) + '</b></span>' +
         (o.state === "current" ? '<span>Next <b>' + esc(ns.title) + '</b></span>' : '') + '</div></div></li>';
     }).join("") + '</ol>';
 
     return '<div class="stack-6">' + hero +
-      card('<div class="card-head"><h3>Process overview</h3><span class="muted" style="font-size:13px">7 stages · Effectivity ' + fmtDate(c.meta.effectivity) + '</span></div>' + stageList) +
+      card(head("Process overview", '<span class="muted" style="font-size:13px">7 stages · Effectivity ' + fmtDate(c.meta.effectivity) + '</span>') + stageList) +
       '<div class="grid-2">' +
-        card('<div class="card-head"><h3>Client</h3></div>' + U.dl([
-          ["Company", c.meta.client],
-          ["Franchise ref", c.meta.franchiseRef || "—"],
-          ["Account ref", c.meta.accountRef || "—"],
-          ["Members", String(c.meta.members)],
-          ["Channel", c.meta.channel]
+        card(head("Case") + U.dl([
+          ["Client", c.meta.client],
+          ["Case number", c.meta.caseNo || "—"],
+          ["Channel", c.meta.channel ? (c.meta.channel === "Direct" ? "Direct" : "Intermediary — " + c.meta.intermediary) : "Not set"],
+          ["Sales owner", c.meta.owner],
+          ["Requested effectivity", fmtDate(c.meta.effectivity)]
         ], true)) +
-        card('<div class="card-head"><h3>Key dates & people</h3></div>' + U.dl([
-          ["Effectivity", fmtDate(c.meta.effectivity)],
-          ["Case owner", c.meta.owner],
-          ["Primary contact", c.meta.contactName],
-          ["Current stage", "Stage " + cur.stage.id + " — " + cur.stage.name]
+        card(head("Status at a glance") + U.dl([
+          ["Current stage", "Stage " + cur.stage.id + " — " + cur.stage.name],
+          ["Next action", ns.title],
+          ["Owner", ns.owner],
+          ["Franchise validity", c.flags.franchiseApproved ? (c.meta.franchiseValidity + " · to " + fmtDate(c.meta.franchiseExpiry)) : "—"],
+          ["Accepted commercial version", c.flags.clientAccepted ? ("v" + (c.proposal ? c.proposal.version : 1) + " — " + optName(c)) : "Pending"],
+          ["Blocker", blocker]
         ], true)) +
       '</div>' +
+      card(head("Latest activity", '<a href="#/case/history" class="btn btn-ghost btn-sm">View History</a>') +
+        (c.activity.length ? miniActivity(c.activity.slice(0, 4)) : '<div class="muted">Nothing recorded yet.</div>')) +
       '</div>';
+  }
+  function miniActivity(items) {
+    return '<div class="stack-3">' + items.map(function (a) {
+      return '<div class="row" style="gap:10px;align-items:flex-start"><span style="color:var(--' + (a.automated ? "text-3" : "green") + ');margin-top:1px">' +
+        icon(a.automated ? "sparkle" : "check", 16) + '</span><div><div style="font-weight:550;font-size:14px">' + esc(a.title) +
+        (a.automated ? ' <span class="auto-tag">Automated</span>' : '') + '</div>' +
+        '<div class="tiny">' + esc(actorName(a.actor)) + ' · ' + esc(a.ts) + '</div></div></div>';
+    }).join("") + '</div>';
   }
 
   /* ============================================================
-     CASE · FRANCHISE  (create → requirements → approve)
+     CASE · LEAD  (capture + duplicate + channel/AOR routing)
+     ============================================================ */
+  function caseLead(c) {
+    var f = c.flags;
+    if (!f.leadCaptured) {
+      return sectionShell("Lead", "Record the opportunity and confirm the company before you build the case.",
+        card(head("Company", pill("Possible duplicate", "warn")) +
+          banner("warn", "A matching company exists", "“Northwind Manufacturing Corporation” is already in HMS3 with no active account. Reuse it so records stay connected.") +
+          resultRow("building", "blue", "Northwind Manufacturing Corporation", "TIN 009-842-337-000 · No active account", "Last seen 2025", "Possible duplicate",
+            btn("Use this company", { size: "sm", act: "noop" })) ) +
+        card(head("Lead details") +
+          U.field({ label: "How did this opportunity come to ValuCare?", type: "select", value: c.meta.leadSource, options: ["Referral", "Inbound enquiry", "Existing relationship", "Agent/Broker introduction"] }) +
+          U.field({ label: "Primary contact", value: c.meta.contactName }) +
+          U.field({ label: "Target effectivity", type: "text", value: fmtDate(c.meta.effectivity), readonly: true, help: "Dates downstream are calculated from this using configured turnaround times." }) +
+          actionbar(btn("Capture lead", { variant: "primary", icon: "check", act: "lead:capture" }),
+            btn("Back", { variant: "ghost", icon: "arrowLeft", nav: "#/new" }))));
+    }
+    if (!f.channelValidated) {
+      var isBroker = c.meta.channel === "Agent / Broker";
+      return sectionShell("Validate the sales channel", "How did this opportunity come to ValuCare? We only ask for the fields your channel needs.",
+        card(head("Channel") +
+          '<div class="stack-3">' +
+            choice("ch-direct", "Direct", "Sold directly by Corporate Sales. No intermediary.", c.meta.channel === "Direct") +
+            choice("ch-broker", "Agent / Broker", "Sold through an accredited intermediary — AOR/BOR applies.", isBroker) +
+          '</div>' +
+          '<div class="divider"></div>' +
+          (isBroker
+            ? '<div class="stack-4" data-when="broker">' +
+                U.field({ label: "Intermediary", value: c.meta.intermediary, help: "Search accredited Agents/Brokers." }) +
+                U.field({ label: "Representative", value: "R. Cruz" }) +
+                banner("warn", "AOR/BOR conflict detected", "Another broker holds an authority (AOR) for this company, expiring 2026-10-20. Resolve the conflict before proceeding.") +
+                '<div class="makerchecker"><div class="mc-pane"><div class="mc-role">Agreement status</div><div class="mc-name">Active</div><div class="tiny mt-2">Accreditation valid to 2027-03-31</div></div>' +
+                '<div class="mc-pane"><div class="mc-role">Competing authority</div><div class="mc-name" style="color:var(--amber)">Pinnacle vs Apex Brokers</div><div class="tiny mt-2">Apex AOR expires 2026-10-20</div></div></div>' +
+                '<div class="row" style="gap:10px"><button type="button" class="btn btn-sm" data-act="lead:resolveaor">Record conflict resolution</button>' +
+                '<span class="tiny muted" style="align-self:center">Upload or validate AOR/BOR</span></div>'
+              : '<div class="impact" data-when="direct"><b>Direct account</b><ul><li>Agent/Broker and AOR/BOR fields are hidden — they don\'t apply.</li><li>No commission setup required later.</li></ul></div>') +
+          actionbar(btn("Validate channel", { variant: "primary", icon: "check", act: "lead:channel" }))));
+    }
+    return sectionShell("Lead", "Lead captured and channel validated.",
+      banner("success", "Lead ready", "The opportunity is recorded and the channel is validated. You can create the franchise next.") +
+      card(head("Lead summary", pill("Completed")) + U.dl([
+        ["Company", c.meta.client],
+        ["Lead source", c.meta.leadSource],
+        ["Channel", c.meta.channel === "Direct" ? "Direct" : ("Intermediary — " + c.meta.intermediary + (c.meta.aorStatus ? " · AOR " + c.meta.aorStatus : ""))],
+        ["Primary contact", c.meta.contactName]
+      ], true)) +
+      actionbar(btn("Go to Franchise", { variant: "primary", iconRight: "arrowRight", nav: "#/case/franchise" })));
+  }
+
+  /* ============================================================
+     CASE · FRANCHISE
      ============================================================ */
   function caseFranchise(c) {
     var f = c.flags;
+    if (!f.channelValidated) return gatePage("Franchise", "Validate the sales channel first.", "Go to Lead", "#/case/lead");
     if (!f.franchiseCreated) {
-      return sectionShell("Franchise", "The company isn't set up yet.",
-        banner("info", "No franchise yet", "Create the franchise to begin. It only takes a moment.") +
-        actionbar(btn("Create franchise", { variant: "primary", icon: "plus", nav: "#/franchise/new" })));
-    }
-    var reqItems = [
-      { name: "Business registration certificate", meta: "Confirms the company is registered", key: "doc1" },
-      { name: "Authority to transact", meta: "Confirms who can sign for the company", key: "doc2" },
-      { name: "Primary contact confirmed", meta: c.meta.contactName + " · " + c.meta.contactEmail, key: "doc3" }
-    ];
-    if (!f.franchiseRequirementsComplete) {
-      return sectionShell("Franchise requirements", "Attach the documents that confirm the company and its authority.",
-        banner("success", "Franchise created", "Your franchise reference is " + (c.meta.franchiseRef || "FR-2026-00142") + ".") +
-        card('<div class="card-head"><h3>Required documents</h3>' + pill("Action required") + '</div>' +
-          '<div class="checklist">' + reqItems.map(function (r) {
-            return U.check({ name: r.name, meta: r.meta, state: "todo",
-              right: btn("Attach", { size: "sm", icon: "upload", act: "noop" }) });
-          }).join("") + '</div>' +
-          actionbar(btn("Mark requirements complete", { variant: "primary", icon: "check", act: "franchise:requirements" }))
-        ));
+      return sectionShell("Create the franchise", "A short guided form. We reuse the lead details — you only confirm coverage.",
+        card(U.wizardSteps(["Company", "Sales channel", "Coverage request", "Review"], 2) +
+          '<h2 class="section-title">Coverage request</h2>' +
+          '<p class="muted mt-2" style="margin-bottom:18px">Company and channel came from the lead. Tell us the coverage you\'re requesting.</p>' +
+          '<div class="grid-2" style="margin-top:0">' +
+            U.field({ label: "Product", type: "select", value: c.meta.product, options: ["Corporate Health Plan", "Corporate Health Plan + Dental"] }) +
+            U.field({ label: "Estimated members", type: "number", value: c.meta.members }) +
+          '</div>' +
+          U.field({ label: "Requested effectivity", value: fmtDate(c.meta.effectivity), readonly: true }) +
+          '<div class="divider"></div>' +
+          U.dl([["Company", c.meta.client], ["Channel", c.meta.channel], ["Contact", c.meta.contactName]], true) +
+          actionbar(btn("Create franchise", { variant: "primary", icon: "check", act: "franchise:create" }),
+            btn("Save draft", { variant: "ghost", act: "noop" }))));
     }
     if (!f.franchiseApproved) {
-      return sectionShell("Franchise approval", "The company record is ready for a quick internal review.",
-        card('<div class="card-head"><h3>Required documents</h3>' + pill("Completed") + '</div>' +
-          '<div class="checklist">' + reqItems.map(function (r) {
-            return U.check({ name: r.name, meta: r.meta, state: "done" });
-          }).join("") + '</div>') +
-        banner("info", "Ready for approval", "Submit the franchise so you can open the new-business account.") +
-        actionbar(btn("Submit for approval", { variant: "primary", iconRight: "arrowRight", act: "franchise:approve" })));
+      return sectionShell("Franchise approval", "The company record is ready for a maker-checker approval.",
+        banner("success", "Franchise created", "Your franchise reference is " + c.meta.franchiseRef + ".") +
+        card(head("Approval", pill("Under review")) +
+          '<div class="makerchecker"><div class="mc-pane"><div class="mc-role">Prepared by (maker)</div><div class="mc-name">A. Reyes · Corporate Sales</div><div class="tiny mt-2">Submitted just now</div></div>' +
+          '<div class="mc-pane"><div class="mc-role">Approver (checker)</div><div class="mc-name">M. Santos · Sales Manager</div><div class="tiny mt-2">Awaiting decision</div></div></div>' +
+          U.dl([["Validity", c.meta.franchiseValidity + " (configurable)"], ["Expiry", fmtDate(c.meta.franchiseExpiry)], ["Required pricing inputs", "Member Data, TOR, utilization, target rates"]], true) +
+          reveal("View approval options", '<div class="row" style="gap:10px"><button type="button" class="btn btn-sm" data-act="noop">Return for correction</button>' +
+            '<button type="button" class="btn btn-sm btn-danger" data-act="noop">Reject with reason</button>' +
+            '<button type="button" class="btn btn-sm" data-act="noop">Request extension</button></div>') +
+          actionbar(btn("Approve franchise", { variant: "primary", icon: "check", act: "franchise:approve" }),
+            '<span class="tiny muted" style="align-self:center">Approver action (maker-checker)</span>')));
     }
     return sectionShell("Franchise", "The company is set up and approved.",
-      banner("success", "Franchise approved", "Reference " + (c.meta.franchiseRef || "FR-2026-00142") + " is ready. You can now create the new-business account.") +
-      card('<div class="card-head"><h3>Company</h3>' + pill("Completed") + '</div>' + U.dl([
-        ["Company", c.meta.client], ["Reference", c.meta.franchiseRef || "FR-2026-00142"],
-        ["Industry", c.meta.industry], ["Channel", c.meta.channel]
-      ], true)) +
-      actionbar(btn(c.flags.accountCreated ? "Go to Requirements" : "Create new-business account",
-        { variant: "primary", iconRight: "arrowRight", nav: "#/case/requirements" })));
-  }
-
-  /* ============================================================
-     CASE · REQUIREMENTS  (account → account reqs → member data)
-     ============================================================ */
-  function caseRequirements(c) {
-    var f = c.flags;
-    if (!f.accountCreated) {
-      return sectionShell("New-business account", "Open the account that carries this opportunity to activation.",
-        banner("info", "Create the account", "This connects everything — quotation, proposal, setup and activation — into one case.") +
-        actionbar(btn("Create account", { variant: "primary", icon: "plus", act: "account:create" })));
-    }
-    if (!f.accountRequirementsComplete) {
-      return sectionShell("Account requirements", "A few details before we can load member data.",
-        banner("success", "New Business case created", "Your case reference is " + (c.meta.accountRef || "CNB-2026-00482") + ".") +
-        card('<div class="card-head"><h3>Confirm the basics</h3>' + pill("In progress") + '</div>' +
-          U.dl([["Product", c.meta.product], ["Requested effectivity", fmtDate(c.meta.effectivity)], ["Billing contact", c.meta.contactName]], true) +
-          '<div class="divider"></div>' +
-          '<div class="checklist">' +
-            U.check({ name: "Product selected", meta: c.meta.product, state: "done" }) +
-            U.check({ name: "Requested effectivity set", meta: fmtDate(c.meta.effectivity), state: "done" }) +
-            U.check({ name: "Billing contact confirmed", meta: c.meta.contactName, state: "current" }) +
-          '</div>' +
-          actionbar(btn("Mark requirements complete", { variant: "primary", icon: "check", act: "account:requirements" }))
-        ));
-    }
-    /* Member Data sub-flow (not "Census") with a validation exception */
-    var md = c.memberData;
-    if (!md.received) {
-      return memberDataShell(c,
-        banner("info", "Add Member Data", "Upload the list of members so we can validate it and prepare a quotation.") +
-        card('<div class="card-head"><h3>Member Data</h3>' + pill("Not started") + '</div>' +
-          '<div style="border:1.5px dashed var(--border);border-radius:12px;padding:32px;text-align:center">' +
-          '<span class="medallion blue" style="margin:0 auto 12px">' + icon("upload", 22) + '</span>' +
-          '<div style="font-weight:600">Upload member list</div>' +
-          '<div class="muted" style="font-size:13.5px;margin-top:4px">Accepts the standard member template. We\'ll check it for you.</div>' +
-          '<div class="actionbar" style="justify-content:center;border:none;margin-top:16px">' +
-            btn("Upload Member Data", { variant: "primary", icon: "upload", act: "memberdata:upload" }) + '</div></div>'));
-    }
-    if (md.issues > 0 && !md.fixed) {
-      return memberDataShell(c,
-        banner("warn", md.issues + " records need attention",
-          "Most records are fine. A few are missing a required field — fix them here, no spreadsheet needed.") +
-        card('<div class="card-head"><h3>Validation results</h3>' + pill("Action required") + '</div>' +
-          '<div class="grid-3">' +
-            statCard(md.received, "Received", "gray") +
-            statCard(md.valid, "Valid", "green") +
-            statCard(md.issues, "Need attention", "amber") +
-          '</div>' +
-          '<div class="divider"></div>' +
-          '<div class="checklist">' +
-            U.check({ name: "3 members missing date of birth", meta: "Required for eligibility and pricing", state: "current",
-              right: pill("Action required") }) +
-          '</div>' +
-          actionbar(btn("Fix and revalidate", { variant: "primary", icon: "check", act: "memberdata:fix" }),
-            btn("Download error list", { variant: "ghost", icon: "doc", act: "noop" }))));
-    }
-    if (!f.memberDataAccepted) {
-      return memberDataShell(c,
-        banner("success", "All records valid", "Member Data passed validation. Accept it to move on to eligibility and quotation.") +
-        card('<div class="card-head"><h3>Validation results</h3>' + pill("Completed") + '</div>' +
-          '<div class="grid-3">' +
-            statCard(md.received, "Received", "gray") +
-            statCard(md.received, "Valid", "green") +
-            statCard(0, "Need attention", "gray") +
-          '</div>') +
-        actionbar(btn("Accept Member Data", { variant: "primary", icon: "check", act: "memberdata:accept" })));
-    }
-    return memberDataShell(c,
-      banner("success", "Member Data accepted for quotation", "The group is ready to be reviewed and quoted.") +
-      card('<div class="card-head"><h3>Member Data</h3>' + pill("Completed") + '</div>' +
-        U.dl([["Members accepted", String(md.received)], ["Accepted for", "Eligibility & quotation"]], true)) +
-      actionbar(btn("Go to Eligibility", { variant: "primary", iconRight: "arrowRight", nav: "#/case/eligibility" })));
-  }
-
-  function memberDataShell(c, inner) {
-    return sectionShell("Member Data", "Upload and validate the member list for " + esc(c.meta.client) + ".", inner);
-  }
-
-  /* ============================================================
-     CASE · ELIGIBILITY  (outcome: eligible with review)
-     ============================================================ */
-  function caseEligibility(c) {
-    var f = c.flags;
-    if (!f.memberDataAccepted) {
-      return sectionShell("Eligibility", "We'll check eligibility once Member Data is accepted.",
-        banner("info", "Waiting for Member Data", "Accept Member Data first — then eligibility can be reviewed.") +
-        actionbar(btn("Go to Member Data", { variant: "primary", iconRight: "arrowRight", nav: "#/case/requirements" })));
-    }
-    if (!f.eligibilityComplete) {
-      return sectionShell("Eligibility review", "Confirm the group meets the rules to be quoted.",
-        card('<div class="card-head"><h3>Eligibility checks</h3>' + pill("Under review") + '</div>' +
-          '<div class="checklist">' +
-            U.check({ name: "Group size within range", meta: c.meta.members + " members", state: "done" }) +
-            U.check({ name: "Industry accepted", meta: c.meta.industry, state: "done" }) +
-            U.check({ name: "Age profile", meta: "A small number of members are above the standard band", state: "current",
-              right: pill("Under review") }) +
-          '</div>' +
-          banner("warn", "Eligible with review",
-            "The group can be quoted. One item — the age profile — will be flagged to Actuarial so pricing accounts for it. No action needed from the client.") +
-          actionbar(btn("Confirm eligibility", { variant: "primary", icon: "check", act: "eligibility:review" }))));
-    }
-    return sectionShell("Eligibility", "The group is cleared for quotation.",
-      banner("success", "Eligible with review", "The group is eligible. Actuarial has been notified about the age profile so pricing reflects it.") +
-      card('<div class="card-head"><h3>Outcome</h3>' + pill("Completed") + '</div>' + U.dl([
-        ["Outcome", "Eligible with review"], ["Members", String(c.meta.members)], ["Noted for pricing", "Age profile"]
-      ], true)) +
+      banner("success", "Franchise approved", "Reference " + c.meta.franchiseRef + " is valid for " + c.meta.franchiseValidity + ", to " + fmtDate(c.meta.franchiseExpiry) + ".") +
+      card(head("Franchise", pill("Completed")) + U.dl([
+        ["Company", c.meta.client], ["Reference", c.meta.franchiseRef], ["Validity", c.meta.franchiseValidity], ["Expiry", fmtDate(c.meta.franchiseExpiry)]
+      ], true) +
+      reveal("Franchise is approaching expiry?", banner("warn", "Request an extension", "If the quotation won't be ready before " + fmtDate(c.meta.franchiseExpiry) + ", request an extension to avoid auto-expiry.") +
+        '<button type="button" class="btn btn-sm mt-3" data-act="noop">Request extension</button>')) +
       actionbar(btn("Go to Quotation", { variant: "primary", iconRight: "arrowRight", nav: "#/case/quotation" })));
   }
 
   /* ============================================================
-     CASE · QUOTATION (submit → clarification → approved + options)
+     CASE · QUOTATION (requirements → submit → rate sheet → pricing)
      ============================================================ */
   function caseQuotation(c) {
     var f = c.flags, q = c.quotation;
-    if (!f.eligibilityComplete) {
-      return sectionShell("Quotation", "We'll request a quotation once eligibility is confirmed.",
-        banner("info", "Eligibility first", "Confirm eligibility, then you can submit the quotation request.") +
-        actionbar(btn("Go to Eligibility", { variant: "primary", iconRight: "arrowRight", nav: "#/case/eligibility" })));
+    if (!f.franchiseApproved) return gatePage("Quotation", "Approve the franchise first.", "Go to Franchise", "#/case/franchise");
+
+    if (!f.requirementsComplete) {
+      var broker = c.meta.channel === "Agent / Broker";
+      var reqs = [
+        { n: "Member Data (Master List)", m: "420 members · received", s: "done" },
+        { n: "TOR — Terms of Reference", m: "Converted to comparison baseline", s: "done" },
+        { n: "Utilization report", m: "12 months · received", s: "done" },
+        { n: "Target rates", m: "Client target provided", s: "done" },
+        { n: "Company documents", m: "Registration, authority", s: "current" }
+      ];
+      if (broker) reqs.push({ n: "Agent/Broker documents", m: "AOR/BOR, accreditation", s: "current" });
+      return sectionShell("Quotation requirements", "Collect everything Actuarial needs, then send one consolidated request.",
+        card(head("Requirements checklist", pill("Action required")) +
+          '<div class="checklist">' + reqs.map(function (r) {
+            return U.check({ name: r.n, meta: r.m, state: r.s, right: r.s === "done" ? pill("Completed") : btn("Attach", { size: "sm", icon: "upload", act: "noop" }) });
+          }).join("") + '</div>' +
+          banner("info", "TOR converted automatically", "HMS converted the TOR into a structured comparison baseline — used later to flag any benefit lower than the TOR.") +
+          actionbar(btn("Mark requirements complete", { variant: "primary", icon: "check", act: "quote:requirements" }),
+            btn("Send consolidated request to client", { variant: "ghost", icon: "arrowRight", act: "noop" }))));
     }
     if (!f.quotationSubmitted) {
-      return sectionShell("Quotation request", "Everything needed is ready. Send the request to Actuarial for pricing.",
-        card('<div class="card-head"><h3>Readiness</h3>' + pill("In progress") + '</div>' +
+      return sectionShell("Submit quotation request", "Replaces the external form — the request lives in the case.",
+        card(head("Readiness") +
           '<div class="checklist">' +
-            U.check({ name: "Member Data accepted", meta: c.meta.members + " members", state: "done" }) +
-            U.check({ name: "Eligibility confirmed", meta: "Eligible with review", state: "done" }) +
-            U.check({ name: "Product selected", meta: c.meta.product, state: "done" }) +
+            U.check({ name: "Franchise approved", meta: c.meta.franchiseRef, state: "done" }) +
+            U.check({ name: "Member Data (Master List) provided", meta: c.meta.members + " members", state: "done" }) +
+            U.check({ name: "TOR, utilization & target rates", meta: "All received", state: "done" }) +
+            U.check({ name: "Risk flags reviewed", meta: "Age profile noted for Actuarial", state: "done" }) +
           '</div>' +
-          banner("info", "Ready to submit", "You don't need to re-attach anything — the case already has it.") +
-          actionbar(btn("Submit quotation request", { variant: "primary", iconRight: "arrowRight", act: "quotation:submit" }))));
+          banner("info", "Nothing to re-attach", "The request reuses everything already in the case.") +
+          actionbar(btn("Submit quotation request", { variant: "primary", iconRight: "arrowRight", act: "quote:submit" }))));
     }
     if (q && q.status === "Clarification required" && !f.clarificationAnswered) {
-      return sectionShell("Quotation", "Actuarial needs one detail confirmed before pricing continues.",
-        quoteTimeline(c) +
-        card('<div class="card-head"><h3>Clarification from Actuarial</h3>' + pill("Action required") + '</div>' +
-          banner("warn", "One question from ACCUSA",
-            "“Can you confirm whether the 3 members above the standard age band are active employees or dependents?”") +
-          U.field({ label: "Your answer", type: "textarea", value: "All 3 are active employees.",
-            help: "Your answer is recorded in the case History — no email needed." }) +
-          actionbar(btn("Send answer", { variant: "primary", icon: "arrowRight", act: "quotation:answer" }))));
+      return sectionShell("Quotation", "Actuarial needs one detail before computing rates.",
+        quoteProgress(c) +
+        card(head("Clarification from Actuarial", pill("Action required")) +
+          banner("warn", "One question from ACCUSA", "“Confirm whether the 3 members above the standard age band are active employees or dependents.”") +
+          U.field({ label: "Your answer", type: "textarea", value: "All 3 are active employees.", help: "Recorded in History — no email needed." }) +
+          actionbar(btn("Send answer", { variant: "primary", icon: "arrowRight", act: "quote:answer" }))));
     }
-    if (!f.quotationApproved) {
-      return sectionShell("Quotation", "Actuarial is pricing the group.",
-        quoteTimeline(c) +
-        card('<div class="card-head"><h3>Status</h3>' + pill("Under review") + '</div>' +
-          banner("info", "Pricing in progress",
-            "ACCUSA is finalizing the rates. You'll be notified here when the quotation is approved — nothing to do right now.") +
+    if (!f.rateSheetReceived) {
+      return sectionShell("Quotation", "Actuarial is computing rates. Import the structured rate sheet when it arrives.",
+        quoteProgress(c) +
+        card(head("Rate sheet", pill("Waiting for another team")) +
+          banner("info", "Rates computed outside HMS for now", "Actuarial computes rates externally during this phase. HMS accepts a structured rate-sheet import so the data stays in the case.") +
           '<div class="mt-4">' + owner("ACCUSA · Actuarial") + '</div>') +
-        actionbar(btn("Mark quotation approved", { variant: "primary", icon: "check", act: "quotation:approve" }),
-          '<span class="tiny muted" style="align-self:center">Demo shortcut — normally Actuarial does this</span>'));
+        actionbar(btn("Import rate sheet", { variant: "primary", icon: "upload", act: "quote:ratesheet" })));
     }
-    /* approved — show options */
-    return sectionShell("Quotation approved", "ACCUSA has released two priced options for this group.",
-      quoteTimeline(c) +
+    if (!f.pricingApproved) {
+      return sectionShell("Check rates and approve pricing", "Review the rate sheet, add justification, and obtain internal approval.",
+        quoteProgress(c) +
+        card(head("Rate sheet v1", pill("Under review")) +
+          comparisonTable(["Plan", "Rate / member / mo", "vs target"], [
+            objRow("Standard", "₱320", "At target"),
+            objRow("Enhanced", "₱385", "Within 5% of target")
+          ]) +
+          U.field({ label: "Pricing justification", type: "textarea", value: "Rates reflect the age profile noted in eligibility; Enhanced recommended for benefit fit.", help: "Captured for the approval record." })) +
+        card(head("Internal approval (maker-checker)") +
+          '<div class="makerchecker"><div class="mc-pane"><div class="mc-role">Sales Manager</div><div class="mc-name">M. Santos</div>' + pill("Action required") + '</div>' +
+          '<div class="mc-pane"><div class="mc-role">Senior Management</div><div class="mc-name">Pending SM approval</div>' + pill("Not started") + '</div></div>') +
+        actionbar(btn("Approve pricing", { variant: "primary", icon: "check", act: "quote:approve" }),
+          '<span class="tiny muted" style="align-self:center">Records both approvals</span>'));
+    }
+    return sectionShell("Quotation approved", "Pricing is approved and ready to turn into a proposal.",
+      quoteProgress(c) +
+      banner("success", "Pricing approved", "Rate sheet v1 approved by Sales Manager and Senior Management.") +
+      '<p class="muted" style="font-size:13.5px">Choose the option to carry into the proposal and SOB. Enhanced is recommended.</p>' +
       '<div class="options">' +
-        optionCard("standard", "Standard", "320", ["Core inpatient & outpatient", "Standard room & board", "Nationwide network"], false) +
-        optionCard("enhanced", "Enhanced", "385", ["Everything in Standard", "Higher room & board", "Dental & optical add-on"], true) +
+        optionCard("standard", "Standard", "320", ["Core inpatient & outpatient", "Standard room & board", "Nationwide network"], false, c.chosenOption === "standard") +
+        optionCard("enhanced", "Enhanced", "385", ["Everything in Standard", "Higher room & board", "Dental & optical add-on"], true, c.chosenOption !== "standard") +
       '</div>' +
-      actionbar(btn("Build proposal from quotation", { variant: "primary", iconRight: "arrowRight", nav: "#/case/proposal" })));
+      actionbar(btn("Go to Proposal", { variant: "primary", iconRight: "arrowRight", nav: "#/case/proposal" })));
   }
-
-  function optionCard(id, name, rate, feats, recommended) {
-    return '<div class="option' + (recommended ? " recommended" : "") + '">' +
-      (recommended ? '<span class="o-badge">Recommended</span>' : "") +
-      '<div class="o-name">' + esc(name) + '</div>' +
+  function objRow(a, b, c2) { var r = [a, b, c2]; return r; }
+  function optName(c) { return c.chosenOption === "standard" ? "Standard" : "Enhanced"; }
+  function optionCard(id, name, rate, feats, rec, selected) {
+    return '<div class="option' + (rec ? " recommended" : "") + (selected ? " selected" : "") + '" data-choice="opt-' + id + '" role="button" tabindex="0" aria-pressed="' + (selected ? "true" : "false") + '" style="cursor:pointer">' +
+      (rec ? '<span class="o-badge">Recommended</span>' : "") +
+      '<div class="row between"><div class="o-name">' + esc(name) + '</div>' + (selected ? pill("Selected", "info") : '') + '</div>' +
       '<div class="o-rate">₱' + esc(rate) + ' <small>/ member / month</small></div>' +
-      '<ul>' + feats.map(function (ft) { return '<li>' + icon("check", 16) + '<span>' + esc(ft) + '</span></li>'; }).join("") + '</ul>' +
-      '</div>';
+      '<ul>' + feats.map(function (ft) { return '<li>' + icon("check", 16) + '<span>' + esc(ft) + '</span></li>'; }).join("") + '</ul></div>';
   }
-
-  function quoteTimeline(c) {
+  function quoteProgress(c) {
     var f = c.flags;
     var steps = [
       { t: "Request submitted", done: f.quotationSubmitted },
-      { t: "Clarification requested", done: true, auto: true, pending: false },
+      { t: "Clarification requested", done: f.quotationSubmitted, auto: true },
       { t: "Clarification answered", done: f.clarificationAnswered },
-      { t: "Pricing in progress", done: f.clarificationAnswered, auto: true },
-      { t: "Quotation approved", done: f.quotationApproved, auto: true }
+      { t: "Rate sheet received", done: f.rateSheetReceived, auto: true },
+      { t: "Pricing approved", done: f.pricingApproved }
     ];
-    return card('<div class="card-head"><h3>Quotation progress</h3></div><div class="timeline">' +
-      steps.map(function (s, i) {
-        var state = s.done ? "done" : (i > 0 && steps[i - 1].done ? "current" : "pending");
-        return '<div class="tl ' + state + '"><div class="tl-rail"><span class="tl-node">' +
-          (s.done ? icon("check", 13) : icon("circle", 13)) + '</span>' +
-          (i < steps.length - 1 ? '<span class="tl-line"></span>' : '') + '</div>' +
-          '<div class="tl-body"><div class="tl-title">' + esc(s.t) +
-          (s.auto ? '<span class="auto-tag">Automated</span>' : '') + '</div></div></div>';
-      }).join("") + '</div>');
+    return card(head("Quotation progress") + '<div class="timeline">' + timeline(steps) + '</div>');
   }
 
   /* ============================================================
-     CASE · PROPOSAL (generate → send → negotiate → decision)
+     CASE · PROPOSAL
      ============================================================ */
   function caseProposal(c) {
     var f = c.flags;
-    if (!f.quotationApproved) {
-      return sectionShell("Proposal", "You can build a proposal once the quotation is approved.",
-        banner("info", "Quotation needed", "Approve the quotation first, then generate the proposal.") +
-        actionbar(btn("Go to Quotation", { variant: "primary", iconRight: "arrowRight", nav: "#/case/quotation" })));
-    }
+    if (!f.pricingApproved) return gatePage("Proposal", "Approve pricing first.", "Go to Quotation", "#/case/quotation");
     var p = c.proposal || { version: 1 };
-    if (!f.proposalSent) {
-      return sectionShell("Prepare proposal", "Turn the approved quotation into a proposal for the client.",
-        card('<div class="card-head"><h3>Proposal v' + p.version + '</h3>' + pill("In progress") + '</div>' +
-          banner("info", "Generated from the approved quotation", "The proposal reuses the quotation — you don't re-enter benefits or pricing.") +
-          '<div class="divider"></div>' +
-          U.dl([["Client", c.meta.client], ["Recommended option", "Enhanced — ₱385 / member / month"],
-            ["Members", String(c.meta.members)], ["Proposed effectivity", fmtDate(c.meta.effectivity)]], true) +
-          actionbar(btn("Send proposal to client", { variant: "primary", iconRight: "arrowRight", act: "proposal:send" }),
-            btn("Preview", { variant: "ghost", icon: "doc", act: "noop" }))));
-    }
-    if (!f.clientAccepted && c.declined) {
-      return sectionShell("Proposal declined", "The client declined for now. The case is paused — nothing is lost, and you can reopen it.",
-        banner("warn", "Client declined proposal v" + p.version, "You can reopen the proposal to continue the conversation, revise it, or record a later acceptance.") +
-        card('<div class="card-head"><h3>What happens now</h3>' + pill("Waiting for client") + '</div>' +
-          '<p class="muted">Everything entered so far stays in the case. If the client comes back, reopen and pick up exactly where you left off.</p>') +
-        actionbar(btn("Reopen proposal", { variant: "primary", icon: "arrowLeft", act: "proposal:reopen" })));
-    }
-    if (!f.clientAccepted) {
-      return sectionShell("Proposal sent", "The proposal is with the client. Record their response here when it arrives.",
-        card('<div class="card-head"><h3>Proposal v' + p.version + '</h3>' + pill("Waiting for client") + '</div>' +
-          U.dl([["Sent", "Today"], ["Recommended option", "Enhanced"], ["Awaiting", c.meta.contactName]], true)) +
-        '<details class="reveal"><summary>' + icon("edit", 18) + 'Client asked for a change (negotiation)' +
-          '<span class="chev">' + icon("chevron", 16) + '</span></summary>' +
-          '<div class="reveal-body"><p class="muted" style="margin-bottom:12px">Record a benefit revision. We\'ll note the new version and flag any re-approval it needs — history is kept.</p>' +
-          banner("info", "Revision creates v" + (p.version + 1), "Switching to the Standard option changes pricing, so it's re-checked before re-sending.") +
-          '<div class="actionbar" style="border:none;margin-top:12px">' +
-          btn("Record revision & re-send", { variant: "secondary", icon: "edit", act: "proposal:revise" }) + '</div></div></details>' +
-        card('<div class="card-head"><h3>Record the client’s decision</h3></div>' +
-          '<div class="stack-3">' +
-            choice("dec-accept", "Client accepted", "They've agreed to the proposal as sent.", true) +
-            choice("dec-decline", "Client declined", "They've decided not to proceed for now.", false) +
+    if (!f.proposalGenerated) {
+      return sectionShell("Generate the proposal", "Built from the approved rate sheet, the TOR and the standard SOB template.",
+        card(head("Proposal source") +
+          '<div class="checklist">' +
+            U.check({ name: "Approved rate sheet v1", meta: "Standard ₱320 · Enhanced ₱385", state: "done" }) +
+            U.check({ name: "TOR comparison baseline", meta: "Benefits mapped", state: "done" }) +
+            U.check({ name: "Standard SOB template", meta: "Summary of Benefits", state: "done" }) +
           '</div>' +
-          actionbar(btn("Record acceptance", { variant: "primary", icon: "check", act: "proposal:accept" }),
-            btn("Record decline", { variant: "danger", act: "proposal:decline" }))));
+          banner("info", "Preliminary SOB content included", "The proposal carries preliminary Summary of Benefits content so the client sees the full picture.") +
+          actionbar(btn("Generate proposal", { variant: "primary", icon: "sparkle", act: "proposal:generate" }))));
     }
-    return sectionShell("Proposal accepted", "The client has accepted. The accepted version drives account setup.",
-      banner("success", "Client accepted proposal v" + p.version,
-        "Acceptance created the downstream tasks for Account Services, MDA, Legal and Billing — automatically.") +
-      card('<div class="card-head"><h3>Accepted proposal</h3>' + pill("Completed") + '</div>' + U.dl([
-        ["Accepted version", "v" + p.version], ["Chosen option", c.chosenOption === "standard" ? "Standard" : "Enhanced"],
-        ["Members", String(c.meta.members)], ["Effectivity", fmtDate(c.meta.effectivity)]
-      ], true)) +
-      actionbar(btn("Go to Account Setup", { variant: "primary", iconRight: "arrowRight", nav: "#/case/account" })));
+    if (!f.proposalSent) {
+      return sectionShell("Proposal ready", "Review and send the proposal to the client.",
+        card(head("Proposal v" + p.version, pill("In progress")) +
+          U.dl([["Client", c.meta.client], ["Recommended option", "Enhanced — ₱385 / member / month"], ["Members", String(c.meta.members)], ["Proposed effectivity", fmtDate(c.meta.effectivity)]], true) +
+          actionbar(btn("Send proposal to client", { variant: "primary", iconRight: "arrowRight", act: "proposal:send" }),
+            btn("Generate PDF", { variant: "ghost", icon: "doc", act: "noop" }))));
+    }
+    return sectionShell("Proposal sent", "The proposal is with the client. Track negotiation and record the decision in Negotiation.",
+      banner("success", "Proposal v" + p.version + " sent", "Shared with " + c.meta.contactName + ". You'll be notified of client activity.") +
+      card(head("Proposal", pill("Waiting for client")) + U.dl([["Version", "v" + p.version], ["Recommended", "Enhanced"], ["Sent", "Today"]], true)) +
+      actionbar(btn("Go to Negotiation", { variant: "primary", iconRight: "arrowRight", nav: "#/case/negotiation" })));
   }
 
   /* ============================================================
-     CASE · ACCOUNT SETUP (account record → member setup)
+     CASE · NEGOTIATION (versioning + decision)
      ============================================================ */
-  function caseAccount(c) {
+  function caseNegotiation(c) {
     var f = c.flags;
-    if (!f.clientAccepted) {
-      return sectionShell("Account Setup", "Account setup opens once the client accepts the proposal.",
-        banner("info", "Waiting for client decision", "Record the client's acceptance first.") +
-        actionbar(btn("Go to Proposal", { variant: "primary", iconRight: "arrowRight", nav: "#/case/proposal" })));
-    }
-    if (!f.accountRecordCreated) {
-      return sectionShell("Account record", "Account Services builds the account from the accepted proposal.",
-        banner("info", "Set up the account record", "Details come straight from the accepted proposal — no re-entry.") +
-        card('<div class="card-head"><h3>From the accepted proposal</h3></div>' + U.dl([
-          ["Client", c.meta.client], ["Option", c.chosenOption === "standard" ? "Standard" : "Enhanced"],
-          ["Members", String(c.meta.members)], ["Effectivity", fmtDate(c.meta.effectivity)]
+    if (!f.proposalSent) return gatePage("Negotiation", "Send the proposal first.", "Go to Proposal", "#/case/proposal");
+    var p = c.proposal || { version: 1 };
+    var versions = c.versions && c.versions.length ? c.versions : [{ v: 1, change: "Initial proposal", reason: "First offer", by: "A. Reyes", approver: "M. Santos", date: "Today", status: "Sent" }];
+
+    if (f.clientAccepted) {
+      return sectionShell("Negotiation complete", "The client has accepted. This is the commercial baseline for setup.",
+        banner("success", "Client accepted proposal v" + p.version, "Acceptance created downstream tasks for Account Services, MDA, Legal and Billing automatically.") +
+        card(head("Accepted baseline", pill("Completed")) + U.dl([
+          ["Accepted version", "v" + p.version], ["Chosen option", optName(c)], ["Members", String(c.meta.members)], ["Effectivity", fmtDate(c.meta.effectivity)]
         ], true)) +
-        actionbar(btn("Create account record", { variant: "primary", icon: "check", act: "account:record" })));
+        card(head("Version history") + versionTable(versions)) +
+        actionbar(btn("Go to Contract", { variant: "primary", iconRight: "arrowRight", nav: "#/case/contract" })));
     }
-    /* account record exists — show setup checklist, then member setup */
-    var setupDone = f.memberSetupComplete;
-    return sectionShell("Account Setup", "Build the account, plan codes, SOB and members.",
-      card('<div class="card-head"><h3>Setup checklist</h3>' + pill(setupDone ? "Completed" : "In progress") + '</div>' +
-        '<div class="checklist">' +
-          U.check({ name: "Account record created", meta: c.meta.accountRef, state: "done" }) +
-          U.check({ name: "Plan codes approved", meta: "Match to accepted option",
-            state: f.planCodesApproved ? "done" : "current",
-            right: f.planCodesApproved ? "" : btn("Open", { size: "sm", nav: "#/case/plancodes" }) }) +
-          U.check({ name: "Schedule of Benefits finalized", meta: "Checked against the proposal",
-            state: f.sobFinalized ? "done" : (f.planCodesApproved ? "current" : "todo"),
-            right: (f.planCodesApproved && !f.sobFinalized) ? btn("Open", { size: "sm", nav: "#/case/plancodes" }) : "" }) +
-          U.check({ name: "Member setup (MDA)", meta: "Load accepted members against plans",
-            state: f.memberSetupComplete ? "done" : (f.sobFinalized ? "current" : "todo") }) +
+    if (c.declined) {
+      return sectionShell("Proposal declined", "The client declined for now. The case is paused — nothing is lost.",
+        banner("warn", "Client declined proposal v" + p.version, "Reopen to continue the conversation, revise, or record a later acceptance.") +
+        card(head("Version history") + versionTable(versions)) +
+        actionbar(btn("Reopen proposal", { variant: "primary", icon: "arrowLeft", act: "nego:reopen" })));
+    }
+    return sectionShell("Negotiation", "Record revisions and the client's decision. Every change is versioned with full evidence.",
+      card(head("Version history", pill("Waiting for client")) + versionTable(versions)) +
+      reveal("Record a revision (client asked for a change)",
+        banner("info", "A revision creates v" + (p.version + 1), "Switching to Standard changes pricing, so it is re-checked before re-sending. Change, reason, requester, approver and date are all recorded.") +
+        '<button type="button" class="btn mt-3" data-act="nego:revise">' + icon("edit", 18) + '<span>Record revision & re-send</span></button>') +
+      card(head("Record the client's decision") +
+        '<div class="stack-3">' +
+          choice("dec-accept", "Client accepted", "Agreed to the proposal as sent.", true) +
+          choice("dec-decline", "Client declined", "Decided not to proceed for now.", false) +
         '</div>' +
-        (f.sobFinalized && !f.memberSetupComplete
-          ? actionbar(btn("Complete member setup", { variant: "primary", icon: "check", act: "member:setup" }))
-          : setupDone
-            ? actionbar(btn("Go to Contract", { variant: "primary", iconRight: "arrowRight", nav: "#/case/contract" }))
-            : "")
-      ));
+        actionbar(btn("Record acceptance", { variant: "primary", icon: "check", act: "nego:accept" }),
+          btn("Record decline", { variant: "danger", act: "nego:decline" }))));
   }
-
-  /* ============================================================
-     CASE · PLAN CODES AND SOB (comparison tables + exceptions)
-     ============================================================ */
-  function casePlanCodes(c) {
-    var f = c.flags;
-    if (!f.accountRecordCreated) {
-      return sectionShell("Plan Codes and SOB", "Available once the account record exists.",
-        banner("info", "Account record needed", "Create the account record first.") +
-        actionbar(btn("Go to Account Setup", { variant: "primary", iconRight: "arrowRight", nav: "#/case/account" })));
-    }
-    var opt = c.chosenOption === "standard" ? "Standard" : "Enhanced";
-    var planRows = [
-      ["Inpatient", "IP-" + opt.slice(0, 3).toUpperCase(), "Matches proposal", true],
-      ["Outpatient", "OP-" + opt.slice(0, 3).toUpperCase(), "Matches proposal", true],
-      ["Dental & optical", opt === "Enhanced" ? "DO-ENH" : "—", opt === "Enhanced" ? "Matches proposal" : "Not in option", true]
-    ];
-    if (!f.planCodesApproved) {
-      return sectionShell("Plan codes", "Confirm the plan codes match the accepted “" + opt + "” option.",
-        card('<div class="card-head"><h3>Plan codes vs accepted proposal</h3>' + pill("Under review") + '</div>' +
-          comparisonTable(["Benefit", "Plan code", "Check"], planRows) +
-          banner("success", "All plan codes match", "Each code lines up with the accepted option. Nothing to reconcile.")) +
-        actionbar(btn("Approve plan codes", { variant: "primary", icon: "check", act: "plancodes:approve" })));
-    }
-    if (!f.sobFinalized) {
-      var sobRows = [
-        ["Room & board", opt === "Enhanced" ? "Private" : "Semi-private", "Matches proposal", true],
-        ["Annual benefit limit", opt === "Enhanced" ? "₱500,000" : "₱300,000", "Matches proposal", true],
-        ["Dental & optical", opt === "Enhanced" ? "Included" : "Excluded", "Matches proposal", true]
-      ];
-      return sectionShell("Schedule of Benefits", "Check the SOB against the accepted proposal, then finalize.",
-        card('<div class="card-head"><h3>SOB vs accepted proposal</h3>' + pill("In progress") + '</div>' +
-          comparisonTable(["Benefit", "Schedule", "Check"], sobRows) +
-          banner("success", "SOB matches the proposal", "The schedule reflects exactly what the client accepted.")) +
-        actionbar(btn("Finalize SOB", { variant: "primary", icon: "check", act: "sob:finalize" })));
-    }
-    return sectionShell("Plan Codes and SOB", "Plan codes and the Schedule of Benefits are finalized.",
-      banner("success", "Plan codes and SOB finalized", "Both match the accepted “" + opt + "” option.") +
-      card('<div class="card-head"><h3>Summary</h3>' + pill("Completed") + '</div>' + U.dl([
-        ["Option", opt], ["Plan codes", "Approved"], ["Schedule of Benefits", "Finalized"]
-      ], true)) +
-      actionbar(btn("Back to Account Setup", { variant: "primary", iconRight: "arrowRight", nav: "#/case/account" })));
-  }
-
-  function comparisonTable(headers, rows) {
-    return '<table class="ctable"><thead><tr>' + headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join("") +
-      '</tr></thead><tbody>' + rows.map(function (r) {
-        return '<tr><td><b>' + esc(r[0]) + '</b></td><td>' + esc(r[1]) + '</td>' +
-          '<td>' + (r[3] ? '<span class="match">' + icon("check", 14) + ' ' + esc(r[2]) + '</span>' : esc(r[2])) + '</td></tr>';
+  function versionTable(versions) {
+    return '<table class="ctable"><thead><tr><th scope="col">Version</th><th scope="col">Change</th><th scope="col">Reason</th><th scope="col">Approver</th><th scope="col">Status</th></tr></thead><tbody>' +
+      versions.map(function (v) {
+        return '<tr><th scope="row">v' + v.v + '</th><td>' + esc(v.change) + '</td><td>' + esc(v.reason) + '</td><td>' + esc(v.approver) + '</td><td>' + pill(v.status, v.status === "Accepted" ? "success" : "info") + '</td></tr>';
       }).join("") + '</tbody></table>';
   }
 
   /* ============================================================
-     CASE · CONTRACT (multi-status flow: requested → completed)
+     CASE · CONTRACT (DSA timeline; starts during negotiation)
      ============================================================ */
-  var CONTRACT_STEPS = ["Contract requested", "Draft prepared", "Under review", "Sent to client",
-    "Client comments received", "Signed", "Notarized", "Completed"];
+  var CONTRACT_STEPS = ["Draft requested", "Draft prepared", "Legal review", "Sent to client", "Client comments", "Revised", "Signed", "Notarized", "Closed"];
   function caseContract(c) {
     var f = c.flags;
-    if (!f.memberSetupComplete) {
-      return sectionShell("Contract", "The contract starts once account setup is complete.",
-        banner("info", "Finish account setup first", "Plan codes, SOB and member setup need to be done.") +
-        actionbar(btn("Go to Account Setup", { variant: "primary", iconRight: "arrowRight", nav: "#/case/account" })));
-    }
+    if (!f.clientAccepted) return gatePage("Contract", "Contract closes after the client accepts. You can start the draft during negotiation.", "Go to Negotiation", "#/case/negotiation");
     var idx = c.contract ? c.contract.stepIndex : 0;
-    if (f.contractComplete) idx = CONTRACT_STEPS.length - 1;
-    var statusKindMap = { 0: "In progress", 7: "Completed" };
+    if (f.contractSigned) idx = CONTRACT_STEPS.length - 1;
 
-    var timeline = '<div class="timeline">' + CONTRACT_STEPS.map(function (s, i) {
+    var tl = '<div class="timeline">' + CONTRACT_STEPS.map(function (s, i) {
       var state = i < idx ? "done" : i === idx ? "current" : "pending";
-      return '<div class="tl ' + state + '"><div class="tl-rail"><span class="tl-node">' +
-        (i < idx ? icon("check", 13) : icon("circle", 13)) + '</span>' +
+      return '<div class="tl ' + state + '"><div class="tl-rail"><span class="tl-node">' + (i < idx ? icon("check", 13) : icon("circle", 13)) + '</span>' +
         (i < CONTRACT_STEPS.length - 1 ? '<span class="tl-line"></span>' : '') + '</div>' +
-        '<div class="tl-body"><div class="tl-title">' + esc(s) + '</div>' +
-        (i === idx && !f.contractComplete ? '<div class="tl-meta">Current step · Legal</div>' : '') + '</div></div>';
+        '<div class="tl-body"><div class="tl-title">' + esc(s) + '</div>' + (i === idx && !f.contractSigned ? '<div class="tl-meta">Current step · Legal</div>' : '') + '</div></div>';
     }).join("") + '</div>';
 
-    if (f.contractComplete) {
-      return sectionShell("Contract", "The agreement is signed, notarized and complete.",
-        banner("success", "Contract completed", "The signed and notarized DSA is attached to the case.") +
-        card('<div class="card-head"><h3>Contract and DSA</h3>' + pill("Completed") + '</div>' + timeline) +
-        actionbar(btn("Go to Billing", { variant: "primary", iconRight: "arrowRight", nav: "#/case/billing" })));
+    if (f.contractSigned) {
+      return sectionShell("Contract", "The agreement is signed, notarized and closed.",
+        banner("success", "Contract closed", "The signed and notarized Contract and DSA are stored in the case.") +
+        card(head("Contract & DSA", pill("Completed")) + tl) +
+        actionbar(btn("Go to Onboarding", { variant: "primary", iconRight: "arrowRight", nav: "#/case/onboarding" })));
     }
-    var current = CONTRACT_STEPS[idx];
     var next = CONTRACT_STEPS[idx + 1];
-    return sectionShell("Contract and DSA", "Legal prepares, sends and finalizes the agreement.",
-      card('<div class="card-head"><h3>Contract progress</h3>' + pill(idx === 4 ? "Action required" : "Under review") + '</div>' +
-        banner(idx === 4 ? "warn" : "info",
-          idx === 4 ? "Client comments received" : current,
-          idx === 4 ? "The client asked for one wording change. Legal will fold it in before signing."
-            : "Current step with Legal. Advance when the step is done.") +
-        timeline +
-        '<div class="mt-4">' + owner("Legal") + '</div>') +
+    return sectionShell("Contract and DSA", "Legal prepares, reviews, sends and closes the agreement. Contract and DSA are tracked together.",
+      card(head("Contract & DSA progress", pill(idx === 4 ? "Action required" : "In progress")) +
+        banner(idx === 4 ? "warn" : "info", idx === 4 ? "Client comments received" : CONTRACT_STEPS[idx],
+          idx === 4 ? "The client asked for one wording change. Legal folds it in, then re-sends for signing."
+            : "Current step with Legal. Advance when the step is done. All versions and approval evidence are stored.") +
+        tl + '<div class="mt-4">' + owner("Legal") + '</div>') +
       actionbar(btn("Mark “" + next + "”", { variant: "primary", iconRight: "arrowRight", act: "contract:advance" })));
   }
 
   /* ============================================================
-     CASE · BILLING AND MEMBERSHIP (setup + discrepancy exception)
+     CASE · ONBOARDING (gate + 5 workstreams + KYC + account)
+     ============================================================ */
+  function caseOnboarding(c) {
+    var f = c.flags;
+    if (!f.contractSigned) return gatePage("Onboarding", "Onboarding opens once the signed contract is closed.", "Go to Contract", "#/case/contract");
+
+    /* KYC sub-flow lives here */
+    if (!f.kycCleared) {
+      var flagged = c.kyc && c.kyc.solytics === "Flagged";
+      return sectionShell("Compliance and KYC", "Capture KYC and record the SOLYTICS compliance result before the account can be created.",
+        onboardingTarget() +
+        card(head("KYC", pill(flagged ? "Action required" : "In progress")) +
+          '<div class="checklist">' +
+            U.check({ name: "KYC form", meta: "Company & authorized signatories", state: "done" }) +
+            U.check({ name: "Required documents", meta: "Configurable list · 4 of 4 received", state: "done" }) +
+            U.check({ name: "SOLYTICS screening", meta: flagged ? "Returned a match to review" : "Reference & result", state: flagged ? "current" : "current", right: pill(flagged ? "Action required" : "Under review") }) +
+          '</div>' +
+          (flagged
+            ? banner("warn", "SOLYTICS returned a flag", "A possible match needs review. Clear it with evidence, or record an authorized waiver — onboarding is blocked until then.")
+            : banner("info", "Record the SOLYTICS result", "Enter the reference and result. If integration is unavailable, record the result manually with evidence.")) +
+          U.dl([["SOLYTICS reference", "SLY-2026-33119"], ["Check date", "Today"], ["Checker", "Compliance"]], true) +
+          reveal("Need to record a waiver?", banner("info", "Authorized waiver", "A waiver may be recorded only by an authorized approver, with reason and evidence. It's kept in the audit trail.") +
+            '<button type="button" class="btn btn-sm mt-3" data-act="noop">Record authorized waiver</button>') +
+          actionbar(btn(flagged ? "Clear flag with evidence & proceed" : "Clear KYC & compliance", { variant: "primary", icon: "shieldCheck", act: "kyc:clear" }),
+            flagged ? "" : btn("Record a SOLYTICS flag", { variant: "ghost", act: "kyc:flag" }))));
+    }
+
+    /* account + affiliate creation — gated */
+    if (!f.accountCreated) {
+      var passed = M.gatePassed(c);
+      return sectionShell("Account and affiliates", "Create the account from approved, accepted and signed records. The gate below must pass first.",
+        onboardingTarget() +
+        card(head("Mandatory gate", pill(passed ? "In progress" : "Blocked")) +
+          '<div class="gate">' +
+            gateRow("Pricing approved", c.flags.pricingApproved) +
+            gateRow("Client accepted the proposal", c.flags.clientAccepted) +
+            gateRow("Contract signed and closed", c.flags.contractSigned) +
+            gateRow("KYC cleared (or authorized waiver)", c.flags.kycCleared) +
+          '</div>' +
+          (passed ? banner("success", "Gate passed", "All controls are satisfied. You can create the account and affiliates.")
+            : banner("error", "Account creation is blocked", "Account and Plan Code creation can't occur until every control above passes. HMS won't let this be bypassed."))) +
+        card(head("Account setup") +
+          U.dl([["Parent account", c.meta.client], ["Members", String(c.meta.members)], ["Chosen option", optName(c)], ["Effectivity", fmtDate(c.meta.effectivity)]], true) +
+          reveal("Add an affiliate / sub-account",
+            '<div class="impact"><b>Creating an affiliate affects:</b><ul>' +
+            '<li>A separate account number is issued for the affiliate.</li>' +
+            '<li>You choose shared or separate SOB, billing and Plan Codes.</li>' +
+            '<li>A separate SOB means an extra SOB approval and set of Plan Codes.</li></ul></div>' +
+            '<div class="row mt-3" style="gap:10px"><button type="button" class="btn btn-sm" data-act="account:affiliate">Add affiliate (separate SOB)</button>' +
+            (c.affiliateSeparateSob ? pill("Affiliate added", "info") : '') + '</div>')) +
+        actionbar(btn("Create account & affiliates", { variant: "primary", icon: "check", act: "account:create", disabled: !passed })));
+    }
+
+    /* account exists — show the 5 workstreams hub */
+    return sectionShell("Account Onboarding", "One workspace for the whole onboarding. Target: 17 working days.",
+      onboardingTarget() +
+      '<div class="workstreams">' +
+        workstream("shieldCheck", "green", "Compliance and KYC", "Compliance", "Cleared", "success", "KYC and SOLYTICS complete.", null, "View", "#/case/onboarding") +
+        workstream("building", "green", "Account and Affiliates", "Account Services", c.meta.accountNo, "success", (c.affiliateSeparateSob ? "Parent + 1 affiliate (separate SOB)." : "Parent account created."), null, "View", "#/case/onboarding") +
+        workstream("layers", f.cocGenerated ? "green" : "blue", "SOB, COC and Benefits", "Account Services", f.cocGenerated ? "COC generated" : (f.sobApproved ? "SOB approved" : "SOB in progress"), f.cocGenerated ? "success" : "info", "Structured Summary of Benefits, independently validated, then COC.", f.cocGenerated ? null : "SOB must be approved before COC", "Open", "#/case/sob") +
+        workstream("calc", f.planCodesApproved ? (f.memberDataAccepted ? "green" : "blue") : "gray", "Plan Codes and Member Data", "Account Services · MDA", f.planCodesApproved ? (f.memberDataAccepted ? "Member Data accepted" : "Plan Codes approved") : "Waiting for SOB", f.planCodesApproved ? "info" : "neutral", "Generate Plan Codes from the approved SOB; hand Member Data to MDA.", f.sobApproved ? null : "Needs approved SOB", "Open", "#/case/plancodes") +
+        workstream("receipt", f.billingComplete ? "green" : "gray", "Billing, Commission and Orientation", "Billing", f.billingComplete ? "Billing ready" : "Not started", f.billingComplete ? "success" : "neutral", "Billing setup, commission form and benefit orientation.", f.memberDataAccepted ? null : "Needs accepted Member Data", "Open", "#/case/billing") +
+      '</div>' +
+      actionbar(btn(f.cocGenerated ? "Go to Plan Codes" : "Open SOB and Benefits", { variant: "primary", iconRight: "arrowRight", nav: f.cocGenerated ? "#/case/plancodes" : "#/case/sob" })));
+  }
+  function onboardingTarget() {
+    return banner("info", "Onboarding target: 17 working days", "Due dates for each workstream are calculated automatically from configured turnaround times.");
+  }
+  function gateRow(label, ok) {
+    return '<div class="g-row ' + (ok ? "pass" : "pending") + '"><span class="g-ic">' + icon(ok ? "checkCircle" : "circle", 18) + '</span>' +
+      '<span>' + esc(label) + '</span><span class="spacer" style="flex:1"></span>' + (ok ? pill("Completed") : pill("Not started")) + '</div>';
+  }
+  function workstream(ic, tone, title, own, statusVal, statusKind, desc, blocker, cta, route) {
+    return '<div class="ws"><div class="ws-top">' + U.medallion(ic, tone) +
+      '<div><div class="ws-title">' + esc(title) + '</div><div class="ws-sub">' + esc(own) + '</div></div></div>' +
+      '<div class="muted" style="font-size:13.5px">' + esc(desc) + '</div>' +
+      (blocker ? '<div class="tiny" style="color:var(--amber)">' + icon("alert", 13) + ' Blocker: ' + esc(blocker) + '</div>' : '') +
+      '<div class="ws-foot">' + pill(statusVal, statusKind) + btn(cta, { size: "sm", iconRight: "arrowRight", nav: route }) + '</div></div>';
+  }
+
+  /* ============================================================
+     CASE · SOB AND BENEFITS (structured builder + TOR compare + COC)
+     ============================================================ */
+  function caseSob(c) {
+    var f = c.flags;
+    if (!f.accountCreated) return gatePage("SOB and Benefits", "Create the account first.", "Go to Onboarding", "#/case/onboarding");
+    var enhanced = c.chosenOption !== "standard";
+
+    if (!f.sobApproved) {
+      var fixed = !!(c.sob && c.sob.fixed);
+      var diagLow = !enhanced && !fixed;
+      var benefits = [
+        { cat: "Inpatient", rows: [
+          ["Room & board", enhanced ? "Private" : "Semi-private", "Matches proposal", false],
+          ["Annual benefit limit (MBL)", enhanced ? "₱500,000" : "₱300,000", "Matches proposal", false]
+        ]},
+        { cat: "Outpatient", rows: [
+          ["Consultations", "Unlimited", "Matches proposal", false],
+          ["Diagnostics inner limit", enhanced ? "₱40,000" : (diagLow ? "₱18,000" : "₱20,000"), diagLow ? "Below TOR (₱20,000)" : "Raised to TOR", diagLow]
+        ]},
+        { cat: "Dental & optical", rows: [
+          ["Dental & optical", enhanced ? "Included" : "Excluded", enhanced ? "Matches proposal" : "Per option", false]
+        ]}
+      ];
+      var hasFlag = benefits.some(function (g) { return g.rows.some(function (r) { return r[3]; }); });
+      return sectionShell("SOB — Summary of Benefits", "Build the SOB from structured controls. We automatically flag anything lower than the TOR or mismatched with the proposal.",
+        card(head("Workflow", pill("Under review")) +
+          '<div class="timeline">' + timeline([
+            { t: "Draft", done: true }, { t: "Sales review", done: true },
+            { t: "Independent validation", done: false, auto: false },
+            { t: "Approved", done: false }, { t: "Client signed", done: false }, { t: "Codified and active", done: false }
+          ]) + '</div>') +
+        card(head("Benefits by category", '<span class="tiny">Grouped · structured fields</span>') +
+          benefits.map(function (g) {
+            return '<div class="bcat"><div class="bcat-head">' + icon("layers", 16) + ' ' + esc(g.cat) + '</div>' +
+              g.rows.map(function (r) {
+                return '<div class="bcat-row' + (r[3] ? ' flagged' : '') + '"><div><b>' + esc(r[0]) + '</b></div><div>' + esc(r[1]) + '</div>' +
+                  '<div>' + (r[3] ? '<span class="tor-flag">' + icon("alert", 13) + ' ' + esc(r[2]) + '</span>' : '<span class="match">' + icon("check", 14) + ' ' + esc(r[2]) + '</span>') + '</div></div>';
+              }).join("") + '</div>';
+          }).join("") +
+          (hasFlag
+            ? banner("warn", "One benefit is lower than the TOR", "Outpatient diagnostics inner limit (₱18,000) is below the TOR (₱20,000). Raise it to match, or record an approved exception, before validation.")
+            : banner("success", "SOB matches the TOR and proposal", "Every benefit meets or exceeds the TOR and matches the accepted proposal.")) +
+          reveal("Why we show this here (recognition over recall)", '<p class="muted" style="margin:0">Accepted proposal values and TOR limits are shown beside each benefit so you don\'t have to remember them from another screen.</p>')) +
+        actionbar(
+          hasFlag
+            ? btn("Fix to match TOR & send for validation", { variant: "primary", icon: "check", act: "sob:fix" })
+            : btn("Send for independent validation", { variant: "primary", icon: "check", act: "sob:approve" }),
+          btn("Save draft", { variant: "ghost", act: "noop" })));
+    }
+    if (!f.cocGenerated) {
+      return sectionShell("SOB approved — generate the COC", "The SOB is approved, signed and codified. Generate the Certificate of Coverage.",
+        banner("success", "SOB approved and codified", "Independently validated, client-signed and stored as a PDF in HMS.") +
+        card(head("COC — Certificate of Coverage") +
+          U.dl([["Account", c.meta.accountNo], ["Approved SOB", "v1"], ["Plan", optName(c)], ["Effective", fmtDate(c.meta.effectivity)], ["Expiry", "2027-10-31"]], true) +
+          banner("info", "Approval before release", "The COC needs an approval step before it is released.") +
+          actionbar(btn("Generate & approve COC", { variant: "primary", icon: "doc", act: "coc:generate" }))));
+    }
+    return sectionShell("SOB and Benefits", "SOB approved and COC generated.",
+      banner("success", "SOB and COC complete", "The approved SOB drives Plan Code generation next.") +
+      card(head("Summary", pill("Completed")) + U.dl([["SOB", "Approved & codified"], ["COC", "Generated & approved"], ["Option", optName(c)]], true)) +
+      actionbar(btn("Go to Plan Codes", { variant: "primary", iconRight: "arrowRight", nav: "#/case/plancodes" })));
+  }
+
+  /* ============================================================
+     CASE · PLAN CODES (generate from SOB, maker-checker)
+     ============================================================ */
+  function casePlanCodes(c) {
+    var f = c.flags;
+    if (!f.sobApproved) return gatePage("Plan Codes", "Approve the SOB first — Plan Codes are generated from it.", "Go to SOB and Benefits", "#/case/sob");
+    var pc = c.planCodes || { generated: false, approved: false, returned: false };
+
+    if (!pc.generated) {
+      return sectionShell("Plan Codes", "Generate Plan Code drafts from the approved SOB. Preview before creating — no need to recreate for corrections.",
+        card(head("Generate from approved SOB") +
+          banner("info", "Generated from SOB v1", "Each plan definition in the approved SOB becomes a Plan Code draft. You can preview, clone, amend and bulk-import.") +
+          planCodePreview(c, "Draft") +
+          actionbar(btn("Generate Plan Codes", { variant: "primary", icon: "sparkle", act: "plancodes:generate" }),
+            btn("Bulk import", { variant: "ghost", icon: "upload", act: "noop" }))));
+    }
+    if (!f.planCodesApproved) {
+      return sectionShell("Plan Codes — approval", "Maker-checker approval. A validation report runs automatically.",
+        (pc.returned ? banner("warn", "1 Plan Code returned for correction", "“Enhanced — Dependent” had a missing room & board value. It's been corrected and is ready for re-approval. No full recreation needed.") : "") +
+        card(head("Validation report", pill("For approval")) +
+          '<div class="checklist">' +
+            U.check({ name: "All codes map to approved SOB", meta: "SOB v1", state: "done" }) +
+            U.check({ name: "Room & board, MBL, benefit set present", meta: pc.returned ? "Corrected" : "Checked", state: "done" }) +
+            U.check({ name: "Provider access valid", meta: "Saved provider group applied", state: "done" }) +
+          '</div>') +
+        card(head("Plan Codes (" + planCount(c) + ")", '<span class="tiny">Showing 1–' + Math.min(5, planCount(c)) + ' of ' + planCount(c) + '</span>') +
+          planCodePreview(c, "For approval") +
+          '<div class="pager"><span>Scales to 400 codes — search, filter and pagination keep it fast.</span>' +
+          '<div class="pager-btns"><button type="button" class="btn btn-sm" disabled>Previous</button><button type="button" class="btn btn-sm" data-act="noop">Next</button></div></div>') +
+        '<div class="makerchecker"><div class="mc-pane"><div class="mc-role">Maker</div><div class="mc-name">A. Reyes</div><div class="tiny mt-2">Generated the codes</div></div>' +
+        '<div class="mc-pane"><div class="mc-role">Checker</div><div class="mc-name">Account Services</div>' + pill("Action required") + '</div></div>' +
+        actionbar(btn("Approve Plan Codes", { variant: "primary", icon: "check", act: "plancodes:approve" }),
+          btn("Return for correction", { variant: "danger", act: "plancodes:return", disabled: pc.returned })));
+    }
+    return sectionShell("Plan Codes", "Plan Codes are approved and active.",
+      banner("success", "Plan Codes approved", planCount(c) + " codes approved and active. Historical versions remain available for date-of-service adjudication.") +
+      card(head("Active Plan Codes", pill("Completed")) + planCodePreview(c, "Active")) +
+      actionbar(btn("Go to Member Data", { variant: "primary", iconRight: "arrowRight", nav: "#/case/memberdata" })));
+  }
+  function planCount(c) { return c.chosenOption === "standard" ? 2 : 4; }
+  function planCodePreview(c, status) {
+    var enhanced = c.chosenOption !== "standard";
+    var rows = [
+      ["PC-2026-STD-P", "Standard · Principal", enhanced ? "Semi-private" : "Semi-private", "₱300,000"],
+      ["PC-2026-STD-D", "Standard · Dependent", "Semi-private", "₱300,000"]
+    ];
+    if (enhanced) rows = [
+      ["PC-2026-ENH-P", "Enhanced · Principal", "Private", "₱500,000"],
+      ["PC-2026-ENH-D", "Enhanced · Dependent", "Private", "₱500,000"],
+      ["PC-2026-STD-P", "Standard · Principal", "Semi-private", "₱300,000"],
+      ["PC-2026-STD-D", "Standard · Dependent", "Semi-private", "₱300,000"]
+    ];
+    return '<table class="ctable"><thead><tr><th scope="col">Code</th><th scope="col">Plan · type</th><th scope="col">Room & board</th><th scope="col">MBL</th><th scope="col">Status</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><th scope="row">' + esc(r[0]) + '</th><td>' + esc(r[1]) + '</td><td>' + esc(r[2]) + '</td><td>' + esc(r[3]) + '</td><td>' + pill(status, status === "Active" ? "success" : "info") + '</td></tr>';
+      }).join("") + '</tbody></table>';
+  }
+
+  /* ============================================================
+     CASE · MEMBER DATA (Master List) + MDA handover
+     ============================================================ */
+  function caseMemberData(c) {
+    var f = c.flags;
+    if (!f.planCodesApproved) return gatePage("Member Data", "Approve Plan Codes first — MDA needs them for enrollment.", "Go to Plan Codes", "#/case/plancodes");
+    var md = c.memberData;
+
+    if (!md.received) {
+      return sectionShell("Member Data (Master List)", "The MDA task was created automatically when the account and Plan Codes were approved.",
+        banner("info", "MDA task ready", "Account number, approved Plan Codes, effective date and special instructions were sent to MDA automatically.") +
+        card(head("Member Data (Master List)", pill("Not started")) +
+          '<div style="border:1.5px dashed var(--border);border-radius:12px;padding:32px;text-align:center">' +
+          '<span class="medallion blue" style="margin:0 auto 12px">' + icon("upload", 22) + '</span>' +
+          '<div style="font-weight:600">Upload Member Data (Master List)</div>' +
+          '<div class="muted" style="font-size:13.5px;margin-top:4px">We validate fields, duplicates, relationships, eligibility and plan assignment — and show progress for large files.</div>' +
+          '<div class="actionbar" style="justify-content:center;border:none;margin-top:16px">' + btn("Upload Member Data", { variant: "primary", icon: "upload", act: "member:upload" }) + '</div></div>'));
+    }
+    if (md.issues > 0 && !md.fixed) {
+      return sectionShell("Member Data (Master List)", "Validation found a few issues. Fix them here — we show targeted errors instead of rejecting the whole file.",
+        banner("warn", md.issues + " members need attention", "Most records are fine. We flag only the rows with issues so you don't re-do the whole list.") +
+        card(head("Validation results", pill("Action required")) +
+          '<div class="grid-3">' + statCard(md.received, "Received", "gray") + statCard(md.valid, "Valid", "green") + statCard(md.issues, "Need attention", "amber") + '</div>' +
+          '<div class="divider"></div>' +
+          '<div class="checklist">' +
+            U.check({ name: "2 members missing date of birth", meta: "Required for eligibility", state: "current", right: pill("Action required") }) +
+            U.check({ name: "1 member has no approved Plan Code", meta: "Assign an approved plan before enrollment", state: "current", right: pill("Action required") }) +
+          '</div>' +
+          actionbar(btn("Fix and revalidate", { variant: "primary", icon: "check", act: "member:fix" }),
+            btn("Download error report", { variant: "ghost", icon: "doc", act: "noop" }))));
+    }
+    if (!f.memberDataAccepted) {
+      return sectionShell("Member Data (Master List)", "All records valid. Accept to enroll and trigger IDs and cards.",
+        banner("success", "All records valid", "Duplicates, relationships, eligibility and plan assignment all check out.") +
+        card(head("Validation results", pill("Completed")) +
+          '<div class="grid-3">' + statCard(md.received, "Received", "gray") + statCard(md.received, "Valid", "green") + statCard(0, "Need attention", "gray") + '</div>') +
+        actionbar(btn("Accept Member Data & enroll", { variant: "primary", icon: "check", act: "member:accept" })));
+    }
+    return sectionShell("Member Data (Master List)", "Members enrolled against the approved Plan Codes.",
+      banner("success", "Member Data accepted", "Enrollment complete. Policy numbers generated, electronic IDs published, and physical cards requested. Sales was updated automatically.") +
+      card(head("Enrollment", pill("Completed")) + U.dl([
+        ["Members enrolled", String(md.received)], ["Policy numbers", "Generated"], ["Electronic ID", "Published"], ["Physical cards", "Requested"]
+      ], true)) +
+      actionbar(btn("Go to Billing", { variant: "primary", iconRight: "arrowRight", nav: "#/case/billing" })));
+  }
+
+  /* ============================================================
+     CASE · BILLING (billing + commission + orientation)
      ============================================================ */
   function caseBilling(c) {
     var f = c.flags;
-    if (!f.contractComplete) {
-      return sectionShell("Billing and Membership", "Billing is set up after the contract is complete.",
-        banner("info", "Contract needed", "Finish the contract and DSA first.") +
-        actionbar(btn("Go to Contract", { variant: "primary", iconRight: "arrowRight", nav: "#/case/contract" })));
-    }
-    var b = c.billing || { step: 0 };
+    if (!f.memberDataAccepted) return gatePage("Billing", "Accept Member Data first.", "Go to Member Data", "#/case/memberdata");
+    var broker = c.meta.channel === "Agent / Broker";
+
     if (!f.billingComplete) {
-      return sectionShell("Billing and Membership", "Billing creates the arrangement and confirms the first premium.",
-        card('<div class="card-head"><h3>Billing setup</h3>' + pill("In progress") + '</div>' +
-          '<div class="checklist">' +
-            U.check({ name: "Billing arrangement created", meta: "Monthly, in advance", state: "done" }) +
-            U.check({ name: "Premium matches accepted proposal", meta: c.meta.members + " members · " + (c.chosenOption === "standard" ? "₱320" : "₱385") + " / member", state: "done" }) +
-            U.check({ name: "First premium confirmed", meta: "Needed before activation", state: "current", right: pill("Action required") }) +
+      return sectionShell("Billing, Commission and Orientation", "The Billing task was created automatically. Set up billing, VAT, commission and orientation.",
+        card(head("Billing setup", pill("Action required")) +
+          '<div class="grid-2" style="margin-top:0">' +
+            U.field({ label: "Billing arrangement", type: "select", value: "Corporate consolidated", options: ["Corporate consolidated", "Per affiliate"] }) +
+            U.field({ label: "Payment mode", type: "select", value: "Bank transfer", options: ["Bank transfer", "Cheque", "Auto-debit"] }) +
+            U.field({ label: "Payment terms", type: "select", value: "Monthly, in advance", options: ["Monthly, in advance", "Quarterly, in advance"] }) +
+            U.field({ label: "VAT status", type: "select", value: "VAT-registered", options: ["VAT-registered", "VAT-exempt"] }) +
           '</div>' +
-          banner("info", "Membership mirrors Member Data",
-            "Members already loaded in setup flow into billing — no duplicate list to maintain.") +
-          actionbar(btn("Confirm billing ready", { variant: "primary", icon: "check", act: "billing:setup" }))));
+          U.field({ label: "Initial billing date", value: fmtDate(c.meta.effectivity), readonly: true, help: "Calculated from the effective date." }) +
+          banner("warn", "VAT document discrepancy", "The VAT registration on file doesn't match the billing name. Confirm the correct VAT document before completing setup.") +
+          '<button type="button" class="btn btn-sm mt-3" data-act="noop">Resolve VAT document</button>') +
+        (broker
+          ? card(head("Commission-rate form") +
+              '<div class="grid-2" style="margin-top:0">' +
+                U.field({ label: "Intermediary", value: c.meta.intermediary, readonly: true }) +
+                U.field({ label: "Commission %", type: "number", value: 7.5 }) +
+                U.field({ label: "Calculation basis", type: "select", value: "Net premium", options: ["Net premium", "Gross premium"] }) +
+                U.field({ label: "Effective period", value: "Policy year", readonly: true }) +
+              '</div>' +
+              banner("info", "Release condition", "Commission is released after the first premium is confirmed. Approval is recorded for audit."))
+          : card(head("Commission") + banner("info", "No commission — Direct account", "Commission setup doesn't apply to Direct business, so it's hidden."))) +
+        card(head("Benefit orientation") +
+          '<div class="checklist">' + U.check({ name: "Schedule benefit orientation", meta: "With the client's HR team", state: "current", right: pill("Action required") }) + '</div>') +
+        actionbar(btn("Complete billing setup", { variant: "primary", icon: "check", act: "billing:complete" })));
     }
-    return sectionShell("Billing and Membership", "Billing is set up and reconciled with the accepted proposal.",
-      banner("success", "Billing ready", "The billing arrangement matches the accepted proposal and the first premium is confirmed.") +
-      card('<div class="card-head"><h3>Summary</h3>' + pill("Completed") + '</div>' + U.dl([
-        ["Arrangement", "Monthly, in advance"], ["Members billed", String(c.meta.members)],
-        ["Rate", c.chosenOption === "standard" ? "₱320 / member / month" : "₱385 / member / month"]
+    return sectionShell("Billing, Commission and Orientation", "Billing is set up and reconciled; orientation is scheduled.",
+      banner("success", "Billing ready", "Billing matches the accepted proposal; VAT confirmed; " + (broker ? "commission approved; " : "") + "orientation scheduled.") +
+      card(head("Summary", pill("Completed")) + U.dl([
+        ["Arrangement", "Corporate consolidated · Monthly, in advance"],
+        ["Members billed", String(c.meta.members)],
+        ["Rate", c.chosenOption === "standard" ? "₱320 / member / month" : "₱385 / member / month"],
+        ["Commission", broker ? "7.5% of net premium (approved)" : "Not applicable (Direct)"],
+        ["Orientation", "Scheduled"]
       ], true)) +
       actionbar(btn("Go to Activation", { variant: "primary", iconRight: "arrowRight", nav: "#/case/activation" })));
   }
 
   /* ============================================================
-     CASE · ACTIVATION (readiness → activate → handover)
+     CASE · ACTIVATION (readiness by exception → activate → handover)
      ============================================================ */
   function caseActivation(c) {
     var f = c.flags;
-    if (!f.billingComplete) {
-      return sectionShell("Activation", "The activation checklist opens once billing is ready.",
-        banner("info", "Billing needed", "Confirm billing is ready before activation.") +
-        actionbar(btn("Go to Billing", { variant: "primary", iconRight: "arrowRight", nav: "#/case/billing" })));
-    }
-    var checklist = [
-      { name: "Account record created", done: f.accountRecordCreated, owner: "Account Services" },
-      { name: "Plan codes approved", done: f.planCodesApproved, owner: "Account Services" },
-      { name: "Schedule of Benefits finalized", done: f.sobFinalized, owner: "Account Services" },
-      { name: "Member setup complete", done: f.memberSetupComplete, owner: "MDA" },
-      { name: "Contract signed & notarized", done: f.contractComplete, owner: "Legal" },
-      { name: "Billing ready & first premium confirmed", done: f.billingComplete, owner: "Billing" }
+    if (!f.billingComplete) return gatePage("Activation", "Complete billing first.", "Go to Billing", "#/case/billing");
+    var controls = [
+      { name: "KYC cleared (or authorized waiver)", done: f.kycCleared, owner: "Compliance" },
+      { name: "Account and affiliates approved", done: f.accountCreated, owner: "Account Services" },
+      { name: "SOB approved and codified", done: f.sobApproved, owner: "Account Services" },
+      { name: "COC approved", done: f.cocGenerated, owner: "Account Services" },
+      { name: "Plan Codes approved", done: f.planCodesApproved, owner: "Account Services" },
+      { name: "Member Data accepted & MDA enrollment ready", done: f.memberDataAccepted, owner: "MDA" },
+      { name: "Billing & commission setup ready", done: f.billingComplete, owner: "Billing" },
+      { name: "Contract and DSA closed", done: f.contractSigned, owner: "Legal" }
     ];
-    var allReady = checklist.every(function (x) { return x.done; });
+    var blockers = controls.filter(function (x) { return !x.done; });
+    var allReady = blockers.length === 0;
 
     if (!f.activationReady) {
-      return sectionShell("Activation readiness", "One last review before the account goes live on " + fmtDate(c.meta.effectivity) + ".",
-        card('<div class="card-head"><h3>Readiness checklist</h3>' + pill(allReady ? "In progress" : "Blocked") + '</div>' +
-          '<div class="checklist">' + checklist.map(function (x) {
-            return U.check({ name: x.name, meta: "Owner: " + x.owner, state: x.done ? "done" : "current",
-              right: x.done ? pill("Completed") : pill("Action required") });
-          }).join("") + '</div>' +
+      return sectionShell("Activation readiness", "We show incomplete controls by exception, so you focus only on what's blocking go-live on " + fmtDate(c.meta.effectivity) + ".",
+        card(head("Readiness", pill(allReady ? "In progress" : "Blocked")) +
           (allReady
-            ? banner("success", "Everything is ready", "All teams have completed their part. You can confirm readiness.")
-            : banner("warn", "One item is blocking activation", "Activation can't proceed until every item above is complete."))) +
+            ? banner("success", "All controls pass", "Every team has completed their part. You can confirm readiness.")
+            : '<div class="stack-3">' + blockers.map(function (b) {
+                return '<div class="task"><span class="c-ico" style="color:var(--amber)">' + icon("alert", 22) + '</span>' +
+                  '<div class="t-main"><div class="t-name">' + esc(b.name) + '</div>' +
+                  '<div class="t-reason">Why it matters: required before the account can go live.</div>' +
+                  '<div class="t-meta"><span>Owner <b>' + esc(b.owner) + '</b></span><span>Due <b>' + fmtDate(c.meta.effectivity) + '</b></span>' + pill("Action required") + '</div></div>' +
+                  btn("Open", { size: "sm", nav: "#/case/onboarding" }) + '</div>';
+              }).join("") + '</div>') +
+          reveal("View all controls", '<div class="checklist">' + controls.map(function (x) {
+            return U.check({ name: x.name, meta: "Owner: " + x.owner, state: x.done ? "done" : "current", right: x.done ? pill("Completed") : pill("Action required") });
+          }).join("") + '</div>')) +
         actionbar(btn("Confirm activation readiness", { variant: "primary", icon: "check", act: "activation:ready", disabled: !allReady })));
     }
     if (!f.accountActivated) {
-      return sectionShell("Activate account", "Everything is ready. Activate the account for its effectivity date.",
-        card('<div class="card-head"><h3>Ready to activate</h3>' + pill("Action required") + '</div>' +
-          '<div class="checklist">' + checklist.map(function (x) {
-            return U.check({ name: x.name, meta: "Owner: " + x.owner, state: "done" });
-          }).join("") + '</div>' +
-          banner("info", "Activation date", "The account will be active from " + fmtDate(c.meta.effectivity) + ".")) +
-        actionbar(btn("Activate account", { variant: "primary", icon: "rocket", act: "activation:activate" })));
+      return sectionShell("Activate account", "All mandatory controls pass. Activating sets the account live for its effective date.",
+        card(head("Ready to activate", pill("Action required")) +
+          '<div class="checklist">' + controls.map(function (x) { return U.check({ name: x.name, meta: "Owner: " + x.owner, state: "done" }); }).join("") + '</div>' +
+          banner("info", "Activation date", "The account will be active from " + fmtDate(c.meta.effectivity) + ". You'll confirm this in the next step.")) +
+        actionbar(btn("Activate account", { variant: "primary", icon: "rocket", act: "activation:confirm" })));
     }
     if (!f.handoverComplete) {
-      return sectionShell("Operational handover", "Confirm the operating teams are set, then close out New Business.",
-        banner("success", "Account activated successfully", "The account is active from " + fmtDate(c.meta.effectivity) + ".") +
-        card('<div class="card-head"><h3>Handover to operations</h3>' + pill("In progress") + '</div>' +
+      return sectionShell("Operational handover", "The account is live. Confirm the operating teams are set, then close New Business.",
+        banner("success", "Account activated successfully", "Active from " + fmtDate(c.meta.effectivity) + ". All teams were notified and the account is now in reporting and the renewal pipeline.") +
+        card(head("Handover to operations", pill("In progress")) +
           '<div class="checklist">' +
-            U.check({ name: "Account Services notified", meta: "Owns the live account", state: "done" }) +
+            U.check({ name: "Account Services — owns the live account", meta: c.meta.accountNo, state: "done" }) +
             U.check({ name: "MDA — membership live", meta: c.meta.members + " members active", state: "done" }) +
             U.check({ name: "Billing — first cycle scheduled", meta: "Monthly, in advance", state: "done" }) +
-            U.check({ name: "Welcome pack to client", meta: c.meta.contactName, state: "current" }) +
+            U.check({ name: "Welcome pack & orientation", meta: c.meta.contactName, state: "current" }) +
           '</div>') +
         actionbar(btn("Complete operational handover", { variant: "primary", icon: "check", act: "activation:handover" })));
     }
-    return '<div class="splash">' +
-      '<span class="big-ico" style="background:var(--green-soft);color:var(--green)">' + icon("checkCircle", 40) + '</span>' +
+    return '<div class="splash"><span class="big-ico" style="background:var(--green-soft);color:var(--green)">' + icon("checkCircle", 40) + '</span>' +
       '<h1>New Business process completed</h1>' +
-      '<p>' + esc(c.meta.client) + ' is active from ' + fmtDate(c.meta.effectivity) + ' and has been handed over to the operating teams. Everything happened inside this one case.</p>' +
-      '<div class="actionbar">' + btn("View case summary", { variant: "primary", nav: "#/case/summary" }) +
-        btn("View History", { variant: "ghost", icon: "history", nav: "#/case/history" }) + '</div></div>';
+      '<p>' + esc(c.meta.client) + ' is active from ' + fmtDate(c.meta.effectivity) + ' and handed over to operations. The full audit trail — lead to handover — lives in this one case.</p>' +
+      '<div class="actionbar"><button type="button" class="btn btn-primary" data-nav="#/case/summary">View case summary</button>' +
+      btn("View History", { variant: "ghost", icon: "history", nav: "#/case/history" }) + '</div></div>';
   }
 
   /* ============================================================
-     CASE · HISTORY (user vs automated actions)
+     CASE · HISTORY
      ============================================================ */
   function caseHistory(c) {
     var items = c.activity.length ? c.activity : [{ title: "Case created", detail: "Nothing recorded yet.", actor: "me", ts: "—" }];
-    return sectionShell("History", "Everything that's happened in this case — including the steps HMS3 did automatically.",
-      card('<div class="row between" style="margin-bottom:16px"><span class="tiny">' +
-          '<span class="status plain info">' + icon("user", 14) + ' You / teams</span> ' +
-          '<span class="status plain neutral">' + icon("sparkle", 14) + ' Automated</span></span></div>' +
+    return sectionShell("History", "Everything that's happened — including the steps HMS3 did automatically. A complete audit trail.",
+      card('<div class="row" style="margin-bottom:16px;gap:8px"><span class="status plain info">' + icon("user", 14) + ' You / teams</span>' +
+          '<span class="status plain neutral">' + icon("sparkle", 14) + ' Automated</span></div>' +
         '<div class="timeline">' + items.map(function (a, i) {
-          return '<div class="tl done"><div class="tl-rail"><span class="tl-node">' +
-            (a.automated ? icon("sparkle", 13) : icon("check", 13)) + '</span>' +
+          return '<div class="tl done"><div class="tl-rail"><span class="tl-node">' + icon(a.automated ? "sparkle" : "check", 13) + '</span>' +
             (i < items.length - 1 ? '<span class="tl-line"></span>' : '') + '</div>' +
-            '<div class="tl-body"><div class="tl-title">' + esc(a.title) +
-            (a.automated ? '<span class="auto-tag">Automated</span>' : '') + '</div>' +
-            '<div class="tl-meta">' + esc(a.actor === "me" ? "A. Reyes" : (M.PEOPLE[a.actor] ? M.PEOPLE[a.actor].name : a.actor)) +
-            ' · ' + esc(a.ts) + (a.detail ? ' — ' + esc(a.detail) : '') + '</div></div></div>';
+            '<div class="tl-body"><div class="tl-title">' + esc(a.title) + (a.automated ? '<span class="auto-tag">Automated</span>' : '') + '</div>' +
+            '<div class="tl-meta">' + esc(actorName(a.actor)) + ' · ' + esc(a.ts) + (a.detail ? ' — ' + esc(a.detail) : '') + '</div></div></div>';
         }).join("") + '</div>'));
   }
 
@@ -767,64 +906,50 @@
      MY TASKS & APPROVALS
      ============================================================ */
   function tasks(c) {
-    var ns = M.nextStep(c);
-    var cur = M.currentStage(c);
+    var ns = M.nextStep(c), cur = M.currentStage(c);
     var mine = [];
-    if (c.flags.franchiseCreated && !c.flags.handoverComplete) {
-      mine.push({ title: ns.title, reason: ns.desc, client: c.meta.client,
-        ref: c.meta.accountRef || c.meta.franchiseRef, due: c.meta.effectivity, status: cur.statusText, route: ns.route });
-    }
-    M.SAMPLE_CASES.forEach(function (s) {
-      if (s.owner === "A. Reyes") mine.push({ title: s.next, reason: "Stage — " + s.stage, client: s.client,
-        ref: s.ref, due: s.due, status: s.status, route: "#/home" });
+    if ((c.flags.leadCaptured || c.meta.caseNo) && !c.flags.handoverComplete)
+      mine.push({ title: ns.title, reason: ns.desc, client: c.meta.client, ref: c.meta.caseNo, due: c.meta.effectivity, status: cur.statusText, route: ns.route });
+    M.SAMPLE_CASES.forEach(function (sx) {
+      if (sx.owner === "A. Reyes") mine.push({ title: sx.next, reason: "Stage — " + sx.stage, client: sx.client, ref: sx.caseNo, due: sx.due, status: sx.status, route: "#/home" });
     });
-    return '<div class="stack-6">' +
-      U.pageHead("My Tasks", "Everything waiting on you, across all your cases. Open one to act on it in the case.") +
+    return '<div class="stack-6">' + U.pageHead("My Tasks", "Everything waiting on you, across your cases. Open one to act on it in the case.") +
       (mine.length ? '<div class="stack-3">' + mine.map(function (t) {
         return '<div class="task"><span class="c-ico" style="color:var(--blue)">' + icon("tasks", 22) + '</span>' +
-          '<div class="t-main"><div class="t-name">' + esc(t.title) + '</div>' +
-          '<div class="t-reason">' + esc(t.reason) + '</div>' +
-          '<div class="t-meta"><span>' + esc(t.client) + ' · ' + esc(t.ref || "—") + '</span>' +
-          '<span>Due <b>' + fmtDate(t.due) + '</b></span>' + pill(t.status) + '</div></div>' +
+          '<div class="t-main"><div class="t-name">' + esc(t.title) + '</div><div class="t-reason">' + esc(t.reason) + '</div>' +
+          '<div class="t-meta"><span>' + esc(t.client) + ' · ' + esc(t.ref || "—") + '</span><span>Due <b>' + fmtDate(t.due) + '</b></span>' + pill(t.status) + '</div></div>' +
           btn("Open", { size: "sm", iconRight: "arrowRight", nav: t.route }) + '</div>';
-      }).join("") + '</div>'
-        : card(banner("success", "You're all caught up", "No tasks need your attention right now."))) +
-      '</div>';
+      }).join("") + '</div>' : card(banner("success", "You're all caught up", "No tasks need your attention right now."))) + '</div>';
   }
-
   function approvals(c) {
     var pending = [];
-    if (c.flags.franchiseRequirementsComplete && !c.flags.franchiseApproved)
-      pending.push({ title: "Franchise approval", client: c.meta.client, ref: c.meta.franchiseRef || "FR-2026-00142",
-        reason: "Company record ready for review", route: "#/case/franchise" });
-    return '<div class="stack-6">' +
-      U.pageHead("Approvals", "Items waiting for a decision. In this demo, approvals you own appear here.") +
+    var f = c.flags;
+    if (f.franchiseCreated && !f.franchiseApproved) pending.push({ t: "Franchise approval", r: "Company record ready", ref: c.meta.franchiseRef, route: "#/case/franchise" });
+    if (f.rateSheetReceived && !f.pricingApproved) pending.push({ t: "Pricing approval", r: "Rate sheet v1 needs internal sign-off", ref: c.meta.caseNo, route: "#/case/quotation" });
+    if (c.planCodes && c.planCodes.generated && !f.planCodesApproved) pending.push({ t: "Plan Code approval", r: "Maker-checker approval", ref: c.meta.caseNo, route: "#/case/plancodes" });
+    return '<div class="stack-6">' + U.pageHead("Approvals", "Items waiting for a decision. Approvals you own appear here.") +
       (pending.length ? '<div class="stack-3">' + pending.map(function (t) {
         return '<div class="task"><span class="c-ico" style="color:var(--blue)">' + icon("approvals", 22) + '</span>' +
-          '<div class="t-main"><div class="t-name">' + esc(t.title) + '</div>' +
-          '<div class="t-reason">' + esc(t.reason) + ' · ' + esc(t.client) + ' · ' + esc(t.ref) + '</div></div>' +
+          '<div class="t-main"><div class="t-name">' + esc(t.t) + '</div><div class="t-reason">' + esc(t.r) + ' · ' + esc(c.meta.client) + ' · ' + esc(t.ref || "—") + '</div></div>' +
           btn("Review", { size: "sm", nav: t.route }) + '</div>';
-      }).join("") + '</div>'
-        : card(banner("info", "Nothing awaiting approval", "When something needs a decision, it'll show up here."))) +
-      '</div>';
+      }).join("") + '</div>' : card(banner("info", "Nothing awaiting approval", "When something needs a decision, it'll show up here."))) + '</div>';
   }
 
-  /* ---------- shared section shell (header + body) ---------- */
-  function sectionShell(title, sub, body) {
-    return '<div class="stack-5"><header class="stack-2"><h1 class="page-title">' + esc(title) + '</h1>' +
-      (sub ? '<p class="page-sub">' + esc(sub) + '</p>' : '') + '</header>' + body + '</div>';
+  /* ---------- shared pieces ---------- */
+  function gatePage(title, msg, cta, route) {
+    return sectionShell(title, "This step isn't available yet.",
+      banner("info", "One step first", msg) + actionbar(btn(cta, { variant: "primary", iconRight: "arrowRight", nav: route })));
   }
-
-  function statCard(n, label, tone) {
-    var color = tone === "green" ? "var(--green)" : tone === "amber" ? "var(--amber)" : "var(--text)";
-    return '<div class="card soft" style="text-align:center;padding:18px"><div style="font-size:30px;font-weight:700;letter-spacing:-.02em;color:' + color + '">' +
-      n + '</div><div class="muted" style="font-size:13px;margin-top:2px">' + esc(label) + '</div></div>';
+  function timeline(steps) {
+    return steps.map(function (s, i) {
+      var state = s.done ? "done" : (i > 0 && steps[i - 1].done ? "current" : (i === 0 ? "current" : "pending"));
+      return '<div class="tl ' + state + '"><div class="tl-rail"><span class="tl-node">' + (s.done ? icon("check", 13) : icon("circle", 13)) + '</span>' +
+        (i < steps.length - 1 ? '<span class="tl-line"></span>' : '') + '</div>' +
+        '<div class="tl-body"><div class="tl-title">' + esc(s.t) + (s.auto ? '<span class="auto-tag">Automated</span>' : '') + '</div></div></div>';
+    }).join("");
   }
-
-  function stageIcon(id) {
-    return ({ 1: "building", 2: "doc", 3: "calc", 4: "handshake", 5: "layers", 6: "receipt", 7: "rocket" })[id] || "circle";
-  }
-
+  function actorName(a) { return a === "me" ? "A. Reyes" : (M.PEOPLE[a] ? M.PEOPLE[a].name : a); }
+  function stageIcon(id) { return ({ 1: "flag", 2: "calc", 3: "handshake", 4: "gavel", 5: "layers", 6: "users", 7: "rocket" })[id] || "circle"; }
   function fmtDate(iso) {
     if (!iso) return "—";
     var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -834,10 +959,10 @@
   }
 
   global.VIEWS = {
-    home: home, newBusiness: newBusiness, franchiseNew: franchiseNew, tasks: tasks, approvals: approvals,
-    caseSummary: caseSummary, caseFranchise: caseFranchise, caseRequirements: caseRequirements,
-    caseEligibility: caseEligibility, caseQuotation: caseQuotation, caseProposal: caseProposal,
-    caseAccount: caseAccount, casePlanCodes: casePlanCodes, caseContract: caseContract,
+    home: home, newBusiness: newBusiness, searchPage: searchPage, tasks: tasks, approvals: approvals,
+    caseSummary: caseSummary, caseLead: caseLead, caseFranchise: caseFranchise, caseQuotation: caseQuotation,
+    caseProposal: caseProposal, caseNegotiation: caseNegotiation, caseContract: caseContract,
+    caseOnboarding: caseOnboarding, caseSob: caseSob, casePlanCodes: casePlanCodes, caseMemberData: caseMemberData,
     caseBilling: caseBilling, caseActivation: caseActivation, caseHistory: caseHistory,
     stageIcon: stageIcon, fmtDate: fmtDate
   };

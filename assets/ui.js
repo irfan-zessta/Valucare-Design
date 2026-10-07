@@ -46,7 +46,11 @@
     user:        '<circle cx="12" cy="8" r="3.5" '+P.f+'/><path '+P.f+' d="M5 20a7 7 0 0 1 14 0"/>',
     flag:        '<path '+P.f+' d="M6 21V4M6 4h11l-2 3.5L17 11H6"/>',
     edit:        '<path '+P.f+' d="M4 20h4L19 9l-4-4L4 16v4ZM14 6l4 4"/>',
-    link:        '<path '+P.f+' d="M9 15l6-6M8 12l-2 2a3 3 0 0 0 4 4l2-2M16 12l2-2a3 3 0 0 0-4-4l-2 2"/>'
+    link:        '<path '+P.f+' d="M9 15l6-6M8 12l-2 2a3 3 0 0 0 4 4l2-2M16 12l2-2a3 3 0 0 0-4-4l-2 2"/>',
+    bell:        '<path '+P.f+' d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M9.5 19a2.5 2.5 0 0 0 5 0"/>',
+    more:        '<circle cx="5" cy="12" r="1.4" '+P.f+'/><circle cx="12" cy="12" r="1.4" '+P.f+'/><circle cx="19" cy="12" r="1.4" '+P.f+'/>',
+    gavel:       '<path '+P.f+' d="M14 4l6 6-3 3-6-6 3-3ZM11 7 4 14l3 3 7-7M3 21h8"/>',
+    shieldCheck: '<path '+P.f+' d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z"/><path '+P.f+' d="M9 12l2 2 4-4"/>'
   };
 
   function icon(name, size, cls) {

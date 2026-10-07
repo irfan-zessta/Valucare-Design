@@ -1,353 +1,467 @@
 /* ============================================================
-   HMS3 · Corporate New Business — router, shell & actions
-   Hash routing + app chrome. Actions flip milestone flags,
-   stamp History, persist, and re-render. One source of truth.
+   HMS3 · Corporate New Business — router + app chrome
+   Hash routing, left nav, case layout, and the action
+   state-machine: an action flips milestone flags, records
+   History, persists, re-renders and announces. The mandatory
+   gate is enforced here — it cannot be bypassed silently.
    ============================================================ */
 (function (global) {
   "use strict";
 
   var M = global.HMS, U = global.UI, V = global.VIEWS;
   var icon = U.icon, esc = U.esc;
-  var root = document.getElementById("root");
-  var C = null; // live case
+  var C = null;                     // the one live case
+  var ui = { notif: false, menu: false };   // transient chrome state
+  var lastFocusId = null;           // for dialog focus return
+  var dialogOnConfirm = null;
 
-  /* ---------- primary nav ---------- */
+  /* ---------- primary + case navigation ---------- */
   var NAV = [
-    { id: "home", label: "Home", icon: "home", route: "#/home" },
-    { id: "new", label: "New Business", icon: "briefcase", route: "#/new" },
-    { id: "tasks", label: "My Tasks", icon: "tasks", route: "#/tasks" },
-    { id: "approvals", label: "Approvals", icon: "approvals", route: "#/approvals" }
+    { hash: "#/home", label: "Home", icon: "home" },
+    { hash: "#/new", label: "New Business", icon: "briefcase" },
+    { hash: "#/tasks", label: "My Tasks", icon: "tasks" },
+    { hash: "#/approvals", label: "Approvals", icon: "approvals" },
+    { hash: "#/search", label: "Search", icon: "search" }
   ];
-
-  /* ---------- case side menu (sections) ---------- */
-  var SECTIONS = [
-    { id: "summary", label: "Summary", flags: [] },
-    { id: "franchise", label: "Franchise", flags: ["franchiseCreated", "franchiseRequirementsComplete", "franchiseApproved"] },
-    { id: "requirements", label: "Requirements", flags: ["accountCreated", "accountRequirementsComplete", "memberDataAccepted"] },
-    { id: "eligibility", label: "Eligibility", flags: ["eligibilityComplete"] },
-    { id: "quotation", label: "Quotation", flags: ["quotationSubmitted", "quotationApproved"] },
-    { id: "proposal", label: "Proposal", flags: ["proposalSent", "clientAccepted"] },
-    { id: "account", label: "Account Setup", flags: ["accountRecordCreated", "memberSetupComplete"] },
-    { id: "plancodes", label: "Plan Codes & SOB", flags: ["planCodesApproved", "sobFinalized"] },
-    { id: "contract", label: "Contract", flags: ["contractComplete"] },
-    { id: "billing", label: "Billing & Membership", flags: ["billingComplete"] },
-    { id: "activation", label: "Activation", flags: ["activationReady", "accountActivated", "handoverComplete"] },
-    { id: "history", label: "History", flags: [] }
+  var CASE_SECTIONS = [
+    { id: "summary", label: "Summary", icon: "home", view: "caseSummary", stage: null },
+    { id: "lead", label: "Lead", icon: "flag", view: "caseLead", stage: 1 },
+    { id: "franchise", label: "Franchise", icon: "building", view: "caseFranchise", stage: 1 },
+    { id: "quotation", label: "Quotation", icon: "calc", view: "caseQuotation", stage: 2 },
+    { id: "proposal", label: "Proposal", icon: "doc", view: "caseProposal", stage: 3 },
+    { id: "negotiation", label: "Negotiation", icon: "handshake", view: "caseNegotiation", stage: 3 },
+    { id: "contract", label: "Contract", icon: "gavel", view: "caseContract", stage: 4 },
+    { id: "onboarding", label: "Onboarding", icon: "shieldCheck", view: "caseOnboarding", stage: 5 },
+    { id: "sob", label: "SOB and Benefits", icon: "layers", view: "caseSob", stage: 5 },
+    { id: "plancodes", label: "Plan Codes", icon: "calc", view: "casePlanCodes", stage: 5 },
+    { id: "memberdata", label: "Member Data", icon: "users", view: "caseMemberData", stage: 6 },
+    { id: "billing", label: "Billing", icon: "receipt", view: "caseBilling", stage: 6 },
+    { id: "activation", label: "Activation", icon: "rocket", view: "caseActivation", stage: 7 },
+    { id: "history", label: "History", icon: "history", view: "caseHistory", stage: null }
   ];
+  var SECTION_TITLE = {};
+  CASE_SECTIONS.forEach(function (s) { SECTION_TITLE[s.id] = s.label; });
 
-  function sectionState(sec, activeId) {
-    if (!sec.flags.length) return "neutral";
-    var done = sec.flags.every(function (f) { return C.flags[f]; });
-    if (done) return "success";
-    var started = sec.flags.some(function (f) { return C.flags[f]; });
-    /* current = first not-done section among the stateful ones */
-    var firstOpen = SECTIONS.filter(function (s) { return s.flags.length; })
-      .find(function (s) { return !s.flags.every(function (f) { return C.flags[f]; }); });
-    if (started || (firstOpen && firstOpen.id === sec.id)) return "info";
-    return "neutral";
+  /* ============================================================
+     App chrome
+     ============================================================ */
+  function sidebar(activeHash) {
+    var links = NAV.map(function (n) {
+      var active = activeHash === n.hash || (n.hash === "#/new" && activeHash.indexOf("#/case") === 0);
+      return '<a class="nav-link' + (active ? " active" : "") + '" href="' + n.hash + '">' +
+        icon(n.icon, 20) + '<span class="lbl">' + esc(n.label) + '</span></a>';
+    }).join("");
+    var moreMenu = ui.menu
+      ? '<div class="menu" role="menu">' +
+          '<div class="menu-item" data-ui="noop" role="menuitem">' + icon("doc", 18) + '<span>Reports</span></div>' +
+          '<div class="menu-item" data-ui="noop" role="menuitem">' + icon("shield", 18) + '<span>Settings</span></div>' +
+          '<div class="menu-item" data-act="reset" role="menuitem">' + icon("history", 18) + '<span>Reset demo</span></div>' +
+        '</div>'
+      : "";
+    return '<nav class="sidebar" aria-label="Primary">' +
+      '<div class="brand"><span class="mark">VC</span><span class="name">ValuCare<small>HMS3 · New Business</small></span></div>' +
+      '<div class="nav">' + links + '</div>' +
+      '<div class="spacer"></div>' +
+      '<div class="notif-wrap" style="position:relative">' + moreMenu +
+        '<div class="profile" data-ui="more" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="' + (ui.menu ? "true" : "false") + '">' +
+        '<span class="avatar">AR</span><span class="who"><b>A. Reyes</b><span>Corporate Sales</span></span>' +
+        '<span class="spacer" style="flex:1"></span>' + icon("more", 18) + '</div></div>' +
+      '</nav>';
+  }
+
+  function topbar(crumbs) {
+    var unread = C.notifications.filter(function (n) { return !n.read; }).length;
+    var panel = ui.notif ? notifPanel() : "";
+    return '<header class="topbar">' +
+      '<div class="crumbs">' + crumbs + '</div><div class="spacer"></div>' +
+      '<div class="notif-wrap">' +
+        '<button type="button" class="btn btn-ghost bell" data-ui="notif" aria-label="Notifications' + (unread ? " (" + unread + " unread)" : "") + '" aria-expanded="' + (ui.notif ? "true" : "false") + '">' +
+        icon("bell", 20) + (unread ? '<span class="bell-pip"></span>' : "") + '</button>' + panel +
+      '</div>' +
+      '<button type="button" class="btn btn-sm" data-act="reset">' + icon("history", 16) + '<span>Reset demo</span></button>' +
+      '</header>';
+  }
+
+  function notifPanel() {
+    var items = C.notifications.length
+      ? C.notifications.map(function (n) {
+          var ic = n.kind === "success" ? "checkCircle" : n.kind === "warn" ? "alert" : "info";
+          var color = n.kind === "success" ? "var(--green)" : n.kind === "warn" ? "var(--amber)" : "var(--blue)";
+          return '<div class="np-item"><span style="color:' + color + ';flex:none">' + icon(ic, 18) + '</span>' +
+            '<div><div>' + esc(n.title) + '</div><div class="np-ts">' + esc(n.ts) + '</div></div></div>';
+        }).join("")
+      : '<div class="np-empty">No notifications yet.</div>';
+    return '<div class="notif-panel" role="region" aria-label="Notifications">' +
+      '<div class="np-head">Notifications</div>' + items + '</div>';
+  }
+
+  function shell(content, activeHash, crumbs) {
+    return '<div class="app">' + sidebar(activeHash) +
+      '<div class="content">' + topbar(crumbs) +
+      '<main class="main" id="main" tabindex="-1">' + content + '</main>' +
+      '<div class="sr-only" id="sr-live" aria-live="assertive"></div>' +
+      '</div></div>';
   }
 
   /* ============================================================
-     Render
+     Case layout (stage chips + 14-section menu + body)
+     ============================================================ */
+  function caseLayout(sectionId, activeHash) {
+    var sec = CASE_SECTIONS.find(function (s) { return s.id === sectionId; }) || CASE_SECTIONS[0];
+    var summary = M.stageSummary(C);
+    var stageState = {};
+    summary.forEach(function (o) { stageState[o.stage.id] = o.state; });
+
+    var chips = summary.map(function (o) {
+      var cls = o.state === "done" ? "done" : o.state === "current" ? "current" : "";
+      return '<span class="stagechip ' + cls + '">' + (o.state === "done" ? icon("check", 13) : ('<b>' + o.stage.id + '</b>')) +
+        '<span>' + esc(o.stage.name) + '</span></span>';
+    }).join("");
+
+    var menu = '<nav class="casemenu" aria-label="Case sections">' +
+      '<div class="cm-head"><div class="ref">' + esc(C.meta.caseNo || "NEW CASE") + '</div>' +
+      '<div class="nm">' + esc(C.meta.tradeName) + '</div></div>' +
+      CASE_SECTIONS.map(function (s) {
+        var active = s.id === sectionId;
+        var dot = "";
+        if (s.stage) {
+          var st = stageState[s.stage];
+          var kind = st === "done" ? "success" : st === "current" ? "info" : "neutral";
+          var lbl = st === "done" ? "Completed" : st === "current" ? "In progress" : "Not started";
+          dot = '<span class="dot">' + U.statusDot(kind, lbl) + '</span>';
+        }
+        return '<a class="cm-link' + (active ? " active" : "") + '" href="#/case/' + s.id + '">' +
+          icon(s.icon, 18) + '<span>' + esc(s.label) + '</span>' + dot + '</a>';
+      }).join("") + '</nav>';
+
+    var body = '<div class="case-body">' + V[sec.view](C) + '</div>';
+    var content = '<div class="stagebar" style="margin-bottom:var(--s5)">' + chips + '</div>' +
+      '<div class="case">' + menu + body + '</div>';
+
+    var crumbs = '<b>' + esc(C.meta.tradeName) + '</b><span class="sep">/</span><span>' + esc(sec.label) + '</span>';
+    return shell(content, activeHash, crumbs);
+  }
+
+  /* ============================================================
+     Render dispatch
      ============================================================ */
   function render() {
     var hash = global.location.hash || "#/home";
-    var parts = hash.replace(/^#\//, "").split("/"); // e.g. ["case","quotation"]
-    var top = parts[0] || "home";
+    var root = document.getElementById("root");
+    var title = "HMS3 · Corporate New Business";
+    var html;
 
-    if (top === "case") {
-      root.innerHTML = shell(caseLayout(parts[1] || "summary"), "case", parts[1] || "summary");
-    } else if (top === "franchise") {
-      root.innerHTML = shell('<main id="main" class="main" tabindex="-1">' +
-        V.franchiseNew(C, parts[2]) + '</main>', "new");
+    if (hash.indexOf("#/case/") === 0) {
+      var sectionId = hash.split("/")[2] || "summary";
+      if (!CASE_SECTIONS.some(function (s) { return s.id === sectionId; })) sectionId = "summary";
+      html = caseLayout(sectionId, hash);
+      title = (SECTION_TITLE[sectionId] || "Case") + " · " + C.meta.tradeName + " · HMS3";
     } else {
-      var inner, active = top;
-      switch (top) {
-        case "new": inner = V.newBusiness(C); break;
-        case "tasks": inner = V.tasks(C); break;
-        case "approvals": inner = V.approvals(C); break;
-        case "home": default: inner = V.home(C); active = "home"; break;
+      var crumbs, content, active = hash;
+      switch (hash) {
+        case "#/new": content = V.newBusiness(C); crumbs = '<b>New Business</b>'; title = "New Business · HMS3"; break;
+        case "#/search": content = V.searchPage(C); crumbs = '<b>Search</b>'; title = "Search · HMS3"; break;
+        case "#/tasks": content = V.tasks(C); crumbs = '<b>My Tasks</b>'; title = "My Tasks · HMS3"; break;
+        case "#/approvals": content = V.approvals(C); crumbs = '<b>Approvals</b>'; title = "Approvals · HMS3"; break;
+        default: active = "#/home"; content = V.home(C); crumbs = '<b>Home</b>'; title = "Home · HMS3";
       }
-      root.innerHTML = shell('<main id="main" class="main" tabindex="-1">' + inner + '</main>', active);
+      html = shell(content, active, crumbs);
     }
-    focusMain();
+    root.innerHTML = html;
+    document.title = title;
   }
 
-  /* ---------- app shell ---------- */
-  function shell(contentHtml, activeNav, caseSection) {
-    var p = M.milestoneProgress(C);
-    var sidebar =
-      '<aside class="sidebar">' +
-        '<a class="brand" href="#/home" aria-label="HMS3 home"><span class="mark">H3</span>' +
-          '<span class="name">HMS3<small>Corporate New Business</small></span></a>' +
-        '<nav class="nav" aria-label="Primary">' + NAV.map(function (n) {
-          var badge = n.id === "tasks" ? taskCount() : 0;
-          return '<a class="nav-link' + (n.id === activeNav ? " active" : "") + '" href="' + n.route + '">' +
-            icon(n.icon, 20) + '<span class="lbl">' + esc(n.label) + '</span>' +
-            (badge ? '<span class="pip">' + badge + '</span>' : '') + '</a>';
-        }).join("") + '</nav>' +
-        '<span class="spacer"></span>' +
-        '<div class="profile" role="button" tabindex="0" title="A. Reyes — Corporate Sales (More options in profile)">' +
-          '<span class="avatar">AR</span><span class="who"><b>A. Reyes</b><span>Corporate Sales</span></span></div>' +
-      '</aside>';
-
-    var crumbs = buildCrumbs(activeNav, caseSection);
-    var topbar = '<div class="topbar"><div class="crumbs">' + crumbs + '</div><span class="spacer"></span>' +
-      '<button type="button" class="btn btn-ghost btn-sm" data-act="app:reset" title="Reset this prototype to the start">' +
-      icon("history", 16) + '<span>Reset demo</span></button></div>';
-
-    return '<div class="app">' + sidebar +
-      '<div class="content">' + topbar + contentHtml + '</div></div>';
-  }
-
-  function buildCrumbs(activeNav, caseSection) {
-    if (activeNav === "case") {
-      var sec = SECTIONS.find(function (s) { return s.id === caseSection; });
-      return '<a href="#/home">Home</a><span class="sep">' + icon("chevron", 14) + '</span>' +
-        '<span>' + esc(C.meta.accountRef || C.meta.franchiseRef || "New case") + '</span>' +
-        '<span class="sep">' + icon("chevron", 14) + '</span><b>' + esc(sec ? sec.label : "Summary") + '</b>';
-    }
-    var nav = NAV.find(function (n) { return n.id === activeNav; });
-    if (activeNav === "new" && (global.location.hash || "").indexOf("franchise") >= 0) {
-      return '<a href="#/home">Home</a><span class="sep">' + icon("chevron", 14) + '</span><b>Create franchise</b>';
-    }
-    return '<b>' + esc(nav ? nav.label : "Home") + '</b>';
-  }
-
-  /* ---------- case layout (menu + body) ---------- */
-  function caseLayout(section) {
-    var cur = M.currentStage(C);
-    var menu = '<nav class="casemenu" aria-label="Case sections">' +
-      '<div class="cm-head"><div class="ref">' + esc(C.meta.accountRef || C.meta.franchiseRef || "NEW CASE") + '</div>' +
-      '<div class="nm">' + esc(C.meta.tradeName || C.meta.client) + '</div></div>' +
-      SECTIONS.map(function (s) {
-        var st = sectionState(s, section);
-        var dot = s.flags.length ? U.statusDot(st, stateLabel(st)) : "";
-        return '<a class="cm-link' + (s.id === section ? " active" : "") + '" href="#/case/' + s.id + '">' +
-          '<span>' + esc(s.label) + '</span>' + (dot ? '<span class="dot">' + dot + '</span>' : '') + '</a>';
-      }).join("") + '</nav>';
-
-    var stageChips = '<div class="stagebar" role="list" aria-label="Process stages">' +
-      M.stageSummary(C).map(function (o) {
-        return '<span class="stagechip ' + o.state + '" role="listitem">' +
-          (o.state === "done" ? icon("check", 13) : '<b>' + o.stage.id + '</b>') + ' ' + esc(o.stage.name) + '</span>';
-      }).join("") + '</div>';
-
-    var body = renderSection(section);
-    return '<main id="main" class="main wide" tabindex="-1">' +
-      '<div style="margin-bottom:20px">' + stageChips + '</div>' +
-      '<div class="case">' + menu + '<div class="case-body">' + body + '</div></div></main>';
-  }
-
-  function renderSection(section) {
-    switch (section) {
-      case "summary": return V.caseSummary(C);
-      case "franchise": return V.caseFranchise(C);
-      case "requirements": return V.caseRequirements(C);
-      case "eligibility": return V.caseEligibility(C);
-      case "quotation": return V.caseQuotation(C);
-      case "proposal": return V.caseProposal(C);
-      case "account": return V.caseAccount(C);
-      case "plancodes": return V.casePlanCodes(C);
-      case "contract": return V.caseContract(C);
-      case "billing": return V.caseBilling(C);
-      case "activation": return V.caseActivation(C);
-      case "history": return V.caseHistory(C);
-      default: return V.caseSummary(C);
-    }
-  }
-
-  function stateLabel(st) {
-    return st === "success" ? "Completed" : st === "info" ? "In progress" : "Not started";
-  }
-  function taskCount() {
-    var n = 0;
-    if (C.flags.franchiseCreated && !C.flags.handoverComplete) n++;
-    n += M.SAMPLE_CASES.filter(function (s) { return s.owner === "A. Reyes" && s.status === "Action required"; }).length;
-    return n;
-  }
+  function focusMain() { var m = document.getElementById("main"); if (m) m.focus(); }
+  function announce(msg) { var live = document.getElementById("sr-live"); if (live) live.textContent = msg; }
 
   /* ============================================================
      Actions — the state machine
      ============================================================ */
-  function log(title, opts) { M.logActivity(C, Object.assign({ title: title }, opts || {})); }
+  function log(title, opts) {
+    opts = opts || {};
+    M.logActivity(C, { title: title, actor: opts.actor, automated: opts.automated, detail: opts.detail });
+  }
 
   var ACTIONS = {
     "noop": function () {},
 
-    "app:reset": function () {
+    "reset": function () {
       M.reset();
       C = M.createInitialCase();
+      ui.notif = false; ui.menu = false;
       go("#/home");
-      U.toast("Prototype reset");
-      return { skipToast: true };
+      return { toast: "Demo reset — fresh start", skipSave: true };
     },
 
+    "case:create": function () {
+      if (!C.meta.caseNo) C.meta.caseNo = "CNB-2026-00482";
+      log("New Business case created", { detail: C.meta.caseNo });
+      M.notify(C, "Case " + C.meta.caseNo + " created", "info");
+      go("#/case/lead");
+      return { toast: "Case " + C.meta.caseNo + " created" };
+    },
+
+    /* ---- Lead ---- */
+    "lead:usecompany": function () { C.duplicateResolved = true; return { toast: "Using existing company record" }; },
+    "lead:capture": function () {
+      if (!C.meta.caseNo) C.meta.caseNo = "CNB-2026-00482";
+      C.flags.leadCaptured = true;
+      log("Lead captured", { detail: C.meta.client });
+      return { toast: "Lead captured" };
+    },
+    "lead:resolveaor": function () {
+      C.meta.aorStatus = "Valid";
+      log("AOR/BOR conflict resolved", { detail: "Authority confirmed for " + C.meta.intermediary });
+      return { toast: "AOR/BOR conflict resolved" };
+    },
+    "lead:channel": function () {
+      if (!C.meta.channel) C.meta.channel = "Direct";
+      if (C.meta.channel === "Agent / Broker" && !C.meta.aorStatus) C.meta.aorStatus = "Valid";
+      C.flags.channelValidated = true;
+      log("Sales channel validated", { detail: C.meta.channel });
+      return { toast: "Channel validated" };
+    },
+
+    /* ---- Franchise ---- */
     "franchise:create": function () {
       C.flags.franchiseCreated = true;
       C.meta.franchiseRef = "FR-2026-00142";
-      log("Franchise created", { detail: "Reference " + C.meta.franchiseRef });
-      go("#/case/franchise");
-      return { toast: "Franchise created" };
-    },
-    "franchise:requirements": function () {
-      C.flags.franchiseRequirementsComplete = true;
-      log("Franchise requirements completed");
-      return { toast: "Requirements complete" };
+      log("Franchise created", { detail: C.meta.franchiseRef });
+      M.notify(C, "Franchise " + C.meta.franchiseRef + " submitted for approval", "info");
+      return { toast: "Franchise " + C.meta.franchiseRef + " created" };
     },
     "franchise:approve": function () {
       C.flags.franchiseApproved = true;
-      log("Franchise approved", { actor: "mgmt" });
+      log("Franchise approved", { actor: "salesmgr", detail: "Valid to " + C.meta.franchiseExpiry });
+      M.notify(C, "Franchise approved — valid to " + C.meta.franchiseExpiry, "success");
       return { toast: "Franchise approved" };
     },
 
-    "account:create": function () {
-      C.flags.accountCreated = true;
-      C.meta.accountRef = "CNB-2026-00482";
-      log("New Business case created", { detail: "Reference " + C.meta.accountRef });
-      return { toast: "New Business case created" };
-    },
-    "account:requirements": function () {
-      C.flags.accountRequirementsComplete = true;
-      log("Account requirements completed");
+    /* ---- Quotation ---- */
+    "quote:requirements": function () {
+      C.flags.requirementsComplete = true;
+      C.tor = { converted: true };
+      log("Quotation requirements completed", { detail: "Member Data, TOR, utilization, target rates" });
+      log("TOR converted to comparison baseline", { automated: true });
       return { toast: "Requirements complete" };
     },
-
-    "memberdata:upload": function () {
-      C.memberData = { received: 420, valid: 417, issues: 3, fixed: false };
-      log("Member Data uploaded", { detail: "420 records received" });
-      log("Member Data validated", { automated: true, actor: "mda", detail: "3 records need attention" });
-      return { toast: "Member Data uploaded" };
-    },
-    "memberdata:fix": function () {
-      C.memberData.issues = 0; C.memberData.valid = C.memberData.received; C.memberData.fixed = true;
-      log("Member Data corrected", { detail: "All 420 records now valid" });
-      return { toast: "Records fixed — all valid" };
-    },
-    "memberdata:accept": function () {
-      C.flags.memberDataAccepted = true;
-      C.memberData.accepted = true;
-      log("Member Data accepted for quotation");
-      return { toast: "Member Data accepted for quotation" };
-    },
-
-    "eligibility:review": function () {
-      C.flags.eligibilityComplete = true;
-      C.eligibility = { outcome: "Eligible with review" };
-      log("Eligibility confirmed", { actor: "actuarial", detail: "Eligible with review" });
-      return { toast: "Eligibility confirmed" };
-    },
-
-    "quotation:submit": function () {
+    "quote:submit": function () {
       C.flags.quotationSubmitted = true;
       C.quotation = { status: "Clarification required" };
-      log("Quotation request submitted");
-      log("Clarification requested", { automated: true, actor: "actuarial", detail: "ACCUSA asked about the age profile" });
+      log("Quotation request submitted to Actuarial", { detail: "Request QR-2026-0291" });
+      log("Actuarial requested a clarification", { actor: "actuarial", automated: true, detail: "Age-band query" });
+      M.notify(C, "Actuarial needs a clarification", "warn");
       return { toast: "Quotation request submitted" };
     },
-    "quotation:answer": function () {
+    "quote:answer": function () {
       C.flags.clarificationAnswered = true;
-      C.quotation.status = "Pricing in progress";
-      log("Clarification answered", { detail: "All 3 are active employees" });
+      if (C.quotation) C.quotation.status = "Computing";
+      log("Answered actuarial clarification", { detail: "3 members confirmed as active employees" });
       return { toast: "Answer sent to Actuarial" };
     },
-    "quotation:approve": function () {
-      C.flags.quotationApproved = true;
-      C.quotation.status = "Approved";
-      log("Quotation approved", { automated: true, actor: "actuarial", detail: "Two options released" });
-      return { toast: "Quotation approved" };
+    "quote:ratesheet": function () {
+      C.flags.rateSheetReceived = true;
+      if (C.quotation) C.quotation.rateSheet = "v1";
+      log("Rate sheet v1 imported", { actor: "actuarial", detail: "Structured import" });
+      M.notify(C, "Rate sheet v1 is available", "success");
+      return { toast: "Rate sheet imported" };
+    },
+    "quote:approve": function () {
+      C.flags.pricingApproved = true;
+      if (!C.chosenOption) C.chosenOption = "enhanced";
+      C.pricing = { recommended: "Enhanced", smApproved: true, srApproved: true };
+      log("Pricing approved", { actor: "salesmgr", detail: "Rate sheet v1 · Sales Manager + Senior Management" });
+      M.notify(C, "Pricing approved", "success");
+      return { toast: "Pricing approved" };
     },
 
+    /* ---- Proposal ---- */
+    "proposal:generate": function () {
+      C.flags.proposalGenerated = true;
+      C.proposal = { version: 1, status: "Draft" };
+      log("Proposal v1 generated", { automated: true, detail: "From rate sheet, TOR and SOB template" });
+      return { toast: "Proposal generated" };
+    },
     "proposal:send": function () {
-      if (!C.proposal) C.proposal = { version: 1 };
       C.flags.proposalSent = true;
-      log("Proposal sent to client", { detail: "Proposal v" + C.proposal.version });
+      if (C.proposal) C.proposal.status = "Sent";
+      C.versions = [{ v: 1, change: "Initial proposal", reason: "First offer", by: "A. Reyes", approver: "M. Santos", date: "Today", status: "Sent" }];
+      log("Proposal v1 sent to client", { detail: C.meta.contactName });
+      M.notify(C, "Proposal v1 sent to client", "info");
       return { toast: "Proposal sent to client" };
     },
-    "proposal:revise": function () {
-      if (!C.proposal) C.proposal = { version: 1 };
-      C.proposal.version += 1;
+
+    /* ---- Negotiation ---- */
+    "nego:revise": function () {
+      var v = (C.proposal.version || 1) + 1;
+      C.proposal.version = v;
       C.chosenOption = "standard";
-      log("Proposal revised and re-sent", { detail: "Now v" + C.proposal.version + " — Standard option" });
-      return { toast: "Revision recorded — v" + C.proposal.version + " re-sent" };
+      C.versions.unshift({ v: v, change: "Switched to Standard option", reason: "Client budget", by: "A. Reyes", approver: "M. Santos", date: "Today", status: "Sent" });
+      log("Proposal revised to v" + v, { detail: "Standard option · re-approved before re-send" });
+      return { toast: "Revision v" + v + " recorded & re-sent" };
     },
-    "proposal:accept": function () {
+    "nego:accept": function () {
       C.flags.clientAccepted = true;
       C.declined = false;
-      if (!C.chosenOption) C.chosenOption = "enhanced";
-      C.decision = { outcome: "accepted", acceptedVersion: C.proposal ? C.proposal.version : 1 };
-      log("Client accepted proposal", { detail: "v" + (C.proposal ? C.proposal.version : 1) });
-      log("Downstream tasks created", { automated: true, detail: "Account Services, MDA, Legal, Billing" });
+      C.decision = "accepted";
+      if (C.versions[0]) C.versions[0].status = "Accepted";
+      log("Client accepted proposal v" + (C.proposal.version || 1), { detail: "Commercial baseline confirmed" });
+      log("Downstream tasks created for Account Services, Legal, MDA and Billing", { automated: true });
+      M.notify(C, "Client accepted the proposal", "success");
       return { toast: "Client acceptance recorded" };
     },
-    "proposal:decline": function () {
+    "nego:decline": function () {
       C.declined = true;
-      log("Client declined proposal", { detail: "Case paused — can be reopened" });
+      log("Client declined proposal v" + (C.proposal.version || 1), { detail: "Case paused" });
+      M.notify(C, "Client declined — case paused", "warn");
       return { toast: "Decline recorded — case paused" };
     },
-    "proposal:reopen": function () {
+    "nego:reopen": function () {
       C.declined = false;
-      log("Proposal reopened");
+      log("Proposal reopened", { detail: "Conversation resumed" });
       return { toast: "Proposal reopened" };
     },
 
-    "account:record": function () {
-      C.flags.accountRecordCreated = true;
-      log("Account record created", { actor: "accserv" });
-      return { toast: "Account record created" };
+    /* ---- Contract ---- */
+    "contract:advance": function () {
+      if (!C.contract) C.contract = { stepIndex: 0 };
+      var total = 9;
+      C.contract.stepIndex = Math.min(C.contract.stepIndex + 1, total - 1);
+      if (C.contract.stepIndex >= total - 1) {
+        C.flags.contractSigned = true;
+        log("Contract signed, notarized and closed", { actor: "legal", detail: "Contract and DSA stored" });
+        M.notify(C, "Contract signed and closed", "success");
+        return { toast: "Contract closed" };
+      }
+      log("Contract advanced", { actor: "legal", detail: "Step " + (C.contract.stepIndex + 1) + " of " + total });
+      return { toast: "Contract step updated" };
+    },
+
+    /* ---- KYC / compliance ---- */
+    "kyc:flag": function () {
+      C.kyc = { status: "Flagged", solytics: "Flagged" };
+      log("SOLYTICS returned a flag", { actor: "compliance", detail: "Possible match for review" });
+      M.notify(C, "SOLYTICS flag needs review", "warn");
+      return { toast: "SOLYTICS flag recorded" };
+    },
+    "kyc:clear": function () {
+      var wasFlagged = C.kyc && C.kyc.solytics === "Flagged";
+      C.flags.kycCleared = true;
+      C.kyc = { status: "Cleared", solytics: wasFlagged ? "Cleared after review" : "Cleared", reference: "SLY-2026-33119" };
+      log("KYC and compliance cleared", { actor: "compliance", detail: wasFlagged ? "Flag cleared with evidence" : "SOLYTICS reference SLY-2026-33119" });
+      M.notify(C, "KYC cleared", "success");
+      return { toast: "KYC cleared" };
+    },
+
+    /* ---- Account + affiliate (GATED) ---- */
+    "account:affiliate": function () {
+      C.affiliateSeparateSob = true;
+      if (!C.account) C.account = { affiliates: [] };
+      C.account.affiliates = [{ name: "Northwind Logistics (affiliate)", sob: "separate" }];
+      log("Affiliate added", { detail: "Separate SOB, billing and plan codes" });
+      return { toast: "Affiliate added (separate SOB)" };
+    },
+    "account:create": function () {
+      if (!M.gatePassed(C)) return { toast: "Blocked — complete the mandatory controls first" };
+      C.flags.accountCreated = true;
+      C.meta.accountNo = "ACC-2026-10847";
+      if (!C.account) C.account = { affiliates: [] };
+      log("Account created", { actor: "accserv", detail: C.meta.accountNo + (C.affiliateSeparateSob ? " + 1 affiliate" : "") });
+      M.notify(C, "Account " + C.meta.accountNo + " created", "success");
+      return { toast: "Account " + C.meta.accountNo + " created" };
+    },
+
+    /* ---- SOB + COC ---- */
+    "sob:fix": function () {
+      C.sob = C.sob || {};
+      C.sob.fixed = true;
+      log("SOB benefit raised to match TOR", { detail: "Outpatient diagnostics inner limit" });
+      return { toast: "Benefit fixed to match TOR" };
+    },
+    "sob:approve": function () {
+      C.flags.sobApproved = true;
+      C.sob = C.sob || {}; C.sob.status = "Approved";
+      log("SOB independently validated and approved", { actor: "accserv", detail: "Client-signed and codified" });
+      M.notify(C, "SOB approved and codified", "success");
+      return { toast: "SOB approved" };
+    },
+    "coc:generate": function () {
+      C.flags.cocGenerated = true;
+      C.coc = { status: "Approved" };
+      log("COC generated and approved", { actor: "accserv", detail: "Certificate of Coverage released" });
+      return { toast: "COC generated & approved" };
+    },
+
+    /* ---- Plan Codes (maker-checker) ---- */
+    "plancodes:generate": function () {
+      C.planCodes = { generated: true, approved: false, returned: false };
+      log("Plan Codes generated from approved SOB", { automated: true, detail: "Draft set" });
+      return { toast: "Plan Codes generated" };
+    },
+    "plancodes:return": function () {
+      if (!C.planCodes) C.planCodes = { generated: true };
+      C.planCodes.returned = true;
+      log("Plan Code returned for correction", { actor: "accserv", detail: "Missing room & board value" });
+      return { toast: "Returned for correction" };
     },
     "plancodes:approve": function () {
       C.flags.planCodesApproved = true;
-      log("Plan codes approved", { actor: "accserv" });
-      return { toast: "Plan codes approved" };
-    },
-    "sob:finalize": function () {
-      C.flags.sobFinalized = true;
-      log("Schedule of Benefits finalized", { actor: "accserv" });
-      return { toast: "Schedule of Benefits finalized" };
-    },
-    "member:setup": function () {
-      C.flags.memberSetupComplete = true;
-      log("Member setup complete", { actor: "mda", detail: C.meta.members + " members loaded" });
-      return { toast: "Member setup complete" };
+      C.planCodes = C.planCodes || {}; C.planCodes.approved = true;
+      log("Plan Codes approved", { actor: "accserv", detail: "Maker-checker approval" });
+      log("Member Data task created for MDA", { automated: true, detail: "Account, plan codes, effective date shared" });
+      M.notify(C, "Plan Codes approved · MDA task created", "success");
+      return { toast: "Plan Codes approved" };
     },
 
-    "contract:advance": function () {
-      if (!C.contract) C.contract = { stepIndex: 0 };
-      var last = 7;
-      C.contract.stepIndex = Math.min(C.contract.stepIndex + 1, last);
-      var steps = ["Contract requested", "Draft prepared", "Under review", "Sent to client",
-        "Client comments received", "Signed", "Notarized", "Completed"];
-      var now = steps[C.contract.stepIndex];
-      if (C.contract.stepIndex >= last) {
-        C.flags.contractComplete = true;
-        log("Contract completed", { actor: "legal", detail: "Signed and notarized" });
-        return { toast: "Contract completed" };
-      }
-      log("Contract — " + now, { actor: "legal" });
-      return { toast: now };
+    /* ---- Member Data ---- */
+    "member:upload": function () {
+      C.memberData = { received: 420, valid: 417, issues: 3, fixed: false, accepted: false };
+      log("Member Data (Master List) uploaded", { actor: "mda", detail: "420 records · validated" });
+      return { toast: "Member Data uploaded & validated" };
+    },
+    "member:fix": function () {
+      C.memberData.issues = 0;
+      C.memberData.valid = C.memberData.received;
+      C.memberData.fixed = true;
+      log("Member Data issues fixed", { actor: "mda", detail: "3 records corrected" });
+      return { toast: "Issues fixed — all records valid" };
+    },
+    "member:accept": function () {
+      C.flags.memberDataAccepted = true;
+      C.memberData.accepted = true;
+      log("Member Data accepted — members enrolled", { actor: "mda", detail: C.memberData.received + " members" });
+      log("Policy numbers generated, e-IDs published, cards requested", { automated: true });
+      M.notify(C, "Members enrolled — Sales updated", "success");
+      return { toast: "Member Data accepted & enrolled" };
     },
 
-    "billing:setup": function () {
+    /* ---- Billing ---- */
+    "billing:complete": function () {
       C.flags.billingComplete = true;
-      log("Billing ready", { actor: "billing", detail: "First premium confirmed" });
-      return { toast: "Billing ready" };
+      C.billing = { setup: true, commission: C.meta.channel === "Agent / Broker", vatIssue: false };
+      log("Billing setup completed", { actor: "billing", detail: "VAT confirmed · orientation scheduled" });
+      M.notify(C, "Billing ready", "success");
+      return { toast: "Billing setup complete" };
     },
 
+    /* ---- Activation + handover ---- */
     "activation:ready": function () {
       C.flags.activationReady = true;
-      log("Activation readiness confirmed", { actor: "accserv" });
-      return { toast: "Activation readiness confirmed" };
+      log("Activation readiness confirmed", { detail: "All mandatory controls pass" });
+      return { toast: "Readiness confirmed" };
     },
-    "activation:activate": function () {
+    "activation:confirm": function () {
       C.flags.accountActivated = true;
-      log("Account activated", { detail: "Active from " + V.fmtDate(C.meta.effectivity) });
-      return { toast: "Account activated successfully" };
+      log("Account activated", { actor: "accserv", detail: "Active from " + C.meta.effectivity });
+      log("Teams notified · added to reporting and renewal pipeline", { automated: true });
+      M.notify(C, "Account activated", "success");
+      return { toast: "Account activated" };
     },
     "activation:handover": function () {
       C.flags.handoverComplete = true;
-      log("Operational handover completed", { detail: "New Business process completed" });
-      return { toast: "New Business process completed" };
+      log("Operational handover completed", { detail: "New Business closed" });
+      M.notify(C, "Handover complete", "success");
+      return { toast: "Handover complete" };
     }
   };
 
@@ -355,59 +469,139 @@
     var fn = ACTIONS[name];
     if (!fn) return;
     var res = fn() || {};
-    M.save(C);
-    if (!res.skipToast) {
-      render();
-      if (res.toast) U.toast(res.toast);
+    if (!res.skipSave) M.save(C);
+    render();
+    if (res.toast) { U.toast(res.toast); announce(res.toast); }
+  }
+
+  /* ============================================================
+     Confirmation dialog (accessible: focus trap + return)
+     ============================================================ */
+  function openDialog(opts) {
+    closeDialog();
+    lastFocusId = document.activeElement;
+    var root = document.createElement("div");
+    root.id = "dialog-root";
+    root.innerHTML =
+      '<div class="overlay" data-dialog="overlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="dlg-title">' +
+      '<h2 id="dlg-title">' + esc(opts.title) + '</h2>' +
+      '<p>' + esc(opts.body) + '</p>' +
+      '<div class="modal-actions">' +
+        '<button type="button" class="btn" data-dialog="cancel">' + esc(opts.cancelLabel || "Cancel") + '</button>' +
+        '<button type="button" class="btn btn-primary" data-dialog="confirm">' + icon(opts.icon || "check", 18) + '<span>' + esc(opts.confirmLabel || "Confirm") + '</span></button>' +
+      '</div></div></div>';
+    document.body.appendChild(root);
+    dialogOnConfirm = opts.onConfirm;
+    var first = root.querySelector('[data-dialog="confirm"]');
+    if (first) first.focus();
+  }
+  function closeDialog() {
+    var r = document.getElementById("dialog-root");
+    if (r) r.parentNode.removeChild(r);
+    dialogOnConfirm = null;
+    if (lastFocusId && lastFocusId.focus) { try { lastFocusId.focus(); } catch (e) {} }
+    lastFocusId = null;
+  }
+  function trapDialog(e) {
+    var r = document.getElementById("dialog-root");
+    if (!r) return;
+    if (e.key === "Escape") { e.preventDefault(); closeDialog(); return; }
+    if (e.key !== "Tab") return;
+    var f = r.querySelectorAll("button");
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  /* ============================================================
+     data-choice handlers (channel + option selection)
+     ============================================================ */
+  function handleChoice(id) {
+    switch (id) {
+      case "ch-direct": C.meta.channel = "Direct"; C.meta.aorStatus = null; break;
+      case "ch-broker": C.meta.channel = "Agent / Broker"; break;
+      case "opt-standard": C.chosenOption = "standard"; break;
+      case "opt-enhanced": C.chosenOption = "enhanced"; break;
+      default: return; // decorative choices (e.g. decision radios) — no state
     }
+    M.save(C);
+    render();
   }
 
   /* ============================================================
      Events
      ============================================================ */
-  function go(hash) {
-    if (global.location.hash === hash) render();
-    else global.location.hash = hash;
-  }
+  function go(hash) { if (global.location.hash === hash) render(); else global.location.hash = hash; }
 
   document.addEventListener("click", function (e) {
-    var navEl = e.target.closest("[data-nav]");
-    if (navEl) { e.preventDefault(); go(navEl.getAttribute("data-nav")); return; }
+    var close = e.target.closest ? e.target.closest.bind(e.target) : null;
+    if (!close) return;
 
-    var actEl = e.target.closest("[data-act]");
-    if (actEl) {
-      if (actEl.hasAttribute("disabled")) return;
-      e.preventDefault();
-      runAction(actEl.getAttribute("data-act"));
+    var d = close("[data-dialog]");
+    if (d) {
+      var kind = d.getAttribute("data-dialog");
+      if (kind === "confirm") { var cb = dialogOnConfirm; closeDialog(); if (cb) cb(); }
+      else if (kind === "cancel") { closeDialog(); }
+      else if (kind === "overlay" && e.target === d) { closeDialog(); }
       return;
     }
-
-    var choice = e.target.closest(".choice[data-choice]");
-    if (choice) {
-      var group = choice.parentNode;
-      group.querySelectorAll(".choice").forEach(function (ch) { ch.classList.remove("selected"); });
-      choice.classList.add("selected");
-    }
-  });
-
-  /* keyboard: Enter/Space on the profile button */
-  document.addEventListener("keydown", function (e) {
-    if ((e.key === "Enter" || e.key === " ") && e.target.classList && e.target.classList.contains("profile")) {
+    var act = close("[data-act]");
+    if (act) {
       e.preventDefault();
-      U.toast("Profile menu — Renewal Business and settings live here");
+      var name = act.getAttribute("data-act");
+      if (name === "activation:confirm") {
+        openDialog({
+          title: "Activate this account?",
+          body: "This sets " + C.meta.client + " live from " + V.fmtDate(C.meta.effectivity) + ". All teams will be notified. You can review the full audit trail in History.",
+          confirmLabel: "Activate account", icon: "rocket",
+          onConfirm: function () { runAction("activation:confirm"); }
+        });
+        return;
+      }
+      runAction(name);
+      return;
+    }
+    var uiEl = close("[data-ui]");
+    if (uiEl) {
+      e.preventDefault();
+      var u = uiEl.getAttribute("data-ui");
+      if (u === "notif") { ui.notif = !ui.notif; if (ui.notif) markNotifsRead(); render(); }
+      else if (u === "more") { ui.menu = !ui.menu; render(); }
+      return;
+    }
+    var ch = close("[data-choice]");
+    if (ch) { e.preventDefault(); handleChoice(ch.getAttribute("data-choice")); return; }
+
+    var navEl = close("[data-nav]");
+    if (navEl) { e.preventDefault(); go(navEl.getAttribute("data-nav")); return; }
+
+    if (ui.notif || ui.menu) {
+      if (!close(".notif-wrap")) { ui.notif = false; ui.menu = false; render(); }
     }
   });
 
-  function focusMain() {
-    var main = document.getElementById("main");
-    if (main) { try { main.focus({ preventScroll: false }); } catch (e) { main.focus(); } }
-  }
+  document.addEventListener("keydown", function (e) {
+    if (document.getElementById("dialog-root")) { trapDialog(e); return; }
+    if (e.key === "Escape" && (ui.notif || ui.menu)) { ui.notif = false; ui.menu = false; render(); return; }
+    if (e.key === "Enter" || e.key === " ") {
+      var t = e.target;
+      if (t && t.getAttribute) {
+        if (t.hasAttribute("data-choice")) { e.preventDefault(); handleChoice(t.getAttribute("data-choice")); }
+        else if (t.hasAttribute("data-ui")) { e.preventDefault(); t.click(); }
+      }
+    }
+  });
 
-  global.addEventListener("hashchange", render);
+  function markNotifsRead() { C.notifications.forEach(function (n) { n.read = true; }); M.save(C); }
 
-  /* ---------- boot ---------- */
-  C = M.load();
-  if (!C) { C = M.createInitialCase(); }
+  global.addEventListener("hashchange", function () { render(); focusMain(); });
+
+  /* ============================================================
+     Boot
+     ============================================================ */
+  C = M.load() || M.createInitialCase();
   if (!global.location.hash) global.location.hash = "#/home";
   render();
+
 })(window);
