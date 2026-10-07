@@ -68,6 +68,8 @@
     "Waiting for another team":{ kind: "warn",   icon: "clock" },
     "Action required":        { kind: "warn",    icon: "alert" },
     "Under review":           { kind: "info",    icon: "clock" },
+    "Ready for approval":     { kind: "info",    icon: "approvals" },
+    "Returned for correction":{ kind: "warn",    icon: "arrowLeft" },
     "Blocked":                { kind: "error",   icon: "alert" },
     "Completed":              { kind: "success", icon: "checkCircle" }
   };
@@ -103,6 +105,8 @@
     var attrs = "";
     if (opts.nav) attrs += ' data-nav="' + esc(opts.nav) + '"';
     if (opts.act) attrs += ' data-act="' + esc(opts.act) + '"';
+    if (opts.arg != null) attrs += ' data-arg="' + esc(opts.arg) + '"';
+    if (opts.ariaLabel) attrs += ' aria-label="' + esc(opts.ariaLabel) + '"';
     if (opts.href) return '<a class="' + cls + '"' + attrs + ' href="' + esc(opts.href) + '">' +
       (opts.icon ? icon(opts.icon, 18) : "") + '<span>' + esc(label) + '</span>' +
       (opts.iconRight ? icon(opts.iconRight, 18) : "") + '</a>';

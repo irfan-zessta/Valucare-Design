@@ -11,18 +11,75 @@
   var M = global.HMS, U = global.UI, V = global.VIEWS;
   var icon = U.icon, esc = U.esc;
   var C = null;                     // the one live case
-  var ui = { notif: false, menu: false };   // transient chrome state
+  var ui = { notif: false, menu: false, navGroup: null, collapsed: false };   // transient chrome state
   var lastFocusId = null;           // for dialog focus return
   var dialogOnConfirm = null;
 
-  /* ---------- primary + case navigation ---------- */
-  var NAV = [
-    { hash: "#/home", label: "Home", icon: "home" },
-    { hash: "#/new", label: "New Business", icon: "briefcase" },
-    { hash: "#/tasks", label: "My Tasks", icon: "tasks" },
-    { hash: "#/approvals", label: "Approvals", icon: "approvals" },
-    { hash: "#/search", label: "Search", icon: "search" }
+  /* ---------- grouped primary navigation ----------
+     Home is a standalone link; everything else lives in a
+     collapsible group. Only the group containing the current
+     route is expanded. No Renewal / IFG items — Corporate New
+     Business only. New Business stages are not flat top-level
+     items; they live inside the Sales group. */
+  var NAV_HOME = { hash: "#/home", label: "Home", icon: "home" };
+  var NAV_GROUPS = [
+    { id: "mywork", label: "My Work", icon: "briefcase", items: [
+      { hash: "#/cases",         label: "My Cases",      icon: "briefcase" },
+      { hash: "#/tasks",         label: "My Tasks",      icon: "tasks" },
+      { hash: "#/approvals",     label: "Approvals",     icon: "approvals" },
+      { hash: "#/notifications", label: "Notifications", icon: "bell" }
+    ]},
+    { id: "sales", label: "Sales", icon: "handshake", items: [
+      { hash: "#/franchise-list",     label: "Franchise",                icon: "building" },
+      { hash: "#/franchise-list",     label: "Franchise List",           icon: "layers" },
+      { hash: "#/add-franchise",      label: "Add Franchise",            icon: "plus" },
+      { hash: "#/case/franchise",     label: "Franchise Enrollment",     icon: "edit" },
+      { hash: "#/approvals",          label: "Franchise Approvals",      icon: "approvals" },
+      { hash: "#/new",                label: "Corporate New Business",   icon: "briefcase" },
+      { hash: "#/new",                label: "Account Enrollment — New", icon: "flag" },
+      { hash: "#/case/quotation",     label: "Quotation",                icon: "calc" },
+      { hash: "#/case/proposal",      label: "Proposal and Negotiation", icon: "handshake" },
+      { hash: "#/case/contract",      label: "Contract and KYC",         icon: "gavel" },
+      { hash: "#/case/onboarding",    label: "Account Setup",            icon: "shieldCheck" },
+      { hash: "#/case/sob",           label: "SOB and Benefits",         icon: "layers" },
+      { hash: "#/case/plancodes",     label: "Plan Codes",               icon: "calc" },
+      { hash: "#/case/memberdata",    label: "Member Data",              icon: "users" },
+      { hash: "#/case/billing",       label: "Billing",                  icon: "receipt" },
+      { hash: "#/case/activation",    label: "Activation and Handover",  icon: "rocket" }
+    ]},
+    { id: "maintenance", label: "Maintenance", icon: "shield", items: [
+      { hash: "#/module/account-maintenance", label: "Account Maintenance",      icon: "building" },
+      { hash: "#/module/agent-broker",        label: "Agent/Broker Maintenance", icon: "users" },
+      { hash: "#/module/eligibility",         label: "Eligibility",              icon: "shieldCheck" },
+      { hash: "#/module/rates",               label: "Rate's Creation",          icon: "calc" },
+      { hash: "#/module/plan-types",          label: "Plan Type Management",     icon: "layers" }
+    ]},
+    { id: "inquiry", label: "Inquiry", icon: "search", items: [
+      { hash: "#/search",                  label: "Accounts Inquiry", icon: "search" },
+      { hash: "#/module/plan-code-viewer", label: "Plan Code Viewer", icon: "calc" },
+      { hash: "#/module/sob-viewing",      label: "SOB Viewing",      icon: "layers" },
+      { hash: "#/case/history",            label: "Activity History", icon: "history" }
+    ]},
+    { id: "reports", label: "Reports", icon: "doc", items: [
+      { hash: "#/franchise-list",             label: "Franchise List",     icon: "layers" },
+      { hash: "#/report/franchise-by-agent",  label: "Franchise by Agent", icon: "doc" },
+      { hash: "#/report/franchise-by-sales",  label: "Franchise by Sales", icon: "doc" }
+    ]}
   ];
+
+  // Which group owns the current route (for auto-expand + highlight).
+  function groupForHash(hash) {
+    for (var i = 0; i < NAV_GROUPS.length; i++) {
+      var g = NAV_GROUPS[i];
+      for (var j = 0; j < g.items.length; j++) {
+        if (g.items[j].hash === hash) return g.id;
+      }
+    }
+    if (hash.indexOf("#/case/") === 0) return "sales";   // any case section → Sales
+    if (hash.indexOf("#/module/") === 0) return "maintenance";
+    if (hash.indexOf("#/report/") === 0) return "reports";
+    return null;
+  }
   var CASE_SECTIONS = [
     { id: "summary", label: "Summary", icon: "home", view: "caseSummary", stage: null },
     { id: "lead", label: "Lead", icon: "flag", view: "caseLead", stage: 1 },
@@ -45,22 +102,52 @@
   /* ============================================================
      App chrome
      ============================================================ */
+  function navItem(it, activeHash, expanded) {
+    var active = it.hash === activeHash;
+    return '<a class="nav-link' + (active ? " active" : "") + '" href="' + it.hash + '"' +
+      (active ? ' aria-current="page"' : "") + (expanded ? "" : ' tabindex="-1"') + '>' +
+      icon(it.icon, 18) + '<span class="lbl">' + esc(it.label) + '</span></a>';
+  }
+
   function sidebar(activeHash) {
-    var links = NAV.map(function (n) {
-      var active = activeHash === n.hash || (n.hash === "#/new" && activeHash.indexOf("#/case") === 0);
-      return '<a class="nav-link' + (active ? " active" : "") + '" href="' + n.hash + '">' +
-        icon(n.icon, 20) + '<span class="lbl">' + esc(n.label) + '</span></a>';
+    var expandedId = ui.navGroup !== null ? ui.navGroup : groupForHash(activeHash);
+
+    var homeActive = activeHash === NAV_HOME.hash;
+    var homeLink = '<a class="nav-link nav-home' + (homeActive ? " active" : "") + '" href="' +
+      NAV_HOME.hash + '"' + (homeActive ? ' aria-current="page"' : "") + '>' +
+      icon(NAV_HOME.icon, 18) + '<span class="lbl">' + esc(NAV_HOME.label) + '</span></a>';
+
+    var groups = NAV_GROUPS.map(function (g) {
+      var open = g.id === expandedId;
+      var panelId = "navgrp-" + g.id;
+      var header = '<button type="button" class="nav-group-h" data-ui="navgroup:' + g.id + '"' +
+        ' aria-expanded="' + (open ? "true" : "false") + '" aria-controls="' + panelId + '">' +
+        icon(g.icon, 18) + '<span class="lbl">' + esc(g.label) + '</span>' +
+        '<span class="nav-caret' + (open ? " open" : "") + '" aria-hidden="true">' + icon("chevron", 16) + '</span>' +
+        '</button>';
+      var items = '<div class="nav-group-items" id="' + panelId + '"' + (open ? "" : " hidden") + '>' +
+        g.items.map(function (it) { return navItem(it, activeHash, open); }).join("") + '</div>';
+      return '<div class="nav-group' + (open ? " open" : "") + '">' + header + items + '</div>';
     }).join("");
+
     var moreMenu = ui.menu
       ? '<div class="menu" role="menu">' +
-          '<div class="menu-item" data-ui="noop" role="menuitem">' + icon("doc", 18) + '<span>Reports</span></div>' +
-          '<div class="menu-item" data-ui="noop" role="menuitem">' + icon("shield", 18) + '<span>Settings</span></div>' +
+          '<div class="menu-item" data-nav="#/notifications" role="menuitem">' + icon("bell", 18) + '<span>Notifications</span></div>' +
+          '<div class="menu-item" data-nav="#/report/franchise-by-sales" role="menuitem">' + icon("doc", 18) + '<span>Reports</span></div>' +
           '<div class="menu-item" data-act="reset" role="menuitem">' + icon("history", 18) + '<span>Reset demo</span></div>' +
         '</div>'
       : "";
-    return '<nav class="sidebar" aria-label="Primary">' +
-      '<div class="brand"><span class="mark">VC</span><span class="name">ValuCare<small>HMS3 · New Business</small></span></div>' +
-      '<div class="nav">' + links + '</div>' +
+
+    var collapsed = ui.collapsed;
+    return '<nav class="sidebar' + (collapsed ? " collapsed" : "") + '" aria-label="Primary">' +
+      '<div class="brand">' +
+        '<span class="mark">VC</span>' +
+        '<span class="name">ValuCare<small>HMS3 · New Business</small></span>' +
+        '<button type="button" class="nav-collapse" data-ui="navcollapse" aria-label="' +
+          (collapsed ? "Expand sidebar" : "Collapse sidebar") + '" aria-pressed="' + (collapsed ? "true" : "false") + '">' +
+          icon("chevron", 18) + '</button>' +
+      '</div>' +
+      '<div class="nav">' + homeLink + groups + '</div>' +
       '<div class="spacer"></div>' +
       '<div class="notif-wrap" style="position:relative">' + moreMenu +
         '<div class="profile" data-ui="more" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="' + (ui.menu ? "true" : "false") + '">' +
@@ -158,11 +245,25 @@
       title = (SECTION_TITLE[sectionId] || "Case") + " · " + C.meta.tradeName + " · HMS3";
     } else {
       var crumbs, content, active = hash;
-      switch (hash) {
+      if (hash.indexOf("#/sample/") === 0) {
+        var scId = decodeURIComponent(hash.slice("#/sample/".length));
+        var sc = V.sampleCase(C, scId);
+        content = sc.body; crumbs = '<b>My Cases</b><span class="sep">/</span><span>' + esc(sc.title) + '</span>'; title = sc.title + " · HMS3";
+      } else if (hash.indexOf("#/module/") === 0) {
+        var mod = V.modulePage(C, hash.slice("#/module/".length));
+        content = mod.body; crumbs = '<b>' + esc(mod.title) + '</b>'; title = mod.title + " · HMS3";
+      } else if (hash.indexOf("#/report/") === 0) {
+        var rep = V.reportPage(C, hash.slice("#/report/".length));
+        content = rep.body; crumbs = '<b>Reports</b><span class="sep">/</span><span>' + esc(rep.title) + '</span>'; title = rep.title + " · HMS3";
+      } else switch (hash) {
         case "#/new": content = V.newBusiness(C); crumbs = '<b>New Business</b>'; title = "New Business · HMS3"; break;
-        case "#/search": content = V.searchPage(C); crumbs = '<b>Search</b>'; title = "Search · HMS3"; break;
+        case "#/cases": content = V.myCases(C); crumbs = '<b>My Cases</b>'; title = "My Cases · HMS3"; break;
+        case "#/search": content = V.searchPage(C); crumbs = '<b>Accounts Inquiry</b>'; title = "Accounts Inquiry · HMS3"; break;
         case "#/tasks": content = V.tasks(C); crumbs = '<b>My Tasks</b>'; title = "My Tasks · HMS3"; break;
         case "#/approvals": content = V.approvals(C); crumbs = '<b>Approvals</b>'; title = "Approvals · HMS3"; break;
+        case "#/notifications": content = V.notificationsPage(C); crumbs = '<b>Notifications</b>'; title = "Notifications · HMS3"; break;
+        case "#/franchise-list": content = V.franchiseList(C); crumbs = '<b>Franchise List</b>'; title = "Franchise List · HMS3"; break;
+        case "#/add-franchise": content = V.addFranchise(C); crumbs = '<b>Franchise List</b><span class="sep">/</span><span>Add Franchise</span>'; title = "Add Franchise · HMS3"; break;
         default: active = "#/home"; content = V.home(C); crumbs = '<b>Home</b>'; title = "Home · HMS3";
       }
       html = shell(content, active, crumbs);
@@ -182,6 +283,27 @@
     M.logActivity(C, { title: title, actor: opts.actor, automated: opts.automated, detail: opts.detail });
   }
 
+  // Create (or continue) the case from the selected company. `separate` marks
+  // an authorized override that created a distinct company despite a duplicate.
+  function createCaseFrom(co, separate, reason) {
+    C.meta.client = co.name;
+    C.meta.tradeName = co.shortName;
+    C.meta.tin = co.tin;
+    C.meta.industry = co.nature;
+    if (co.franchiseCode) C.meta.franchiseRef = co.franchiseCode;
+    if (!C.meta.caseNo) C.meta.caseNo = "CNB-2026-00482";
+    C.intake.override = !!separate;
+    C.intake.overrideReason = reason || null;
+    C.duplicateResolved = true;
+    if (separate) {
+      log("Separate company created despite a possible duplicate", { detail: "Reason: " + reason });
+    } else {
+      log("New Business case created", { detail: C.meta.caseNo + " · " + co.name + (co.dup ? " · reused existing company" : "") });
+    }
+    M.notify(C, "Case " + C.meta.caseNo + " created", "info");
+    go("#/case/lead");
+  }
+
   var ACTIONS = {
     "noop": function () {},
 
@@ -193,12 +315,78 @@
       return { toast: "Demo reset — fresh start", skipSave: true };
     },
 
+    /* ---- New Business intake (Find company → Resolve duplicates → Create) ---- */
+    "intake:select": function (id) {
+      C.intake.selectedId = id;
+      C.intake.override = false;
+      C.intake.overrideReason = null;
+      var co = M.findCompany(id);
+      return { toast: co ? ("Selected " + co.shortName) : "Company selected" };
+    },
+    "intake:clear": function () {
+      C.intake.selectedId = null;
+      C.intake.override = false;
+      C.intake.overrideReason = null;
+      return { toast: "Selection cleared" };
+    },
+    "intake:override": function () {
+      var co = M.findCompany(C.intake.selectedId);
+      if (!co) return { toast: "Select a company first" };
+      var ta = document.getElementById("intakeReason");
+      var reason = ta ? ta.value.trim() : "";
+      if (!reason) {
+        if (ta) ta.focus();
+        return { toast: "Enter a reason to create a separate company", skipRender: true };
+      }
+      createCaseFrom(co, true, reason);
+      return { toast: "Separate company created — reason recorded in History" };
+    },
     "case:create": function () {
-      if (!C.meta.caseNo) C.meta.caseNo = "CNB-2026-00482";
-      log("New Business case created", { detail: C.meta.caseNo });
-      M.notify(C, "Case " + C.meta.caseNo + " created", "info");
-      go("#/case/lead");
+      var co = M.findCompany(C.intake.selectedId);
+      if (!co) return { toast: "Select a company first" };
+      if (co.dup && !C.intake.override) {
+        // A possible duplicate can only proceed by reuse here; a separate
+        // company requires the authorized override path. Reuse is intended.
+        createCaseFrom(co, false, null);
+        return { toast: "Case " + C.meta.caseNo + " created — reusing existing company" };
+      }
+      createCaseFrom(co, false, null);
       return { toast: "Case " + C.meta.caseNo + " created" };
+    },
+
+    /* ---- Franchise List table ---- */
+    "franchise:filter": function (status) { C.frList.status = status || "All"; C.frList.page = 1; return {}; },
+    "franchise:sort": function (col) {
+      if (C.frList.sortCol === col) C.frList.sortDir = C.frList.sortDir === "asc" ? "desc" : "asc";
+      else { C.frList.sortCol = col; C.frList.sortDir = "asc"; }
+      return {};
+    },
+    "franchise:page": function (dir) {
+      var rows = M.franchiseRows(C);
+      var pages = Math.max(1, Math.ceil(rows.length / C.frList.size));
+      C.frList.page += (dir === "next" ? 1 : -1);
+      if (C.frList.page < 1) C.frList.page = 1;
+      if (C.frList.page > pages) C.frList.page = pages;
+      return {};
+    },
+    "franchise:size": function (sz) { C.frList.size = parseInt(sz, 10) || 8; C.frList.page = 1; return {}; },
+    "franchise:export": function () {
+      var rows = M.franchiseRows(C);
+      var header = ["Franchise Code", "Name", "Nature of Business", "Status", "Created Date", "Approved Date"];
+      var csv = [header.join(",")].concat(rows.map(function (r) {
+        return [r.code, r.name, r.nature, r.status, r.created || "", r.approved || ""]
+          .map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(",");
+      })).join("\n");
+      try {
+        var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url; a.download = "franchise-list.csv";
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      } catch (_e) {}
+      return { toast: "Exported " + rows.length + " franchises (CSV)", skipRender: true };
     },
 
     /* ---- Lead ---- */
@@ -465,12 +653,12 @@
     }
   };
 
-  function runAction(name) {
+  function runAction(name, arg) {
     var fn = ACTIONS[name];
     if (!fn) return;
-    var res = fn() || {};
+    var res = fn(arg) || {};
     if (!res.skipSave) M.save(C);
-    render();
+    if (!res.skipRender) render();
     if (res.toast) { U.toast(res.toast); announce(res.toast); }
   }
 
@@ -532,7 +720,10 @@
   /* ============================================================
      Events
      ============================================================ */
-  function go(hash) { if (global.location.hash === hash) render(); else global.location.hash = hash; }
+  function go(hash) {
+    ui.navGroup = null;   // let the destination's group auto-expand
+    if (global.location.hash === hash) render(); else global.location.hash = hash;
+  }
 
   document.addEventListener("click", function (e) {
     var close = e.target.closest ? e.target.closest.bind(e.target) : null;
@@ -559,7 +750,7 @@
         });
         return;
       }
-      runAction(name);
+      runAction(name, act.getAttribute("data-arg"));
       return;
     }
     var uiEl = close("[data-ui]");
@@ -568,6 +759,19 @@
       var u = uiEl.getAttribute("data-ui");
       if (u === "notif") { ui.notif = !ui.notif; if (ui.notif) markNotifsRead(); render(); }
       else if (u === "more") { ui.menu = !ui.menu; render(); }
+      else if (u === "navcollapse") {
+        ui.collapsed = !ui.collapsed;
+        render();
+      }
+      else if (u.indexOf("navgroup:") === 0) {
+        var gid = u.slice("navgroup:".length);
+        if (ui.collapsed) { ui.collapsed = false; ui.navGroup = gid; }
+        else {
+          var cur = ui.navGroup !== null ? ui.navGroup : groupForHash(global.location.hash || "#/home");
+          ui.navGroup = cur === gid ? "" : gid;   // "" = all collapsed
+        }
+        render();
+      }
       return;
     }
     var ch = close("[data-choice]");
@@ -588,14 +792,27 @@
       var t = e.target;
       if (t && t.getAttribute) {
         if (t.hasAttribute("data-choice")) { e.preventDefault(); handleChoice(t.getAttribute("data-choice")); }
-        else if (t.hasAttribute("data-ui")) { e.preventDefault(); t.click(); }
+        else if (t.hasAttribute("data-ui") && t.tagName !== "BUTTON" && t.tagName !== "A") { e.preventDefault(); t.click(); }
       }
+    }
+  });
+
+  // Live company search — filter as you type, preserving focus + caret.
+  document.addEventListener("input", function (e) {
+    var t = e.target;
+    if (t && t.id === "coSearch") {
+      C.intake.query = t.value;
+      M.save(C);
+      var caret = t.selectionStart;
+      render();
+      var n = document.getElementById("coSearch");
+      if (n) { n.focus(); try { n.setSelectionRange(caret, caret); } catch (_e) {} }
     }
   });
 
   function markNotifsRead() { C.notifications.forEach(function (n) { n.read = true; }); M.save(C); }
 
-  global.addEventListener("hashchange", function () { render(); focusMain(); });
+  global.addEventListener("hashchange", function () { ui.navGroup = null; render(); focusMain(); });
 
   /* ============================================================
      Boot

@@ -46,16 +46,41 @@ border `#E4E7EC` · surface `#FFFFFF`. Status is **always colour + icon + text**
 
 ## Navigation
 
-**Primary:** Home · New Business · My Tasks · Approvals · Search (Reports and Settings live
-under the user/More menu).
+A **collapsible left sidebar** (not a top-heavy bar) with **Home** plus five groups that
+expand one at a time; the group holding the current page auto-expands, and the active item is
+highlighted (`aria-current="page"`). Every item is text + a simple icon, fully keyboard-operable
+with a visible focus ring; collapsed items are removed from the tab order.
+
+- **Home**
+- **My Work** — My Cases · My Tasks · Approvals · Notifications
+- **Sales** — Franchise · Franchise List · Add Franchise · Franchise Enrollment ·
+  Franchise Approvals · Corporate New Business · Account Enrollment — New · Quotation ·
+  Proposal and Negotiation · Contract and KYC · Account Setup · SOB and Benefits · Plan Codes ·
+  Member Data · Billing · Activation and Handover
+- **Maintenance** — Account Maintenance · Agent/Broker Maintenance · Eligibility ·
+  Rate's Creation · Plan Type Management
+- **Inquiry** — Accounts Inquiry · Plan Code Viewer · SOB Viewing · Activity History
+- **Reports** — Franchise List · Franchise by Agent · Franchise by Sales
+
+New Business stages are reached **inside the case**, not as permanent flat menu items. The scope is
+**Corporate New Business only** — no Renewal, IFG, or Unverified-team items appear anywhere.
 
 **Case sections (14):** Summary · Lead · Franchise · Quotation · Proposal · Negotiation ·
 Contract · Onboarding · SOB and Benefits · Plan Codes · Member Data · Billing · Activation · History.
 
-**Global 7-stage indicator (customer-oriented):** 1 Lead and Franchise · 2 Quotation ·
-3 Proposal and Negotiation · 4 Contract and Compliance · 5 Account and Benefits ·
-6 Members and Billing · 7 Activation and Handover — each with a plain-language status and owner.
-Eight statuses are used; there is **no progress-percentage** as the primary cue.
+**Global 7-stage indicator:** 1 Franchise · 2 Quotation · 3 Proposal · 4 Contract and KYC ·
+5 Account and Benefits · 6 Member Data and Billing · 7 Activation — each with an owner and exactly
+one of **eight** plain-language statuses (Not started · In progress · Waiting for client ·
+Waiting for another team · Returned for correction · Blocked · Ready for approval · Completed).
+There is **no progress-percentage** as the primary cue.
+
+## Starting a case (find company first, never duplicate)
+
+New Business opens a three-step intake — **Find company → Resolve duplicates → Create case** —
+backed by a real company register you search live. Nothing is pre-filled. Selecting a record stores
+it; a possible duplicate **blocks** case creation until you either reuse the existing company or, with
+an explicit typed reason, create a separate company. That authorized override is written to Activity
+History against your name and role. All demo client data is clearly marked **fictional**.
 
 ## The connected flow (clickable, end-to-end)
 

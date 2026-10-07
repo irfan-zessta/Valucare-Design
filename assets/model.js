@@ -85,10 +85,15 @@
         product: "Corporate Health Plan",
         members: 420,
         effectivity: "2026-11-01",
+        taskDue: "2026-10-09",         // the next action's own due date (not effectivity)
         franchiseValidity: "90 days",
         franchiseExpiry: "2026-12-30",
         owner: "A. Reyes"
       },
+      /* New Business intake (Find company → Resolve duplicates → Create) */
+      intake: { query: "", selectedId: null, override: false, overrideReason: null },
+      /* transient Franchise List table state (search/filter/sort/paging) */
+      frList: { status: "All", sortCol: "created", sortDir: "desc", page: 1, size: 8 },
       /* records produced along the way (so nothing is re-entered) */
       duplicateResolved: false,
       requirements: null,
@@ -118,40 +123,100 @@
   /* --- sample cards for Home (static, for realism only) --- */
   var SAMPLE_CASES = [
     { caseNo: "CNB-2026-00461", client: "Southgate Logistics Inc.", channel: "Direct",
-      stage: "Proposal and Negotiation", status: "Waiting for client", statusKind: "warn",
+      stage: "Proposal", stageId: 3, status: "Waiting for client", statusKind: "warn",
       next: "Follow up on proposal v2 sent 25 Sep", owner: "A. Reyes", due: "2026-10-09",
       effectivity: "2026-11-01", members: 180, blocker: null, waiting: "client" },
     { caseNo: "CNB-2026-00455", client: "Harbor Freight Services", channel: "Agent / Broker",
-      stage: "Contract and Compliance", status: "Waiting for another team", statusKind: "warn",
+      stage: "Contract and KYC", stageId: 4, status: "Waiting for another team", statusKind: "warn",
       next: "Legal reviewing DSA draft", owner: "Legal", due: "2026-10-10",
       effectivity: "2026-11-15", members: 95, blocker: null, waiting: "team" },
     { caseNo: "CNB-2026-00448", client: "Delta Pharma Distributors", channel: "Direct",
-      stage: "Members and Billing", status: "Action required", statusKind: "warn",
+      stage: "Member Data and Billing", stageId: 6, status: "Blocked", statusKind: "error",
       next: "Resolve VAT document discrepancy", owner: "Billing", due: "2026-10-08",
       effectivity: "2026-10-20", members: 310, blocker: "VAT document mismatch", waiting: null }
   ];
 
+  /* --- franchise register (demo data, clearly fictional) for the Franchise List --- */
+  var SAMPLE_FRANCHISES = [
+    { code: "FR-2026-00142", name: "Northwind Manufacturing Corporation", nature: "Manufacturing", status: "For approval",   created: "2026-10-05", approved: null },
+    { code: "FR-2026-00138", name: "Southgate Logistics Inc.",            nature: "Logistics",      status: "Approved",       created: "2026-09-28", approved: "2026-09-30" },
+    { code: "FR-2026-00129", name: "Harbor Freight Services",             nature: "Freight",        status: "Approved",       created: "2026-09-20", approved: "2026-09-22" },
+    { code: "FR-2026-00117", name: "Delta Pharma Distributors",           nature: "Pharmaceuticals",status: "Approved",       created: "2026-09-11", approved: "2026-09-12" },
+    { code: "FR-2026-00104", name: "Vertex Engineering Group",            nature: "Engineering",    status: "Returned",       created: "2026-09-03", approved: null },
+    { code: "FR-2026-00098", name: "Lakeside Hospitality Corp.",          nature: "Hospitality",    status: "Approved",       created: "2026-08-25", approved: "2026-08-27" },
+    { code: "FR-2026-00091", name: "Meridian Retail Holdings",            nature: "Retail",         status: "Draft",          created: "2026-08-18", approved: null },
+    { code: "FR-2026-00085", name: "Cascade Agri Ventures",               nature: "Agriculture",    status: "Approved",       created: "2026-08-09", approved: "2026-08-11" },
+    { code: "FR-2026-00077", name: "Ironwood Construction Inc.",          nature: "Construction",   status: "Approved",       created: "2026-07-30", approved: "2026-08-01" },
+    { code: "FR-2026-00068", name: "Brightpath Education Network",        nature: "Education",      status: "Approved",       created: "2026-07-21", approved: "2026-07-23" },
+    { code: "FR-2026-00060", name: "Summit Financial Partners",          nature: "Financial",      status: "For approval",   created: "2026-07-12", approved: null },
+    { code: "FR-2026-00054", name: "Coastal Seafoods Trading",            nature: "Trading",        status: "Approved",       created: "2026-07-03", approved: "2026-07-05" }
+  ];
+
+  /* --- searchable company register for New Business intake (demo, fictional) ---
+     `dup` marks a possible duplicate that must be resolved before a new case
+     can be created. Searchable by registered name, short name, TIN, franchise
+     code, or account reference. */
+  var COMPANIES = [
+    { id: "co-northwind", name: "Northwind Manufacturing Corporation", shortName: "Northwind",
+      tin: "009-842-337-000", franchiseCode: null, accountRef: null, nature: "Manufacturing",
+      dup: true, detail: "Company record exists · no active account", tag: "Possible duplicate" },
+    { id: "co-northwind-old", name: "Northwind Mfg. Corp.", shortName: "Northwind Mfg",
+      tin: "009-842-337-000", franchiseCode: "FR-2025-00981", accountRef: null, nature: "Manufacturing",
+      dup: true, detail: "Expired franchise FR-2025-00981 (2025-12-01)", tag: "Possible duplicate" },
+    { id: "co-southgate", name: "Southgate Logistics Inc.", shortName: "Southgate",
+      tin: "006-221-905-000", franchiseCode: "FR-2026-00138", accountRef: "ACC-2026-10712", nature: "Logistics",
+      dup: true, detail: "Active account ACC-2026-10712", tag: "Active account exists" },
+    { id: "co-harbor", name: "Harbor Freight Services", shortName: "Harbor",
+      tin: "004-118-662-000", franchiseCode: "FR-2026-00129", accountRef: "ACC-2026-10688", nature: "Freight",
+      dup: true, detail: "Active account ACC-2026-10688", tag: "Active account exists" },
+    { id: "co-northstar", name: "Northstar Industrial Corp.", shortName: "Northstar",
+      tin: "012-553-410-000", franchiseCode: null, accountRef: null, nature: "Industrial",
+      dup: false, detail: "No existing records — safe to create", tag: "No conflict" },
+    { id: "co-brightpath", name: "Brightpath Education Network", shortName: "Brightpath",
+      tin: "018-900-221-000", franchiseCode: "FR-2026-00068", accountRef: "ACC-2026-10501", nature: "Education",
+      dup: true, detail: "Active account ACC-2026-10501", tag: "Active account exists" }
+  ];
+  function findCompany(id) { for (var i = 0; i < COMPANIES.length; i++) if (COMPANIES[i].id === id) return COMPANIES[i]; return null; }
+
+  // Filtered + sorted franchise rows for the Franchise List (shared by the
+  // table view and the CSV export so both always agree). Not paginated.
+  function franchiseRows(c) {
+    var st = c.frList || { status: "All", sortCol: "created", sortDir: "desc" };
+    var q = (c.intake && c.intake.query ? c.intake.query : "").trim().toLowerCase();
+    var rows = SAMPLE_FRANCHISES.filter(function (r) {
+      if (st.status && st.status !== "All" && r.status !== st.status) return false;
+      if (!q) return true;
+      return [r.code, r.name, r.nature].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; });
+    });
+    var col = st.sortCol || "created", dir = st.sortDir === "asc" ? 1 : -1;
+    rows = rows.slice().sort(function (a, b) {
+      var av = a[col] == null ? "" : a[col], bv = b[col] == null ? "" : b[col];
+      return av < bv ? -1 * dir : av > bv ? 1 * dir : 0;
+    });
+    return rows;
+  }
+
   /* --- the 7 customer-oriented stages --- */
   var STAGES = [
-    { id: 1, name: "Lead and Franchise",
+    { id: 1, name: "Franchise",
       flags: ["leadCaptured", "channelValidated", "franchiseCreated", "franchiseApproved"],
       owner: "Corporate Sales", section: "lead" },
     { id: 2, name: "Quotation",
       flags: ["requirementsComplete", "quotationSubmitted", "rateSheetReceived", "pricingApproved"],
       owner: "Sales · Actuarial", section: "quotation" },
-    { id: 3, name: "Proposal and Negotiation",
+    { id: 3, name: "Proposal",
       flags: ["proposalGenerated", "proposalSent", "clientAccepted"],
       owner: "Corporate Sales", section: "proposal" },
-    { id: 4, name: "Contract and Compliance",
+    { id: 4, name: "Contract and KYC",
       flags: ["contractSigned", "kycCleared"],
       owner: "Legal · Compliance", section: "contract" },
     { id: 5, name: "Account and Benefits",
       flags: ["accountCreated", "sobApproved", "cocGenerated", "planCodesApproved"],
       owner: "Account Services", section: "onboarding" },
-    { id: 6, name: "Members and Billing",
+    { id: 6, name: "Member Data and Billing",
       flags: ["memberDataAccepted", "billingComplete"],
       owner: "MDA · Billing", section: "memberdata" },
-    { id: 7, name: "Activation and Handover",
+    { id: 7, name: "Activation",
       flags: ["activationReady", "accountActivated", "handoverComplete"],
       owner: "Account Services", section: "activation" }
   ];
@@ -181,36 +246,32 @@
     var f = c.flags;
     switch (o.stage.id) {
       case 1:
-        if (!f.leadCaptured) return "Action required";
-        if (!f.channelValidated) return "In progress";
-        if (!f.franchiseCreated) return "Action required";
-        return "Under review";
+        if (!f.franchiseCreated) return "In progress";
+        return "Ready for approval";                       // created, awaiting checker
       case 2:
-        if (!f.requirementsComplete) return "Action required";
-        if (!f.quotationSubmitted) return "Action required";
-        if (c.quotation && c.quotation.status === "Clarification required" && !f.clarificationAnswered) return "Action required";
+        if (!f.requirementsComplete) return "In progress";
+        if (!f.quotationSubmitted) return "In progress";
+        if (c.quotation && c.quotation.status === "Clarification required" && !f.clarificationAnswered) return "Waiting for another team";
         if (!f.rateSheetReceived) return "Waiting for another team";
-        return "Under review";
+        return "Ready for approval";                       // rate sheet in, needs pricing sign-off
       case 3:
-        if (!f.proposalGenerated) return "Action required";
-        if (!f.proposalSent) return "Action required";
-        if (c.declined) return "Action required";
+        if (!f.proposalGenerated) return "In progress";
+        if (!f.proposalSent) return "In progress";
+        if (c.declined) return "Blocked";                  // client declined — paused
         return "Waiting for client";
       case 4:
-        if (!f.contractSigned) return "In progress";
         return "In progress";
       case 5:
-        if (!f.accountCreated) return "Action required";
-        if (!f.sobApproved) return "In progress";
-        if (!f.cocGenerated) return "In progress";
-        return "Under review";
+        if (!f.accountCreated) return gatePassed(c) ? "In progress" : "Blocked";
+        if (c.planCodes && c.planCodes.returned && !f.planCodesApproved) return "Returned for correction";
+        if (c.planCodes && c.planCodes.generated && !f.planCodesApproved) return "Ready for approval";
+        return "In progress";
       case 6:
-        if (!f.memberDataAccepted) return "In progress";
+        if (c.memberData && c.memberData.issues > 0 && !c.memberData.fixed) return "Returned for correction";
         return "In progress";
       case 7:
         if (!f.activationReady) return "In progress";
-        if (!f.accountActivated) return "Action required";
-        return "In progress";
+        return "Ready for approval";                       // ready, awaiting activation confirm
     }
     return "In progress";
   }
@@ -329,7 +390,8 @@
 
   global.HMS = {
     STORE_KEY: STORE_KEY, PEOPLE: PEOPLE, FLAG_ORDER: FLAG_ORDER, GATE_FLAGS: GATE_FLAGS,
-    STAGES: STAGES, SAMPLE_CASES: SAMPLE_CASES,
+    STAGES: STAGES, SAMPLE_CASES: SAMPLE_CASES, SAMPLE_FRANCHISES: SAMPLE_FRANCHISES,
+    COMPANIES: COMPANIES, findCompany: findCompany, franchiseRows: franchiseRows,
     createInitialCase: createInitialCase, gatePassed: gatePassed,
     stageSummary: stageSummary, currentStage: currentStage, nextStep: nextStep,
     milestoneProgress: milestoneProgress, logActivity: logActivity, notify: notify,

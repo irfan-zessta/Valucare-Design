@@ -82,22 +82,22 @@
 
     var actionRows = [], clientRows = [], teamRows = [], effRows = [];
     if (started && !c.flags.handoverComplete) {
-      var row = { text: ns.title, client: c.meta.client, ref: c.meta.caseNo, due: c.meta.effectivity, status: cur.statusText, route: ns.route };
+      var row = { text: ns.title, client: c.meta.client, ref: c.meta.caseNo, due: c.meta.taskDue, status: cur.statusText, route: ns.route };
       if (cur.statusText === "Waiting for client") clientRows.push(row);
       else if (cur.statusText.indexOf("another team") >= 0) teamRows.push(row);
       else actionRows.push(row);
     }
     M.SAMPLE_CASES.forEach(function (sx) {
-      var r = { text: sx.next, client: sx.client, ref: sx.caseNo, due: sx.due, status: sx.status, blocker: sx.blocker, route: "#/home" };
+      var r = { text: sx.next, client: sx.client, ref: sx.caseNo, due: sx.due, status: sx.status, blocker: sx.blocker, route: "#/sample/" + sx.caseNo };
       if (sx.waiting === "client") clientRows.push(r);
       else if (sx.waiting === "team") teamRows.push(r);
       else actionRows.push(r);
-      effRows.push({ text: "Target effectivity " + fmtDate(sx.effectivity), client: sx.client, ref: sx.caseNo, due: sx.effectivity, status: sx.status, route: "#/home" });
+      effRows.push({ text: "Target effectivity " + fmtDate(sx.effectivity), client: sx.client, ref: sx.caseNo, due: sx.effectivity, status: sx.status, route: "#/sample/" + sx.caseNo });
     });
     if (started) effRows.unshift({ text: "Target effectivity " + fmtDate(c.meta.effectivity), client: c.meta.client, ref: c.meta.caseNo, due: c.meta.effectivity, status: cur.statusText, route: "#/case/summary" });
 
     var sampleCards = M.SAMPLE_CASES.map(function (sx) {
-      return '<a class="card card-link" href="#/home"><div class="row between">' +
+      return '<a class="card card-link" href="#/sample/' + encodeURIComponent(sx.caseNo) + '"><div class="row between">' +
         '<div class="eyebrow" style="color:var(--text-3)">' + esc(sx.caseNo) + '</div>' + pill(sx.status) + '</div>' +
         '<div class="section-title mt-2">' + esc(sx.client) + '</div>' +
         '<div class="muted" style="font-size:13px;margin-top:2px">' + esc(sx.channel) + ' · ' + esc(sx.stage) + '</div>' +
@@ -124,49 +124,110 @@
   /* ============================================================
      GLOBAL SEARCH / NEW BUSINESS ENTRY (duplicate checking)
      ============================================================ */
-  function searchResults(query) {
-    return '<div class="stack-3">' +
-      resultRow("building", "blue", "Northwind Manufacturing Corporation", "Existing company · TIN 009-842-337-000", "No active account", "Possible duplicate",
-        btn("Use existing company", { size: "sm", act: "lead:usecompany" })) +
-      resultRow("flag", "amber", "Northwind Mfg. Corp.", "Existing franchise FR-2025-00981 · Expired", "Franchise expired 2025-12-01", "No conflict", "") +
-      resultRow("briefcase", "gray", "Northstar Industrial (different TIN)", "Different legal entity", "Unrelated", "No conflict",
-        btn("Confirm different entity", { size: "sm", variant: "ghost", act: "noop" })) +
-    '</div>';
+  function matchCompany(co, q) {
+    q = (q || "").trim().toLowerCase();
+    if (!q) return true;
+    return [co.name, co.shortName, co.tin, co.franchiseCode, co.accountRef].some(function (v) {
+      return v && String(v).toLowerCase().indexOf(q) >= 0;
+    });
   }
-  function resultRow(ic, tone, title, sub, detail, tag, action) {
-    var tagKind = tag === "Possible duplicate" ? "warn" : tag === "No conflict" ? "success" : "neutral";
-    return '<div class="task"><span class="medallion ' + tone + '" style="width:40px;height:40px">' + icon(ic, 20) + '</span>' +
-      '<div class="t-main"><div class="t-name">' + esc(title) + ' ' + pill(tag, tagKind) + '</div>' +
+  function companyRow(co, selectedId) {
+    var isSel = co.id === selectedId;
+    var tagKind = co.tag === "No conflict" ? "success" : co.dup ? "warn" : "neutral";
+    var tone = co.dup ? "amber" : "green";
+    var sub = [co.nature, "TIN " + co.tin, co.franchiseCode ? "Franchise " + co.franchiseCode : null, co.accountRef ? "Account " + co.accountRef : null]
+      .filter(Boolean).join(" · ");
+    var action = isSel
+      ? '<span class="btn btn-sm" aria-disabled="true" style="pointer-events:none;color:var(--green);border-color:var(--green)">' + icon("check", 16) + '<span>Selected</span></span>'
+      : btn("Use this company", { size: "sm", variant: co.dup ? "ghost" : "primary", act: "intake:select", arg: co.id });
+    return '<div class="task' + (isSel ? " selected" : "") + '"><span class="medallion ' + tone + '" style="width:40px;height:40px">' + icon("building", 20) + '</span>' +
+      '<div class="t-main"><div class="t-name">' + esc(co.name) + ' ' + pill(co.tag, tagKind) + '</div>' +
       '<div class="t-reason">' + esc(sub) + '</div>' +
-      '<div class="t-meta"><span>' + esc(detail) + '</span></div></div>' + (action || "") + '</div>';
+      '<div class="t-meta"><span>' + esc(co.detail) + '</span></div></div>' + action + '</div>';
+  }
+  function nbSteps(active) {
+    var labels = ["Find company", "Resolve duplicates", "Create case"];
+    return '<ol class="wsteps" aria-label="New Business steps">' + labels.map(function (l, i) {
+      var n = i + 1, state = n < active ? "done" : n === active ? "current" : "todo";
+      return '<li class="wstep ' + state + '"><span class="wnode">' + (state === "done" ? icon("check", 14) : n) + '</span>' +
+        '<span class="wlbl">' + esc(l) + '</span></li>';
+    }).join("") + '</ol>';
   }
 
   function newBusiness(c) {
-    var has = c.meta.caseNo;
-    return sectionShell("New Business", "Before creating a case, search for existing company, franchise, account, affiliate or intermediary records so you never duplicate.",
-      card(
-        '<label class="field" style="margin:0"><span style="font-weight:600">Search company, TIN, franchise, account, affiliate or Agent/Broker</span>' +
-        '<div class="search-wrap mt-2">' + icon("search", 20) +
-        '<input class="input input-lg" id="coSearch" placeholder="e.g. Northwind, TIN, FR-…, ACC-…" value="Northwind" aria-describedby="coSearch_h" /></div>' +
-        '<span class="help mt-2" id="coSearch_h">We check existing records so you can reuse them instead of starting over. Results appear in under two seconds.</span></label>' +
-        '<div class="divider"></div>' +
-        '<div class="row between" style="margin-bottom:12px"><h3 style="font-size:15px;font-weight:650">3 possible matches</h3><span class="tiny">Found in 0.4s</span></div>' +
-        searchResults("Northwind") +
-        banner("warn", "Possible duplicate found", "A company with this name exists but has no active account. Reuse it, or confirm this is a different legal entity before creating a new company.") +
-        actionbar(
-          has ? btn("Continue current case", { variant: "primary", iconRight: "arrowRight", nav: "#/case/summary" })
-              : btn("Create New Business case", { variant: "primary", icon: "plus", act: "case:create" }),
-          btn("Back to Home", { variant: "ghost", icon: "arrowLeft", nav: "#/home" }))
-      ));
+    var q = c.intake.query || "";
+    var selected = M.findCompany(c.intake.selectedId);
+    var matches = M.COMPANIES.filter(function (co) { return matchCompany(co, q); });
+
+    var activeStep = !selected ? 1 : ((selected.dup && !c.intake.override) ? 2 : 3);
+
+    // Step 1 — search + results
+    var resultsHead = '<div class="row between" style="margin-bottom:12px"><h3 style="font-size:15px;font-weight:650">' +
+      (q ? (matches.length + ' match' + (matches.length === 1 ? "" : "es") + ' for “' + esc(q) + '”') : 'All company records') +
+      '</h3><span class="tiny">' + M.COMPANIES.length + ' records</span></div>';
+    var resultsList = matches.length
+      ? '<div class="stack-3" id="nbResults">' + matches.map(function (co) { return companyRow(co, c.intake.selectedId); }).join("") + '</div>'
+      : '<div class="muted" id="nbResults">No records match “' + esc(q) + '”. You can create a new company below.</div>';
+
+    var searchCard = card(
+      '<label class="field" style="margin:0"><span style="font-weight:600">Search by registered name, short name, TIN, franchise code or account reference</span>' +
+      '<div class="search-wrap mt-2">' + icon("search", 20) +
+      '<input class="input input-lg" id="coSearch" placeholder="e.g. Northwind · 009-842-337-000 · FR-2026-… · ACC-2026-…" value="' + esc(q) + '" autocomplete="off" aria-describedby="coSearch_h" /></div>' +
+      '<span class="help mt-2" id="coSearch_h">We check existing records so you can reuse them instead of creating a duplicate. Start typing to filter.</span></label>' +
+      '<div class="divider"></div>' + resultsHead + resultsList);
+
+    // Step 2/3 — resolution panel for the selected company
+    var panel = "";
+    if (selected) {
+      var inner = '<div class="row between"><div><div class="eyebrow">Selected company</div>' +
+        '<div class="section-title mt-1">' + esc(selected.name) + '</div>' +
+        '<div class="muted" style="font-size:13px">' + esc(selected.nature) + ' · TIN ' + esc(selected.tin) + '</div></div>' +
+        btn("Change", { size: "sm", variant: "ghost", act: "intake:clear" }) + '</div>';
+
+      if (!selected.dup) {
+        inner += banner("success", "No conflict", "No existing franchise or account for this company. You can create the case.") +
+          actionbar(btn("Create New Business case", { variant: "primary", icon: "plus", act: "case:create" }),
+            btn("Back to Home", { variant: "ghost", icon: "arrowLeft", nav: "#/home" }));
+      } else if (!c.intake.override) {
+        inner += banner("warn", "Possible duplicate — resolve before creating",
+          esc(selected.detail) + ". Reuse this existing company, or — only if this is genuinely a different legal entity — record an authorized reason to create a separate company.") +
+          '<div class="actionbar"><span class="spacer"></span>' +
+          btn("Continue with existing company", { variant: "primary", iconRight: "arrowRight", act: "case:create" }) + '</div>' +
+          reveal("Create a separate company instead (authorization required)",
+            '<label class="field"><span style="font-weight:600">Reason for creating a separate company <span style="color:var(--red)">*</span></span>' +
+            '<textarea class="textarea" id="intakeReason" rows="3" placeholder="e.g. Different legal entity sharing a trade name; confirmed distinct TIN registration with SEC."></textarea>' +
+            '<span class="help mt-2">This reason is recorded in Activity History against your name and role.</span></label>' +
+            '<div class="actionbar"><span class="spacer"></span>' +
+            btn("Create separate company", { variant: "danger", icon: "plus", act: "intake:override" }) + '</div>');
+      }
+      panel = card(inner);
+    }
+
+    return sectionShell("Corporate New Business",
+      "Find the company first so you never create a duplicate. Reuse an existing record, or — with authorization — create a separate company.",
+      '<div class="stack-5">' + nbSteps(activeStep) + searchCard + panel + '</div>');
   }
 
   function searchPage(c) {
-    return sectionShell("Search", "Find any company, franchise, account, affiliate or Agent/Broker across HMS3.",
+    var q = c.intake.query || "";
+    var matches = M.COMPANIES.filter(function (co) { return matchCompany(co, q); });
+    return sectionShell("Accounts Inquiry", "Find any company, franchise or account across HMS3 Corporate New Business.",
       card(
         '<label class="field" style="margin:0"><span style="font-weight:600">Search</span>' +
         '<div class="search-wrap mt-2">' + icon("search", 20) +
-        '<input class="input input-lg" placeholder="Company, TIN, registration, franchise, account, affiliate, Agent/Broker" value="Northwind" /></div></label>' +
-        '<div class="divider"></div>' + searchResults("Northwind")
+        '<input class="input input-lg" id="coSearch" placeholder="Company, short name, TIN, franchise code, account reference" value="' + esc(q) + '" autocomplete="off" /></div></label>' +
+        '<div class="divider"></div>' +
+        '<div class="row between" style="margin-bottom:12px"><h3 style="font-size:15px;font-weight:650">' +
+          (q ? matches.length + ' result' + (matches.length === 1 ? "" : "s") : 'All records') + '</h3></div>' +
+        (matches.length
+          ? '<div class="stack-3" id="nbResults">' + matches.map(function (co) {
+              var tagKind = co.dup ? "warn" : "success";
+              var sub = [co.nature, "TIN " + co.tin, co.franchiseCode, co.accountRef].filter(Boolean).join(" · ");
+              return '<div class="task"><span class="medallion ' + (co.dup ? "amber" : "green") + '" style="width:40px;height:40px">' + icon("building", 20) + '</span>' +
+                '<div class="t-main"><div class="t-name">' + esc(co.name) + ' ' + pill(co.tag, tagKind) + '</div>' +
+                '<div class="t-reason">' + esc(sub) + '</div></div></div>';
+            }).join("") + '</div>'
+          : '<div class="muted" id="nbResults">No records match “' + esc(q) + '”.</div>')
       ));
   }
 
@@ -233,11 +294,19 @@
   function caseLead(c) {
     var f = c.flags;
     if (!f.leadCaptured) {
-      return sectionShell("Lead", "Record the opportunity and confirm the company before you build the case.",
-        card(head("Company", pill("Possible duplicate", "warn")) +
-          banner("warn", "A matching company exists", "“Northwind Manufacturing Corporation” is already in HMS3 with no active account. Reuse it so records stay connected.") +
-          resultRow("building", "blue", "Northwind Manufacturing Corporation", "TIN 009-842-337-000 · No active account", "Last seen 2025", "Possible duplicate",
-            btn("Use this company", { size: "sm", act: "noop" })) ) +
+      var dupResolved = c.intake.override;
+      return sectionShell("Lead", "Record the opportunity for the company you confirmed in the New Business intake.",
+        card(head("Company", pill("Confirmed", "success")) +
+          (dupResolved
+            ? banner("warn", "Separate company — authorized", "A possible duplicate was found and overridden. Reason on record: " + esc(c.intake.overrideReason || "—") + ". See Activity History.")
+            : banner("success", "Company confirmed", "Selected from existing records during the New Business intake, so no duplicate conflict remains.")) +
+          U.dl([
+            ["Registered name", c.meta.client || "—"],
+            ["Short name", c.meta.tradeName || "—"],
+            ["TIN", c.meta.tin || "—"],
+            ["Nature of business", c.meta.industry || "—"]
+          ].concat(c.meta.franchiseRef ? [["Existing franchise", c.meta.franchiseRef]] : []), true) +
+          '<div class="row" style="margin-top:12px"><a href="#/new" class="btn btn-ghost btn-sm">Change company</a></div>') +
         card(head("Lead details") +
           U.field({ label: "How did this opportunity come to ValuCare?", type: "select", value: c.meta.leadSource, options: ["Referral", "Inbound enquiry", "Existing relationship", "Agent/Broker introduction"] }) +
           U.field({ label: "Primary contact", value: c.meta.contactName }) +
@@ -958,8 +1027,240 @@
     return parseInt(p[2], 10) + " " + months[parseInt(p[1], 10) - 1] + " " + p[0];
   }
 
+  /* ============================================================
+     MY CASES  ·  NOTIFICATIONS  ·  SAMPLE CASE (read-only)
+     ============================================================ */
+  function caseTone(status) {
+    if (status === "Blocked") return "red";
+    if (status === "Completed") return "green";
+    if (status === "Waiting for client" || status === "Waiting for another team" ||
+        status === "Returned for correction" || status === "Ready for approval") return "amber";
+    return "blue";
+  }
+  function myCases(c) {
+    var started = c.flags.leadCaptured || c.meta.caseNo;
+    var cur = M.currentStage(c);
+    var cards = "";
+    if (started) {
+      cards += '<a class="card card-link" href="#/case/summary"><div class="row between">' +
+        '<div class="eyebrow">' + esc(c.meta.caseNo || "Draft — not yet created") + '</div>' + pill(cur.statusText) + '</div>' +
+        '<div class="section-title mt-2">' + esc(c.meta.client) + '</div>' +
+        '<div class="muted" style="font-size:13px;margin-top:2px">' + esc(c.meta.channel || "Channel not set") + ' · Stage ' + cur.stage.id + ' of 7 — ' + esc(cur.stage.name) + '</div>' +
+        '<div class="t-meta mt-3"><span class="tiny">' + icon("user", 13) + ' ' + esc(c.meta.owner) + '</span>' +
+        '<span class="tiny">' + icon("clock", 13) + ' Due ' + fmtDate(c.meta.taskDue) + '</span></div></a>';
+    }
+    cards += M.SAMPLE_CASES.map(function (sx) {
+      return '<a class="card card-link" href="#/sample/' + encodeURIComponent(sx.caseNo) + '"><div class="row between">' +
+        '<div class="eyebrow" style="color:var(--text-3)">' + esc(sx.caseNo) + '</div>' + pill(sx.status) + '</div>' +
+        '<div class="section-title mt-2">' + esc(sx.client) + '</div>' +
+        '<div class="muted" style="font-size:13px;margin-top:2px">' + esc(sx.channel) + ' · Stage ' + sx.stageId + ' of 7 — ' + esc(sx.stage) + '</div>' +
+        (sx.blocker ? '<div class="mt-3" style="font-size:13px;color:var(--red)">' + icon("alert", 13) + ' Blocker: ' + esc(sx.blocker) + '</div>' : '') +
+        '<div class="t-meta mt-3"><span class="tiny">' + icon("user", 13) + ' ' + esc(sx.owner) + '</span>' +
+        '<span class="tiny">' + icon("clock", 13) + ' Due ' + fmtDate(sx.due) + '</span></div></a>';
+    }).join("");
+
+    return '<div class="stack-6">' +
+      U.pageHead("My Cases", "Every Corporate New Business case you own. Open one to continue it.") +
+      '<div class="row between"><span class="muted" style="font-size:13.5px">' + (started ? (M.SAMPLE_CASES.length + 1) : M.SAMPLE_CASES.length) + ' cases</span>' +
+      '<a href="#/new" class="btn btn-primary btn-sm">' + icon("plus", 16) + '<span>New Business case</span></a></div>' +
+      '<div class="grid-3">' + cards + '</div>' +
+      '<p class="tiny muted">All displayed client data is fictional, for demonstration only.</p></div>';
+  }
+
+  function notificationsPage(c) {
+    var items = c.notifications.length
+      ? '<div class="stack-3">' + c.notifications.map(function (n) {
+          var ic = n.kind === "success" ? "checkCircle" : n.kind === "warn" ? "alert" : n.kind === "error" ? "alert" : "info";
+          var tone = n.kind === "success" ? "green" : (n.kind === "warn" || n.kind === "error") ? "amber" : "blue";
+          return '<div class="task"><span class="medallion ' + tone + '" style="width:40px;height:40px">' + icon(ic, 20) + '</span>' +
+            '<div class="t-main"><div class="t-name">' + esc(n.title) + '</div>' +
+            '<div class="t-reason">' + esc(n.ts) + (n.read ? "" : ' · <span style="color:var(--blue)">New</span>') + '</div></div></div>';
+        }).join("") + '</div>'
+      : card(banner("info", "No notifications yet", "Updates about your cases will appear here."));
+    return '<div class="stack-6">' + U.pageHead("Notifications", "Updates across your Corporate New Business cases.") + items + '</div>';
+  }
+
+  function sampleCase(c, caseNo) {
+    var sx = M.SAMPLE_CASES.filter(function (s) { return s.caseNo === caseNo; })[0];
+    if (!sx) return { title: "Case not found", body: sectionShell("Case not found",
+      "That reference doesn't match a case.", actionbar(btn("Back to My Cases", { variant: "primary", nav: "#/cases" }))) };
+
+    var hero = '<div class="hero"><span class="medallion ' + caseTone(sx.status) + '" style="width:52px;height:52px">' + icon(stageIcon(sx.stageId), 26) + '</span>' +
+      '<div><div class="h-eyebrow">' + esc(sx.caseNo) + ' · read-only reference case</div><h2>' + esc(sx.client) + '</h2>' +
+      '<p>Next: ' + esc(sx.next) + '</p>' +
+      '<div class="h-meta"><span>' + icon("user", 14) + ' Owner <b>' + esc(sx.owner) + '</b></span>' +
+      '<span>' + icon("clock", 14) + ' Due <b>' + fmtDate(sx.due) + '</b></span>' +
+      '<span>' + icon("flag", 14) + ' Stage <b>' + sx.stageId + ' of 7</b></span></div></div>' +
+      pill(sx.status) + '</div>';
+
+    var details = card(head("Case details") + U.dl([
+      ["Case number", sx.caseNo],
+      ["Company", sx.client],
+      ["Channel", sx.channel],
+      ["Current stage", "Stage " + sx.stageId + " — " + sx.stage],
+      ["Status", sx.status],
+      ["Members", String(sx.members)],
+      ["Target effectivity", fmtDate(sx.effectivity)],
+      ["Next action due", fmtDate(sx.due)],
+      ["Owner", sx.owner],
+      ["Blocker", sx.blocker || "None"]
+    ]));
+
+    var body = '<div class="stack-6">' + hero +
+      banner("info", "Reference case", "This is one of several distinct demo cases. It opens its own record — it is read-only in this prototype. Your editable case is " + (c.meta.caseNo || "the draft") + ".") +
+      details +
+      actionbar(btn("Back to My Cases", { variant: "primary", icon: "arrowLeft", nav: "#/cases" })) +
+      '<p class="tiny muted">All displayed client data is fictional, for demonstration only.</p></div>';
+    return { title: sx.client, body: body };
+  }
+
+  /* ============================================================
+     FRANCHISE LIST  ·  ADD FRANCHISE
+     ============================================================ */
+  function frStatusPill(status) {
+    var k = status === "Approved" ? "success" : status === "Returned" ? "warn" : status === "For approval" ? "info" : "neutral";
+    return pill(status, k);
+  }
+  function franchiseList(c) {
+    var all = M.franchiseRows(c);
+    var size = c.frList.size, page = c.frList.page;
+    var pages = Math.max(1, Math.ceil(all.length / size));
+    if (page > pages) page = pages;
+    var start = (page - 1) * size;
+    var pageRows = all.slice(start, start + size);
+    var q = (c.intake.query || "");
+
+    var statuses = ["All", "Draft", "For approval", "Approved", "Returned"];
+    var filterChips = '<div class="chips" role="group" aria-label="Filter by status">' + statuses.map(function (s) {
+      var on = (c.frList.status || "All") === s;
+      return '<button type="button" class="chip' + (on ? " on" : "") + '" data-act="franchise:filter" data-arg="' + esc(s) + '"' +
+        (on ? ' aria-pressed="true"' : ' aria-pressed="false"') + '>' + esc(s) + '</button>';
+    }).join("") + '</div>';
+
+    function th(label, col, align) {
+      var active = c.frList.sortCol === col;
+      var caret = active ? (c.frList.sortDir === "asc" ? " ▲" : " ▼") : "";
+      return '<th scope="col"' + (align ? ' style="text-align:' + align + '"' : '') + '>' +
+        '<button type="button" class="th-sort" data-act="franchise:sort" data-arg="' + col + '"' +
+        (active ? ' aria-sort="' + (c.frList.sortDir === "asc" ? "ascending" : "descending") + '"' : '') + '>' +
+        esc(label) + '<span aria-hidden="true">' + caret + '</span></button></th>';
+    }
+
+    var rowsHtml = pageRows.length ? pageRows.map(function (r) {
+      return '<tr><td style="font-weight:600">' + esc(r.code) + '</td>' +
+        '<td>' + esc(r.name) + '</td>' +
+        '<td>' + esc(r.nature) + '</td>' +
+        '<td>' + frStatusPill(r.status) + '</td>' +
+        '<td>' + fmtDate(r.created) + '</td>' +
+        '<td>' + (r.approved ? fmtDate(r.approved) : '<span class="muted">—</span>') + '</td>' +
+        '<td style="text-align:right">' + btn("Open", { size: "sm", variant: "ghost", nav: "#/case/franchise" }) + '</td></tr>';
+    }).join("") : '<tr><td colspan="7" class="muted" style="padding:24px;text-align:center">No franchises match your filters.</td></tr>';
+
+    var table = '<div class="table-wrap"><table class="dtable"><thead><tr>' +
+      th("Franchise Code", "code") + th("Name", "name") + th("Nature of Business", "nature") +
+      th("Status", "status") + th("Created Date", "created") + th("Approved Date", "approved") +
+      '<th scope="col" style="text-align:right">Action</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+
+    var sizes = [8, 15, 25];
+    var pager = '<div class="pager"><div class="pg-size">Rows per page: ' + sizes.map(function (s) {
+        return '<button type="button" class="chip tiny' + (size === s ? " on" : "") + '" data-act="franchise:size" data-arg="' + s + '"' +
+          (size === s ? ' aria-pressed="true"' : '') + '>' + s + '</button>';
+      }).join("") + '</div><span class="spacer"></span>' +
+      '<span class="pg-info">' + (all.length ? (start + 1) + '–' + Math.min(start + size, all.length) : 0) + ' of ' + all.length + '</span>' +
+      btn("Prev", { size: "sm", variant: "ghost", icon: "arrowLeft", act: "franchise:page", arg: "prev", disabled: page <= 1 }) +
+      '<span class="pg-info">Page ' + page + ' / ' + pages + '</span>' +
+      btn("Next", { size: "sm", variant: "ghost", iconRight: "arrowRight", act: "franchise:page", arg: "next", disabled: page >= pages }) + '</div>';
+
+    var toolbar = card(
+      '<div class="row between" style="gap:12px;flex-wrap:wrap">' +
+        '<div class="search-wrap" style="flex:1;min-width:220px">' + icon("search", 20) +
+        '<input class="input" id="coSearch" placeholder="Search code, name or nature of business" value="' + esc(q) + '" autocomplete="off" aria-label="Search franchises" /></div>' +
+        '<div class="row" style="gap:8px">' +
+          btn("Export CSV", { size: "sm", variant: "ghost", icon: "upload", act: "franchise:export" }) +
+          btn("Add Franchise", { size: "sm", variant: "primary", icon: "plus", nav: "#/add-franchise" }) +
+        '</div>' +
+      '</div>' + '<div class="divider"></div>' + filterChips);
+
+    return '<div class="stack-6">' +
+      U.pageHead("Franchise List", "Every franchise in Corporate New Business. Search, filter, sort and open any record.") +
+      toolbar + card(table + pager) +
+      '<p class="tiny muted">All displayed data is fictional, for demonstration only.</p></div>';
+  }
+
+  function addFranchise(c) {
+    return '<div class="stack-6">' +
+      U.pageHead("Add Franchise", "Create a company record so it exists in HMS3 before quotation.") +
+      banner("info", "Start from the connected case",
+        "In this prototype the full franchise form — Account Information, Other Information, Required Documents and Affiliates, with draft-saving and validation — is built inside the active case so the data flows straight into quotation and account setup. Open it there to avoid re-entering anything.") +
+      card(head("What the full Add Franchise form captures") +
+        '<div class="grid-2">' +
+          miniList("Account Information", ["Registered & short name", "TIN, SEC/DTI", "Nature of business", "Company address (province → city)", "Contact person & details"]) +
+          miniList("Other Information", ["Sales channel (Direct / Agent / Broker)", "Intermediary & AOR/BOR", "Lead source", "Target effectivity", "Franchise validity"]) +
+          miniList("Required Documents", ["AOR/BOR", "Signatory ID", "Member Data (Master List)", "TOR", "Utilization"]) +
+          miniList("Affiliates", ["Affiliate companies", "Shared or separate SOB", "Per-affiliate member counts"]) +
+        '</div>') +
+      actionbar(
+        btn("Open Franchise in the case", { variant: "primary", iconRight: "arrowRight", nav: "#/case/franchise" }),
+        btn("Back to Franchise List", { variant: "ghost", icon: "arrowLeft", nav: "#/franchise-list" })) +
+      '</div>';
+  }
+  function miniList(title, items) {
+    return '<div class="card soft"><div class="eyebrow" style="margin-bottom:8px">' + esc(title) + '</div>' +
+      '<ul class="tick-list">' + items.map(function (i) {
+        return '<li>' + icon("check", 15) + '<span>' + esc(i) + '</span></li>';
+      }).join("") + '</ul></div>';
+  }
+
+  /* ============================================================
+     MODULE + REPORT placeholders (honest, navigable, never dead)
+     ============================================================ */
+  var MODULES = {
+    "account-maintenance": { title: "Account Maintenance", icon: "building", desc: "Maintain existing corporate accounts — company details, contacts and status.", scope: "Part of HMS3 Maintenance. Represented here for navigation; out of scope for the Corporate New Business flow." },
+    "agent-broker": { title: "Agent/Broker Maintenance", icon: "users", desc: "Maintain intermediaries, AOR/BOR authority and commission setup.", scope: "Part of HMS3 Maintenance. Represented here for navigation." },
+    "eligibility": { title: "Eligibility", icon: "shieldCheck", desc: "Maintain eligibility rules used across accounts.", scope: "Part of HMS3 Maintenance. Represented here for navigation." },
+    "rates": { title: "Rate's Creation", icon: "calc", desc: "Create and maintain the rate tables actuarial pricing draws from.", scope: "Part of HMS3 Maintenance. Represented here for navigation." },
+    "plan-types": { title: "Plan Type Management", icon: "layers", desc: "Define and maintain plan types available to new business.", scope: "Part of HMS3 Maintenance. Represented here for navigation." },
+    "plan-code-viewer": { title: "Plan Code Viewer", icon: "calc", desc: "Look up approved plan codes across accounts.", scope: "Part of HMS3 Inquiry. Plan codes for the active case live in the case's Plan Codes section." },
+    "sob-viewing": { title: "SOB Viewing", icon: "layers", desc: "View schedules of benefits across accounts.", scope: "Part of HMS3 Inquiry. The active case's SOB lives in its SOB and Benefits section." }
+  };
+  function modulePage(c, key) {
+    var m = MODULES[key] || { title: "Module", icon: "circle", desc: "This module is represented for navigation.", scope: "Out of scope for the Corporate New Business prototype." };
+    var body = '<div class="stack-6">' + U.pageHead(m.title, m.desc) +
+      card('<div class="row" style="gap:14px">' + U.medallion(m.icon, "blue") +
+        '<div><div class="section-title">Represented for navigation</div>' +
+        '<div class="muted" style="font-size:14px">' + esc(m.scope) + '</div></div></div>') +
+      actionbar(btn("Back to Home", { variant: "primary", icon: "arrowLeft", nav: "#/home" })) + '</div>';
+    return { title: m.title, body: body };
+  }
+
+  function reportPage(c, key) {
+    var title = key === "franchise-by-agent" ? "Franchise by Agent"
+      : key === "franchise-by-sales" ? "Franchise by Sales" : "Franchise List";
+    // Real summary over the fictional franchise register — count by status.
+    var rows = M.SAMPLE_FRANCHISES;
+    var byStatus = {};
+    rows.forEach(function (r) { byStatus[r.status] = (byStatus[r.status] || 0) + 1; });
+    var statCards = '<div class="grid-4">' + Object.keys(byStatus).map(function (s) {
+      return statCard(byStatus[s], s);
+    }).join("") + '</div>';
+    var dim = key === "franchise-by-agent" ? "Agent/Broker" : "Sales owner";
+    var body = '<div class="stack-6">' + U.pageHead(title, "Summary of the franchise register, grouped by " + dim.toLowerCase() + ".") +
+      statCards +
+      card(head("All franchises (" + rows.length + ")") +
+        '<div class="table-wrap"><table class="dtable"><thead><tr>' +
+        '<th scope="col">Franchise Code</th><th scope="col">Name</th><th scope="col">Nature</th><th scope="col">Status</th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          return '<tr><td style="font-weight:600">' + esc(r.code) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.nature) + '</td><td>' + frStatusPill(r.status) + '</td></tr>';
+        }).join("") + '</tbody></table></div>') +
+      banner("info", "Report view", dim + " attribution is shown at a summary level in this prototype. Full per-" + dim.toLowerCase() + " breakdowns are part of the HMS3 Reports module.") +
+      '<p class="tiny muted">All displayed data is fictional, for demonstration only.</p></div>';
+    return { title: title, body: body };
+  }
+
   global.VIEWS = {
     home: home, newBusiness: newBusiness, searchPage: searchPage, tasks: tasks, approvals: approvals,
+    myCases: myCases, notificationsPage: notificationsPage, sampleCase: sampleCase,
+    franchiseList: franchiseList, addFranchise: addFranchise, modulePage: modulePage, reportPage: reportPage,
     caseSummary: caseSummary, caseLead: caseLead, caseFranchise: caseFranchise, caseQuotation: caseQuotation,
     caseProposal: caseProposal, caseNegotiation: caseNegotiation, caseContract: caseContract,
     caseOnboarding: caseOnboarding, caseSob: caseSob, casePlanCodes: casePlanCodes, caseMemberData: caseMemberData,
