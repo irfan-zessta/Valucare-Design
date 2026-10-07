@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Confirm the dev server is reachable.
+PORT="${PORT:-4173}"
+curl -sf -o /dev/null "http://127.0.0.1:${PORT}/index.html"

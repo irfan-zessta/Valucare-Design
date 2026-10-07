@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# No system dependencies — static HTML/JS prototype.
+exit 0

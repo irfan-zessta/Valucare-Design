@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# No package install needed — no build step, no dependencies.
+exit 0
