@@ -6,17 +6,15 @@
   const app = document.getElementById("app");
 
   const TOPNAV = [
-    ["My Work", "#/mywork"],
-    ["Corporate New Business", "#/case/overview"],
-    ["Tasks", "#/tasks"],
+    ["Home", "#/mywork"],
+    ["New Business", "#/case/overview"],
+    ["My Tasks", "#/tasks"],
     ["Approvals", "#/approvals"],
-    ["Notifications", "#/notifications"],
-    ["Reports", "#/reports"],
   ];
   const CASENAV = [
-    ["overview","Overview"],["franchise","Franchise"],["requirements","Requirements"],
-    ["eligibility","Eligibility and Risk"],["quotation","Quotation"],["proposal","Proposal"],
-    ["account","Account Setup"],["contract","Contract"],["activation","Activation"],["history","Activity History"],
+    ["overview","Summary"],["franchise","Company / Franchise"],["requirements","Requirements"],
+    ["eligibility","Eligibility"],["quotation","Quotation"],["proposal","Proposal"],
+    ["account","Account Setup"],["contract","Contract"],["activation","Activation"],["history","History"],
   ];
   // mini status shown beside each case-nav item
   function caseMini(key) {
@@ -40,29 +38,28 @@
   function topnav(activeHash) {
     const isCase = activeHash.startsWith("#/case");
     const links = TOPNAV.map(([label, href]) => {
-      const active = href === activeHash || (label === "Corporate New Business" && isCase);
-      const badge = label === "Notifications" ? '<span class="badge dark">3</span>' : "";
-      const cls = label === "Notifications" ? "np" : "";
-      return `<a class="${active ? "active" : ""} ${cls}" data-nav="${href}">${label}${badge}</a>`;
+      const active = href === activeHash || (label === "New Business" && isCase);
+      return `<a class="${active ? "active" : ""}" data-nav="${href}" href="${href}" ${active?'aria-current="page"':''}>${label}</a>`;
     }).join("");
-    return `<div class="topnav">
-      <span class="brand">HMS</span>${links}
-      <span class="who"><span class="avatar">AR</span>A. Reyes · Corporate Sales</span>
-    </div>`;
+    return `<header class="topnav" role="banner">
+      <span class="brand" aria-label="HMS version 3">HMS3</span>
+      <nav aria-label="Primary">${links}</nav>
+      <span class="who"><span class="avatar" aria-hidden="true">AR</span>A. Reyes · Corporate Sales</span>
+    </header>`;
   }
 
   function casenav(activeSection) {
     const c = Store.c();
     const links = CASENAV.map(([key, label]) => {
       const mini = caseMini(key);
-      return `<a class="${activeSection === key ? "active" : ""}" data-nav="#/case/${key}">
-        <span>${label}</span><span class="mini">${mini}</span></a>`;
+      return `<a class="${activeSection === key ? "active" : ""}" data-nav="#/case/${key}" href="#/case/${key}" ${activeSection===key?'aria-current="page"':''}>
+        <span>${label}</span><span class="mini" aria-hidden="true">${mini}</span></a>`;
     }).join("");
-    return `<nav class="casenav">
+    return `<nav class="casenav" aria-label="Case sections">
       <div class="cn-head">
         <div class="cn-num">${c.meta.number}</div>
         <div class="cn-client">${UI.esc(c.meta.client)}</div>
-      </div>${links}</nav>`;
+      </div><div class="cn-group">Case menu</div>${links}</nav>`;
   }
 
   function render() {
@@ -78,7 +75,7 @@
       const sub = parts[2] || null;
       app.innerHTML =
         topnav("#/case/overview") +
-        `<div class="shell">${casenav(section)}<main class="case-body">${SCREENS.case(section, sub)}</main></div>`;
+        `<div class="shell">${casenav(section)}<main class="case-body" id="main-content" tabindex="-1">${SCREENS.case(section, sub)}</main></div>`;
       window.scrollTo(0, 0);
       return;
     }
@@ -89,7 +86,7 @@
     };
     const fn = map[root] || SCREENS.mywork;
     const activeHash = "#/" + root;
-    app.innerHTML = topnav(activeHash) + `<div class="shell"><main class="page">${fn()}</main></div>`;
+    app.innerHTML = topnav(activeHash) + `<div class="shell"><main class="page" id="main-content" tabindex="-1">${fn()}</main></div>`;
     window.scrollTo(0, 0);
   }
 
@@ -175,10 +172,10 @@
       c.flags.clarificationAnswered = true;
       c.flags.quotationReleased = true;
       c.quotation.approved.available = true;
-      c.quotation.tracking.status = "Released";
+      c.quotation.tracking.status = "Released to Sales";
       c.quotation.tracking.timeline.push(
         { title: "Approved", detail: "Management approved Q-v3", when: "just now", actor: DB.P.mgmt, auto: false },
-        { title: "Released", detail: "Quotation released to Sales", when: "just now", actor: null, auto: true });
+        { title: "Released to Sales", detail: "Quotation released to Sales", when: "just now", actor: null, auto: true });
       stamp("Quotation released", "Q-v3 approved & released", DB.P.mgmt, false);
       Store.save(); render(); toast("Quotation released");
     },
@@ -273,7 +270,13 @@
     }
   });
 
-  window.addEventListener("hashchange", render);
+  // On navigation, move keyboard focus to the main content region so screen-reader
+  // and keyboard users land on the new page (WCAG 2.2 — focus management).
+  window.addEventListener("hashchange", () => {
+    render();
+    const main = document.getElementById("main-content");
+    if (main) main.focus();
+  });
 
   // ---- boot -----------------------------------------------------------
   Store.load();

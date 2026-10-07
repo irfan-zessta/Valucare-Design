@@ -21,19 +21,29 @@
   };
 
   // ---- status vocabulary → pill kind ----------------------------------
+  // Plain-business-language statuses. Every pill pairs a glyph + text (never
+  // colour alone) so meaning survives for colour-blind / grayscale viewers.
   const KIND = {
     // ok / complete
     "Valid":"ok","Complete":"done","Passed":"ok","Ready":"ok","Approved":"done",
     "Ready to submit":"ok","Activated":"done","Fully signed":"done","Notarized":"done",
     "Completed":"done","Accepted":"done","Prefilled":"ok","Released":"done","Approved & released":"done",
-    "Answered":"ok","Approved exception":"ok",
+    "Released to Sales":"done","Answered":"ok","Approved exception":"ok","Signed":"done",
+    // eligibility outcomes (plain language)
+    "Eligible":"ok","Eligible with review":"warn","More information required":"warn","Not eligible":"blocked",
+    // quotation statuses (plain language)
+    "Preparing request":"waiting","Clarification required":"warn","Awaiting approval":"waiting",
+    // contract statuses (plain language)
+    "Contract requested":"waiting","Client comments received":"warn",
+    // plan codes / SOB
+    "Match":"ok","Reused":"ok","Finalized":"done","New":"neutral","Discrepancy":"warn","Not set up":"neutral",
     // waiting
     "Requested":"waiting","Submitted":"waiting","Under validation":"waiting","Pending":"waiting",
     "Pending review":"waiting","Waiting":"waiting","Waiting for Sales":"waiting","Queued":"waiting",
     "Under review":"waiting","Pricing in progress":"waiting","Pending Supervisor approval":"waiting",
     "Pending Management approval":"waiting","In progress":"waiting","In discussion":"waiting",
     "Pending activation":"waiting","Not yet generated":"waiting","Sent to client":"waiting",
-    "Internal review":"waiting","Draft prepared":"waiting","Draft requested":"waiting",
+    "Internal review":"waiting","Draft prepared":"waiting","Draft requested":"waiting","Draft":"waiting",
     "Open":"warn","Not started":"neutral","Not requested":"neutral","Not submitted":"neutral",
     "Not yet":"neutral","Superseded":"neutral","Current":"ok","N/A":"neutral",
     // warn
@@ -49,11 +59,11 @@
   function pill(text) {
     const kind = KIND[text] || "neutral";
     const g = GLYPH[kind] || "";
-    return `<span class="pill ${kind}"><span class="g">${g}</span>${esc(text)}</span>`;
+    return `<span class="pill ${kind}"><span class="g" aria-hidden="true">${g}</span>${esc(text)}</span>`;
   }
   function pillKind(text, kind) {
     const g = GLYPH[kind] || "";
-    return `<span class="pill ${kind}"><span class="g">${g}</span>${esc(text)}</span>`;
+    return `<span class="pill ${kind}"><span class="g" aria-hidden="true">${g}</span>${esc(text)}</span>`;
   }
 
   function actor(person) {

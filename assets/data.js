@@ -153,13 +153,13 @@
         openClarifications: 1,
       },
       tracking: {
-        status: "Waiting for Sales",   // see FLOW 9 statuses
+        status: "Clarification required",   // plain-language quotation statuses
         timeline: [
           tl("Quotation request submitted","Pricing queue created","2026-09-26 09:12",P.sales,false),
-          tl("Queued","Assigned to analyst M. Santos","2026-09-26 11:40",null,true),
-          tl("Under review","Analyst opened the package","2026-09-27 08:05",P.analyst,true),
+          tl("Submitted","Assigned to analyst M. Santos","2026-09-26 11:40",null,true),
+          tl("Pricing in progress","Analyst opened the package","2026-09-27 08:05",P.analyst,true),
           tl("Clarification raised","Q: Confirm maternity waiver intent (see benefits)","2026-09-27 15:22",P.analyst,false),
-          tl("Status → Waiting for Sales","Pricing paused pending answer","2026-09-27 15:22",null,true),
+          tl("Status → Clarification required","Pricing paused pending your answer","2026-09-27 15:22",null,true),
         ],
         clarifications: [
           { id:"CL-1", q:"Requested benefits list a 3-month maternity waiver vs standard 10 months. Confirm this is intended and client-approved?",
@@ -179,7 +179,7 @@
         exclusions: "Standard corporate exclusions apply; cosmetic & pre-existing per SOB.",
         commercial: "12-month term, quarterly billing.",
         validity: "2026-10-30",
-        approvalStatus: "Approved & released",
+        approvalStatus: "Released to Sales",
         approvedBy: P.mgmt,
         approvalDate: "2026-10-05",
       },
@@ -256,11 +256,37 @@
         { name:"Member onboarding", status:"Awaiting corrected census" },
         { name:"Billing setup", status:"Not started" },
       ],
+
+      // Module 8 — Plan Codes & SOB (accepted proposal is the controlled source)
+      source: "Accepted proposal P-v1 (read-only baseline)",
+      planCodes: [
+        { tier:"Tier 1 — Corporate Health Plus", code:"PLN-A", origin:"Reused", note:"Matches affiliate plan structure" },
+        { tier:"Tier 2 — Officers", code:"PLN-B", origin:"New", note:"Created for this account" },
+      ],
+      sob: {
+        status: "Draft prepared",   // Not started | Draft prepared | Under review | Finalized
+        version: "SOB-v1",
+        // setup SOB compared against the accepted proposal baseline
+        comparison: [
+          cmp("Room & board (Tier 1)","₱6,000/day","₱6,000/day","Match"),
+          cmp("Maximum benefit limit (Tier 1)","₱250,000","₱250,000","Match"),
+          cmp("Dental rider (Tier 1)","₱15,000/yr","₱15,000/yr","Match"),
+          cmp("Maternity (Tier 1)","3-month waiver (approved exception)","10-month waiver (standard)","Discrepancy"),
+          cmp("Room & board (Tier 2)","₱10,000/day","₱10,000/day","Match"),
+          cmp("Pre-existing condition","Covered after 6 months","Covered after 6 months","Match"),
+          cmp("Premium (Tier 1)","₱2,180/mo","₱2,180/mo","Match"),
+        ],
+        versions: [
+          { v:"SOB-v1", when:"2026-10-07", by:"MDA Team", note:"First draft from accepted proposal", status:"Current" },
+        ],
+      },
     },
 
-    // Flow 15 — contract & DSA
+    // Flow 15 — contract & DSA (plain-language statuses)
     contract: {
-      status: "Internal review",   // see FLOW 15 statuses
+      // Contract requested · Draft prepared · Under review · Sent to client ·
+      // Client comments received · Signed · Notarized · Completed
+      status: "Under review",
       contractVersion: "C-v2",
       dsaVersion: "DSA-v1",
       responsible: P.legal,
@@ -269,9 +295,15 @@
       signature: "Unsigned",
       notarization: "Not started",
       comments: "Client requested indemnity clause tweak in C-v1; addressed in C-v2.",
+      documents: [
+        { name:"Service contract", ref:"C-v2", status:"Under review" },
+        { name:"Data sharing agreement (DSA)", ref:"DSA-v1", status:"Draft prepared" },
+        { name:"KYC / signatory documents", ref:"KYC-pack", status:"Complete" },
+        { name:"Notarized copy", ref:"—", status:"Not started" },
+      ],
       versions: [
         { v:"C-v1", when:"2026-10-03", by:P.legal, note:"Draft prepared", status:"Superseded" },
-        { v:"C-v2", when:"2026-10-06", by:P.legal, note:"Internal review", status:"Current" },
+        { v:"C-v2", when:"2026-10-06", by:P.legal, note:"Under review", status:"Current" },
         { v:"DSA-v1", when:"2026-10-06", by:P.legal, note:"Draft prepared", status:"Current" },
       ],
       exception: null, // {reason, approver, expiry, followup}
@@ -350,6 +382,7 @@
     return {task,team,person:person||null,status,due,dep,blocker,evidence};
   }
   function ctl(name,status,owner,due){ return {name,status,owner:owner||null,due}; }
+  function cmp(item,setup,accepted,result){ return {item,setup,accepted,result}; }
 
   // ---- My Work dashboard lists (derived + fixtures) --------------------
   const DASH = {
@@ -375,14 +408,39 @@
   }
 
   // ---- tasks / approvals / notifications fixtures ----------------------
+  // My Tasks — each task names the required action, who's responsible, the due
+  // date, WHY it needs doing, and a deep-link into the exact case location.
+  // `group` drives the prioritised ordering on the My Tasks page.
   const TASKS = [
-    { id:"T-901", title:"Answer clarification CL-1 (maternity waiver)", case:"CNB-2026-00482", owner:"A. Reyes", due:"2026-09-30", status:"Open", priority:"High" },
-    { id:"T-902", title:"Resolve census v2 errors (18 rows)", case:"CNB-2026-00482", owner:"A. Reyes", due:"2026-09-30", status:"Open", priority:"High" },
-    { id:"T-903", title:"Client to submit additional risk documents", case:"CNB-2026-00482", owner:"G. Ferrer (client)", due:"2026-10-02", status:"Waiting", priority:"High" },
-    { id:"T-904", title:"Confirm scope vs affiliate ACC-20119", case:"CNB-2026-00482", owner:"A. Reyes", due:"2026-10-01", status:"Open", priority:"Med" },
-    { id:"T-905", title:"Update company profile (franchise)", case:"CNB-2026-00482", owner:"A. Reyes", due:"2026-10-01", status:"Open", priority:"Low" },
-    { id:"T-906", title:"Follow up proposal — Harbor Freight", case:"CNB-2026-00455", owner:"A. Reyes", due:"2026-10-02", status:"Open", priority:"Med" },
+    tk("T-903","Submit additional risk documents","Blocking","Northwind Manufacturing","CNB-2026-00482",
+       "G. Ferrer (client)","2026-10-02","Quotation cannot be submitted until risk documents are received.",
+       "#/case/eligibility"),
+    tk("T-902","Resolve census errors (18 rows)","Overdue","Northwind Manufacturing","CNB-2026-00482",
+       "A. Reyes","2026-09-30","Member file cannot be accepted while 18 rows fail validation.",
+       "#/case/requirements/census"),
+    tk("T-901","Answer Actuarial clarification CL-1","Clarification","Northwind Manufacturing","CNB-2026-00482",
+       "A. Reyes","2026-09-30","Pricing is paused until you confirm the maternity-waiver intent.",
+       "#/case/quotation/tracking"),
+    tk("T-907","Return approval decision on activation exception","Approval","Delta Foods Mfg.","CNB-2026-00448",
+       "A. Reyes","2026-10-04","Manager returned the exception request for more detail before approving.",
+       "#/case/contract"),
+    tk("T-908","Clear activation blocker — member file","Activation","Northwind Manufacturing","CNB-2026-00482",
+       "A. Reyes","2026-10-24","Account cannot activate until the corrected member file is accepted.",
+       "#/case/activation"),
+    tk("T-905","Approaching effectivity — confirm readiness","Effectivity","Northwind Manufacturing","CNB-2026-00482",
+       "A. Reyes","2026-10-30","Target effectivity 2026-11-01 is close; trailing items put go-live at risk.",
+       "#/case/activation"),
+    tk("T-906","Follow up on released proposal","Follow-up","Harbor Freight PH","CNB-2026-00455",
+       "A. Reyes","2026-10-09","Proposal was sent to the client; scheduled follow-up is due.",
+       "#/case/proposal/negotiation"),
+    tk("T-904","Confirm scope vs affiliate ACC-20119","Action","Northwind Manufacturing","CNB-2026-00482",
+       "A. Reyes","2026-10-01","Eligibility flagged a possible overlap with an existing affiliate account.",
+       "#/case/eligibility"),
   ];
+  function tk(id,title,group,client,caseNo,owner,due,reason,link){
+    return { id, title, group, client, case:caseNo, owner, due, reason, link,
+             status:owner.includes("client")?"Waiting":"Open" };
+  }
   const APPROVALS = [
     { id:"AP-51", item:"Maternity-waiver benefit exception", case:"CNB-2026-00482", approver:"D. Lim (Actuarial Supervisor)", status:"Pending", raised:"2026-09-27" },
     { id:"AP-52", item:"Quotation Q-v3 release", case:"CNB-2026-00482", approver:"V. Aquino (Management)", status:"Approved", raised:"2026-10-04" },

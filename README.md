@@ -35,9 +35,20 @@ Open at **`#/start`** for the moderated-test intro. "Reset prototype" (top bar) 
 
 ## Navigation
 
-**Main:** My Work · Corporate New Business · Tasks · Approvals · Notifications · Reports
-**Case:** Overview · Franchise · Requirements · Eligibility and Risk · Quotation · Proposal ·
-Account Setup · Contract · Activation · Activity History
+Designed to feel like a **simplified, improved HMS3** — not a replacement product.
+
+**Main (HMS3 shell):** Home · New Business · My Tasks · Approvals · User profile
+**Case:** Summary · Company / Franchise · Requirements · Eligibility · Quotation · Proposal ·
+Account Setup (incl. **Plan codes & SOB**) · Contract · Activation · History
+
+Status is always shown as **glyph + text** (never colour alone). Plain-language vocabularies:
+- Quotation: Preparing request · Submitted · Clarification required · Pricing in progress · Awaiting approval · Approved · Released to Sales
+- Eligibility outcome: Eligible · Eligible with review · More information required · Not eligible
+- Contract: Contract requested · Draft prepared · Under review · Sent to client · Client comments received · Signed · Notarized · Completed
+
+Accessibility (WCAG 2.2 AA): skip link, semantic landmarks, visible focus, focus moves to
+main content on navigation, keyboard-operable links/buttons, and structured tables used only
+for comparing records (e.g. SOB vs the accepted proposal).
 
 ## Flows covered (1–17)
 

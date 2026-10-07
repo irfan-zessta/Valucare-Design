@@ -87,49 +87,43 @@
   // =====================================================================
   S.mywork = () => {
     const d = DB.DASH;
+    // Tasks the logged-in Sales user must act on (not client / other-dept owned).
+    const mine = DB.TASKS.filter(t => t.owner === "A. Reyes");
+    const topTask = mine[0];
     const rows = d.rows.map(r => ({
-      _attr: ` class="click" data-nav="${r.primary ? '#/case/overview' : '#/case/overview'}"`,
+      _attr: ' class="click" data-nav="#/case/overview"',
       cells: [
-        `<strong>${esc(r.num)}</strong>${r.primary?' '+pillKind('your case','neutral'):''}`,
+        `<a class="text-link" data-nav="#/case/overview" href="#/case/overview"><strong>${esc(r.num)}</strong></a>${r.primary?' '+pillKind('your case','neutral'):''}`,
         esc(r.client),
         esc(r.stage),
-        esc(r.owner),
-        esc(r.eff),
-        `<div style="min-width:90px">${prog(r.ready)}<span class="mini">${r.ready}%</span></div>`,
         esc(r.next),
-        esc(r.taskOwner),
         esc(r.due),
-        r.blocker === "—" ? '<span class="muted">—</span>' : pillKind(r.blocker, "blocked"),
+        r.blocker === "—" ? pillKind("On track","ok") : pillKind(r.blocker, "blocked"),
       ],
     }));
     return `
-      <h1>My Work</h1>
-      <p class="sub">Exception-based dashboard — only cases and items that need attention. Click any row to open the case.</p>
+      <h1>Home</h1>
+      <p class="sub">Welcome back, A. Reyes. Here's what needs you, and the corporate cases you own.</p>
 
-      <h2>Needs attention</h2>
-      <div class="grid g4">
-        ${tile(d.buckets.myAction, "Cases requiring my action", {act:"demo",})}
-        ${tile(d.buckets.waitingClient, "Waiting for the client")}
-        ${tile(d.buckets.waitingDept, "Waiting for another dept")}
-        ${tile(d.buckets.overdue, "Overdue tasks")}
-      </div>
-      <div class="grid g4 mt">
-        ${tile(d.buckets.approaching, "Approaching effectivity")}
-        ${tile(d.buckets.newQuotes, "New quotation responses", {nav:"#/case/quotation/tracking"})}
-        ${tile(d.buckets.expiring, "Proposals nearing expiry")}
-        ${tile(d.buckets.blockedActivation, "Accounts blocked from activation", {nav:"#/case/activation"})}
-      </div>
+      <section class="action-card" aria-labelledby="home-action-title">
+        <div class="action-label">Needs you now</div>
+        <div class="action-copy">
+          <h2 id="home-action-title">${mine.length} task${mine.length===1?"":"s"} need your action</h2>
+          <p>${topTask ? "Most urgent: "+esc(topTask.title)+" — due "+esc(topTask.due)+"." : "You're all caught up."}</p>
+        </div>
+        <a class="btn primary action-button" data-nav="#/tasks" href="#/tasks">Go to My Tasks</a>
+      </section>
 
       <div class="spread" style="margin-top:22px">
-        <h2 style="border:none;margin:0">My corporate cases</h2>
-        <button class="btn primary" data-nav="#/create">+ New corporate opportunity</button>
+        <h2 style="border:none;margin:0">Your corporate cases</h2>
+        <button class="btn primary" data-nav="#/create">+ New opportunity</button>
       </div>
       ${table(
-        ["Case #","Corporate client","Stage","Sales owner","Target eff.","Readiness","Next action","Task owner","Due","Blocker"],
+        ["Case","Corporate client","Current stage","Next action","Due","Attention"],
         rows
       )}
-      <p class="note">Recently updated cases appear at the top. "New quotation responses" and
-      "Proposals nearing expiry" are also surfaced as tiles so Sales never needs a separate tracker.</p>`;
+      <p class="note">Select a case to open it. Everything you need — requirements, quotation, proposal,
+      setup and activation — lives inside the case, so you never need a separate tracker or spreadsheet.</p>`;
   };
 
   // =====================================================================
@@ -269,17 +263,42 @@
   // TASKS
   // =====================================================================
   S.tasks = () => {
-    const rows = DB.TASKS.map(t => ({
-      _attr: ' class="click" data-nav="#/case/overview"',
-      cells: [esc(t.id), esc(t.title), esc(t.case), esc(t.owner), esc(t.due), pill(t.status), pillKind(t.priority, t.priority==="High"?"warn":"neutral")],
-    }));
+    // Prioritised groups, most urgent first. Each group heading is plain language.
+    const GROUPS = [
+      ["Overdue","Overdue — needs attention now","blocked"],
+      ["Blocking","Blocking the case","blocked"],
+      ["Clarification","Clarifications to answer","warn"],
+      ["Approval","Approval returns","warn"],
+      ["Activation","Activation blockers","warn"],
+      ["Effectivity","Approaching effectivity","warn"],
+      ["Follow-up","Client follow-ups","neutral"],
+      ["Action","Other items requiring action","neutral"],
+    ];
+    const taskCard = (t) => `
+      <div class="box task-item">
+        <div class="spread">
+          <div><strong>${esc(t.title)}</strong> ${pill(t.status)}</div>
+          <div class="muted">Due ${esc(t.due)}</div>
+        </div>
+        <p class="task-reason"><strong>Why:</strong> ${esc(t.reason)}</p>
+        <div class="spread task-meta">
+          <span class="muted">${esc(t.client)} · ${esc(t.case)} · Responsible: ${esc(t.owner)}</span>
+          <a class="btn sm" data-nav="${t.link}" href="${t.link}">Open in case</a>
+        </div>
+      </div>`;
+    const sections = GROUPS.map(([key,label]) => {
+      const items = DB.TASKS.filter(t => t.group === key);
+      if (!items.length) return "";
+      return `<section aria-label="${esc(label)}"><h2>${esc(label)} <span class="count">${items.length}</span></h2>
+        <div class="stack">${items.map(taskCard).join("")}</div></section>`;
+    }).join("");
     return `
-      <h1>Tasks</h1>
-      <p class="sub">Every task carries an owner and a due date. Tasks are generated by the case — resolving a task
-      updates the case automatically.</p>
-      ${table(["Task #","Task","Case","Owner","Due","Status","Priority"], rows)}
-      <p class="note">Open tasks on your worked case: answer clarification CL-1, resolve census v2 errors,
-      confirm scope vs the affiliate. Client- and department-owned tasks are visible but not yours to complete.</p>`;
+      <h1>My Tasks</h1>
+      <p class="sub">Your work across all cases, ordered by urgency. Every task names what to do, who is
+      responsible, when it's due, why it matters, and links straight to the right place in the case.</p>
+      ${sections}
+      <p class="note">Client- and department-owned tasks are shown so you can see the whole picture, but you
+      complete only the ones assigned to you. Resolving a task updates its case automatically.</p>`;
   };
 
   // =====================================================================
@@ -338,22 +357,11 @@
   // =====================================================================
   function caseBand() {
     const m = c().meta;
-    const blocker = c().activation.status === "Blocked"
-      ? c().activation.primaryBlocker : "No active blocker";
-    const bkind = c().activation.status === "Blocked" ? "blocked" : "ok";
     return `
       <div class="caseband">
-        <div class="cb-item"><span class="l">Stage</span><span class="v">${esc(m.stage)}</span></div>
-        <div class="cb-sep"></div>
-        <div class="cb-item"><span class="l">Next action</span><span class="v">${esc(nextAction())}</span></div>
-        <div class="cb-sep"></div>
-        <div class="cb-item"><span class="l">Readiness</span><span class="v">${m.readiness}%</span></div>
-        <div class="cb-sep"></div>
-        <div class="cb-item"><span class="l">Sales owner</span><span class="v">${esc(m.salesOwner.name)}</span></div>
-        <div class="cb-sep"></div>
+        <div class="cb-item"><span class="l">Current step</span><span class="v">${esc(m.stage)}</span></div>
         <div class="cb-item"><span class="l">Target effectivity</span><span class="v">${esc(m.effectivity)}</span></div>
-        <div class="cb-sep"></div>
-        <div class="cb-item"><span class="l">Blocker</span><span class="v">${pillKind(bkind==="blocked"?"Blocked":"Clear", bkind)}</span></div>
+        <div class="cb-item"><span class="l">Owner</span><span class="v">${esc(m.salesOwner.name)}</span></div>
       </div>`;
   }
   function nextAction() {
@@ -364,6 +372,27 @@
     if (!f.decisionRecorded)      return "Record client decision";
     if (c().activation.status !== "Activated") return "Clear activation blocker";
     return "Activate account";
+  }
+  // The single most important thing for the user to do right now, in plain language.
+  function primaryAction() {
+    const f = c().flags;
+    if (!f.clarificationAnswered)
+      return { title:"Answer Actuarial clarification CL-1", who:"Actuarial is waiting on you",
+        body:"Pricing is paused until you respond to the clarification.", label:"Open clarification", href:"#/case/quotation/tracking" };
+    if (!f.quotationReleased)
+      return { title:"Review the quotation", who:"With Actuarial / approvers",
+        body:"Pricing has resumed. The quotation will return here for your review.", label:"View quotation", href:"#/case/quotation/tracking" };
+    if (!f.proposalGenerated)
+      return { title:"Generate the client proposal", who:"Waiting on you",
+        body:"The quotation is approved and released to Sales — build the proposal from it.", label:"Generate proposal", href:"#/case/proposal/generate" };
+    if (!f.decisionRecorded)
+      return { title:"Record the client's decision", who:"Waiting on the client",
+        body:"The proposal is with the client — capture their decision when it comes in.", label:"Record decision", href:"#/case/proposal/decision" };
+    if (c().activation.status !== "Activated")
+      return { title:"Clear the activation blocker", who:"Waiting on you",
+        body:c().activation.primaryBlocker, label:"View activation", href:"#/case/activation" };
+    return { title:"Account is ready", who:"No action needed",
+      body:"Every step is complete.", label:"View activation", href:"#/case/activation" };
   }
   function subtabs(section, current, items) {
     return `<div class="subtabs">${items.map(([k,label]) =>
@@ -383,50 +412,72 @@
 
   // ---- OVERVIEW -------------------------------------------------------
   CASE_SECTIONS.overview = () => {
-    const m = c().meta;
+    const m = c().meta, f = c().flags, pa = primaryAction();
+    // 4-stage progress — each stage's state derived from the flags.
+    const s1 = f.quotationReleased ? ["done","Complete"] : ["current","Needs correction"];
+    const s2 = f.quotationReleased ? ["done","Quotation approved"]
+             : f.clarificationAnswered ? ["current","Pricing in progress"]
+             : ["current","Waiting for your response"];
+    const s3 = f.decisionRecorded ? ["done","Client decision recorded"]
+             : f.proposalGenerated ? ["current","In discussion"]
+             : f.quotationReleased ? ["current","Ready to start"]
+             : ["future","Not started"];
+    const s4 = c().activation.status==="Activated" ? ["done","Activated"]
+             : f.decisionRecorded ? ["current", c().activation.status]
+             : ["future","Not started"];
     return `
-      <div class="spread"><h1>${esc(m.client)}</h1><span class="muted">${esc(m.number)}</span></div>
-      <p class="sub">${esc(m.channel)} corporate business · ${esc(m.product)}</p>
+      <div class="record-heading">
+        <div><p class="eyebrow">Corporate new business · ${esc(m.number)}</p><h1>${esc(m.client)}</h1>
+        <p class="sub">${esc(m.product)}</p></div>
+        <button class="btn" data-nav="#/case/history">View history</button>
+      </div>
 
-      <div class="grid g2">
-        <div class="box">
-          <div class="card-head">Snapshot</div>
+      <section class="action-card" aria-labelledby="action-title">
+        <div class="action-label">Action required</div>
+        <div class="action-copy">
+          <h2 id="action-title">${esc(pa.title)}</h2>
+          <p><strong>${esc(pa.who)}.</strong> ${esc(pa.body)}</p>
+        </div>
+        <a class="btn primary action-button" data-nav="${pa.href}" href="${pa.href}">${esc(pa.label)}</a>
+      </section>
+
+      ${c().activation.status==="Blocked" && f.decisionRecorded ? `<div class="plain-alert" role="status"><strong>Also needs attention:</strong> ${esc(c().activation.primaryBlocker)} <a class="text-link" data-nav="#/case/activation" href="#/case/activation">View activation</a></div>` : ""}
+
+      <div class="overview-layout">
+        <section class="box simple-details" aria-labelledby="details-title">
+          <div class="card-head" id="details-title">Case details</div>
           ${kv([
-            ["Lead source", esc(m.leadSource)],
-            ["Channel", esc(m.channel)],
+            ["Business type", esc(m.channel)+" corporate"],
             ["Principal members", esc(m.members)],
-            ["Requested effectivity", esc(m.effectivity)],
-            ["Sales owner", actor(m.salesOwner)],
             ["Client contact", actor(m.clientContact)],
-            ["Notes", `<span class="muted">${esc(m.notes)}</span>`],
+            ["Lead source", esc(m.leadSource)],
           ])}
-        </div>
-        <div class="box">
-          <div class="card-head">Readiness to activate</div>
-          ${prog(m.readiness)}
-          <p style="margin:8px 0"><strong>${m.readiness}%</strong> complete · stage: ${pill(m.stage)}</p>
-          <h3>What needs you now</h3>
-          ${callout("warn","Next action", esc(nextAction())+" — owner "+esc(m.salesOwner.name))}
-          ${c().activation.status==="Blocked" ? callout("blocked","Active blocker", esc(c().activation.primaryBlocker)) : ""}
-        </div>
+          <a class="text-link" data-nav="#/case/franchise" href="#/case/franchise">View company and franchise details</a>
+        </section>
+
+        <section class="box" aria-labelledby="progress-title">
+          <div class="card-head" id="progress-title">Application progress</div>
+          <ol class="stepper">
+            ${simpleStep("1", "Company and requirements", s1[1], "requirements", s1[0])}
+            ${simpleStep("2", "Eligibility and quotation", s2[1], "quotation", s2[0])}
+            ${simpleStep("3", "Proposal and client decision", s3[1], "proposal", s3[0])}
+            ${simpleStep("4", "Setup, contract and activation", s4[1], "account", s4[0])}
+          </ol>
+        </section>
       </div>
 
-      <h2>Stage progress</h2>
-      <div class="box">
-        <table class="wt"><thead><tr><th>Stage</th><th>Status</th><th>Owner</th><th>Jump</th></tr></thead><tbody>
-          ${stageRow("Franchise & authority", c().franchise.status==="Approved"?"Complete":c().franchise.status, c().franchise.status==="Approved"?DB.P.franchise:DB.P.sales, "franchise")}
-          ${stageRow("Requirements", "Correction required", DB.P.sales, "requirements")}
-          ${stageRow("Eligibility & risk", "Review required", DB.P.analyst, "eligibility")}
-          ${stageRow("Quotation", c().flags.quotationReleased?"Approved & released":c().quotation.tracking.status, DB.P.analyst, "quotation")}
-          ${stageRow("Proposal", c().flags.proposalGenerated?(c().proposal.decision.outcome||"In progress"):"Not yet generated", DB.P.sales, "proposal")}
-          ${stageRow("Account setup", "Awaiting acceptance", DB.P.acctsvc, "account")}
-          ${stageRow("Contract & DSA", c().contract.status, c().contract.responsible, "contract")}
-          ${stageRow("Activation", c().activation.status, DB.P.acctsvc, "activation")}
-        </tbody></table>
-      </div>
-      <p class="note">This is the progress tracker — no separate spreadsheet. Automated steps are labelled in
-      Activity History. Each stage shows the responsible owner.</p>`;
+      <section class="recent-work" aria-labelledby="recent-title">
+        <div class="spread"><h2 id="recent-title">Recent updates</h2><a data-nav="#/case/history" href="#/case/history">See all history</a></div>
+        <ul>
+          <li><strong>Actuarial clarification received</strong><span>Today · Pricing is paused until Sales responds</span></li>
+          <li><strong>Census correction requested</strong><span>18 member rows need correction</span></li>
+          <li><strong>Franchise validated</strong><span>Completed by Account Services</span></li>
+        </ul>
+      </section>`;
   };
+  function simpleStep(num, name, status, section, state) {
+    return `<li class="${state}"><span class="step-num">${num}</span><a data-nav="#/case/${section}" href="#/case/${section}"><strong>${esc(name)}</strong><span>${esc(status)}</span></a></li>`;
+  }
   function stageRow(name, status, owner, section) {
     return `<tr class="click" data-nav="#/case/${section}">
       <td><strong>${esc(name)}</strong></td><td>${pill(status)}</td><td>${actor(owner)}</td>
@@ -609,20 +660,39 @@
               r.reviewer==="—"?'<span class="muted">—</span>':esc(r.reviewer)]
     }));
     const blocked = rules.filter(r=>r.result==="Blocked");
-    const review = rules.filter(r=>r.result==="Review required");
+    const review = rules.filter(r=>r.result==="Review required" || r.result==="Warning");
+    // Plain-language overall outcome.
+    let outcome = "Eligible", oKind = "ok",
+        oExplain = "All eligibility rules passed. This case can proceed to quotation.";
+    if (rules.some(r=>r.result==="Not eligible")) {
+      outcome = "Not eligible"; oKind = "blocked";
+      oExplain = "One or more rules rule this case out for Corporate New Business.";
+    } else if (blocked.length) {
+      outcome = "More information required"; oKind = "warn";
+      oExplain = "The case can't clear eligibility until outstanding items are supplied.";
+    } else if (review.length) {
+      outcome = "Eligible with review"; oKind = "warn";
+      oExplain = "Eligible, but "+review.length+" rule(s) need a risk-desk / Actuarial review before pricing.";
+    }
     return `
-      <h1>Eligibility &amp; Risk</h1>
-      <p class="sub">Rules evaluated automatically from case data. The system explains every warning and block — and what to do next.</p>
+      <h1>Eligibility</h1>
+      <p class="sub">Rules evaluated automatically from case data. The system explains every outcome — and what to do next.</p>
 
-      ${blocked.length ? callout("blocked","Case has "+blocked.length+" block(s)",
+      <section class="box outcome-box" aria-labelledby="elig-outcome">
+        <div class="card-head" id="elig-outcome">Overall eligibility outcome</div>
+        <p class="outcome-pill">${pillKind(outcome, oKind)}</p>
+        <p>${esc(oExplain)}</p>
+      </section>
+
+      ${blocked.length ? callout("blocked","Outstanding item(s): "+blocked.length,
         blocked.map(b=>`<div><strong>${esc(b.name)}:</strong> ${esc(b.reason)} → <em>${esc(b.action)}</em> (owner: ${esc(b.reviewer)})</div>`).join("")) : ""}
       ${review.length ? callout("warn", review.length+" rule(s) need review",
         review.map(b=>esc(b.name)).join(", ")+" — routed to the risk desk / Actuarial.") : ""}
 
       ${table(["Rule","Result","Reason","Source","Required action","Reviewer"], rows)}
 
-      <p class="note">Statuses: Passed · Warning · Review required · Blocked · Approved exception. A block is never a
-      dead end — it always names the reason, the action, and the owner.</p>
+      <p class="note">Outcomes: Eligible · Eligible with review · More information required · Not eligible. An outstanding
+      item is never a dead end — it always names the reason, the action, and the owner.</p>
       <div class="btn-row">
         <button class="btn" data-nav="#/case/requirements">← Requirements</button>
         <span class="spacer"></span>
@@ -730,8 +800,8 @@
 
   function quoteTracking() {
     const t = c().quotation.tracking;
-    const statuses = ["Submitted","Queued","Under review","Waiting for Sales","Pricing in progress",
-      "Pending Supervisor approval","Pending Management approval","Approved","Released"];
+    const statuses = ["Preparing request","Submitted","Clarification required","Pricing in progress",
+      "Awaiting approval","Approved","Released to Sales"];
     const chips = statuses.map(s => s===t.status
       ? pillKind(s+" ◄ now", "warn")
       : pillKind(s, "neutral")).join(" ");
@@ -763,7 +833,7 @@
         <p class="note">You see only what Sales is authorized to see — confidential actuarial calculations are hidden.</p>
       </div>
 
-      ${t.status==="Waiting for Sales" ? callout("waiting","Waiting on you",
+      ${t.status==="Clarification required" ? callout("waiting","Waiting on you",
         "Actuarial paused pricing pending clarification CL-1. Answer below to move it back to pricing.") : ""}
 
       <h2>Timeline</h2>
@@ -1017,8 +1087,16 @@
       starts onboarding and generates downstream tasks.</p>`;
   }
 
-  // ---- ACCOUNT & PLAN SETUP (Flow 14) --------------------------------
-  CASE_SECTIONS.account = () => {
+  // ---- ACCOUNT SETUP (Flow 14) + PLAN CODES & SOB (Module 8) ----------
+  CASE_SECTIONS.account = (sub) => {
+    sub = sub || "setup";
+    const tabs = subtabs("account", sub, [["setup","Account & plan setup"],["sob","Plan codes & SOB"]]);
+    const inner = (sub==="sob" ? accountSob : accountSetup)();
+    return `<h1>Account Setup</h1>
+      <p class="sub">Prepopulated from the accepted proposal — the controlled source of truth. Review and correct exceptions only; don't re-enter the proposal.</p>${tabs}${inner}`;
+  };
+
+  function accountSetup() {
     const a = c().account;
     const secRows = a.sections.map(s=>({cells:[esc(s.name), pill(s.status)]}));
     const planBlocks = a.plans.map(pl=>`
@@ -1034,8 +1112,6 @@
         ])}
       </div>`).join("");
     return `
-      <h1>Account &amp; Plan Setup</h1>
-      <p class="sub">Prepopulated from the accepted proposal. Review and correct exceptions only — don't re-enter the proposal.</p>
       ${c().flags.decisionRecorded ? callout("ok","Prefilled from accepted baseline","Edit exceptions only.") :
         callout("waiting","Waiting for client acceptance","Onboarding prefills once the client decision is recorded as Accepted. (Showing the seeded prefill for exploration.)")}
 
@@ -1059,19 +1135,70 @@
         <button class="btn" data-nav="#/case/proposal/decision">← Decision</button>
         <button class="btn ghost" data-act="demo" data-msg="Exception corrections saved">Save exception edits</button>
         <span class="spacer"></span>
-        <button class="btn primary" data-nav="#/case/contract">Continue to Contract &amp; DSA →</button>
+        <button class="btn primary" data-nav="#/case/account/sob">Continue to Plan codes & SOB →</button>
       </div>`;
-  };
+  }
 
-  // ---- CONTRACT & DSA (Flow 15) --------------------------------------
+  function accountSob() {
+    const a = c().account, sob = a.sob;
+    const codeRows = a.planCodes.map(p=>({cells:[`<strong>${esc(p.tier)}</strong>`, esc(p.code), pill(p.origin), esc(p.note)]}));
+    const cmpRows = sob.comparison.map(r=>({
+      cells:[`<strong>${esc(r.item)}</strong>`, esc(r.setup), esc(r.accepted), pill(r.result)]
+    }));
+    const discrepancies = sob.comparison.filter(r=>r.result==="Discrepancy");
+    const allMatch = discrepancies.length === 0;
+    return `
+      ${callout("ok","Source of truth: "+esc(a.source),"Plan codes and the SOB are built from the accepted proposal — not re-keyed.")}
+
+      <h2>Plan codes</h2>
+      <p class="sub" style="margin-top:0">Reuse an existing plan code where the structure matches; create a new one only when needed.</p>
+      ${table(["Plan / tier","Plan code","Origin","Note"], codeRows)}
+      <div class="btn-row" style="border:none">
+        <button class="btn" data-act="demo" data-msg="Searched for reusable plan codes">Find reusable code</button>
+        <button class="btn" data-act="demo" data-msg="New plan code drafted (prototype)">Create new code</button>
+      </div>
+
+      <h2>SOB vs accepted proposal</h2>
+      <div class="box">
+        <div class="spread">
+          <div><strong>SOB:</strong> ${pill(sob.status)} · ${pillKind(sob.version,"neutral")}</div>
+          <div>${allMatch ? pillKind("No discrepancies","ok") : pillKind(discrepancies.length+" discrepancy"+(discrepancies.length===1?"":"ies")+" to resolve","warn")}</div>
+        </div>
+      </div>
+      ${discrepancies.length ? callout("warn","Discrepancies found — resolve before finalizing",
+        discrepancies.map(d=>`<div><strong>${esc(d.item)}:</strong> setup says "${esc(d.setup)}" vs accepted "${esc(d.accepted)}".</div>`).join("")+
+        "<div style='margin-top:6px'>The maternity waiver is an approved exception — confirm it's intentional, then finalize.</div>") : ""}
+      ${table(["Benefit item","SOB setup","Accepted proposal","Result"], cmpRows)}
+      <p class="note">This comparison is a structured table on purpose — it lets you line up setup against the accepted proposal, row by row.</p>
+
+      <div class="box mt">
+        <div class="card-head">Finalize SOB</div>
+        <div class="btn-row" style="border:none;margin:0;padding:0">
+          <button class="btn" data-act="demo" data-msg="Discrepancy accepted as approved exception (logged)">Accept exception</button>
+          <button class="btn primary" data-act="demo" data-msg="SOB-v2 finalized with version history (prototype)">Finalize SOB</button>
+        </div>
+      </div>
+
+      <h2>SOB versions</h2>
+      ${table(["Version","Prepared","By","Note","Status"], sob.versions.map(v=>({cells:[esc(v.v),esc(v.when),esc(v.by),esc(v.note),pill(v.status)]})))}
+
+      <div class="btn-row">
+        <button class="btn" data-nav="#/case/account/setup">← Account & plan setup</button>
+        <span class="spacer"></span>
+        <button class="btn primary" data-nav="#/case/contract">Continue to Contract →</button>
+      </div>`;
+  }
+
+  // ---- CONTRACT (Flow 15) --------------------------------------------
   CASE_SECTIONS.contract = () => {
     const ct = c().contract;
-    const flow = ["Draft requested","Draft prepared","Internal review","Sent to client","Client revision",
-      "Approved for signature","Partially signed","Fully signed","For notarization","Notarized","Completed"];
+    const flow = ["Contract requested","Draft prepared","Under review","Sent to client",
+      "Client comments received","Signed","Notarized","Completed"];
     const chips = flow.map(s=> s===ct.status?pillKind(s+" ◄ now","warn"):pillKind(s,"neutral")).join(" ");
+    const docRows = (ct.documents||[]).map(d=>({cells:[`<strong>${esc(d.name)}</strong>`, esc(d.ref), pill(d.status)]}));
     return `
-      <h1>Contract &amp; DSA</h1>
-      <p class="sub">One tracker for contract and DSA status, versions, and signatures.</p>
+      <h1>Contract</h1>
+      <p class="sub">One tracker for the contract, DSA, and supporting documents — status, versions, and signatures.</p>
       <div class="box"><div class="card-head">Status flow</div><div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div></div>
 
       <div class="grid g2">
@@ -1086,10 +1213,16 @@
             ["Notarization status", pill(ct.notarization)],
             ["Comments", `<span class="muted">${esc(ct.comments)}</span>`],
           ])}</div>
-        <div class="box"><div class="card-head">Versions</div>
-          ${table(["Version","Date","By","Note","Status"],
-            ct.versions.map(v=>({cells:[esc(v.v),esc(v.when),(v.by.name||v.by),esc(v.note),pill(v.status)]})))}
-          <p class="note">Previous versions are retained and read-only.</p></div>
+        <div class="box"><div class="card-head">Documents</div>
+          ${table(["Document","Reference","Status"], docRows)}
+          <p class="note">Contract, DSA, KYC and the notarized copy are tracked in one place.</p></div>
+      </div>
+
+      <h2>Versions</h2>
+      <div class="box">
+        ${table(["Version","Date","By","Note","Status"],
+          ct.versions.map(v=>({cells:[esc(v.v),esc(v.when),(v.by.name||v.by),esc(v.note),pill(v.status)]})))}
+        <p class="note">Previous versions are retained and read-only.</p>
       </div>
 
       <h2>Activation exception</h2>
@@ -1148,6 +1281,7 @@
     }));
     const outstanding = act.controls.filter(x=>["Outstanding","Blocked","In progress"].includes(x.status));
     const done = act.controls.filter(x=>!["Outstanding","Blocked","In progress"].includes(x.status));
+    const allPass = outstanding.length === 0;
     return `
       <div class="box">
         <div class="spread">
@@ -1158,8 +1292,14 @@
           <span class="mini">${done.length}/${act.controls.length} controls complete</span></div>
       </div>
 
-      ${act.status==="Blocked" ? callout("blocked","The item preventing activation", esc(act.primaryBlocker)+
-        " — owner: "+esc(DB.P.mda.name)+". Resolve the corrected member file (census v3) to clear it.") : ""}
+      ${act.status==="Blocked" ? `<div class="plain-alert blocker" role="status">
+          <div class="blocker-head">${pillKind("Cannot activate account","blocked")}</div>
+          <dl class="blocker-dl">
+            <dt>What's blocking</dt><dd>${esc(act.primaryBlocker)}</dd>
+            <dt>Owner</dt><dd>Sales — A. Reyes</dd>
+            <dt>Action</dt><dd><a class="text-link" data-nav="#/case/requirements/census" href="#/case/requirements/census">Open member-file correction</a></dd>
+          </dl>
+        </div>` : ""}
       ${callout("warn","Effectivity risk", esc(act.risk))}
 
       <h2>Controls</h2>
@@ -1174,10 +1314,15 @@
       <div class="btn-row">
         <button class="btn" data-nav="#/case/activation/handover">See operational handover</button>
         <span class="spacer"></span>
-        <button class="btn" data-act="demo" data-msg="Activation requires all controls clear or an approved exception">Request activation</button>
-        <button class="btn primary" data-nav="#/end">Finish walkthrough →</button>
+        <button class="btn primary" ${allPass?'':'disabled'} data-act="demo"
+          data-msg="${allPass?'Account activated':'Resolve all controls (or record an approved exception) before activating'}"
+          title="${allPass?'':'Disabled until every control passes or an exception is approved'}">
+          ${allPass?"Activate account":"Activate account (blocked)"}
+        </button>
+        <button class="btn" data-nav="#/end">Finish walkthrough →</button>
       </div>
-      <p class="note">Final statuses: Onboarding in progress · Ready for activation · Blocked · Activated.</p>`;
+      <p class="note">Final statuses: Onboarding in progress · Ready for activation · Blocked · Activated.
+      Activation stays disabled while any control is outstanding — the blocker above names the one thing to fix first.</p>`;
   }
 
   // ---- ACTIVITY HISTORY ----------------------------------------------
