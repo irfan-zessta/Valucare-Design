@@ -967,10 +967,3 @@ details.reveal .reveal-body{padding:0 var(--s4) var(--s4);}
   .frform{grid-template-columns:1fr;}
   .frside{position:static;}
 }
-
-/* page heading with an action on the right (e.g. New Business → Create) */
-.qhead{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s4);}
-.qhead-actions{flex:none;}
-@media (max-width:620px){
-  .qhead{flex-direction:column;align-items:stretch;}
-}

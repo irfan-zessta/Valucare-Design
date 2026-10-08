@@ -1675,6 +1675,7 @@
       '<details class="colmenu"' + (st._colsOpen ? ' open' : '') + '><summary class="btn btn-ghost btn-sm" data-act="queue:colsmenu" data-arg="' + esc(cfg.key) + '">' + icon("more", 15) + '<span>Columns</span></summary>' +
         '<div class="colmenu-body" role="menu" aria-label="Show or hide columns">' + colToggles + '</div></details>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-act="queue:reload" data-arg="' + esc(cfg.key) + '" aria-label="Reload">' + icon("history", 15) + '<span>Reload</span></button>' +
+      (cfg.createBtn || '') +
       '</div>';
 
     // ---- table -------------------------------------------------------------
@@ -1741,14 +1742,8 @@
       ? card(table.replace(/<tbody>[\s\S]*<\/tbody>/, '<tbody></tbody>') + stateBlock)
       : card(table + pager);
 
-    var head = cfg.createBtn
-      ? '<header class="qhead"><div class="stack-3"><h1 class="page-title">' + esc(cfg.title) + '</h1>' +
-          (cfg.sub ? '<p class="page-sub">' + cfg.sub + '</p>' : '') + '</div>' +
-          '<div class="qhead-actions">' + cfg.createBtn + '</div></header>'
-      : U.pageHead(cfg.title, cfg.sub);
-
     return '<div class="stack-5">' +
-      head +
+      U.pageHead(cfg.title, cfg.sub) +
       card('<div class="qtoolbar">' + '<div class="qtoolbar-top">' + search + tools + '</div></div>') +
       body +
       '<p class="tiny muted">All displayed client data is fictional, for demonstration only. ' +
@@ -1806,7 +1801,7 @@
     return dataQueue(c, {
       key: "salesnb", items: M.WORKITEMS, columns: columns, createBtn: createBtn,
       title: "New Business",
-      sub: "Every Corporate New Business case. Search for a company, then open it."
+      sub: "Every Corporate New Business case. Search, then open a company."
     });
   }
 
