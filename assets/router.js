@@ -30,46 +30,35 @@
      Corporate New Business only — no Renewal / IFG / ACUSA / MDA / Claims
      departmental menus. */
   var NAV_HOME = { hash: "#/home", label: "Home", icon: "home" };
+  // Top-level items that sit between Home and the groups — kept to the few
+  // destinations a Commercial user needs every day. Approvals are NOT a
+  // separate item; authorized reviewers see them inside My Tasks.
+  var NAV_TOP = [
+    { hash: "#/tasks", label: "My Tasks", icon: "tasks", countKey: "tasks" }
+  ];
   var NAV_GROUPS = [
-    { id: "mywork", label: "My Work", icon: "briefcase", items: [
-      { hash: "#/sales-tracker", label: "Sales Tracker",          icon: "layers" },
-      { hash: "#/cases",         label: "My New Business Cases",   icon: "briefcase" },
-      { hash: "#/tasks",         label: "My Tasks",                icon: "tasks",     countKey: "tasks" },
-      { hash: "#/approvals",     label: "Approvals",               icon: "approvals", countKey: "approvals", badgeTone: "attention" },
-      { hash: "#/notifications", label: "Notifications",           icon: "bell" }
+    { id: "sales", label: "Sales", icon: "briefcase", items: [
+      { hash: "#/sales-tracker", label: "Sales Tracker — New Business", icon: "layers" },
+      { hash: "#/franchise-list", label: "Franchise",                   icon: "building" },
+      { hash: "#/work/quotation", label: "Quotations and Proposals",    icon: "calc" },
+      { hash: "#/new",            label: "Account Enrollment — New",     icon: "flag" },
+      { hash: "#/search",         label: "Accounts Inquiry",            icon: "search" }
     ]},
-    { id: "newbiz", label: "New Business", icon: "flag", items: [
-      { hash: "#/franchise-list",  label: "Franchise List",           icon: "layers" },
-      { hash: "#/add-franchise",   label: "Add Franchise",            icon: "plus" },
-      { hash: "#/new",             label: "Account Enrollment — New", icon: "flag" },
-      { hash: "#/work/quotation",  label: "Quotations",               icon: "calc" },
-      { hash: "#/work/proposal",   label: "Proposals and Negotiations", icon: "handshake" },
-      { hash: "#/work/contract",   label: "Contracts and KYC",        icon: "gavel" },
-      { hash: "#/work/activation", label: "Activation and Handover",  icon: "rocket" }
-    ]},
-    { id: "accounts", label: "Accounts", icon: "building", sepBefore: true, items: [
-      { hash: "#/module/account-maintenance",  label: "Account Maintenance", icon: "building" },
-      { hash: "#/module/additional-affiliates", label: "Additional Affiliates", icon: "users" },
-      { hash: "#/search",                      label: "Accounts Inquiry",    icon: "search" }
-    ]},
-    { id: "salestools", label: "Sales Tools", icon: "calc", items: [
-      { hash: "#/module/agent-broker",     label: "Agent/Broker Maintenance", icon: "users" },
-      { hash: "#/module/eligibility",      label: "Eligibility",              icon: "shieldCheck" },
-      { hash: "#/module/rates",            label: "Rate Creation",            icon: "calc" },
-      { hash: "#/module/sob-viewing",      label: "SOB Viewer",               icon: "layers" },
-      { hash: "#/module/plan-code-viewer", label: "Plan Code Viewer",         icon: "calc" },
-      { hash: "#/module/plan-types",       label: "Plan Type Management",     icon: "layers" }
+    { id: "tools", label: "Tools", icon: "layers", sepBefore: true, items: [
+      { hash: "#/module/agent-broker",          label: "Agent/Broker Maintenance", icon: "users" },
+      { hash: "#/module/sob-plancodes",         label: "SOB and Plan Codes",       icon: "calc" },
+      { hash: "#/module/additional-affiliates", label: "Additional Affiliates",    icon: "users" }
     ]},
     { id: "reports", label: "Reports", icon: "doc", items: [
-      { hash: "#/report/pipeline",               label: "New Business Pipeline",       icon: "layers" },
-      { hash: "#/franchise-list",                label: "Franchise List",              icon: "doc" },
-      { hash: "#/report/franchise-by-sales",     label: "Franchise by Sales",          icon: "doc" },
-      { hash: "#/report/franchise-by-agent",     label: "Franchise by Agent",          icon: "doc" },
+      { hash: "#/report/pipeline",                label: "New Business Pipeline",           icon: "layers" },
+      { hash: "#/report/franchise-by-sales",      label: "Franchise by Sales",              icon: "doc" },
+      { hash: "#/report/franchise-by-agent",      label: "Franchise by Agent",              icon: "doc" },
       { hash: "#/report/approaching-effectivity", label: "Accounts Approaching Effectivity", icon: "rocket" }
     ]}
   ];
 
-  // Which group owns the current route (for auto-expand + highlight).
+  // Which group owns the current route (for auto-expand + highlight). Top-level
+  // items (My Tasks) and Home belong to no group, so they return null.
   function groupForHash(hash) {
     for (var i = 0; i < NAV_GROUPS.length; i++) {
       var g = NAV_GROUPS[i];
@@ -77,33 +66,36 @@
         if (g.items[j].hash === hash) return g.id;
       }
     }
-    if (hash.indexOf("#/case/") === 0) return "newbiz";    // any case section → New Business
-    if (hash.indexOf("#/work/") === 0) return "newbiz";    // Sales-owned work queues
-    if (hash.indexOf("#/sample/") === 0) return "mywork";  // a case the user owns
+    if (hash.indexOf("#/case/") === 0) return "sales";      // any case section → Sales
+    if (hash.indexOf("#/wi/") === 0) return "sales";        // a work-item record
+    if (hash.indexOf("#/work/") === 0) return "sales";      // Sales-owned work queues
+    if (hash.indexOf("#/sample/") === 0) return "sales";    // a case the user owns
+    if (hash === "#/add-franchise") return "sales";         // Add Franchise is a Franchise-page action
     if (hash.indexOf("#/report/") === 0) return "reports";
-    if (hash.indexOf("#/module/") === 0) return "accounts";
+    if (hash.indexOf("#/module/") === 0) return "tools";
     return null;
   }
 
-  /* Pending counts for the sidebar badges — mirror My Tasks / Approvals. */
-  function taskCount(c) {
+  /* My Tasks badge — only counts work that genuinely needs this user to act
+     (returned, blocked, awaiting their approval, or due within 2 days). Items
+     merely waiting on the client or another team are NOT counted, so the badge
+     always represents actionable work. */
+  function taskCount() {
+    var items = M.WORKITEMS || [];
     var n = 0;
-    if ((c.flags.leadCaptured || c.meta.caseNo) && !c.flags.handoverComplete) n++;
-    M.SAMPLE_CASES.forEach(function (sx) { if (sx.owner === "A. Reyes") n++; });
-    return n;
-  }
-  function approvalCount(c) {
-    var n = 0, f = c.flags;
-    if (f.franchiseCreated && !f.franchiseApproved) n++;
-    if (f.rateSheetReceived && !f.pricingApproved) n++;
-    if (c.planCodes && c.planCodes.generated && !f.planCodesApproved) n++;
+    items.forEach(function (r) {
+      if (r.owner !== "A. Reyes") return;
+      if (r.status === "Returned for correction" || r.status === "Blocked" || r.status === "Ready for approval") n++;
+      else if (r.status !== "Completed" && r.status !== "Waiting for client" &&
+               r.status !== "Waiting for another team" && M.daysUntil(r.due) <= 2) n++;
+    });
     return n;
   }
 
   /* Remembered last-expanded group (persists across sessions). Default
-     "mywork" so the Commercial user lands with My Work expanded. */
+     "sales" so the Commercial user lands with Sales expanded. */
   var NAV_PREF_KEY = "hms3_nav_group";
-  function loadNavPref() { try { return global.localStorage.getItem(NAV_PREF_KEY) || "mywork"; } catch (e) { return "mywork"; } }
+  function loadNavPref() { try { return global.localStorage.getItem(NAV_PREF_KEY) || "sales"; } catch (e) { return "sales"; } }
   function saveNavPref(g) { try { global.localStorage.setItem(NAV_PREF_KEY, g); } catch (e) {} }
   var navPref = loadNavPref();
   var CASE_SECTIONS = [
@@ -155,18 +147,15 @@
   function sidebar(activeHash) {
     var expandedId = expandedGroup(activeHash);
     if (expandedId) { navPref = expandedId; saveNavPref(expandedId); }   // remember last-expanded
-    var counts = { tasks: taskCount(C), approvals: approvalCount(C) };
+    var counts = { tasks: taskCount() };
 
     var homeActive = activeHash === NAV_HOME.hash;
     var homeLink = '<a class="nav-link nav-home' + (homeActive ? " active" : "") + '" href="' +
       NAV_HOME.hash + '"' + (homeActive ? ' aria-current="page"' : "") + ' title="Home">' +
       icon(NAV_HOME.icon, 18) + '<span class="lbl">' + esc(NAV_HOME.label) + '</span></a>';
 
-    // Commercial quick action — always visible, identifiable even collapsed.
-    var createActive = activeHash === "#/new";
-    var createBtn = '<a class="nav-create' + (createActive ? " active" : "") + '" href="#/new"' +
-      ' aria-label="Create New Business" title="Create New Business">' +
-      icon("plus", 18) + '<span class="lbl">Create New Business</span></a>';
+    // Top-level items (My Tasks) — always reachable, never buried in a group.
+    var topLinks = NAV_TOP.map(function (it) { return navItem(it, activeHash, true, counts); }).join("");
 
     var groups = NAV_GROUPS.map(function (g) {
       var open = g.id === expandedId;
@@ -182,14 +171,6 @@
       return sep + '<div class="nav-group' + (open ? " open" : "") + '">' + header + items + '</div>';
     }).join("");
 
-    var moreMenu = ui.menu
-      ? '<div class="menu" role="menu">' +
-          '<div class="menu-item" data-nav="#/notifications" role="menuitem">' + icon("bell", 18) + '<span>Notifications</span></div>' +
-          '<div class="menu-item" data-nav="#/report/franchise-by-sales" role="menuitem">' + icon("doc", 18) + '<span>Reports</span></div>' +
-          '<div class="menu-item" data-act="reset" role="menuitem">' + icon("history", 18) + '<span>Reset demo</span></div>' +
-        '</div>'
-      : "";
-
     var collapsed = ui.collapsed;
     return '<nav class="sidebar' + (collapsed ? " collapsed" : "") + '" aria-label="Primary">' +
       '<div class="brand">' +
@@ -199,25 +180,31 @@
           (collapsed ? "Expand sidebar" : "Collapse sidebar") + '" aria-pressed="' + (collapsed ? "true" : "false") + '">' +
           icon("chevron", 18) + '</button>' +
       '</div>' +
-      '<div class="nav">' + homeLink + createBtn + groups + '</div>' +
+      '<div class="nav">' + homeLink + topLinks + groups + '</div>' +
       '<div class="spacer"></div>' +
-      '<div class="notif-wrap" style="position:relative">' + moreMenu +
-        '<div class="profile" data-ui="more" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="' + (ui.menu ? "true" : "false") + '">' +
-        '<span class="avatar">AR</span><span class="who"><b>A. Reyes</b><span>Corporate Sales</span></span>' +
-        '<span class="spacer" style="flex:1"></span>' + icon("more", 18) + '</div></div>' +
       '</nav>';
   }
 
+  // Notifications bell + user profile live in the header (not the sidebar).
   function topbar(crumbs) {
     var unread = C.notifications.filter(function (n) { return !n.read; }).length;
     var panel = ui.notif ? notifPanel() : "";
+    var menu = ui.menu
+      ? '<div class="menu" role="menu">' +
+          '<div class="menu-item" data-act="reset" role="menuitem">' + icon("history", 18) + '<span>Reset demo</span></div>' +
+        '</div>'
+      : "";
     return '<header class="topbar">' +
       '<div class="crumbs">' + crumbs + '</div><div class="spacer"></div>' +
       '<div class="notif-wrap">' +
         '<button type="button" class="btn btn-ghost bell" data-ui="notif" aria-label="Notifications' + (unread ? " (" + unread + " unread)" : "") + '" aria-expanded="' + (ui.notif ? "true" : "false") + '">' +
         icon("bell", 20) + (unread ? '<span class="bell-pip"></span>' : "") + '</button>' + panel +
       '</div>' +
-      '<button type="button" class="btn btn-sm" data-act="reset">' + icon("history", 16) + '<span>Reset demo</span></button>' +
+      '<div class="notif-wrap profile-wrap">' + menu +
+        '<div class="profile" data-ui="more" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="' + (ui.menu ? "true" : "false") + '" aria-label="A. Reyes, Corporate Sales — account menu">' +
+          '<span class="avatar">AR</span><span class="who"><b>A. Reyes</b><span>Corporate Sales</span></span>' +
+          icon("chevron", 16) + '</div>' +
+      '</div>' +
       '</header>';
   }
 
@@ -328,6 +315,10 @@
         var scId = decodeURIComponent(hash.slice("#/sample/".length));
         var sc = V.sampleCase(C, scId);
         content = sc.body; crumbs = '<b>My Cases</b><span class="sep">/</span><span>' + esc(sc.title) + '</span>'; title = sc.title + " · HMS3";
+      } else if (hash.indexOf("#/wi/") === 0) {
+        var wiId = decodeURIComponent(hash.slice("#/wi/".length));
+        var wic = V.workItemCase(C, wiId);
+        content = wic.body; crumbs = '<b>Sales Tracker — New Business</b><span class="sep">/</span><span>' + esc(wic.title) + '</span>'; title = wic.title + " · HMS3";
       } else if (hash.indexOf("#/work/") === 0) {
         var wk = V.workQueue(C, hash.slice("#/work/".length));
         content = wk.body; crumbs = '<b>New Business</b><span class="sep">/</span><span>' + esc(wk.title) + '</span>'; title = wk.title + " · HMS3";
@@ -339,7 +330,7 @@
         content = rep.body; crumbs = '<b>Reports</b><span class="sep">/</span><span>' + esc(rep.title) + '</span>'; title = rep.title + " · HMS3";
       } else switch (hash) {
         case "#/new": content = V.newBusiness(C); crumbs = '<b>New Business</b>'; title = "New Business · HMS3"; break;
-        case "#/sales-tracker": content = V.salesTracker(C); crumbs = '<b>Sales Tracker</b>'; title = "Sales Tracker · HMS3"; break;
+        case "#/sales-tracker": content = V.salesTrackerNB(C); crumbs = '<b>Sales Tracker — New Business</b>'; title = "Sales Tracker — New Business · HMS3"; break;
         case "#/cases": content = V.myCases(C); crumbs = '<b>My New Business Cases</b>'; title = "My New Business Cases · HMS3"; break;
         case "#/search": content = V.searchPage(C); crumbs = '<b>Accounts Inquiry</b>'; title = "Accounts Inquiry · HMS3"; break;
         case "#/tasks": content = V.tasks(C); crumbs = '<b>My Tasks</b>'; title = "My Tasks · HMS3"; break;
@@ -353,10 +344,38 @@
     }
     root.innerHTML = html;
     document.title = title;
+
+    // One-shot restore of a queue's scroll position when returning from a
+    // record. The position is saved only on row-open; after restoring we clear
+    // it so later filter/sort re-renders start at the top as expected.
+    var scrollers = root.querySelectorAll(".queue-scroll[data-qkey]");
+    for (var si = 0; si < scrollers.length; si++) {
+      var qk = scrollers[si].getAttribute("data-qkey");
+      var qs = M.loadQueueState(qk);
+      if (qs.scroll > 0) {
+        scrollers[si].scrollTop = qs.scroll;
+        qs.scroll = 0;
+        M.saveQueueState(qk, qs);
+      }
+    }
   }
 
   function focusMain() { var m = document.getElementById("main"); if (m) m.focus(); }
   function announce(msg) { var live = document.getElementById("sr-live"); if (live) live.textContent = msg; }
+
+  // Simulated async load for a queue — shows the loading state, then clears it.
+  // Demonstrates real loading/retry UX in a prototype with no backend.
+  function queueLoad(key, ms) {
+    var st = M.loadQueueState(key);
+    st.loading = true;
+    M.saveQueueState(key, st);
+    global.setTimeout(function () {
+      var s2 = M.loadQueueState(key);
+      s2.loading = false;
+      M.saveQueueState(key, s2);
+      render();
+    }, ms || 400);
+  }
 
   /* ============================================================
      Actions — the state machine
@@ -389,6 +408,71 @@
 
   var ACTIONS = {
     "noop": function () {},
+
+    /* ---- Work-queue engine (per-queue state in localStorage) ----
+       Every queue:* action mutates only that queue's saved state (search,
+       view, filters, sort, page, density, columns, scroll) — never the case —
+       so they all return skipSave:true. Re-render picks up the new state. */
+    "queue:view": function (a) {
+      var p = (a || "").split("|"), st = M.loadQueueState(p[0]);
+      st.view = p[1]; st.page = 1; M.saveQueueState(p[0], st);
+      queueLoad(p[0]); return { skipSave: true };
+    },
+    "queue:filterselect": function (a) {
+      var p = (a || "").split("|"), st = M.loadQueueState(p[0]);
+      st[p[1]] = p.slice(2).join("|"); st.page = 1; M.saveQueueState(p[0], st);
+      return { skipSave: true };
+    },
+    "queue:sort": function (a) {
+      var p = (a || "").split("|"), st = M.loadQueueState(p[0]);
+      if (st.sortCol === p[1]) st.sortDir = st.sortDir === "asc" ? "desc" : "asc";
+      else { st.sortCol = p[1]; st.sortDir = "asc"; }
+      M.saveQueueState(p[0], st); return { skipSave: true };
+    },
+    "queue:page": function (a) {
+      var p = (a || "").split("|"), st = M.loadQueueState(p[0]);
+      st.page = (st.page || 1) + (p[1] === "next" ? 1 : -1);
+      if (st.page < 1) st.page = 1;
+      M.saveQueueState(p[0], st); return { skipSave: true };
+    },
+    "queue:size": function (a) {
+      var p = (a || "").split("|"), st = M.loadQueueState(p[0]);
+      st.size = parseInt(p[1], 10) || 10; st.page = 1;
+      M.saveQueueState(p[0], st); return { skipSave: true };
+    },
+    "queue:density": function (a) {
+      var p = (a || "").split("|"), st = M.loadQueueState(p[0]);
+      st.density = p[1]; M.saveQueueState(p[0], st); return { skipSave: true };
+    },
+    "queue:col": function (a) {
+      var p = (a || "").split("|"), st = M.loadQueueState(p[0]);
+      var i = st.hidden.indexOf(p[1]);
+      if (i < 0) st.hidden.push(p[1]); else st.hidden.splice(i, 1);
+      st._colsOpen = true;              // keep the column menu open across re-render
+      M.saveQueueState(p[0], st); return { skipSave: true };
+    },
+    "queue:colsmenu": function (a) {
+      var st = M.loadQueueState(a);
+      st._colsOpen = !st._colsOpen; M.saveQueueState(a, st); return { skipSave: true };
+    },
+    "queue:reset": function (a) {
+      var st = M.loadQueueState(a);
+      st.q = ""; st.view = "My Work"; st.owner = "All"; st.status = "All";
+      st.stage = "All"; st.intermediary = "All"; st.eff = "All"; st.page = 1;
+      M.saveQueueState(a, st); queueLoad(a); return { skipSave: true, toast: "Filters cleared" };
+    },
+    "queue:clearsearch": function (a) {
+      var st = M.loadQueueState(a);
+      st.q = ""; st.page = 1; M.saveQueueState(a, st); return { skipSave: true };
+    },
+    "queue:reload": function (a) {
+      queueLoad(a, 600); return { skipSave: true, skipRender: true };
+    },
+    "queue:retry": function (a) {
+      var st = M.loadQueueState(a);
+      st.q = ""; st.page = 1; M.saveQueueState(a, st);
+      queueLoad(a, 600); return { skipSave: true };
+    },
 
     "reset": function () {
       M.reset();
@@ -861,7 +945,18 @@
     if (ch) { e.preventDefault(); handleChoice(ch.getAttribute("data-choice")); return; }
 
     var navEl = close("[data-nav]");
-    if (navEl) { e.preventDefault(); go(navEl.getAttribute("data-nav")); return; }
+    if (navEl) {
+      e.preventDefault();
+      // Opening a record from a queue? Remember where the queue was scrolled to
+      // so we can restore it when the user comes back.
+      var qk = navEl.getAttribute("data-qkey");
+      if (qk) {
+        var sc = document.querySelector('.queue-scroll[data-qkey="' + qk + '"]');
+        if (sc) { var qst = M.loadQueueState(qk); qst.scroll = sc.scrollTop; M.saveQueueState(qk, qst); }
+      }
+      go(navEl.getAttribute("data-nav"));
+      return;
+    }
 
     if (ui.notif || ui.menu) {
       if (!close(".notif-wrap")) { ui.notif = false; ui.menu = false; render(); }
@@ -880,7 +975,7 @@
     }
   });
 
-  // Live company search — filter as you type, preserving focus + caret.
+  // Live search — filter as you type, preserving focus + caret.
   document.addEventListener("input", function (e) {
     var t = e.target;
     if (t && t.id === "coSearch") {
@@ -890,7 +985,30 @@
       render();
       var n = document.getElementById("coSearch");
       if (n) { n.focus(); try { n.setSelectionRange(caret, caret); } catch (_e) {} }
+      return;
     }
+    if (t && t.id === "queueSearch") {
+      var key = t.getAttribute("data-qkey");
+      var st = M.loadQueueState(key);
+      st.q = t.value; st.page = 1; M.saveQueueState(key, st);
+      var qcaret = t.selectionStart;
+      // "slow" demonstrates a longer load; the engine shows error state for "error".
+      if ((t.value || "").trim().toLowerCase() === "slow") queueLoad(key, 1500);
+      render();
+      var qn = document.getElementById("queueSearch");
+      if (qn) { qn.focus(); try { qn.setSelectionRange(qcaret, qcaret); } catch (_e) {} }
+      return;
+    }
+  });
+
+  // Native <select> filters in the work-queue toolbar dispatch on change.
+  // data-change holds the action name; data-arg holds "key|field"; we append
+  // the chosen value so the action gets "key|field|value".
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var cEl = t.closest("[data-change]");
+    if (cEl) { runAction(cEl.getAttribute("data-change"), cEl.getAttribute("data-arg") + "|" + t.value); }
   });
 
   function markNotifsRead() { C.notifications.forEach(function (n) { n.read = true; }); M.save(C); }

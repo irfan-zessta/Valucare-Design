@@ -46,36 +46,42 @@ border `#E4E7EC` · surface `#FFFFFF`. Status is **always colour + icon + text**
 
 ## Navigation
 
-The sidebar is built for the **Commercial / Sales** user — a cleaner evolution of the familiar
-HMS3 Sales workspace, not a list of every back-office team's internal activity. It is a
-**collapsible left sidebar** with **Home**, a always-visible **Create New Business** quick action,
-and five groups that expand one at a time; the group holding the current page auto-expands, the
-active item shows a blue background + left indicator (`aria-current="page"`), and the **last
-expanded group is remembered** (defaults to **My Work**). Rows are three-column (icon · label ·
-count/arrow), min 44px tall, with neutral count badges (and amber for approvals) that **only show
-when non-zero**. Collapsed, the rail keeps recognizable icons, tooltips, Create, and small pips.
+The sidebar is **short and stable** — built for the Commercial / Sales user, not a list of
+every back-office team's activity. Fixed order, **at most two levels**, one group expanded at a
+time, the last-expanded group remembered (defaults to **Sales**). Active item shows a blue
+background + left indicator (`aria-current="page"`). Counters appear **only when they represent
+actionable work** (My Tasks). **Notifications and the user profile live in the header**, not the
+sidebar.
 
 - **Home**
-- **Create New Business** — the one quick action; starts find-company → resolve duplicates →
-  add/select franchise → verified HMS3 data → upload requirements → save/submit
-- **My Work** — Sales Tracker · My New Business Cases · My Tasks · Approvals · Notifications
-- **New Business** — Franchise List · Add Franchise · Account Enrollment — New · Quotations ·
-  Proposals and Negotiations · Contracts and KYC · Activation and Handover
-- **Accounts** — Account Maintenance · Additional Affiliates · Accounts Inquiry
-- **Sales Tools** — Agent/Broker Maintenance · Eligibility · Rate Creation · SOB Viewer ·
-  Plan Code Viewer · Plan Type Management
-- **Reports** — New Business Pipeline · Franchise List · Franchise by Sales · Franchise by Agent ·
+- **My Tasks** — top-level; **Approvals appear within My Tasks** for authorized reviewers
+- **Sales** — Sales Tracker — New Business · Franchise · Quotations and Proposals ·
+  Account Enrollment — New · Accounts Inquiry
+- **Tools** — Agent/Broker Maintenance · SOB and Plan Codes · Additional Affiliates
+- **Reports** — New Business Pipeline · Franchise by Sales · Franchise by Agent ·
   Accounts Approaching Effectivity
 
-The **Quotations / Proposals and Negotiations / Contracts and KYC / Activation and Handover** items
-are cross-case **Sales work queues** — entry points into cases at that stage, not duplicates of the
-in-case stage editor (each row opens the real case). Back-office work owned by other teams
-(Actuarial/ACCUSA pricing, Legal, Account Services, SOB validation, Plan Code maker-checker, Member
-Data, Billing) is **never** a primary Commercial menu item — Sales sees it only *inside the case* as
-a stage status, task, blocker or handoff, with no edit controls for another team's work. The scope
-is **Corporate New Business only** — no Renewal, IFG, or Unverified-team items appear anywhere.
-Modules a Sales role can't access (ACUSA, MDA, CCD, Network Provider, Claims, Billing, ICT, Logs,
-Roles and Permissions) are removed.
+**Add Franchise** is an **action on the Franchise page**, not a nav item. Within Franchise,
+the distinct legacy workflows (Franchise records, Enrollment review queue, Approved records,
+Expiring/Returned) keep their separate meanings and identifiers — they are not merged because
+their names are similar.
+
+The scope is **Corporate New Business only** — no Renewal, IFG, or Unverified-team items appear
+anywhere. Back-office work owned by other teams (Actuarial pricing, Legal, Account Services, SOB
+validation, Plan Code maker-checker, Member Data, Billing) is **never** a primary Commercial menu
+item — Sales sees it only *inside the case* as a stage status, task, blocker or handoff.
+
+### Sales Tracker — New Business (the daily work queue)
+
+A reusable **compact work-queue** (`assets/views.js` `dataQueue`): search by company / franchise
+code / main account code / account code; **saved views** (My Work, Returned, Waiting on Client,
+Waiting on Another Team, Due Soon, All Permitted Records); filters (owner, status, stage,
+intermediary, effectivity); sortable sticky columns; configurable columns; comfortable/compact
+density; pagination; and **remembered state** (search, view, filters, sort, page, density, and
+scroll position per queue, in `localStorage`). Rows open the connected record; Ctrl/Cmd/middle-click
+opens it in a new tab. Loading, empty, and error/retry states are built in (facilitator hooks:
+search `error` or `slow`). See **`DELIVERY.md`** for the full status, mapping, traceability, test
+results, unresolved decisions, and config flags.
 
 When a case is open, a **case progress strip** sits above the workspace showing current stage,
 current owner, next action, due date, waiting party and any blocker — the ten internal stages are

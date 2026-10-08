@@ -196,6 +196,216 @@
     return rows;
   }
 
+  /* ============================================================
+     WORK ITEMS — the realistic multi-account dataset the compact
+     work queues read. Clearly fictional. Each row carries the
+     identifying references Commercial users search by (franchise
+     code, main account code, account code) plus the lifecycle
+     facts a queue must show (stage, status, owner, intermediary,
+     effectivity, blocker, waiting). `scenario` ties each row to a
+     section-13 test case so moderated testing can exercise them.
+     ============================================================ */
+  var TODAY = "2026-10-08";               // fixed "now" for deterministic demo buckets
+  function daysUntil(iso) {               // whole days from TODAY to iso (negative = overdue)
+    if (!iso) return Infinity;
+    var a = new Date(TODAY + "T00:00:00"), b = new Date(iso + "T00:00:00");
+    return Math.round((b - a) / 86400000);
+  }
+
+  var WORKITEMS = [
+    { id: "wi-northwind", caseNo: "CNB-2026-00482", company: "Northwind Manufacturing Corporation", shortName: "Northwind",
+      franchiseCode: "FR-2026-00142", mainAccountCode: "MA-0482", accountCode: null,
+      stage: "Franchise", stageId: 1, status: "In progress", owner: "A. Reyes",
+      channel: "Direct", intermediary: "Direct", effectivity: "2026-11-01", due: "2026-10-09",
+      members: 420, premium: 5880000, probability: 70, planCodes: 0, affiliates: 0,
+      updated: "2026-10-08", blocker: null, waiting: null, live: true,
+      scenario: "Direct corporate account", note: "The live, editable case." },
+    { id: "wi-southgate", caseNo: "CNB-2026-00461", company: "Southgate Logistics Inc.", shortName: "Southgate",
+      franchiseCode: "FR-2026-00138", mainAccountCode: "MA-0461", accountCode: null,
+      stage: "Proposal", stageId: 3, status: "Waiting for client", owner: "A. Reyes",
+      channel: "Direct", intermediary: "Direct", effectivity: "2026-11-01", due: "2026-10-09",
+      members: 180, premium: 2520000, probability: 60, planCodes: 0, affiliates: 0,
+      updated: "2026-10-06", blocker: null, waiting: "client",
+      scenario: "Direct corporate account", note: "Proposal v2 out with client." },
+    { id: "wi-harbor", caseNo: "CNB-2026-00455", company: "Harbor Freight Services", shortName: "Harbor",
+      franchiseCode: "FR-2026-00129", mainAccountCode: "MA-0455", accountCode: null,
+      stage: "Contract and KYC", stageId: 4, status: "Waiting for another team", owner: "A. Reyes",
+      channel: "Broker", intermediary: "Pinnacle Brokers Inc.", effectivity: "2026-11-15", due: "2026-10-10",
+      members: 95, premium: 1330000, probability: 80, planCodes: 0, affiliates: 0,
+      updated: "2026-10-05", blocker: null, waiting: "team",
+      scenario: "Agent/broker account", note: "Legal reviewing DSA draft. Client contact via broker." },
+    { id: "wi-delta", caseNo: "CNB-2026-00448", company: "Delta Pharma Distributors", shortName: "Delta Pharma",
+      franchiseCode: "FR-2026-00117", mainAccountCode: "MA-0448", accountCode: "ACC-2026-10843",
+      stage: "Member Data and Billing", stageId: 6, status: "Blocked", owner: "A. Reyes",
+      channel: "Direct", intermediary: "Direct", effectivity: "2026-10-20", due: "2026-10-08",
+      members: 310, premium: 4340000, probability: 95, planCodes: 46, affiliates: 0,
+      updated: "2026-10-07", blocker: "VAT document mismatch", waiting: null,
+      scenario: "Member Data with row errors", note: "6 of 310 member rows fail validation; VAT document mismatch at billing." },
+    { id: "wi-vertex", caseNo: "CNB-2026-00440", company: "Vertex Engineering Group", shortName: "Vertex",
+      franchiseCode: "FR-2026-00104", mainAccountCode: "MA-0440", accountCode: null,
+      stage: "Quotation", stageId: 2, status: "Returned for correction", owner: "A. Reyes",
+      channel: "Agent", intermediary: "Castillo Agency", effectivity: "2026-12-01", due: "2026-10-11",
+      members: 60, premium: 840000, probability: 40, planCodes: 0, affiliates: 0,
+      updated: "2026-10-07", blocker: "Returned by Actuarial — incomplete TOR", waiting: null,
+      scenario: "Returned quotation", note: "Rate request returned: TOR missing room levels." },
+    { id: "wi-lakeside", caseNo: "CNB-2026-00433", company: "Lakeside Hospitality Corp.", shortName: "Lakeside",
+      franchiseCode: "FR-2026-00098", mainAccountCode: "MA-0433", accountCode: null,
+      stage: "Proposal", stageId: 3, status: "Returned for correction", owner: "A. Reyes",
+      channel: "Direct", intermediary: "Direct", effectivity: "2026-11-30", due: "2026-10-13",
+      members: 240, premium: 3360000, probability: 55, planCodes: 0, affiliates: 0,
+      updated: "2026-10-06", blocker: "SOB draft: outpatient benefit below TOR", waiting: null,
+      scenario: "Reduced benefit requiring review", note: "Draft SOB reduces an outpatient inner limit vs TOR — needs review." },
+    { id: "wi-meridian", caseNo: "CNB-2026-00427", company: "Meridian Retail Holdings", shortName: "Meridian",
+      franchiseCode: "FR-2026-00091", mainAccountCode: "MA-0427", accountCode: null,
+      stage: "Franchise", stageId: 1, status: "In progress", owner: "A. Reyes",
+      channel: "Direct", intermediary: "Direct", effectivity: "2026-12-15", due: "2026-10-14",
+      members: 1200, premium: 16800000, probability: 50, planCodes: 0, affiliates: 7,
+      updated: "2026-10-04", blocker: null, waiting: null,
+      scenario: "Multiple affiliates", note: "Parent plus 7 affiliates; some may take a separate SOB." },
+    { id: "wi-ironwood", caseNo: "CNB-2026-00419", company: "Ironwood Construction Inc.", shortName: "Ironwood",
+      franchiseCode: "FR-2026-00077", mainAccountCode: "MA-0419", accountCode: null,
+      stage: "Franchise", stageId: 1, status: "Blocked", owner: "A. Reyes",
+      channel: "Broker", intermediary: "Pinnacle Brokers Inc.", effectivity: "2026-11-20", due: "2026-10-10",
+      members: 150, premium: 2100000, probability: 45, planCodes: 0, affiliates: 0,
+      updated: "2026-10-07", blocker: "Possible duplicate franchise FR-2025-00981", waiting: null,
+      scenario: "Duplicate franchise", note: "Duplicate check flagged an expired franchise for the same TIN." },
+    { id: "wi-summit", caseNo: "CNB-2026-00411", company: "Summit Financial Partners", shortName: "Summit",
+      franchiseCode: "FR-2026-00060", mainAccountCode: "MA-0411", accountCode: null,
+      stage: "Account and Benefits", stageId: 5, status: "Blocked", owner: "A. Reyes",
+      channel: "Direct", intermediary: "Direct", effectivity: "2026-10-25", due: "2026-10-09",
+      members: 85, premium: 1190000, probability: 90, planCodes: 0, affiliates: 0,
+      updated: "2026-10-07", blocker: "Missing onboarding requirement: signatory ID", waiting: null,
+      scenario: "Missing onboarding requirement", note: "Account setup held: signatory ID not yet received." },
+    { id: "wi-cascade", caseNo: "CNB-2026-00402", company: "Cascade Agri Ventures", shortName: "Cascade",
+      franchiseCode: "FR-2026-00085", mainAccountCode: "MA-0402", accountCode: "ACC-2026-10822",
+      stage: "Account and Benefits", stageId: 5, status: "Ready for approval", owner: "A. Reyes",
+      channel: "Direct", intermediary: "Direct", effectivity: "2026-10-18", due: "2026-10-09",
+      members: 2400, premium: 33600000, probability: 95, planCodes: 418, affiliates: 3,
+      updated: "2026-10-07", blocker: null, waiting: null,
+      scenario: "Hundreds of Plan Codes", note: "418 Plan Codes generated from the approved SOB; awaiting checker approval." },
+    { id: "wi-coastal", caseNo: "CNB-2026-00394", company: "Coastal Seafoods Trading", shortName: "Coastal",
+      franchiseCode: "FR-2026-00054", mainAccountCode: "MA-0394", accountCode: "ACC-2026-10810",
+      stage: "Account and Benefits", stageId: 5, status: "Returned for correction", owner: "A. Reyes",
+      channel: "Agent", intermediary: "Castillo Agency", effectivity: "2026-10-22", due: "2026-10-12",
+      members: 130, premium: 1820000, probability: 85, planCodes: 12, affiliates: 0,
+      updated: "2026-10-06", blocker: "Stale approval: SOB revised after sign-off", waiting: null,
+      scenario: "Stale approval after revision", note: "SOB changed after approval — prior pricing sign-off invalidated." },
+    { id: "wi-brightpath", caseNo: "CNB-2026-00388", company: "Brightpath Education Network", shortName: "Brightpath",
+      franchiseCode: "FR-2026-00068", mainAccountCode: "MA-0388", accountCode: "ACC-2026-10501",
+      stage: "Activation", stageId: 7, status: "Waiting for another team", owner: "A. Reyes",
+      channel: "Direct", intermediary: "Direct", effectivity: "2026-10-15", due: "2026-10-10",
+      members: 540, premium: 7560000, probability: 98, planCodes: 64, affiliates: 2,
+      updated: "2026-10-07", blocker: null, waiting: "team",
+      scenario: "Missing onboarding requirement", note: "MDA and Billing handover running in parallel; Billing acknowledgement pending." },
+    { id: "wi-northstar", caseNo: "CNB-2026-00377", company: "Northstar Industrial Corp.", shortName: "Northstar",
+      franchiseCode: null, mainAccountCode: "MA-0377", accountCode: null,
+      stage: "Franchise", stageId: 1, status: "Not started", owner: "M. Santos",
+      channel: "Direct", intermediary: "Direct", effectivity: "2027-01-01", due: "2026-10-20",
+      members: 70, premium: 980000, probability: 30, planCodes: 0, affiliates: 0,
+      updated: "2026-10-03", blocker: null, waiting: null,
+      scenario: "Direct corporate account", note: "New lead owned by a colleague — visible under All Permitted Records." },
+    { id: "wi-riverside", caseNo: "CNB-2026-00369", company: "Riverside Textiles Mfg.", shortName: "Riverside",
+      franchiseCode: "FR-2026-00041", mainAccountCode: "MA-0369", accountCode: null,
+      stage: "Quotation", stageId: 2, status: "Waiting for another team", owner: "M. Santos",
+      channel: "Broker", intermediary: "Pinnacle Brokers Inc.", effectivity: "2026-11-10", due: "2026-10-16",
+      members: 320, premium: 4480000, probability: 65, planCodes: 0, affiliates: 0,
+      updated: "2026-10-05", blocker: null, waiting: "team",
+      scenario: "Agent/broker account", note: "With Actuarial / ACCUSA for pricing. Owned by a colleague." },
+    { id: "wi-granite", caseNo: "CNB-2026-00361", company: "Granite Mining Resources", shortName: "Granite",
+      franchiseCode: "FR-2026-00033", mainAccountCode: "MA-0361", accountCode: null,
+      stage: "Contract and KYC", stageId: 4, status: "Waiting for client", owner: "M. Santos",
+      channel: "Direct", intermediary: "Direct", effectivity: "2026-11-05", due: "2026-10-18",
+      members: 410, premium: 5740000, probability: 75, planCodes: 0, affiliates: 0,
+      updated: "2026-10-04", blocker: null, waiting: "client",
+      scenario: "Direct corporate account", note: "Signed–Unpaid: awaiting first premium. Owned by a colleague." },
+    { id: "wi-beacon", caseNo: "CNB-2026-00352", company: "Beacon Logistics Group", shortName: "Beacon",
+      franchiseCode: "FR-2026-00028", mainAccountCode: "MA-0352", accountCode: "ACC-2026-10777",
+      stage: "Member Data and Billing", stageId: 6, status: "In progress", owner: "M. Santos",
+      channel: "Direct", intermediary: "Direct", effectivity: "2026-10-30", due: "2026-10-17",
+      members: 760, premium: 10640000, probability: 92, planCodes: 88, affiliates: 4,
+      updated: "2026-10-06", blocker: null, waiting: null,
+      scenario: "Multiple affiliates", note: "Parent plus 4 affiliates; MDA upload in progress." }
+  ];
+
+  // Generic query over any work-item-shaped array. Returns a paginated,
+  // filtered, sorted slice plus the counts a toolbar/pager needs. The
+  // caller owns the state object; this function is pure.
+  var SAVED_VIEWS = ["My Work", "Returned", "Waiting on Client", "Waiting on Another Team", "Due Soon", "All Permitted Records"];
+  function viewPredicate(view) {
+    switch (view) {
+      case "Returned": return function (r) { return r.status === "Returned for correction"; };
+      case "Waiting on Client": return function (r) { return r.status === "Waiting for client"; };
+      case "Waiting on Another Team": return function (r) { return r.status === "Waiting for another team"; };
+      case "Due Soon": return function (r) { return daysUntil(r.due) <= 5 && r.status !== "Completed"; };
+      case "All Permitted Records": return function () { return true; };
+      case "My Work": default: return function (r) { return r.owner === "A. Reyes" && r.status !== "Completed"; };
+    }
+  }
+  function effBucket(bucket) {
+    switch (bucket) {
+      case "Overdue": return function (r) { return daysUntil(r.effectivity) < 0; };
+      case "Next 30 days": return function (r) { var d = daysUntil(r.effectivity); return d >= 0 && d <= 30; };
+      case "This quarter": return function (r) { var d = daysUntil(r.effectivity); return d >= 0 && d <= 92; };
+      default: return function () { return true; };
+    }
+  }
+  function queryItems(items, st) {
+    st = st || {};
+    var q = (st.q || "").trim().toLowerCase();
+    var pred = viewPredicate(st.view || "My Work");
+    var effP = effBucket(st.eff || "All");
+    var rows = items.filter(function (r) {
+      if (!pred(r)) return false;
+      if (st.owner && st.owner !== "All" && r.owner !== st.owner) return false;
+      if (st.status && st.status !== "All" && r.status !== st.status) return false;
+      if (st.stage && st.stage !== "All" && String(r.stageId) !== String(st.stage)) return false;
+      if (st.intermediary && st.intermediary !== "All" && r.intermediary !== st.intermediary) return false;
+      if (!effP(r)) return false;
+      if (!q) return true;
+      return [r.company, r.shortName, r.caseNo, r.franchiseCode, r.mainAccountCode, r.accountCode]
+        .some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; });
+    });
+    var col = st.sortCol || "due", dir = st.sortDir === "asc" ? 1 : -1;
+    rows = rows.slice().sort(function (a, b) {
+      var av = a[col] == null ? "" : a[col], bv = b[col] == null ? "" : b[col];
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return av < bv ? -1 * dir : av > bv ? 1 * dir : 0;
+    });
+    var total = rows.length;
+    var size = st.size || 10;
+    var pages = Math.max(1, Math.ceil(total / size));
+    var page = Math.min(Math.max(1, st.page || 1), pages);
+    var start = (page - 1) * size;
+    return { rows: rows.slice(start, start + size), total: total, page: page, pages: pages, start: start, size: size };
+  }
+  // Count how many items fall under each saved view (for chip badges that are
+  // only shown when they represent actionable work).
+  function viewCounts(items) {
+    var out = {};
+    SAVED_VIEWS.forEach(function (v) { out[v] = items.filter(viewPredicate(v)).length; });
+    return out;
+  }
+
+  // Per-queue UI state, remembered across navigation (filters, sort, page,
+  // density, visible columns, scroll). Keyed by queue id.
+  var QUEUE_PREFIX = "hms3_queue_";
+  function queueDefaults() {
+    return { q: "", view: "My Work", owner: "All", status: "All", stage: "All", intermediary: "All",
+      eff: "All", sortCol: "due", sortDir: "asc", page: 1, size: 10, density: "comfortable",
+      hidden: [], scroll: 0 };
+  }
+  function loadQueueState(key) {
+    var d = queueDefaults();
+    try {
+      var raw = global.localStorage.getItem(QUEUE_PREFIX + key);
+      if (raw) { var s = JSON.parse(raw); for (var k in s) if (s.hasOwnProperty(k)) d[k] = s[k]; }
+    } catch (e) {}
+    return d;
+  }
+  function saveQueueState(key, st) {
+    try { global.localStorage.setItem(QUEUE_PREFIX + key, JSON.stringify(st)); } catch (e) {}
+  }
+
   /* --- the 7 customer-oriented stages --- */
   var STAGES = [
     { id: 1, name: "Franchise",
@@ -392,6 +602,9 @@
     STORE_KEY: STORE_KEY, PEOPLE: PEOPLE, FLAG_ORDER: FLAG_ORDER, GATE_FLAGS: GATE_FLAGS,
     STAGES: STAGES, SAMPLE_CASES: SAMPLE_CASES, SAMPLE_FRANCHISES: SAMPLE_FRANCHISES,
     COMPANIES: COMPANIES, findCompany: findCompany, franchiseRows: franchiseRows,
+    WORKITEMS: WORKITEMS, SAVED_VIEWS: SAVED_VIEWS, TODAY: TODAY, daysUntil: daysUntil,
+    queryItems: queryItems, viewCounts: viewCounts,
+    loadQueueState: loadQueueState, saveQueueState: saveQueueState, queueDefaults: queueDefaults,
     createInitialCase: createInitialCase, gatePassed: gatePassed,
     stageSummary: stageSummary, currentStage: currentStage, nextStep: nextStep,
     milestoneProgress: milestoneProgress, logActivity: logActivity, notify: notify,

@@ -1357,12 +1357,252 @@
   }
 
   /* ============================================================
+     WORK-QUEUE ENGINE — the compact, high-density table Commercial
+     users live in. Reusable across Sales Tracker, Franchise, etc.
+     Search · saved views · filters · sort · paging · column config ·
+     density · sticky header · remembered state · loading/empty/error.
+     ============================================================ */
+  function fmtPHP(n) {
+    if (n == null || n === "") return '<span class="muted">—</span>';
+    return "₱" + Number(n).toLocaleString("en-PH");
+  }
+  function recordHref(r) { return r.live ? "#/case/summary" : "#/wi/" + encodeURIComponent(r.id); }
+
+  // A select control that emits a change event the router turns into an action.
+  function qSelect(key, field, label, value, options) {
+    var opts = options.map(function (o) {
+      var v = typeof o === "object" ? o.v : o, t = typeof o === "object" ? o.t : o;
+      return '<option value="' + esc(String(v)) + '"' + (String(value) === String(v) ? " selected" : "") + '>' + esc(t) + '</option>';
+    }).join("");
+    var id = "qf-" + key + "-" + field;
+    return '<label class="qfilter"><span class="qfilter-l">' + esc(label) + '</span>' +
+      '<select id="' + id + '" class="input qsel" data-change="queue:filterselect" data-arg="' + esc(key + "|" + field) + '" aria-label="' + esc(label) + '">' +
+      opts + '</select></label>';
+  }
+
+  // cfg: { key, title, sub, items, columns:[{key,label,get(r),sortCol?,align?,always?,hiddenByDefault?}], createBtn? }
+  function dataQueue(c, cfg) {
+    var st = M.loadQueueState(cfg.key);
+    // one-time default hidden columns (only when the user hasn't customised)
+    if (!st._touchedCols) {
+      st.hidden = cfg.columns.filter(function (col) { return col.hiddenByDefault; }).map(function (col) { return col.key; });
+    }
+    var items = cfg.items;
+    var counts = M.viewCounts(items);
+
+    // --- test hooks (documented): search "error" → error state, "slow" → long load
+    var errorMode = (st.q || "").trim().toLowerCase() === "error";
+
+    var res = M.queryItems(items, st);
+
+    // ---- toolbar: search + saved views -------------------------------------
+    var search = '<div class="search-wrap qsearch">' + icon("search", 18) +
+      '<input class="input" id="queueSearch" data-qkey="' + esc(cfg.key) + '" placeholder="Search company, franchise code, main account or account code" ' +
+      'value="' + esc(st.q || "") + '" autocomplete="off" aria-label="Search records" />' +
+      (st.q ? '<button type="button" class="qsearch-x" data-act="queue:clearsearch" data-arg="' + esc(cfg.key) + '" aria-label="Clear search">' + icon("x", 16) + '</button>' : '') +
+      '</div>';
+
+    var views = '<div class="savedviews" role="tablist" aria-label="Saved views">' + M.SAVED_VIEWS.map(function (v) {
+      var on = (st.view || "My Work") === v;
+      var n = counts[v];
+      var showN = n > 0 && v !== "All Permitted Records";
+      return '<button type="button" role="tab" aria-selected="' + (on ? "true" : "false") + '" class="sv' + (on ? " on" : "") + '" ' +
+        'data-act="queue:view" data-arg="' + esc(cfg.key + "|" + v) + '">' + esc(v) +
+        (showN ? '<span class="sv-n">' + n + '</span>' : '') + '</button>';
+    }).join("") + '</div>';
+
+    // ---- filters -----------------------------------------------------------
+    var owners = ["All"].concat(items.map(function (r) { return r.owner; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }));
+    var inters = ["All"].concat(items.map(function (r) { return r.intermediary; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }));
+    var stageOpts = [{ v: "All", t: "All stages" }].concat(M.STAGES.map(function (s) { return { v: s.id, t: s.id + " · " + s.name }; }));
+    var statusOpts = ["All", "Not started", "In progress", "Waiting for client", "Waiting for another team", "Returned for correction", "Blocked", "Ready for approval", "Completed"];
+    var filters = '<div class="qfilters">' +
+      qSelect(cfg.key, "owner", "Owner", st.owner, owners) +
+      qSelect(cfg.key, "status", "Status", st.status, statusOpts) +
+      qSelect(cfg.key, "stage", "Stage", st.stage, stageOpts) +
+      qSelect(cfg.key, "intermediary", "Intermediary", st.intermediary, inters) +
+      qSelect(cfg.key, "eff", "Effectivity", st.eff, ["All", "Overdue", "Next 30 days", "This quarter"]) +
+      ((st.owner !== "All" || st.status !== "All" || st.stage !== "All" || st.intermediary !== "All" || st.eff !== "All" || st.view !== "My Work" || st.q)
+        ? '<button type="button" class="btn btn-ghost btn-sm qclear" data-act="queue:reset" data-arg="' + esc(cfg.key) + '">' + icon("x", 15) + '<span>Clear</span></button>' : '') +
+      '</div>';
+
+    // ---- density + columns + reload ----------------------------------------
+    var visibleCols = cfg.columns.filter(function (col) { return col.always || st.hidden.indexOf(col.key) < 0; });
+    var colToggles = cfg.columns.map(function (col) {
+      if (col.always) return '';
+      var shown = st.hidden.indexOf(col.key) < 0;
+      return '<button type="button" class="colchip' + (shown ? " on" : "") + '" role="menuitemcheckbox" aria-checked="' + (shown ? "true" : "false") + '" ' +
+        'data-act="queue:col" data-arg="' + esc(cfg.key + "|" + col.key) + '">' + (shown ? icon("check", 14) : icon("circle", 14)) + esc(col.label) + '</button>';
+    }).join("");
+    var tools = '<div class="qtools">' +
+      '<div class="density" role="group" aria-label="Display density">' +
+        '<button type="button" class="dbtn' + (st.density !== "compact" ? " on" : "") + '" data-act="queue:density" data-arg="' + esc(cfg.key + "|comfortable") + '" aria-pressed="' + (st.density !== "compact") + '" title="Comfortable">' + icon("layers", 15) + 'Comfortable</button>' +
+        '<button type="button" class="dbtn' + (st.density === "compact" ? " on" : "") + '" data-act="queue:density" data-arg="' + esc(cfg.key + "|compact") + '" aria-pressed="' + (st.density === "compact") + '" title="Compact">' + icon("tasks", 15) + 'Compact</button>' +
+      '</div>' +
+      '<details class="colmenu"' + (st._colsOpen ? ' open' : '') + '><summary class="btn btn-ghost btn-sm" data-act="queue:colsmenu" data-arg="' + esc(cfg.key) + '">' + icon("more", 15) + '<span>Columns</span></summary>' +
+        '<div class="colmenu-body" role="menu" aria-label="Show or hide columns">' + colToggles + '</div></details>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-act="queue:reload" data-arg="' + esc(cfg.key) + '" aria-label="Reload">' + icon("history", 15) + '<span>Reload</span></button>' +
+      (cfg.createBtn || '') +
+      '</div>';
+
+    // ---- table -------------------------------------------------------------
+    function sortTh(col) {
+      var sortable = !!col.sortCol;
+      var active = st.sortCol === col.sortCol;
+      if (!sortable) return '<th scope="col"' + (col.align ? ' style="text-align:' + col.align + '"' : '') + '>' + esc(col.label) + '</th>';
+      var caret = active ? (st.sortDir === "asc" ? " ▲" : " ▼") : "";
+      return '<th scope="col"' + (col.align ? ' style="text-align:' + col.align + '"' : '') + (col.key === "company" ? ' class="col-id"' : '') + '>' +
+        '<button type="button" class="th-sort" data-act="queue:sort" data-arg="' + esc(cfg.key + "|" + col.sortCol) + '"' +
+        (active ? ' aria-sort="' + (st.sortDir === "asc" ? "ascending" : "descending") + '"' : '') + '>' +
+        esc(col.label) + '<span aria-hidden="true">' + caret + '</span></button></th>';
+    }
+    var headRow = visibleCols.map(sortTh).join("") + '<th scope="col" class="col-act" style="text-align:right">Open</th>';
+
+    var bodyRows;
+    if (errorMode || st.loading) {
+      bodyRows = ""; // body replaced by state block below
+    } else if (!res.rows.length) {
+      bodyRows = '<tr><td colspan="' + (visibleCols.length + 1) + '"><div class="q-empty">' + icon("search", 28) +
+        '<div><b>No records match this view</b><div class="muted">Try another saved view, clear filters, or adjust your search.</div></div>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-act="queue:reset" data-arg="' + esc(cfg.key) + '">Clear filters</button></div></td></tr>';
+    } else {
+      bodyRows = res.rows.map(function (r) {
+        var cells = visibleCols.map(function (col) {
+          return '<td' + (col.align ? ' style="text-align:' + col.align + '"' : '') + (col.key === "company" ? ' class="col-id"' : '') + '>' + col.get(r) + '</td>';
+        }).join("");
+        var href = recordHref(r);
+        var act = '<td class="col-act" style="text-align:right"><span class="row-actions">' +
+          '<a class="btn btn-ghost btn-sm" href="' + href + '" data-nav="' + href + '" data-qkey="' + esc(cfg.key) + '">Open</a>' +
+          '<a class="iconbtn" href="' + href + '" target="_blank" rel="noopener" aria-label="Open ' + esc(r.company) + ' in new tab" title="Open in new tab">' + icon("arrowRight", 15) + '</a>' +
+          '</span></td>';
+        return '<tr' + (r.live ? ' class="row-live"' : '') + '>' + cells + act + '</tr>';
+      }).join("");
+    }
+
+    var table = '<div class="queue-scroll" data-qkey="' + esc(cfg.key) + '" tabindex="0">' +
+      '<table class="qtable ' + (st.density === "compact" ? "compact" : "comfortable") + '">' +
+      '<thead><tr>' + headRow + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div>';
+
+    // ---- loading / error overlays -----------------------------------------
+    var stateBlock = "";
+    if (st.loading) {
+      stateBlock = '<div class="q-state" role="status" aria-live="polite">' +
+        '<div class="skeleton-rows">' + Array.apply(null, { length: 6 }).map(function () { return '<div class="skrow"></div>'; }).join("") + '</div>' +
+        '<div class="muted" style="text-align:center;margin-top:8px">Loading records…</div></div>';
+    } else if (errorMode) {
+      stateBlock = '<div class="q-state q-error" role="alert">' + icon("alert", 28) +
+        '<div><b>Couldn\'t load records</b><div class="muted">The request failed. Your filters are kept — try again.</div></div>' +
+        '<button type="button" class="btn btn-primary btn-sm" data-act="queue:retry" data-arg="' + esc(cfg.key) + '">' + icon("history", 15) + '<span>Retry</span></button></div>';
+    }
+
+    // ---- pager -------------------------------------------------------------
+    var sizes = [10, 25, 50];
+    var pager = '<div class="pager"><div class="pg-size">Rows: ' + sizes.map(function (s) {
+        return '<button type="button" class="chip tiny' + (st.size === s ? " on" : "") + '" data-act="queue:size" data-arg="' + esc(cfg.key + "|" + s) + '"' + (st.size === s ? ' aria-pressed="true"' : '') + '>' + s + '</button>';
+      }).join("") + '</div><span class="spacer"></span>' +
+      '<span class="pg-info">' + (res.total ? (res.start + 1) + '–' + Math.min(res.start + res.size, res.total) : 0) + ' of ' + res.total + '</span>' +
+      btn("Prev", { size: "sm", variant: "ghost", icon: "arrowLeft", act: "queue:page", arg: cfg.key + "|prev", disabled: res.page <= 1 }) +
+      '<span class="pg-info">Page ' + res.page + ' / ' + res.pages + '</span>' +
+      btn("Next", { size: "sm", variant: "ghost", iconRight: "arrowRight", act: "queue:page", arg: cfg.key + "|next", disabled: res.page >= res.pages }) + '</div>';
+
+    var body = (errorMode || st.loading)
+      ? card(table.replace(/<tbody>[\s\S]*<\/tbody>/, '<tbody></tbody>') + stateBlock)
+      : card(table + pager);
+
+    return '<div class="stack-5">' +
+      U.pageHead(cfg.title, cfg.sub) +
+      card('<div class="qtoolbar">' + '<div class="qtoolbar-top">' + search + tools + '</div>' + views + filters + '</div>') +
+      body +
+      '<p class="tiny muted">All displayed client data is fictional, for demonstration only. ' +
+        'Tip: Ctrl/Cmd-click or middle-click a row to open it in a new tab. ' +
+        'Facilitator hooks: search “error” to see the error state, “slow” for a longer load.</p></div>';
+  }
+
+  // Sales Tracker — New Business: the flagship compact queue.
+  function salesTrackerNB(c) {
+    var columns = [
+      { key: "company", label: "Company", always: true, sortCol: "company", get: function (r) {
+        return '<a class="q-co" href="' + recordHref(r) + '" data-nav="' + recordHref(r) + '" data-qkey="salesnb">' + esc(r.company) + '</a>' +
+          '<div class="q-sub">' + esc(r.caseNo) + (r.live ? ' · <span class="q-livetag">Live</span>' : '') + '</div>'; } },
+      { key: "refs", label: "References", get: function (r) {
+        return '<div class="q-refs">' +
+          (r.franchiseCode ? '<span title="Franchise code">' + esc(r.franchiseCode) + '</span>' : '<span class="muted">no franchise</span>') +
+          (r.mainAccountCode ? '<span title="Main account code">' + esc(r.mainAccountCode) + '</span>' : '') +
+          (r.accountCode ? '<span title="Account code">' + esc(r.accountCode) + '</span>' : '') + '</div>'; } },
+      { key: "stage", label: "Stage", sortCol: "stageId", get: function (r) { return '<span class="q-stage"><b>' + r.stageId + '</b> ' + esc(r.stage) + '</span>'; } },
+      { key: "status", label: "Status", sortCol: "status", get: function (r) { return pill(r.status); } },
+      { key: "waiting", label: "Next / blocker", get: function (r) {
+        if (r.blocker) return '<span class="q-blk">' + icon("alert", 14) + esc(r.blocker) + '</span>';
+        if (r.waiting === "client") return '<span class="q-wait">' + icon("clock", 14) + 'Waiting on client</span>';
+        if (r.waiting === "team") return '<span class="q-wait">' + icon("clock", 14) + 'Waiting on ' + esc(r.owner === "A. Reyes" ? "another team" : r.owner) + '</span>';
+        return '<span class="muted">On track</span>'; } },
+      { key: "owner", label: "Owner", sortCol: "owner", get: function (r) { return esc(r.owner); } },
+      { key: "intermediary", label: "Intermediary", hiddenByDefault: true, get: function (r) { return r.intermediary === "Direct" ? '<span class="muted">Direct</span>' : esc(r.intermediary); } },
+      { key: "members", label: "Members", align: "right", sortCol: "members", hiddenByDefault: true, get: function (r) { return Number(r.members).toLocaleString("en-PH"); } },
+      { key: "premium", label: "Est. premium", align: "right", sortCol: "premium", hiddenByDefault: true, get: function (r) { return fmtPHP(r.premium); } },
+      { key: "effectivity", label: "Effectivity", sortCol: "effectivity", get: function (r) {
+        var d = M.daysUntil(r.effectivity);
+        return fmtDate(r.effectivity) + (d < 0 ? ' <span class="q-od">overdue</span>' : d <= 30 ? ' <span class="q-soon">' + d + 'd</span>' : ''); } },
+      { key: "due", label: "Next due", sortCol: "due", get: function (r) {
+        var d = M.daysUntil(r.due);
+        return fmtDate(r.due) + (d < 0 ? ' <span class="q-od">late</span>' : d <= 2 ? ' <span class="q-soon">soon</span>' : ''); } }
+    ];
+    var createBtn = '<a class="btn btn-primary btn-sm" href="#/new" data-nav="#/new">' + icon("plus", 16) + '<span>Create New Business</span></a>';
+    return dataQueue(c, {
+      key: "salesnb", items: M.WORKITEMS, columns: columns, createBtn: createBtn,
+      title: "Sales Tracker — New Business",
+      sub: "Every Corporate New Business record you can act on. Search, pick a saved view, filter and open."
+    });
+  }
+
+  // Read-only connected-case snapshot for any work item (opened from a queue).
+  function workItemCase(c, id) {
+    var r = null;
+    for (var i = 0; i < M.WORKITEMS.length; i++) if (M.WORKITEMS[i].id === id) { r = M.WORKITEMS[i]; break; }
+    if (!r) return { title: "Record", body: sectionShell("Record not found", "That record doesn't exist in this demo dataset.",
+      actionbar(btn("Back to Sales Tracker", { variant: "primary", nav: "#/sales-tracker" }))) };
+
+    var ctx = '<section class="case-context" aria-label="Case context"><div class="cc-grid">' +
+      '<div class="cc-cell cc-co"><div class="cc-l">Company</div><div class="cc-v">' + esc(r.company) + '</div></div>' +
+      '<div class="cc-cell"><div class="cc-l">References</div><div class="cc-v">' + esc(r.caseNo) +
+        (r.franchiseCode ? ' · ' + esc(r.franchiseCode) : '') + (r.mainAccountCode ? ' · ' + esc(r.mainAccountCode) : '') + (r.accountCode ? ' · ' + esc(r.accountCode) : '') + '</div></div>' +
+      '<div class="cc-cell"><div class="cc-l">Status</div><div class="cc-v">' + pill(r.status) + '</div></div>' +
+      '<div class="cc-cell"><div class="cc-l">Owner</div><div class="cc-v">' + esc(r.owner) + '</div></div>' +
+      '<div class="cc-cell"><div class="cc-l">Waiting / blocker</div><div class="cc-v"' + (r.blocker || r.waiting ? ' style="color:var(--amber)"' : '') + '>' +
+        (r.blocker ? esc(r.blocker) : r.waiting === "client" ? "Waiting on client" : r.waiting === "team" ? "Waiting on another team" : "—") + '</div></div>' +
+      '<div class="cc-cell"><div class="cc-l">Target effectivity</div><div class="cc-v">' + fmtDate(r.effectivity) + '</div></div>' +
+      '</div></section>';
+
+    var steps = M.STAGES.map(function (s) {
+      return { t: s.id + " · " + s.name + " — " + s.owner, done: s.id < r.stageId };
+    });
+    var progress = card(head("Lifecycle progress", '<span class="tiny">Stage ' + r.stageId + ' of 7</span>') + timeline(steps));
+
+    var detail = card(head("Record detail") + U.dl([
+      ["Scenario (test case)", r.scenario], ["Channel / business source", r.channel],
+      ["Intermediary", r.intermediary === "Direct" ? "Direct" : r.intermediary],
+      ["Members", Number(r.members).toLocaleString("en-PH")], ["Estimated premium", fmtPHP(r.premium), true],
+      ["Win probability", r.probability + "%"], ["Plan Codes", r.planCodes ? Number(r.planCodes).toLocaleString("en-PH") : "—"],
+      ["Affiliates", r.affiliates || "—"], ["Last updated", fmtDate(r.updated)], ["Note", r.note]
+    ]));
+
+    var body = '<div class="stack-5">' +
+      banner("info", "Read-only reference", "This is a fictional demo record opened from a work queue. The editable, end-to-end case is Northwind (the live case). Full multi-record editing is a later slice.") +
+      ctx + progress + detail +
+      actionbar(btn("Back to Sales Tracker", { variant: "ghost", icon: "arrowLeft", nav: "#/sales-tracker" }),
+        r.live ? btn("Open the live case", { variant: "primary", nav: "#/case/summary" }) : "") +
+      '<p class="tiny muted">All displayed client data is fictional, for demonstration only.</p></div>';
+    return { title: r.shortName, body: body };
+  }
+
+  /* ============================================================
      MODULE + REPORT placeholders (honest, navigable, never dead)
      ============================================================ */
   var MODULES = {
     "account-maintenance": { title: "Account Maintenance", icon: "building", desc: "Maintain existing corporate accounts — company details, contacts and status.", scope: "Part of HMS3 Accounts. Represented here for navigation; out of scope for the Corporate New Business flow." },
     "additional-affiliates": { title: "Additional Affiliates", icon: "users", desc: "Add affiliate / sub-accounts to an existing corporate account.", scope: "Part of HMS3 Accounts. For a case in progress, affiliates are added inside the case's Account Setup section (separate or shared SOB, billing and Plan Codes)." },
-    "agent-broker": { title: "Agent/Broker Maintenance", icon: "users", desc: "Maintain intermediaries, AOR/BOR authority and commission setup.", scope: "Part of HMS3 Sales Tools. Represented here for navigation." },
+    "agent-broker": { title: "Agent/Broker Maintenance", icon: "users", desc: "Maintain intermediaries, AOR/BOR authority and commission setup.", scope: "Part of HMS3 Tools. Represented here for navigation." },
+    "sob-plancodes": { title: "SOB and Plan Codes", icon: "calc", desc: "Reference workspace for standard SOB templates and approved Plan Codes across accounts.", scope: "Part of HMS3 Tools. The active case's SOB and Plan Codes live inside the case (SOB and Benefits · Plan Codes); this is the cross-account reference. A full maker-checker Plan Code workspace is a later slice." },
     "eligibility": { title: "Eligibility", icon: "shieldCheck", desc: "Maintain eligibility rules used across accounts.", scope: "Part of HMS3 Sales Tools. Represented here for navigation." },
     "rates": { title: "Rate Creation", icon: "calc", desc: "Create and maintain the rate tables actuarial pricing draws from.", scope: "Part of HMS3 Sales Tools (legacy “Rate's Creation”). Represented here for navigation." },
     "plan-types": { title: "Plan Type Management", icon: "layers", desc: "Define and maintain plan types available to new business.", scope: "Part of HMS3 Sales Tools. Represented here for navigation." },
@@ -1452,6 +1692,7 @@
     caseOnboarding: caseOnboarding, caseSob: caseSob, casePlanCodes: casePlanCodes, caseMemberData: caseMemberData,
     caseBilling: caseBilling, caseActivation: caseActivation, caseHistory: caseHistory,
     salesTracker: salesTracker, workQueue: workQueue,
+    salesTrackerNB: salesTrackerNB, dataQueue: dataQueue, workItemCase: workItemCase,
     stageIcon: stageIcon, fmtDate: fmtDate
   };
 })(window);
