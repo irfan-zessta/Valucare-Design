@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Start the HMS3 Corporate New Business app.
-# A single Python process serves the UI (from app/) and the /api/ backend.
-# First start seeds fictional demo data into data/hms.db.
+# Start the HMS3 Corporate New Business app (redesigned root build).
+# The UI is a static, dependency-free SPA served straight from the repo root
+# (index.html + assets/). No bundler, no build step, no backend required.
 set -e
 cd "$(dirname "$0")/../.."
 PORT="${PORT:-4180}"
-exec python3 -m server.app --port "$PORT"
+exec python3 -m http.server "$PORT" --bind 127.0.0.1
