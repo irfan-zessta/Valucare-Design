@@ -72,6 +72,10 @@ class Seeder:
     def __init__(self, store):
         self.st = store
         self.t = None
+        self.steps = 0
+        self.step_override = None
+        self.counts = {}
+        self.timing = None
 
     def at(self, when):
         Ctx.fixed_now = when.replace(microsecond=0)
@@ -80,6 +84,9 @@ class Seeder:
         return Ctx(self.st, USERS[uid])
 
     def act(self, uid, name, payload=None, step_hours=5):
+        self.steps += 1
+        if self.step_override:
+            step_hours = self.step_override
         if self.t:
             self.t += dt.timedelta(hours=step_hours)
             now = dt.datetime.now() - dt.timedelta(minutes=5)
@@ -100,15 +107,23 @@ class Seeder:
 
 
 def seed(store):
-    store.wipe()
-    sd = Seeder(store)
+    """Two passes: the first counts each scenario's steps, the second spreads
+    them so every case's latest activity lands within the last few days."""
     now = dt.datetime.now().replace(microsecond=0)
-    sd.t = now - dt.timedelta(days=120)
-    sd.at(sd.t)
-    try:
-        _seed(store, sd, now)
-    finally:
-        Ctx.fixed_now = None
+    counts = {}
+    for pass_no in (1, 2):
+        store.wipe()
+        sd = Seeder(store)
+        sd.timing = counts if pass_no == 2 else None
+        sd.t = now - dt.timedelta(days=120)
+        sd.at(sd.t)
+        try:
+            _seed(store, sd, now)
+        finally:
+            Ctx.fixed_now = None
+        counts = sd.counts
+        global R
+        R = random.Random(7)
 
 
 def _seed(store, sd, now):
@@ -163,13 +178,19 @@ def _seed(store, sd, now):
                      "mda": 85, "coc_approval": 80, "plans_returned": 80, "account_approval": 70, "account_create": 65,
                      "kyc_flagged": 60, "contract_legal": 55, "accepted": 50, "proposal_declined": 50, "sent": 45, "senior_approval": 40,
                      "proposal_review": 38, "sob_validation": 38, "rs_issued": 30, "rr_returned": 25, "rr_submitted": 20,
-                     "franchise_expiring": 58, "extension_requested": 56, "franchise_approved": 12, "franchise_rejected": 15,
+                     "franchise_expiring": 67, "extension_requested": 56, "franchise_approved": 12, "franchise_rejected": 15,
                      "franchise_returned": 8, "franchise_submitted_highrisk": 4, "franchise_draft": 3, "routed_ifg": 6,
                      "closed_lost": 30, "lead": 2}.get(target, 5)
         sd.t = now - dt.timedelta(days=days_back, hours=R.randint(0, 8))
         sd.at(sd.t)
+        sd.steps = 0
+        sd.step_override = None
+        if sd.timing and sd.timing.get(i):
+            recent_h = 6 + (i * 13) % 60
+            sd.step_override = max(0.25, (days_back * 24 - recent_h) / sd.timing[i])
         try:
             run_case(store, sd, i, comp, target, owners[i % 3], active, now)
+            sd.counts[i] = sd.steps
         except ApiError as e:
             raise RuntimeError(f"Seeding {comp[0]} -> {target} failed: {e.code}: {e.message} {e.details}") from e
     Ctx.fixed_now = None
@@ -503,6 +524,10 @@ def run_case(store, sd, i, comp, target, am, active, now):
         if target == "activated_future":
             sd.act(AS1, "activation.activate", {"caseId": cid})
         return
+    after_eff = dt.datetime.combine(eff, dt.time(9, 0)) + dt.timedelta(days=1)
+    if sd.t < after_eff:
+        sd.t = after_eff
+        sd.at(sd.t)
     sd.act(AS1, "activation.activate", {"caseId": cid})
     act = actions.S(store).bundle(cid).one("activation")
     for uid in (MDA, BC1, CCD, WEL):

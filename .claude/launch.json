@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hms3-nb",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "server.app", "--port", "4180"],
+      "port": 4180
+    }
+  ]
+}

@@ -345,10 +345,14 @@ def gate(key, label, ok, owner, link, detail="", evidence=None, blocker=None):
 
 def onboarding_status(b, cfg):
     onb = b.one("onboarding")
+    kyc = b.one("kyc")
     items = []
     for it in cfg["onboardingChecklist"]:
         st = (onb or {}).get("items", {}).get(it["key"], {})
-        items.append({**it, "status": st.get("status", "Missing"), "docId": st.get("docId"), "waiver": st.get("waiver")})
+        if it["key"] == "kyc_form" and kyc and kyc.get("formDocId") and st.get("status") != "Waived":
+            # single source: the KYC form uploaded on the KYC record satisfies the checklist item
+            st = {"status": "Received", "docId": kyc["formDocId"], "source": "KYC record"}
+        items.append({**it, "status": st.get("status", "Missing"), "docId": st.get("docId"), "waiver": st.get("waiver"), "source": st.get("source")})
     return items
 
 
@@ -835,18 +839,6 @@ def task_matches_user(t, user):
     if t["role"] == "validator":
         return True
     return True
-
-
-def task_matches_role(t, role):
-    return t["role"] == role or (t["role"] == "validator" and role in ("validator",))
-
-
-def add_validator_aliases(tasks, cfg):
-    """SOB validation can be done by any configured independent role."""
-    out = []
-    for t in tasks:
-        out.append(t)
-    return out
 
 
 def matches_validator(t, user, cfg):

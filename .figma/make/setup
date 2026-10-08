@@ -1,3 +1,9 @@
 #!/usr/bin/env bash
-# No system dependencies — static HTML/JS prototype.
-exit 0
+# First-open setup. The HMS3 app runs on the Python standard library only
+# (no build tools, no system packages), so setup just confirms Python 3 exists.
+set -e
+command -v python3 >/dev/null 2>&1 || {
+  echo "python3 is required but was not found on PATH" >&2
+  exit 1
+}
+python3 --version

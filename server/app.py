@@ -208,8 +208,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send(e.status, e.payload())
 
     def _body(self):
-        n = int(self.headers.get("Content-Length") or 0)
-        return self.rfile.read(n) if n else b""
+        return self._raw
 
     def _json(self):
         raw = self._body()
@@ -248,6 +247,10 @@ class Handler(BaseHTTPRequestHandler):
         self._route("POST")
 
     def _route(self, method):
+        # Always consume the request body first: an early error (e.g. 401) must
+        # not leave unread bytes on a keep-alive connection.
+        n = int(self.headers.get("Content-Length") or 0)
+        self._raw = self.rfile.read(n) if n else b""
         url = urllib.parse.urlparse(self.path)
         path = url.path
         q = {k: v[0] for k, v in urllib.parse.parse_qs(url.query).items()}
@@ -261,6 +264,9 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # pragma: no cover
             traceback.print_exc()
             return self._send(500, {"error": {"code": "server_error", "message": f"Unexpected server error: {e}. Nothing was saved."}})
+        finally:
+            if store():
+                store().close_thread()
 
     def _static(self, path):
         if path in ("/", ""):
@@ -344,7 +350,7 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"cases/([\w-]+)/plancodes", p)
         if m:
             return self._send(200, self._plancodes(ctx, m.group(1), q))
-        m = re.fullmatch(r"records/([\w#.-]+)", p)
+        m = re.fullmatch(r"records/(.+)", p)
         if m:
             r = st.must(urllib.parse.unquote(m.group(1)))
             if r.get("caseId"):
@@ -415,6 +421,9 @@ class Handler(BaseHTTPRequestHandler):
             cols = ["planCode", "pcVersion", "status", "accountCode", "accountName", "sobVersion"] + [f[0] for f in meta.PLAN_CODE_FIELDS if f[0] not in ("planCode", "accountId", "sobVersion")]
             out = [[(";".join(r.get(c) or []) if isinstance(r.get(c), list) else r.get(c)) for c in cols] for r in rows]
             return self._send(200, tables.to_csv(cols, out), "text/csv", {"Content-Disposition": f"attachment; filename=\"plan-codes-{m.group(1)}.csv\""})
+        m = re.fullmatch(r"samples/([\w-]+)\.csv", p)
+        if m:
+            return self._send(200, self._sample(m.group(1)), "text/csv", {"Content-Disposition": f"attachment; filename=\"{m.group(1)}.csv\""})
         m = re.fullmatch(r"templates/([\w-]+)\.csv", p)
         if m:
             return self._send(200, self._template(m.group(1), q), "text/csv",
@@ -469,6 +478,58 @@ class Handler(BaseHTTPRequestHandler):
         for r in st.list("planCode", case_id):
             counts[r.get("status")] = counts.get(r.get("status"), 0) + 1
         return {"total": len(rows), "items": rows[off:off + lim], "counts": counts}
+
+    def _sample(self, name):
+        """Fictional sample files for upload/import testing."""
+        import random as _r
+        from . import seed as _seed
+        st = store()
+        jumbo = next((c for c in st.list("case") if (st.get(c["companyId"]) or {}).get("registeredName", "").startswith("Kalayaan")), None)
+        approved = [r["planCode"] for r in st.list("planCode", jumbo["id"]) if r.get("status") == "Approved"] if jumbo else []
+        if name == "member-data-10000":
+            return _seed.member_csv(5200, approved or ["PLAN-A"], errors=True, seed=99)
+        if name == "member-data-300":
+            return _seed.member_csv(300, approved or ["PLAN-A"], seed=3)
+        if name == "plan-codes-1000":
+            accs = [a for a in st.list("account", jumbo["id"])] if jumbo else []
+            cols = ["accountCode"] + [f[0] for f in meta.PLAN_CODE_FIELDS if f[0] not in ("planCode", "accountId", "sobVersion")]
+            rnd = _r.Random(5)
+            rows = []
+            for i in range(1000):
+                a = accs[i % len(accs)] if accs else {"accountCode": "MA-UNKNOWN"}
+                mbl = rnd.choice([100000, 150000, 200000, 300000, 500000])
+                prem = round(mbl / 10 * rnd.uniform(0.8, 1.1), 2)
+                row = {"accountCode": a["accountCode"], "planType": rnd.choice(["CORP-STD", "CORP-EXEC", "CORP-DEP"]), "mbl": mbl, "mblDescription": f"Bulk plan {i + 1} MBL {mbl:,}",
+                       "businessSource": "Agent", "roomType": rnd.choice(["Ward", "Semi-private", "Private"]), "roomLimit": rnd.choice([1500, 2500, 3500]),
+                       "modeOfPayment": rnd.choice(["Annual", "Quarterly"]), "memberType": rnd.choice(["Principal", "Dependent"]), "principalPosition": rnd.choice(["Agent", "Supervisor", "Manager"]),
+                       "civilStatus": "Any", "beforeVat": prem, "vatInclusive": "No", "vatAmount": round(prem * 0.12, 2), "vatDesc": "VAT-able 12%", "premium": prem,
+                       "hospitalCodes": ";".join(f"H{n:05d}" for n in rnd.sample(range(1, 200), 5)), "clinicCodes": ";".join(f"C{n:05d}" for n in rnd.sample(range(1, 100), 3)),
+                       "remarks": "Sample bulk import", "dentalRemarks": "Oral prophylaxis", "contractYear": dt.date.today().year, "effectiveFrom": dt.date.today().isoformat(), "effectiveTo": ""}
+                if i % 37 == 5:
+                    row["hospitalCodes"] = "H99999"
+                if i % 53 == 7:
+                    row["vatDesc"] = ""
+                if i % 71 == 9:
+                    row["roomType"] = "Penthouse"
+                rows.append(row)
+            return tables.to_csv(cols, rows)
+        if name in ("rate-sheet", "rate-sheet-errors"):
+            rows = []
+            for plan, room, mbl, base in (("Plan A", "Ward", 150000, 14100), ("Plan B", "Semi-private", 200000, 17500), ("Plan C", "Private", 300000, 25600)):
+                for mt, f in (("Principal", 1.0), ("Dependent", 0.86)):
+                    for mode, mf in (("Annual", 1.0), ("Quarterly", 0.26), ("Monthly", 0.09)):
+                        rows.append([plan, room, mbl, mt, "", mode, round(base * f * mf, 2)])
+            if name == "rate-sheet-errors":
+                rows[2][5] = "Weekly"
+                rows[4][6] = "-15"
+                rows[7][3] = "Spouse"
+            return tables.to_csv(meta.RATE_SHEET_COLUMNS, rows)
+        if name == "tor":
+            rows = [["IP-RB", 200000, "", "", "Private room", "Per confinement", "", ""], ["IP-HOSP", 200000, "", 100, "", "Per confinement", "", ""],
+                    ["OP-LAB", "", 30000, "", "", "Per year", "", ""], ["OP-CONS", "", 2000, "", "", "Per visit", "", ""], ["APE-EXEC", "", 6000, "", "", "Once a year", "", ""],
+                    ["MAT-CS", "", 60000, "", "", "Per confinement", "", ""], ["XX-UNKNOWN", "", 1000, "", "", "", "", ""]]
+            return tables.to_csv(["code", "mbl", "innerLimit", "percentage", "limitDescription", "frequency", "exclusions", "notes"], rows)
+        raise ApiError(404, "not_found", "Unknown sample.")
 
     def _template(self, name, q):
         if name == "member-data":
@@ -593,7 +654,7 @@ def make_server(port, db_path, seed_if_empty=True):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", 4173)))
+    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", 4180)))
     ap.add_argument("--db", default=os.path.join(ROOT, "data", "hms.db"))
     ap.add_argument("--reseed", action="store_true")
     a = ap.parse_args()

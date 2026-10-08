@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
-# No package install needed — no build step, no dependencies.
+# No dependencies to install: the server and UI use only the Python standard
+# library, and the frontend is served as-is (no bundler, no build step).
 exit 0

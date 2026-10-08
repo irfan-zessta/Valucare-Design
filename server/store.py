@@ -69,12 +69,30 @@ class Store:
         self.files_dir = os.path.join(os.path.dirname(path), "files")
         os.makedirs(self.files_dir, exist_ok=True)
         self.lock = threading.RLock()
-        self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
-        self.db.row_factory = sqlite3.Row
+        self._local = threading.local()
         self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.execute("PRAGMA synchronous=NORMAL")
         self._depth = 0
         self._schema()
+
+    @property
+    def db(self):
+        """One connection per thread (sqlite3 connections must not be shared
+        across concurrently running request threads). Writes are serialised by
+        self.lock + BEGIN IMMEDIATE."""
+        c = getattr(self._local, "c", None)
+        if c is None:
+            c = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None, timeout=30)
+            c.row_factory = sqlite3.Row
+            c.execute("PRAGMA synchronous=NORMAL")
+            c.execute("PRAGMA busy_timeout=30000")
+            self._local.c = c
+        return c
+
+    def close_thread(self):
+        c = getattr(self._local, "c", None)
+        if c is not None:
+            c.close()
+            self._local.c = None
 
     def _schema(self):
         self.db.executescript(

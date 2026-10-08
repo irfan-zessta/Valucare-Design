@@ -1,0 +1,115 @@
+{
+  "runAt": "2026-10-08T12:07:29",
+  "results": [
+    {
+      "test": "test_01_zero_result_search_then_new_company",
+      "doc": "New company after a zero-result search; no account number at lead creation.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_02_duplicate_resolution_and_override",
+      "doc": "Duplicate detection by name/TIN; override needs authorized role and reason; existing company stores its id.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_03_full_franchise_entry_and_persistence",
+      "doc": "Full franchise entry, validation summary, phone formats preserved, persistence after reload.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_04_maker_checker_and_version_bound_franchise_approval",
+      "doc": "Approval bound to reviewed version; AS approves; direct validity = calendar year (configurable).",
+      "result": "Passed"
+    },
+    {
+      "test": "test_05_returned_rejected_and_clarification_loops",
+      "doc": "Franchise return/resubmit, rejection with reason, Actuarial return-for-info and answer.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_06_quotation_rates_and_import_errors",
+      "doc": "Requirements need evidence; rate request; Actuarial clarification; rate-sheet import with error report; versions.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_07_sob_separation_of_duties",
+      "doc": "SOB draft by Sales; reduced coverage needs justification; Sales review then independent validation by another person.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_08_pricing_approvals_and_invalidation",
+      "doc": "Separate SM and Senior approvals; SOB amendment invalidates approvals and creates a new proposal version.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_09_contract_kyc_and_account_gates",
+      "doc": "Contract steps need documents; KYC by Compliance; account creation gated; mandatory waiver refused; maker-checker on account.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_10_plan_codes_lifecycle",
+      "doc": "Generate from SOB, customise, maker-checker with partial results, return requires edit, clone, amend keeps history.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_11_bulk_import_1000_plan_codes_partial",
+      "doc": "Bulk import of 1,000 Plan Codes with partial errors; measured against the 5-minute target.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_12_member_data_errors_and_corrections",
+      "doc": "Upload with errors, row correction, exception with evidence, accept, MDA hand-off (simulated).",
+      "result": "Passed"
+    },
+    {
+      "test": "test_13_billing_exception_resolution",
+      "doc": "Open exception blocks billing; resolution needs evidence; approver differs from maker.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_14_future_effective_scheduling_and_handover",
+      "doc": "Future effectivity -> Scheduled (not Active); scheduler activates on the date; handover needs every acknowledgement.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_15_concurrent_edits_idempotency_failed_save_session",
+      "doc": "Concurrent edit detection with changed fields; idempotent submit; failed save recovery; session expiry.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_16_intermediary_rules",
+      "doc": "Inactive intermediary refused; AOR/BOR document required; proposal goes only to the agent/broker (BR-03); 60-day validity.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_17_below_minimum_and_expiry_extension",
+      "doc": "Below 20 principals blocks the franchise and explains IFG routing; extension approval; auto-expiry.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_18_consistent_queue_case_report",
+      "doc": "Queue, case detail, tasks and reports read the same derived state.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_19_member_data_10000_performance",
+      "doc": "10,000-row Member Data upload and validation measured against the 5-minute target.",
+      "result": "Passed"
+    },
+    {
+      "test": "test_20_search_performance",
+      "doc": "Company, provider and Plan Code search under the 2-second target.",
+      "result": "Passed"
+    }
+  ],
+  "performance": {
+    "planCodeImport1000Seconds": 2.45,
+    "memberData10kRows": 10052,
+    "memberData10kSeconds": 0.33,
+    "memberProblemRowsQueryMs": 35,
+    "companySearchMs": 3,
+    "providerSearchMs": 2,
+    "planCodeSearchMs": 22,
+    "queueLoadMs": 35
+  }
+}

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Serve the static wireframe prototype.
+# Start the HMS3 Corporate New Business app.
+# A single Python process serves the UI (from app/) and the /api/ backend.
+# First start seeds fictional demo data into data/hms.db.
 set -e
 cd "$(dirname "$0")/../.."
-PORT="${PORT:-4173}"
-exec python3 -m http.server "$PORT" --bind 127.0.0.1
+PORT="${PORT:-4180}"
+exec python3 -m server.app --port "$PORT"

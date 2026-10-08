@@ -1968,7 +1968,7 @@ def pc_amend(s, ctx, p):
     nv = src.get("pcVersion", 1) + 1
     rec = {k: copy.deepcopy(v) for k, v in src.items() if k not in ("id", "type", "caseId", "v", "createdAt", "updatedAt", "updatedBy")}
     rec.update(pcVersion=nv, status="Draft", statusAt=ctx.now_iso(), effectiveFrom=ef.isoformat(), amendmentReason=p["reason"], prevId=src["id"],
-               makerId=None, checkerId=None, approvedAt=None, returnReason=None)
+               makerId=None, checkerId=None, approvedAt=None, returnReason=None, returnedV=None, supersededBy=None, effectiveTo=src.get("effectiveTo"))
     new = s.store.insert("planCode", rec, src["caseId"], ctx, action="planCode.amend", reason=p["reason"], rid=f"{src['planCode']}#v{nv}")
     return {"id": new["id"]}
 
@@ -2098,6 +2098,10 @@ def validate_pc_import(s, rows, case_id):
         for k in ("hospitalCodes", "clinicCodes"):
             d[k] = [x.strip() for x in str(d.get(k) or "").replace(";", ",").split(",") if x.strip()]
         d["vatInclusive"] = str(d.get("vatInclusive", "")).strip().lower() in ("yes", "true", "1", "y")
+        for k in ("mbl", "roomLimit", "beforeVat", "vatAmount", "premium", "contractYear"):
+            if d.get(k) not in (None, "") and num(d[k]) is not None:
+                d[k] = int(num(d[k])) if k == "contractYear" else num(d[k])
+        d["accountId"] = acc["id"] if acc else None
         fake = {**d}
         ve = [x for x in _pc_validate(s, fake) if not x.get("warning")]
         e += [x["message"] for x in ve]

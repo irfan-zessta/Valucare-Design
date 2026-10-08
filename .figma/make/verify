@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
-# Confirm the dev server is reachable.
-PORT="${PORT:-4173}"
-curl -sf -o /dev/null "http://127.0.0.1:${PORT}/index.html"
+# Confirm the dev server is up and serving the app. The first start seeds demo
+# data before it accepts connections, so retry briefly to cover that delay.
+set -e
+PORT="${PORT:-4180}"
+URL="http://127.0.0.1:${PORT}/"
+for _ in $(seq 1 60); do
+  if curl -sf -o /dev/null "$URL"; then
+    echo "Dev server reachable at $URL"
+    exit 0
+  fi
+  sleep 1
+done
+echo "Dev server did not become reachable at $URL" >&2
+exit 1

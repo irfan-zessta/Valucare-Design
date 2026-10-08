@@ -1,0 +1,83 @@
+{
+  "pointAndEdit": {
+    "priorityPaths": {
+      "prefer": [
+        "app/js/views/**/*.js",
+        "app/js/main.js",
+        "app/css/app.css",
+        "app/index.html"
+      ],
+      "deprioritize": [
+        "assets/**/*",
+        "app/js/core.js"
+      ],
+      "exclude": [
+        "server/**/*",
+        "server/__pycache__/**/*",
+        "tests/**/*",
+        "docs/**/*",
+        ".git/**/*",
+        ".figma/**/*",
+        "*.md",
+        "docs/**/*.md",
+        "run.sh"
+      ]
+    },
+    "libraryPaths": {
+      "local": [
+        "app/js/components.js"
+      ],
+      "external": []
+    },
+    "pathClassification": {
+      "classifier": "sonnet"
+    },
+    "exclusions": [
+      {
+        "glob": "server/**/*",
+        "reason": "Python back-end API and domain logic — not UI source and cannot be a point-and-edit anchor."
+      },
+      {
+        "glob": "server/__pycache__/**/*",
+        "reason": "Compiled Python bytecode — generated, not source."
+      },
+      {
+        "glob": "tests/**/*",
+        "reason": "Automated API test suite — not UI source."
+      },
+      {
+        "glob": "docs/**/*",
+        "reason": "Documentation files — not UI source."
+      },
+      {
+        "glob": ".git/**/*",
+        "reason": "Git internals — not source files."
+      },
+      {
+        "glob": ".figma/**/*",
+        "reason": "Figma Make configuration scripts — not UI source."
+      },
+      {
+        "glob": "*.md",
+        "reason": "Markdown documentation at the repo root — not UI source."
+      },
+      {
+        "glob": "docs/**/*.md",
+        "reason": "Markdown documentation files — not UI source."
+      },
+      {
+        "glob": "run.sh",
+        "reason": "Shell launcher script — tooling, not UI source."
+      }
+    ],
+    "generated": {
+      "schemaVersion": 2,
+      "source": "setup-agent.point-and-edit-path-classifier",
+      "prompt": "same-turn-setup-subagent-v5",
+      "model": "claude-sonnet-4-6",
+      "createdAt": "2026-10-08T00:00:00Z",
+      "confidence": 0.93,
+      "explanation": "The app/ directory is the sole active hi-fi front-end with a clear module boundary; view files are unambiguous UI anchors, and all non-UI paths (server, tests, docs, assets wireframe legacy) are straightforward to exclude."
+    }
+  }
+}
