@@ -1,6 +1,5 @@
 import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, toast, announce } from "./core.js";
 import { icon } from "./components.js";
-import { GROUPS as SALES_GROUPS, ITEMS as SALES_ITEMS } from "./views/sales.js";
 
 const root = document.getElementById("root");
 let lastHash = location.hash;
@@ -38,41 +37,87 @@ function renderLogin(reason) {
 }
 
 // ---------------------------------------------------------------- shell
-const NAV_TOP = [
+// Cross-cutting surfaces that are not tied to one business line.
+const NAV_PRIMARY = [
   { key: "home", label: "Dashboard", icon: "grid", href: "#/home" },
-  { key: "new-business", label: "Sales Tracker", icon: "grid", href: "#/new-business" },
-];
-const NAV_BOTTOM = [
   { key: "tasks", label: "My Tasks", icon: "tasks", href: "#/tasks", count: true },
-  { key: "accounts", label: "Accounts", icon: "building", href: "#/accounts" },
   { key: "reports", label: "Reports", icon: "chart", href: "#/reports" },
 ];
 const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 tasks">0</span>` : html`<span></span>`}</a>`;
-const MORE = [
-  { key: "intermediaries", label: "Agents and Brokers" },
-  { key: "template", label: "SOB template" },
-  { key: "providers", label: "Provider directory" },
-  { key: "config", label: "Configuration" },
-  { key: "testing", label: "Testing tools and demo data" },
+
+// The Sales accordion. Only New Business and Shared Tools are built in this
+// prototype, so every item points to a real, distinct destination. Renewal and
+// IFG are shown for familiarity but marked as handled outside this application
+// (no invented or duplicated pages) — matching how the app itself routes them.
+const SECTIONS = [
+  { key: "new-business", label: "New Business", items: [
+    { key: "nb-list", label: "Franchise List", href: "#/new-business" },
+    { key: "nb-enroll", label: "Franchise Enrollment", href: "#/new-business/create" },
+    { key: "nb-accounts", label: "Account Enrollment & Maintenance", href: "#/accounts" },
+  ] },
+  { key: "renewal-business", label: "Renewal Business",
+    note: "Renewals and account maintenance for active accounts are handled outside Corporate New Business." },
+  { key: "ifg", label: "IFG",
+    note: "Leads below the corporate minimum are routed to the IFG team from within a New Business case. The IFG application itself is outside this system." },
+  { key: "shared-tools", label: "Shared Tools", items: [
+    { key: "st-inter", label: "Agents and Brokers", href: "#/more/intermediaries" },
+    { key: "st-sob", label: "SOB template", href: "#/more/template" },
+    { key: "st-prov", label: "Provider directory", href: "#/more/providers" },
+    { key: "st-config", label: "Configuration", href: "#/more/config" },
+    { key: "st-testing", label: "Testing tools and demo data", href: "#/more/testing" },
+  ] },
 ];
+
+// Flat index for the "Search menu" box: every reachable menu name, plus the
+// Renewal/IFG section names so a search for them surfaces the honest note.
+const SEARCH_INDEX = [];
+NAV_PRIMARY.forEach((n) => SEARCH_INDEX.push({ label: n.label, href: n.href }));
+SECTIONS.forEach((sec) => {
+  if (sec.items) sec.items.forEach((it) => SEARCH_INDEX.push({ label: it.label, href: it.href, section: sec.key, context: sec.label }));
+  if (sec.note) SEARCH_INDEX.push({ label: sec.label, note: sec.note, context: sec.label });
+});
+
+// Which primary item / accordion section + item is active for the current route.
+function activeInfo(parts) {
+  const p = parts[0];
+  if (p === "home") return { top: "home" };
+  if (p === "tasks") return { top: "tasks" };
+  if (p === "reports") return { top: "reports" };
+  if (p === "new-business") return { section: "new-business", item: parts[1] === "create" ? "nb-enroll" : "nb-list" };
+  if (p === "case") return { section: "new-business", item: "nb-list" };
+  if (p === "accounts") return { section: "new-business", item: "nb-accounts" };
+  if (p === "more") {
+    const item = { intermediaries: "st-inter", template: "st-sob", providers: "st-prov", config: "st-config", testing: "st-testing" }[parts[1]];
+    if (item) return { section: "shared-tools", item };
+  }
+  return {};
+}
+
+const sectionHtml = (sec, open) => html`<div class="acc-sec">
+  <button type="button" class="navbtn acc-btn" data-acc="${sec.key}" aria-expanded="${open}" aria-controls="acc-${sec.key}"><span class="lbl">${sec.label}</span><span class="chev" aria-hidden="true">${icon(open ? "chevd" : "chev", 16)}</span></button>
+  <div class="sub acc-panel ${open ? "" : "hidden"}" id="acc-${sec.key}" role="region" aria-label="${sec.label}">
+    ${sec.items ? sec.items.map((it) => html`<a href="${it.href}" data-nav="${it.key}" class="acc-link">${it.label}</a>`) : html`<p class="acc-note">${sec.note}</p>`}
+  </div></div>`;
 
 function renderShell() {
   const collapsed = prefs.get("navCollapsed", false);
-  const moreOpen = prefs.get("moreOpen", false);
-  const onSales = (location.hash || "").startsWith("#/sales/");
-  const salesOpen = prefs.get("salesOpen", false) || onSales;
+  // Auto-expand the section holding the active page; otherwise restore the last
+  // section the user opened (default New Business on a first visit).
+  const info = activeInfo(parseHash().parts);
+  const openSection = info.section || prefs.get("openSection", "new-business");
   const me = state.me;
   root.innerHTML = html`<div class="app ${collapsed ? "collapsed" : ""}" id="app">
     <nav class="sidebar" aria-label="Main navigation" id="sidebar">
       <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3 New Business<small>Corporate · Commercial</small></span></div>
       ${["am", "sm"].includes(me.role) ? html`<a class="btn primary create-btn" href="#/new-business/create" title="Create New Business">${icon("plus")}<span class="lbl">Create New Business</span></a>` : ""}
       <div class="nav">
-        ${NAV_TOP.map(navLink)}
-        <button type="button" class="navbtn" id="salesBtn" aria-expanded="${salesOpen}" aria-controls="salesSub" title="Sales">${icon("briefcase")}<span class="lbl">Sales</span><span class="chev" aria-hidden="true">${icon(salesOpen ? "chevd" : "chev", 16)}</span></button>
-        <div class="sub salesSub ${salesOpen ? "" : "hidden"}" id="salesSub">${SALES_GROUPS.map((g) => html`<div class="navgroup-label">${g.label}</div>${g.items.map((k) => html`<a href="#/sales/${g.key}/${k}" data-nav="sales/${g.key}/${k}" title="${SALES_ITEMS[k].label}">${SALES_ITEMS[k].label}</a>`)}`)}</div>
-        ${NAV_BOTTOM.map(navLink)}
-        <button type="button" class="navbtn" id="moreBtn" aria-expanded="${moreOpen}" aria-controls="moreSub" title="More">${icon("more")}<span class="lbl">More</span><span class="chev" aria-hidden="true">${icon(moreOpen ? "chevd" : "chev", 16)}</span></button>
-        <div class="sub ${moreOpen ? "" : "hidden"}" id="moreSub">${MORE.map((m) => html`<a href="#/more/${m.key}" data-nav="more/${m.key}">${m.label}</a>`)}</div>
+        ${NAV_PRIMARY.map(navLink)}
+        <div class="nav-search" role="search">
+          <label class="sr-only" for="navSearch">Search menu</label>${icon("search", 15)}
+          <input id="navSearch" type="search" placeholder="Search menu…" autocomplete="off" aria-controls="navResults">
+        </div>
+        <div id="navResults" class="nav-results hidden" role="region" aria-label="Menu search results" aria-live="polite"></div>
+        <div id="navAccordion">${SECTIONS.map((sec) => sectionHtml(sec, openSection === sec.key))}</div>
       </div>
       <div class="spacer"></div>
       <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse")}<span class="lbl">${collapsed ? "Expand" : "Collapse sidebar"}</span><span></span></button></div>
@@ -91,22 +136,40 @@ function renderShell() {
     </div></div>`.s;
   const app = document.getElementById("app");
   document.getElementById("collapseBtn").onclick = () => { prefs.set("navCollapsed", !app.classList.contains("collapsed")); renderShell(); route(true); };
-  document.getElementById("moreBtn").onclick = (e) => {
-    const sub = document.getElementById("moreSub");
-    const open = sub.classList.toggle("hidden") === false;
-    e.currentTarget.setAttribute("aria-expanded", open);
-    e.currentTarget.querySelector(".chev").innerHTML = icon(open ? "chevd" : "chev", 16).s;
-    prefs.set("moreOpen", open);
-    if (app.classList.contains("collapsed") && open) { prefs.set("navCollapsed", false); renderShell(); route(true); }
+  // Accordion: open one section, collapse the rest. Clicking an open header
+  // closes it (all-closed is allowed). Navigation never happens here.
+  const setChev = (btn, open) => { btn.querySelector(".chev").innerHTML = icon(open ? "chevd" : "chev", 16).s; };
+  const openAccordion = (key) => {
+    root.querySelectorAll(".acc-panel").forEach((pnl) => pnl.classList.add("hidden"));
+    root.querySelectorAll("[data-acc]").forEach((b) => { const on = b.dataset.acc === key; b.setAttribute("aria-expanded", on); setChev(b, on); });
+    document.getElementById("acc-" + key)?.classList.remove("hidden");
+    prefs.set("openSection", key);
   };
-  document.getElementById("salesBtn").onclick = (e) => {
-    const sub = document.getElementById("salesSub");
-    const open = sub.classList.toggle("hidden") === false;
-    e.currentTarget.setAttribute("aria-expanded", open);
-    e.currentTarget.querySelector(".chev").innerHTML = icon(open ? "chevd" : "chev", 16).s;
-    prefs.set("salesOpen", open);
-    if (app.classList.contains("collapsed") && open) { prefs.set("navCollapsed", false); renderShell(); route(true); }
+  root.querySelectorAll("[data-acc]").forEach((btn) => btn.onclick = () => {
+    const key = btn.dataset.acc;
+    const isOpen = !document.getElementById("acc-" + key).classList.contains("hidden");
+    if (isOpen) { document.getElementById("acc-" + key).classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); setChev(btn, false); prefs.set("openSection", ""); }
+    else openAccordion(key);
+  });
+  // Search menu: filters names across all sections without changing the page.
+  const navSearch = document.getElementById("navSearch");
+  const accWrap = document.getElementById("navAccordion");
+  const results = document.getElementById("navResults");
+  const clearSearch = () => { navSearch.value = ""; results.classList.add("hidden"); results.innerHTML = ""; accWrap.classList.remove("hidden"); };
+  navSearch.oninput = () => {
+    const q = navSearch.value.trim().toLowerCase();
+    if (!q) { clearSearch(); return; }
+    accWrap.classList.add("hidden");
+    results.classList.remove("hidden");
+    const hits = SEARCH_INDEX.filter((e) => e.label.toLowerCase().includes(q) || (e.context && e.context.toLowerCase().includes(q)));
+    results.innerHTML = (hits.length
+      ? html`${hits.map((e) => e.href
+          ? html`<a href="${e.href}" class="acc-link res" data-res data-section="${e.section || ""}">${e.label}${e.context ? html`<span class="ctx">${e.context}</span>` : ""}</a>`
+          : html`<div class="acc-note res">${e.label}<span class="ctx">${e.note}</span></div>`)}`
+      : html`<p class="nav-empty">No matching menu</p>`).s;
   };
+  navSearch.addEventListener("keydown", (e) => { if (e.key === "Escape" && navSearch.value) { e.stopPropagation(); clearSearch(); } });
+  results.addEventListener("click", (e) => { const a = e.target.closest("a[data-res]"); if (!a) return; if (a.dataset.section) openAccordion(a.dataset.section); clearSearch(); });
   const menuBtn = document.getElementById("menuBtn");
   const closeDrawer = () => { app.classList.remove("drawer-open"); menuBtn.setAttribute("aria-expanded", "false"); };
   menuBtn.onclick = () => { app.classList.add("drawer-open"); menuBtn.setAttribute("aria-expanded", "true"); document.querySelector(".sidebar a").focus(); };
@@ -153,7 +216,6 @@ const VIEWS = {
   accounts: () => import("./views/accounts.js"),
   reports: () => import("./views/reports.js"),
   more: () => import("./views/more.js"),
-  sales: () => import("./views/sales.js"),
   case: () => import("./views/case.js"),
 };
 
@@ -167,9 +229,10 @@ async function route(force = false) {
   const loader = VIEWS[key];
   const main = document.getElementById("main");
   if (!main) return;
+  const info = activeInfo(parts);
   document.querySelectorAll("[data-nav]").forEach((a) => {
     const n = a.dataset.nav;
-    const active = n === parts[0] || (parts[0] === "more" && n === `more/${parts[1]}`) || (parts[0] === "sales" && n === `sales/${parts[1]}/${parts[2]}`) || (parts[0] === "case" && n === "new-business");
+    const active = n === info.top || n === info.item;
     if (active) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
   const seq = ++renderSeq;

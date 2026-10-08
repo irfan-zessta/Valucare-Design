@@ -43,12 +43,22 @@ button,input,select,textarea{font:inherit;color:inherit}
 .nav .ico{width:20px;height:20px;justify-self:center}
 .nav .count{min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:#fff;font-size:11.5px;font-weight:700;display:inline-grid;place-items:center}
 .nav .count.zero{background:var(--gray-soft);color:var(--text-3)}
-.nav .sub{display:flex;flex-direction:column;gap:1px;margin:2px 0 6px 34px}
-.nav .sub a{grid-template-columns:1fr;min-height:34px;padding:6px 10px;font-weight:500;font-size:13.5px}
-.nav .navgroup-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);padding:10px 10px 2px}
-.nav .navgroup-label:first-child{padding-top:2px}
-.nav .salesSub a{display:flex;align-items:center;gap:8px}
-.nav .salesSub a::before{content:"";width:9px;height:1px;background:var(--text-3);flex:none;opacity:.7}
+/* Sales accordion */
+.nav .nav-search{position:relative;margin:8px 0 6px}
+.nav .nav-search input{width:100%;height:34px;padding:0 10px 0 30px;border:1px solid #868E99;border-radius:var(--r-sm);background:var(--surface);font-size:13px}
+.nav .nav-search input::placeholder{color:var(--text-3)}
+.nav .nav-search .ico{position:absolute;left:8px;top:9px;color:var(--text-3)}
+.nav .nav-results{display:flex;flex-direction:column;gap:1px;margin:0 0 6px}
+.nav .nav-empty{padding:8px 10px;font-size:12.5px;color:var(--text-3)}
+.nav .acc-sec{display:flex;flex-direction:column}
+.nav .acc-btn{grid-template-columns:1fr auto;min-height:40px;font-weight:650;color:var(--text)}
+.nav .acc-btn .chev{justify-self:end;color:var(--text-3)}
+.nav .acc-panel{display:flex;flex-direction:column;gap:1px;margin:1px 0 4px;padding-left:10px}
+.nav .acc-link{grid-template-columns:1fr;min-height:34px;height:auto;padding:7px 10px;font-weight:500;font-size:13.5px;white-space:normal;line-height:1.3}
+.nav .acc-link .ctx{display:block;font-size:11px;font-weight:500;color:var(--text-3);margin-top:1px}
+.nav .acc-note{margin:2px 10px 6px;padding:8px 10px;font-size:12.5px;color:var(--text-2);background:var(--surface-2);border:1px solid var(--border-2);border-left:3px solid var(--border);border-radius:var(--r-sm);line-height:1.4}
+.nav .acc-note .ctx{display:block;margin-top:3px}
+.app.collapsed #navAccordion,.app.collapsed .nav-search,.app.collapsed .nav-results{display:none}
 .sidebar .spacer{flex:1}
 .sidebar .collapse{margin-top:8px}
 .app.collapsed .nav a,.app.collapsed .nav button.navbtn{grid-template-columns:24px;justify-content:center}
