@@ -28,6 +28,7 @@ const P = {
   ext: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
   filter: "M4 5h16l-6 8v6l-4-2v-4z",
   cols: "M4 4h16v16H4zM10 4v16M16 4v16",
+  grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
 };
 export const icon = (name, size = 18) => raw(`<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${P[name] || ""}"/></svg>`);
 

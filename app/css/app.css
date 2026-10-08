@@ -45,6 +45,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .nav .count.zero{background:var(--gray-soft);color:var(--text-3)}
 .nav .sub{display:flex;flex-direction:column;gap:1px;margin:2px 0 6px 34px}
 .nav .sub a{grid-template-columns:1fr;min-height:34px;padding:6px 10px;font-weight:500;font-size:13.5px}
+.nav .navgroup-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);padding:10px 10px 2px}
+.nav .navgroup-label:first-child{padding-top:2px}
+.nav .salesSub a{display:flex;align-items:center;gap:8px}
+.nav .salesSub a::before{content:"";width:9px;height:1px;background:var(--text-3);flex:none;opacity:.7}
 .sidebar .spacer{flex:1}
 .sidebar .collapse{margin-top:8px}
 .app.collapsed .nav a,.app.collapsed .nav button.navbtn{grid-template-columns:24px;justify-content:center}

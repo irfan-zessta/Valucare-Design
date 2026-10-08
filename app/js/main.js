@@ -1,5 +1,6 @@
 import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, toast, announce } from "./core.js";
 import { icon } from "./components.js";
+import { GROUPS as SALES_GROUPS, ITEMS as SALES_ITEMS } from "./views/sales.js";
 
 const root = document.getElementById("root");
 let lastHash = location.hash;
@@ -37,13 +38,16 @@ function renderLogin(reason) {
 }
 
 // ---------------------------------------------------------------- shell
-const NAV = [
-  { key: "home", label: "Home", icon: "home", href: "#/home" },
-  { key: "new-business", label: "New Business", icon: "briefcase", href: "#/new-business" },
+const NAV_TOP = [
+  { key: "home", label: "Dashboard", icon: "grid", href: "#/home" },
+  { key: "new-business", label: "Sales Tracker", icon: "grid", href: "#/new-business" },
+];
+const NAV_BOTTOM = [
   { key: "tasks", label: "My Tasks", icon: "tasks", href: "#/tasks", count: true },
   { key: "accounts", label: "Accounts", icon: "building", href: "#/accounts" },
   { key: "reports", label: "Reports", icon: "chart", href: "#/reports" },
 ];
+const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 tasks">0</span>` : html`<span></span>`}</a>`;
 const MORE = [
   { key: "intermediaries", label: "Agents and Brokers" },
   { key: "template", label: "SOB template" },
@@ -55,13 +59,18 @@ const MORE = [
 function renderShell() {
   const collapsed = prefs.get("navCollapsed", false);
   const moreOpen = prefs.get("moreOpen", false);
+  const onSales = (location.hash || "").startsWith("#/sales/");
+  const salesOpen = prefs.get("salesOpen", false) || onSales;
   const me = state.me;
   root.innerHTML = html`<div class="app ${collapsed ? "collapsed" : ""}" id="app">
     <nav class="sidebar" aria-label="Main navigation" id="sidebar">
       <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3 New Business<small>Corporate · Commercial</small></span></div>
       ${["am", "sm"].includes(me.role) ? html`<a class="btn primary create-btn" href="#/new-business/create" title="Create New Business">${icon("plus")}<span class="lbl">Create New Business</span></a>` : ""}
       <div class="nav">
-        ${NAV.map((n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 tasks">0</span>` : html`<span></span>`}</a>`)}
+        ${NAV_TOP.map(navLink)}
+        <button type="button" class="navbtn" id="salesBtn" aria-expanded="${salesOpen}" aria-controls="salesSub" title="Sales">${icon("briefcase")}<span class="lbl">Sales</span><span class="chev" aria-hidden="true">${icon(salesOpen ? "chevd" : "chev", 16)}</span></button>
+        <div class="sub salesSub ${salesOpen ? "" : "hidden"}" id="salesSub">${SALES_GROUPS.map((g) => html`<div class="navgroup-label">${g.label}</div>${g.items.map((k) => html`<a href="#/sales/${g.key}/${k}" data-nav="sales/${g.key}/${k}" title="${SALES_ITEMS[k].label}">${SALES_ITEMS[k].label}</a>`)}`)}</div>
+        ${NAV_BOTTOM.map(navLink)}
         <button type="button" class="navbtn" id="moreBtn" aria-expanded="${moreOpen}" aria-controls="moreSub" title="More">${icon("more")}<span class="lbl">More</span><span class="chev" aria-hidden="true">${icon(moreOpen ? "chevd" : "chev", 16)}</span></button>
         <div class="sub ${moreOpen ? "" : "hidden"}" id="moreSub">${MORE.map((m) => html`<a href="#/more/${m.key}" data-nav="more/${m.key}">${m.label}</a>`)}</div>
       </div>
@@ -88,6 +97,14 @@ function renderShell() {
     e.currentTarget.setAttribute("aria-expanded", open);
     e.currentTarget.querySelector(".chev").innerHTML = icon(open ? "chevd" : "chev", 16).s;
     prefs.set("moreOpen", open);
+    if (app.classList.contains("collapsed") && open) { prefs.set("navCollapsed", false); renderShell(); route(true); }
+  };
+  document.getElementById("salesBtn").onclick = (e) => {
+    const sub = document.getElementById("salesSub");
+    const open = sub.classList.toggle("hidden") === false;
+    e.currentTarget.setAttribute("aria-expanded", open);
+    e.currentTarget.querySelector(".chev").innerHTML = icon(open ? "chevd" : "chev", 16).s;
+    prefs.set("salesOpen", open);
     if (app.classList.contains("collapsed") && open) { prefs.set("navCollapsed", false); renderShell(); route(true); }
   };
   const menuBtn = document.getElementById("menuBtn");
@@ -136,6 +153,7 @@ const VIEWS = {
   accounts: () => import("./views/accounts.js"),
   reports: () => import("./views/reports.js"),
   more: () => import("./views/more.js"),
+  sales: () => import("./views/sales.js"),
   case: () => import("./views/case.js"),
 };
 
@@ -151,7 +169,7 @@ async function route(force = false) {
   if (!main) return;
   document.querySelectorAll("[data-nav]").forEach((a) => {
     const n = a.dataset.nav;
-    const active = n === parts[0] || (parts[0] === "more" && n === `more/${parts[1]}`) || (parts[0] === "case" && n === "new-business");
+    const active = n === parts[0] || (parts[0] === "more" && n === `more/${parts[1]}`) || (parts[0] === "sales" && n === `sales/${parts[1]}/${parts[2]}`) || (parts[0] === "case" && n === "new-business");
     if (active) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
   const seq = ++renderSeq;
