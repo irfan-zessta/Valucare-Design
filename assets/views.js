@@ -18,6 +18,22 @@
   }
   function owner(name) { return '<span class="muted">Owner: <b style="color:var(--text)">' + esc(name) + '</b></span>'; }
   function head(title, inner) { return '<div class="card-head"><h3>' + esc(title) + '</h3>' + (inner || "") + '</div>'; }
+  /* Validation surface: errOf returns the message for a bound field (or null);
+     errorSummary renders an accessible list of all current errors with jump links. */
+  function errOf(c, path) { return (c._errors && c._errors[path]) || null; }
+  function errorSummary(c) {
+    if (!c._errors) return "";
+    var keys = Object.keys(c._errors);
+    if (!keys.length) return "";
+    var labels = c._fieldLabels || {};
+    var items = keys.map(function (k) {
+      var id = "f-" + k.replace(/[^a-z0-9]+/gi, "-");
+      return '<li><a href="#' + id + '" data-errjump="' + esc(k) + '">' + esc(labels[k] || c._errors[k]) + '</a></li>';
+    }).join("");
+    return '<div class="errsum" role="alert" tabindex="-1" id="errSum">' +
+      '<div class="errsum-h">' + icon("alert", 16) + ' Please fix ' + keys.length + ' ' + (keys.length === 1 ? "field" : "fields") + ' before continuing</div>' +
+      '<ul class="errsum-list">' + items + '</ul></div>';
+  }
   function sectionShell(title, sub, body) {
     return '<div class="stack-5"><header class="stack-2"><h1 class="page-title">' + esc(title) + '</h1>' +
       (sub ? '<p class="page-sub">' + sub + '</p>' : '') + '</header>' + body + '</div>';
@@ -307,11 +323,14 @@
             ["Nature of business", c.meta.industry || "—"]
           ].concat(c.meta.franchiseRef ? [["Existing franchise", c.meta.franchiseRef]] : []), true) +
           '<div class="row" style="margin-top:12px"><a href="#/new" class="btn btn-ghost btn-sm">Change company</a></div>') +
-        card(head("Lead details") +
-          U.field({ label: "How did this opportunity come to ValuCare?", type: "select", value: c.meta.leadSource, options: ["Referral", "Inbound enquiry", "Existing relationship", "Agent/Broker introduction"] }) +
-          U.field({ label: "Primary contact", value: c.meta.contactName }) +
+        card(head("Lead details", U.saveBar(c._savedAt ? "saved" : "idle", c._savedAt)) +
+          errorSummary(c) +
+          U.field({ label: "How did this opportunity come to ValuCare?", type: "select", bind: "meta.leadSource", required: true, invalid: errOf(c, "meta.leadSource"), value: c.meta.leadSource, placeholder: "Select a lead source", options: ["Referral", "Inbound enquiry", "Existing relationship", "Agent/Broker introduction"] }) +
+          U.field({ label: "Primary contact", bind: "meta.contactName", required: true, invalid: errOf(c, "meta.contactName"), value: c.meta.contactName, placeholder: "Full name of the client contact" }) +
+          U.field({ label: "Product", type: "select", bind: "meta.product", required: true, invalid: errOf(c, "meta.product"), value: c.meta.product, placeholder: "Select a product", options: ["Corporate Health Plan", "HMO Standard", "HMO Premium", "TPA / ASO"] }) +
           U.field({ label: "Target effectivity", type: "text", value: fmtDate(c.meta.effectivity), readonly: true, help: "Dates downstream are calculated from this using configured turnaround times." }) +
           actionbar(btn("Capture lead", { variant: "primary", icon: "check", act: "lead:capture" }),
+            btn("Save draft", { variant: "ghost", icon: "save", act: "form:savedraft", arg: "Lead" }),
             btn("Back", { variant: "ghost", icon: "arrowLeft", nav: "#/new" }))));
     }
     if (!f.channelValidated) {

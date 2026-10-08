@@ -581,8 +581,26 @@
     try { var raw = global.localStorage.getItem(STORE_KEY); return raw ? JSON.parse(raw) : null; }
     catch (e) { return null; }
   }
-  function save(c) { try { global.localStorage.setItem(STORE_KEY, JSON.stringify(c)); } catch (e) {} }
+  function save(c) { global.localStorage.setItem(STORE_KEY, JSON.stringify(c)); }
   function reset() { try { global.localStorage.removeItem(STORE_KEY); } catch (e) {} }
+
+  /* --- generic dot-path read/write, so any bound field updates the right
+     place on the case record (meta.contactName, account.affiliates.0.name, …) --- */
+  function getPath(obj, path) {
+    var p = String(path).split("."), o = obj;
+    for (var i = 0; i < p.length; i++) { if (o == null) return undefined; o = o[p[i]]; }
+    return o;
+  }
+  function setPath(obj, path, val) {
+    var p = String(path).split("."), o = obj;
+    for (var i = 0; i < p.length - 1; i++) {
+      var k = p[i];
+      if (o[k] == null || typeof o[k] !== "object") o[k] = (/^\d+$/.test(p[i + 1]) ? [] : {});
+      o = o[k];
+    }
+    o[p[p.length - 1]] = val;
+    return obj;
+  }
 
   /* --- activity + notifications --- */
   function logActivity(c, entry) {
@@ -608,6 +626,7 @@
     createInitialCase: createInitialCase, gatePassed: gatePassed,
     stageSummary: stageSummary, currentStage: currentStage, nextStep: nextStep,
     milestoneProgress: milestoneProgress, logActivity: logActivity, notify: notify,
-    load: load, save: save, reset: reset
+    load: load, save: save, reset: reset,
+    getPath: getPath, setPath: setPath
   };
 })(window);

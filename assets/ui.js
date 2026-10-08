@@ -138,30 +138,69 @@
   }
 
   /* --- field --- */
+  // A form field. Pass opts.bind = "meta.contactName" to make the control
+  // write through to the case record (the router persists it on input/change).
+  // opts.required flags it for validation; opts.invalid = message renders the
+  // inline error and wires aria for the error summary.
   function field(opts) {
     opts = opts || {};
-    var id = opts.id || ("f_" + Math.abs(hash(opts.label || "")));
+    var id = opts.id || ("f_" + Math.abs(hash((opts.bind || "") + "|" + (opts.label || ""))));
+    var bind = opts.bind ? ' data-field="' + esc(opts.bind) + '"' : "";
+    var req = opts.required ? ' data-required="1" aria-required="true"' : "";
+    var invalid = opts.invalid ? ' aria-invalid="true" aria-describedby="' + id + '_e"' : "";
+    var cls = (opts.invalid ? " invalid" : "");
     var inner;
     if (opts.type === "textarea") {
-      inner = '<textarea class="textarea" id="' + id + '" placeholder="' + esc(opts.placeholder || "") + '">' +
-        esc(opts.value || "") + '</textarea>';
+      inner = '<textarea class="textarea' + cls + '" id="' + id + '"' + bind + req + invalid +
+        ' placeholder="' + esc(opts.placeholder || "") + '"' + (opts.readonly ? " readonly" : "") + '>' +
+        esc(opts.value == null ? "" : opts.value) + '</textarea>';
     } else if (opts.type === "select") {
-      inner = '<select class="select" id="' + id + '">' +
+      inner = '<select class="select' + cls + '" id="' + id + '"' + bind + req + invalid +
+        (opts.disabled ? " disabled" : "") + '>' +
+        (opts.placeholder ? '<option value=""' + (opts.value ? "" : " selected") + '>' + esc(opts.placeholder) + '</option>' : '') +
         (opts.options || []).map(function (o) {
           var v = typeof o === "string" ? o : o.value;
-          var sel = opts.value === v ? " selected" : "";
-          return '<option' + sel + '>' + esc(v) + '</option>';
+          var t = typeof o === "string" ? o : (o.label != null ? o.label : o.value);
+          var sel = String(opts.value) === String(v) ? " selected" : "";
+          return '<option value="' + esc(v) + '"' + sel + '>' + esc(t) + '</option>';
         }).join("") + '</select>';
+    } else if (opts.type === "checkbox") {
+      inner = '<label class="checkbox"><input type="checkbox" id="' + id + '"' + bind +
+        (opts.value ? " checked" : "") + ' /> <span>' + esc(opts.boxLabel || "") + '</span></label>';
     } else {
-      inner = '<input class="input' + (opts.large ? " input-lg" : "") + '" id="' + id + '" type="' +
-        (opts.type || "text") + '" value="' + esc(opts.value || "") + '" placeholder="' +
-        esc(opts.placeholder || "") + '"' + (opts.readonly ? " readonly" : "") + ' />';
+      inner = '<input class="input' + (opts.large ? " input-lg" : "") + cls + '" id="' + id + '" type="' +
+        (opts.type || "text") + '"' + bind + req + invalid + ' value="' + esc(opts.value == null ? "" : opts.value) + '" placeholder="' +
+        esc(opts.placeholder || "") + '"' + (opts.readonly ? " readonly" : "") +
+        (opts.list ? ' list="' + esc(opts.list) + '" autocomplete="off"' : "") + ' />';
     }
-    return '<div class="field">' +
+    var datalist = "";
+    if (opts.list && opts.options) {
+      datalist = '<datalist id="' + esc(opts.list) + '">' + (opts.options || []).map(function (o) {
+        var v = typeof o === "string" ? o : (o.label != null ? o.label : o.value);
+        return '<option value="' + esc(v) + '"></option>';
+      }).join("") + '</datalist>';
+    }
+    var anchor = opts.bind ? ' id="f-' + esc(opts.bind.replace(/[^a-z0-9]+/gi, "-")) + '"' : "";
+    return '<div class="field' + (opts.invalid ? " has-error" : "") + '"' + anchor + '>' +
       '<label for="' + id + '">' + esc(opts.label) + (opts.required ? ' <span class="req" title="Required">*</span>' : '') + '</label>' +
-      inner +
+      inner + datalist +
+      (opts.invalid ? '<span class="field-err" id="' + id + '_e" role="alert">' + esc(opts.invalid) + '</span>' : '') +
       (opts.help ? '<span class="help" id="' + id + '_h">' + esc(opts.help) + '</span>' : '') +
       '</div>';
+  }
+
+  // Save-status bar: reflects idle | saving | saved | failed and last-saved time.
+  function saveBar(state, lastSaved) {
+    var map = {
+      saving: { ic: "clock", cls: "saving", txt: "Saving…" },
+      saved:  { ic: "checkCircle", cls: "saved", txt: "All changes saved" },
+      failed: { ic: "alert", cls: "failed", txt: "Save failed — retry" },
+      idle:   { ic: "circle", cls: "idle", txt: "No unsaved changes" }
+    };
+    var m = map[state] || map.idle;
+    return '<span class="savebar ' + m.cls + '" id="saveBar" role="status" aria-live="polite">' +
+      icon(m.ic, 15) + '<span class="sb-txt">' + esc(m.txt) + '</span>' +
+      (lastSaved ? '<span class="sb-time">· last saved ' + esc(lastSaved) + '</span>' : '') + '</span>';
   }
 
   /* --- definition list --- */
@@ -208,6 +247,6 @@
   global.UI = {
     esc: esc, icon: icon, statusPill: statusPill, statusDot: statusDot,
     banner: banner, medallion: medallion, btn: btn, pageHead: pageHead,
-    wizardSteps: wizardSteps, field: field, dl: dl, check: check, toast: toast
+    wizardSteps: wizardSteps, field: field, saveBar: saveBar, dl: dl, check: check, toast: toast
   };
 })(window);

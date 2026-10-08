@@ -253,6 +253,27 @@ h1,h2,h3,h4,p{margin:0;}
 .search-wrap .ico{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--text-3);}
 .search-wrap .input-lg{padding-left:48px;}
 
+/* validation + save states */
+.field.has-error label{color:var(--red);}
+.input.invalid,.select.invalid,.textarea.invalid{border-color:var(--red);background:var(--red-soft,#FEF2F2);}
+.input.invalid:focus,.select.invalid:focus,.textarea.invalid:focus{box-shadow:0 0 0 3px rgba(185,28,28,.14);}
+.field-err{color:var(--red);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:4px;}
+.checkbox{display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:500;cursor:pointer;padding:4px 0;min-height:44px;}
+.checkbox input{width:18px;height:18px;accent-color:var(--blue);flex:none;cursor:pointer;}
+.errsum{border:1px solid var(--red);background:var(--red-soft,#FEF2F2);border-radius:12px;padding:13px 15px;margin-bottom:16px;}
+.errsum:focus{outline:none;box-shadow:0 0 0 3px rgba(185,28,28,.14);}
+.errsum-h{display:flex;align-items:center;gap:7px;font-weight:650;font-size:14px;color:var(--red);}
+.errsum-list{margin:8px 0 0;padding-left:20px;}
+.errsum-list li{margin:3px 0;font-size:13.5px;}
+.errsum-list a{color:var(--red);font-weight:600;cursor:pointer;}
+.errsum-list a:hover{text-decoration:underline;}
+.savebar{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);}
+.savebar .sb-time{font-weight:500;color:var(--text-3);}
+.savebar.saved{color:var(--green);border-color:#BBF7D0;background:#F0FDF4;}
+.savebar.saving{color:var(--blue);border-color:#BFDBFE;background:#EFF6FF;}
+.savebar.failed{color:var(--red);border-color:#FECACA;background:#FEF2F2;}
+.savebar.idle{color:var(--text-3);}
+
 /* choice cards (radios that look like cards) */
 .choice{display:flex;gap:var(--s3);align-items:flex-start;padding:var(--s4);border:1px solid var(--border);
   border-radius:var(--r);cursor:pointer;background:var(--surface);transition:border-color .14s, background .14s;}

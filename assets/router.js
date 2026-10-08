@@ -363,6 +363,31 @@
   function focusMain() { var m = document.getElementById("main"); if (m) m.focus(); }
   function announce(msg) { var live = document.getElementById("sr-live"); if (live) live.textContent = msg; }
 
+  /* ---- field binding + save status (the data-saving foundation) ----
+     Any control with data-field writes straight through to the case record
+     and persists immediately, so every value survives navigation + refresh. */
+  function fmtNow() {
+    try {
+      var d = new Date(), hh = d.getHours(), mm = d.getMinutes();
+      var ap = hh < 12 ? "AM" : "PM", h = hh % 12; if (h === 0) h = 12;
+      return h + ":" + (mm < 10 ? "0" + mm : mm) + " " + ap;
+    } catch (e) { return "just now"; }
+  }
+  function updateSaveBar(state) {
+    var el = document.getElementById("saveBar");
+    if (el) el.outerHTML = U.saveBar(state, C._savedAt);
+  }
+  function persistField(path, value) {
+    M.setPath(C, path, value);
+    if (C._errors && C._errors[path] && String(value).trim()) {
+      delete C._errors[path];   // clear this field's error as it's corrected
+      var fe = document.querySelector('[data-field="' + path.replace(/"/g, '') + '"]');
+      if (fe) { fe.classList.remove("invalid"); var wrap = fe.closest(".field"); if (wrap) wrap.classList.remove("has-error"); var es = wrap && wrap.querySelector(".field-err"); if (es) es.remove(); }
+    }
+    try { C._savedAt = fmtNow(); M.save(C); C._dirty = false; updateSaveBar("saved"); return true; }
+    catch (e) { C._dirty = true; updateSaveBar("failed"); return false; }
+  }
+
   // Simulated async load for a queue — shows the loading state, then clears it.
   // Demonstrates real loading/retry UX in a prototype with no backend.
   function queueLoad(key, ms) {
@@ -556,12 +581,35 @@
       return { toast: "Exported " + rows.length + " franchises (CSV)", skipRender: true };
     },
 
+    /* ---- Save Draft (generic): data is already written through on edit; this
+       stamps an explicit checkpoint, records it in History and confirms. ---- */
+    "form:savedraft": function (label) {
+      try { C._savedAt = fmtNow(); C._dirty = false; M.save(C); }
+      catch (e) { updateSaveBar("failed"); return { skipSave: true, skipRender: true, toast: "Save failed — check storage and retry" }; }
+      log("Draft saved" + (label ? " — " + label : ""), { automated: false });
+      return { toast: "Draft saved · " + C._savedAt };
+    },
+
     /* ---- Lead ---- */
     "lead:usecompany": function () { C.duplicateResolved = true; return { toast: "Using existing company record" }; },
     "lead:capture": function () {
+      var errs = {};
+      if (!C.meta.contactName || !String(C.meta.contactName).trim()) errs["meta.contactName"] = "Enter the primary contact.";
+      if (!C.meta.leadSource || !String(C.meta.leadSource).trim()) errs["meta.leadSource"] = "Select how this opportunity came in.";
+      if (!C.meta.product || !String(C.meta.product).trim()) errs["meta.product"] = "Select the product.";
+      C._errors = errs;
+      C._fieldLabels = {
+        "meta.contactName": "Primary contact — required",
+        "meta.leadSource": "Lead source — required",
+        "meta.product": "Product — required"
+      };
+      if (Object.keys(errs).length) {
+        return { skipSave: true, toast: "Please complete the required fields", focusErr: true };
+      }
       if (!C.meta.caseNo) C.meta.caseNo = "CNB-2026-00482";
       C.flags.leadCaptured = true;
-      log("Lead captured", { detail: C.meta.client });
+      C._savedAt = fmtNow();
+      log("Lead captured", { detail: C.meta.client + " · contact " + C.meta.contactName });
       return { toast: "Lead captured" };
     },
     "lead:resolveaor": function () {
@@ -826,6 +874,10 @@
     var res = fn(arg) || {};
     if (!res.skipSave) M.save(C);
     if (!res.skipRender) render();
+    if (res.focusErr) {
+      var bad = document.querySelector(".field.has-error [data-field], .invalid");
+      if (bad && bad.focus) bad.focus();
+    }
     if (res.toast) { U.toast(res.toast); announce(res.toast); }
   }
 
@@ -895,6 +947,17 @@
   document.addEventListener("click", function (e) {
     var close = e.target.closest ? e.target.closest.bind(e.target) : null;
     if (!close) return;
+
+    // Error-summary jump: focus the offending field without touching the route hash.
+    var ej = close("[data-errjump]");
+    if (ej) {
+      e.preventDefault();
+      var path = ej.getAttribute("data-errjump");
+      var wrap = document.getElementById("f-" + path.replace(/[^a-z0-9]+/gi, "-"));
+      var ctrl = wrap && wrap.querySelector("input,select,textarea");
+      if (ctrl && ctrl.focus) { ctrl.focus(); if (ctrl.scrollIntoView) ctrl.scrollIntoView({ block: "center" }); }
+      return;
+    }
 
     var d = close("[data-dialog]");
     if (d) {
@@ -999,6 +1062,11 @@
       if (qn) { qn.focus(); try { qn.setSelectionRange(qcaret, qcaret); } catch (_e) {} }
       return;
     }
+    // Generic bound text/textarea — write through, persist, no re-render (keeps caret).
+    if (t && t.getAttribute && t.getAttribute("data-field") && t.type !== "checkbox" && t.tagName !== "SELECT") {
+      persistField(t.getAttribute("data-field"), t.value);
+      return;
+    }
   });
 
   // Native <select> filters in the work-queue toolbar dispatch on change.
@@ -1007,6 +1075,15 @@
   document.addEventListener("change", function (e) {
     var t = e.target;
     if (!t || !t.closest) return;
+    // Bound select / checkbox / date — persist, then re-render (dependent fields
+    // such as Province → City update, "same as company address" copies, etc.).
+    if (t.getAttribute("data-field")) {
+      var val = t.type === "checkbox" ? t.checked : t.value;
+      persistField(t.getAttribute("data-field"), val);
+      var dep = t.getAttribute("data-dependent");
+      if (dep) runAction(dep, t.value); else render();
+      return;
+    }
     var cEl = t.closest("[data-change]");
     if (cEl) { runAction(cEl.getAttribute("data-change"), cEl.getAttribute("data-arg") + "|" + t.value); }
   });
@@ -1014,6 +1091,13 @@
   function markNotifsRead() { C.notifications.forEach(function (n) { n.read = true; }); M.save(C); }
 
   global.addEventListener("hashchange", function () { ui.navGroup = null; render(); focusMain(); });
+
+  // Unsaved-change protection: only warns when a write genuinely failed to
+  // persist (C._dirty stays true after a failed save). With write-through
+  // saving, normal edits are already on disk, so this stays quiet.
+  global.addEventListener("beforeunload", function (e) {
+    if (C && C._dirty) { e.preventDefault(); e.returnValue = ""; return ""; }
+  });
 
   /* ============================================================
      Boot
