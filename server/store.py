@@ -103,20 +103,24 @@ class Store:
     # ------------------------------------------------------------ transactions
     @contextmanager
     def tx(self):
+        """Outer call = transaction; nested calls = savepoints, so a failed
+        item inside a bulk operation rolls back only that item."""
         with self.lock:
             outer = self._depth == 0
-            if outer:
-                self.db.execute("BEGIN IMMEDIATE")
+            sp = f"sp{self._depth}"
+            self.db.execute("BEGIN IMMEDIATE" if outer else f"SAVEPOINT {sp}")
             self._depth += 1
             try:
                 yield
                 self._depth -= 1
-                if outer:
-                    self.db.execute("COMMIT")
+                self.db.execute("COMMIT" if outer else f"RELEASE {sp}")
             except BaseException:
                 self._depth -= 1
                 if outer:
                     self.db.execute("ROLLBACK")
+                else:
+                    self.db.execute(f"ROLLBACK TO {sp}")
+                    self.db.execute(f"RELEASE {sp}")
                 raise
 
     # ------------------------------------------------------------ counters

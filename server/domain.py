@@ -681,7 +681,7 @@ def derive(b, cfg, today):
                 T.append(_task(b, "plans_approve", f"Check and approve {ps['For Approval']} Plan Code(s)", "as", acc.get("approvedAt"),
                                "plan_approve", cfg, "setup/plans", kind="approval", stage=7))
             coc = b.one("coc")
-            if ps.get("Approved") and (not coc or st(coc) in ("Returned",)):
+            if ps.get("Approved") and (not coc or st(coc) in ("Returned", "Draft")):
                 T.append(_task(b, "coc", "Generate the COC", "as", acc.get("approvedAt"), "coc", cfg, "setup/coc", stage=7))
             elif coc and st(coc) == "For Approval":
                 T.append(_task(b, "coc_approve", "Approve the COC", "as", at(coc), "coc", cfg, "setup/coc", kind="approval",

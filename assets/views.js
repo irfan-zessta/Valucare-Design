@@ -1642,7 +1642,8 @@
       st.hidden = cfg.columns.filter(function (col) { return col.hiddenByDefault; }).map(function (col) { return col.key; });
     }
     var items = cfg.items;
-    var counts = M.viewCounts(items);
+    // No saved-views / filters UI — the table always shows all cases; search only.
+    st.view = "All Cases";
 
     // --- test hooks (documented): search "error" → error state, "slow" → long load
     var errorMode = (st.q || "").trim().toLowerCase() === "error";
@@ -1656,32 +1657,7 @@
       (st.q ? '<button type="button" class="qsearch-x" data-act="queue:clearsearch" data-arg="' + esc(cfg.key) + '" aria-label="Clear search">' + icon("x", 16) + '</button>' : '') +
       '</div>';
 
-    var views = '<div class="savedviews" role="tablist" aria-label="Saved views">' + M.SAVED_VIEWS.map(function (v) {
-      var on = (st.view || "My Cases") === v;
-      var n = counts[v];
-      var showN = n > 0 && v !== "All Cases";
-      return '<button type="button" role="tab" aria-selected="' + (on ? "true" : "false") + '" class="sv' + (on ? " on" : "") + '" ' +
-        'data-act="queue:view" data-arg="' + esc(cfg.key + "|" + v) + '">' + esc(v) +
-        (showN ? '<span class="sv-n">' + n + '</span>' : '') + '</button>';
-    }).join("") + '</div>';
-
-    // ---- filters (behind a "Filters" button so the toolbar stays calm) -----
-    var owners = ["All"].concat(items.map(function (r) { return r.owner; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }));
-    var inters = ["All"].concat(items.map(function (r) { return r.intermediary; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }));
-    var stageOpts = [{ v: "All", t: "All stages" }].concat(M.STAGES.map(function (s) { return { v: s.id, t: s.id + " · " + s.name }; }));
-    var statusOpts = ["All", "Not started", "In progress", "Waiting for client", "Waiting for another team", "Returned for correction", "Blocked", "Ready for approval", "Completed"];
-    var activeFilterCount = ["owner", "status", "stage", "intermediary", "eff"].filter(function (k) { return st[k] && st[k] !== "All"; }).length;
-    var filtersBtn = '<button type="button" class="btn btn-ghost btn-sm' + (activeFilterCount ? " has-active" : "") + '" data-act="queue:filters" data-arg="' + esc(cfg.key) + '" aria-expanded="' + (st._filtersOpen ? "true" : "false") + '" aria-controls="qfilters-' + esc(cfg.key) + '">' +
-      icon("filter", 15) + '<span>Filters</span>' + (activeFilterCount ? '<span class="sv-n">' + activeFilterCount + '</span>' : '') + '</button>';
-    var filters = '<div class="qfilters" id="qfilters-' + esc(cfg.key) + '"' + (st._filtersOpen ? "" : " hidden") + '>' +
-      qSelect(cfg.key, "owner", "Owner", st.owner, owners) +
-      qSelect(cfg.key, "status", "Status", st.status, statusOpts) +
-      qSelect(cfg.key, "stage", "Stage", st.stage, stageOpts) +
-      qSelect(cfg.key, "intermediary", "Intermediary", st.intermediary, inters) +
-      qSelect(cfg.key, "eff", "Effectivity", st.eff, ["All", "Overdue", "Next 30 days", "This quarter"]) +
-      ((st.owner !== "All" || st.status !== "All" || st.stage !== "All" || st.intermediary !== "All" || st.eff !== "All" || st.view !== "My Cases" || st.q)
-        ? '<button type="button" class="btn btn-ghost btn-sm qclear" data-act="queue:reset" data-arg="' + esc(cfg.key) + '">' + icon("x", 15) + '<span>Clear</span></button>' : '') +
-      '</div>';
+    // No saved-views tabs or Filters UI — the table always shows all cases, search only.
 
     // ---- density + columns + reload ----------------------------------------
     var visibleCols = cfg.columns.filter(function (col) { return col.always || st.hidden.indexOf(col.key) < 0; });
@@ -1768,8 +1744,7 @@
 
     return '<div class="stack-5">' +
       U.pageHead(cfg.title, cfg.sub) +
-      card('<div class="qtoolbar">' + '<div class="qtoolbar-top">' + search + tools + '</div>' +
-        '<div class="qviews-row">' + views + '<span class="spacer"></span>' + filtersBtn + '</div>' + filters + '</div>') +
+      card('<div class="qtoolbar">' + '<div class="qtoolbar-top">' + search + tools + '</div></div>') +
       body +
       '<p class="tiny muted">All displayed client data is fictional, for demonstration only. ' +
         'Tip: Ctrl/Cmd-click or middle-click a row to open it in a new tab. ' +
