@@ -305,6 +305,114 @@
   }
 
   /* ============================================================
+     CASE · OVERVIEW  (the landing tab)
+     Three calm sections, no repeated status banners:
+       1. Needs your attention — the one next action + owner + due + CTA
+       2. Progress — compact per-stage list (Completed / In progress / Waiting)
+       3. Recent activity — latest updates, link to full history
+     ============================================================ */
+  function caseOverview(c) {
+    var ns = M.nextStep(c), cur = M.currentStage(c), stages = M.stageSummary(c);
+    var st = cur.statusText;
+    var blockerText = st === "Blocked"
+      ? (c.declined ? "Client declined the proposal — reopen in Negotiation to proceed." : "This stage is blocked. Resolve the item below to continue.")
+      : (c.declined ? "Client declined — the case is paused in Negotiation." : "");
+
+    // 1. Needs your attention
+    var attn = '<section class="ov-sec ov-attn">' +
+      '<h2 class="ov-h">Needs your attention</h2>' +
+      '<div class="ov-attn-body">' +
+        '<div class="ov-attn-main">' +
+          '<div class="ov-action">' + esc(ns.title) + '</div>' +
+          '<p class="ov-desc">' + esc(ns.desc) + '</p>' +
+          '<div class="ov-meta"><span>Owner <b>' + esc(ns.owner) + '</b></span>' +
+            '<span>Due <b>' + fmtDate(c.meta.effectivity) + '</b></span>' +
+            '<span>Stage <b>' + cur.stage.id + ' of 7</b></span></div>' +
+          (blockerText ? '<div class="ov-blocker">' + icon("alert", 15) + '<span>' + esc(blockerText) + '</span></div>' : '') +
+        '</div>' +
+        (ns.cta ? '<div class="ov-attn-cta">' + btn(ns.cta, { variant: "primary", iconRight: "arrowRight", nav: ns.route }) + '</div>' : '') +
+      '</div></section>';
+
+    // 2. Progress — one row per stage, jump straight to that work
+    var prog = '<section class="ov-sec">' +
+      '<h2 class="ov-h">Progress</h2>' +
+      '<ol class="ov-prog">' + stages.map(function (o) {
+        var short = o.state === "done" ? "Completed" : o.state === "pending" ? "Waiting"
+          : (o.statusText.indexOf("Waiting") === 0 ? "Waiting" : "In progress");
+        var sec = o.stage.section || "overview";
+        return '<li class="ov-prow ' + o.state + '">' +
+          '<span class="ov-pnode">' + (o.state === "done" ? icon("check", 14) : '<b>' + o.stage.id + '</b>') + '</span>' +
+          '<a class="ov-pname" href="#/case/' + sec + '">' + esc(o.stage.name) + '</a>' +
+          '<span class="spacer"></span>' +
+          '<span class="ov-pstatus ' + (o.state === "done" ? "done" : o.state === "pending" ? "wait" : "prog") + '">' + esc(short) + '</span>' +
+          '</li>';
+      }).join("") + '</ol></section>';
+
+    // 3. Recent activity
+    var act = '<section class="ov-sec">' +
+      '<div class="ov-h-row"><h2 class="ov-h">Recent activity</h2>' +
+        '<a class="btn btn-ghost btn-sm" href="#/case/history">View full history</a></div>' +
+      (c.activity && c.activity.length ? miniActivity(c.activity.slice(0, 4)) : '<div class="muted">Nothing recorded yet.</div>') +
+      '</section>';
+
+    return '<div class="ov-grid">' + attn + '<div class="ov-cols">' + prog + act + '</div></div>';
+  }
+
+  /* ============================================================
+     CASE · ACCOUNT SETUP  (checklist landing of the Account Setup tab)
+     Simple checklist: each back-office step with its status, responsible
+     team, and an Open button. Grouping is navigation only — each row keeps
+     its own record, approvals and status.
+     ============================================================ */
+  function caseAccountSetup(c) {
+    var f = c.flags;
+    var gatePassed = f.contractSigned && f.kycCleared;
+
+    function detailsStatus() {
+      if (f.accountCreated) return "Completed";
+      return gatePassed ? "In progress" : "Blocked";
+    }
+    function planStatus() {
+      if (f.planCodesApproved) return "Completed";
+      if (c.planCodes && c.planCodes.returned) return "Returned for correction";
+      if (c.planCodes && c.planCodes.generated) return "Ready for approval";
+      return f.accountCreated ? "In progress" : "Not started";
+    }
+    function memberStatus() {
+      if (f.memberDataAccepted) return "Completed";
+      if (c.memberData && c.memberData.issues > 0 && !c.memberData.fixed) return "Returned for correction";
+      return f.sobApproved ? "In progress" : "Not started";
+    }
+
+    var rows = [
+      { name: "Account Details", team: "Account Services", href: "#/case/onboarding",
+        status: detailsStatus(),
+        note: gatePassed ? "" : "Waiting on signed contract and KYC clearance" },
+      { name: "SOB and Benefits", team: "Account Services", href: "#/case/sob",
+        status: f.sobApproved ? "Completed" : (f.accountCreated ? "In progress" : "Not started") },
+      { name: "Plan Codes", team: "Account Services", href: "#/case/plancodes", status: planStatus() },
+      { name: "Member Data", team: "MDA · Billing", href: "#/case/memberdata", status: memberStatus() },
+      { name: "Billing", team: "Billing", href: "#/case/billing",
+        status: f.billingComplete ? "Completed" : (f.memberDataAccepted ? "In progress" : "Not started") },
+      { name: "Activation", team: "Account Services", href: "#/case/activation",
+        status: f.accountActivated ? "Completed" : (f.activationReady ? "Ready for approval" : "Not started") }
+    ];
+
+    var list = '<div class="checklist">' + rows.map(function (r) {
+      return '<div class="checkrow">' +
+        '<div class="cr-main"><div class="cr-name">' + esc(r.name) + '</div>' +
+          '<div class="cr-team">' + esc(r.team) + (r.note ? ' · <span class="cr-note">' + esc(r.note) + '</span>' : '') + '</div></div>' +
+        '<div class="cr-status">' + pill(r.status) + '</div>' +
+        '<a class="btn btn-ghost btn-sm" href="' + r.href + '">Open</a>' +
+        '</div>';
+    }).join("") + '</div>';
+
+    return '<div class="stack-5">' +
+      card(head("Account Setup", '<span class="tiny muted">Teams can work in parallel where the process allows.</span>') + list) +
+      '</div>';
+  }
+
+  /* ============================================================
      CASE · LEAD  (capture + duplicate + channel/AOR routing)
      ============================================================ */
   function caseLead(c) {
@@ -366,25 +474,152 @@
   }
 
   /* ============================================================
+     FRANCHISE — full-page form with familiar HMS3 section names:
+     Account Information, Other Information, Documents, Affiliates.
+     One page, all required fields reachable; a sticky section nav
+     shows completion / missing-item counts and keeps your place.
+     ============================================================ */
+  var FR_DOCS = [
+    { key: "sec", name: "SEC / DTI registration", hint: "Certificate of registration" },
+    { key: "bir", name: "BIR Form 2303", hint: "Certificate of registration for tax" },
+    { key: "app", name: "Signed application form", hint: "Signed by an authorized signatory" }
+  ];
+  var FR_INDUSTRIES = ["Manufacturing", "Logistics and Freight", "Financial Services", "Information Technology",
+    "Retail and Trading", "Construction", "Education", "Healthcare", "Agriculture", "Hospitality"];
+  var FR_PRODUCTS = ["Corporate Health Plan", "Corporate Health Plan + Dental", "HMO Standard", "HMO Premium", "TPA / ASO"];
+
+  function franchiseForm(c) {
+    var m = c.meta;
+    var ff = c.franchiseForm || {};
+    var docs = ff.docs || {};
+    var affiliates = ff.affiliates || [];
+    var isBroker = m.channel === "Agent / Broker";
+
+    // required-field completion per section
+    var accReq = [m.client, m.tin, m.industry, m.regAddress];
+    var accFilled = accReq.filter(function (v) { return v != null && String(v).trim() !== ""; }).length;
+    var othReq = [m.product, m.members, m.billingFreq];
+    var othFilled = othReq.filter(function (v) { return v != null && String(v).trim() !== ""; }).length;
+    var docsDone = FR_DOCS.filter(function (d) { return docs[d.key]; }).length;
+
+    var SEClist = [
+      { id: "account", label: "Account Information", filled: accFilled, total: accReq.length },
+      { id: "other", label: "Other Information", filled: othFilled, total: othReq.length },
+      { id: "docs", label: "Documents", filled: docsDone, total: FR_DOCS.length },
+      { id: "affiliates", label: "Affiliates", filled: affiliates.length, total: null }
+    ];
+    function navCount(s) {
+      if (s.total == null) return '<span class="frnav-n">' + s.filled + '</span>';
+      if (s.filled >= s.total) return '<span class="frnav-n done">' + icon("check", 13) + '</span>';
+      return '<span class="frnav-n">' + s.filled + '/' + s.total + '</span>';
+    }
+    var nav = '<nav class="frnav" aria-label="Franchise form sections">' + SEClist.map(function (s) {
+      return '<a class="frnav-item" href="#frsec-' + s.id + '">' +
+        '<span>' + esc(s.label) + '</span>' + navCount(s) + '</a>';
+    }).join("") + '</nav>';
+
+    function secHead(id, label, countTxt) {
+      return head(label, '<span class="tiny muted">' + countTxt + '</span>');
+    }
+
+    // --- Account Information ---
+    var account = '<section id="frsec-account" class="card frsec">' +
+      secHead("account", "Account Information", accFilled + " of " + accReq.length + " required complete") +
+      '<p class="frsec-sub">Company identity carried over from the lead — confirm and complete.</p>' +
+      '<div class="grid-2">' +
+        U.field({ label: "Registered company name", bind: "meta.client", required: true, invalid: errOf(c, "meta.client"), value: m.client, placeholder: "As registered with the SEC/DTI" }) +
+        U.field({ label: "Short name", bind: "meta.tradeName", value: m.tradeName, placeholder: "Common or trade name", help: "Shown across the case and on billing." }) +
+      '</div>' +
+      '<div class="grid-2">' +
+        U.field({ label: "TIN", bind: "meta.tin", required: true, invalid: errOf(c, "meta.tin"), value: m.tin, placeholder: "000-000-000-000", help: "Format: 000-000-000-000" }) +
+        U.field({ label: "Nature of business", bind: "meta.industry", required: true, invalid: errOf(c, "meta.industry"), value: m.industry, list: "fr-industries", options: FR_INDUSTRIES, placeholder: "Start typing to search" }) +
+      '</div>' +
+      U.field({ label: "Registered address", bind: "meta.regAddress", required: true, invalid: errOf(c, "meta.regAddress"), value: m.regAddress, placeholder: "Building, street, city, province" }) +
+      '</section>';
+
+    // --- Other Information (conditional broker block) ---
+    var other = '<section id="frsec-other" class="card frsec">' +
+      secHead("other", "Other Information", othFilled + " of " + othReq.length + " required complete") +
+      '<p class="frsec-sub">Coverage and billing for this account.</p>' +
+      '<div class="grid-2">' +
+        U.field({ label: "Product", bind: "meta.product", required: true, invalid: errOf(c, "meta.product"), value: m.product, list: "fr-products", options: FR_PRODUCTS, placeholder: "Start typing to search" }) +
+        U.field({ label: "Estimated members", type: "number", bind: "meta.members", required: true, invalid: errOf(c, "meta.members"), value: m.members, placeholder: "e.g. 420" }) +
+      '</div>' +
+      '<div class="grid-2">' +
+        U.field({ label: "Billing frequency", type: "select", bind: "meta.billingFreq", required: true, invalid: errOf(c, "meta.billingFreq"), value: m.billingFreq, placeholder: "Select frequency", options: ["Monthly", "Quarterly", "Semi-annual", "Annual"] }) +
+        U.field({ label: "Requested effectivity", value: fmtDate(m.effectivity), readonly: true, help: "Inherited from the lead." }) +
+      '</div>' +
+      '<div class="grid-2">' +
+        U.field({ label: "Sales channel", value: m.channel || "Direct", readonly: true, help: "Set during channel validation." }) +
+        (isBroker
+          ? U.field({ label: "Intermediary", value: m.intermediary, readonly: true, help: "Agent/Broker on record for this account." })
+          : '') +
+      '</div>' +
+      '</section>';
+
+    // --- Documents ---
+    var docList = FR_DOCS.concat(isBroker ? [{ key: "aor", name: "AOR / BOR authority", hint: "Agent/Broker authority on file" }] : [])
+      .map(function (d) {
+        var on = !!docs[d.key];
+        return '<div class="checkrow">' +
+          '<div class="cr-main"><div class="cr-name">' + esc(d.name) + '</div>' +
+            '<div class="cr-team">' + esc(d.hint) + '</div></div>' +
+          '<div class="cr-status">' + (on ? pill("Completed") : '<span class="muted tiny">Not attached</span>') + '</div>' +
+          (on
+            ? '<button type="button" class="btn btn-ghost btn-sm" data-act="franchise:doc" data-arg="' + esc(d.key) + '">Remove</button>'
+            : '<button type="button" class="btn btn-sm" data-act="franchise:doc" data-arg="' + esc(d.key) + '">' + icon("upload", 15) + '<span>Attach</span></button>') +
+          '</div>';
+      }).join("");
+    var docsSec = '<section id="frsec-docs" class="card frsec">' +
+      secHead("docs", "Documents", docsDone + " of " + FR_DOCS.length + " attached") +
+      '<p class="frsec-sub">Attach the supporting documents. Required items are listed first.</p>' +
+      '<div class="checklist">' + docList + '</div>' +
+      '</section>';
+
+    // --- Affiliates ---
+    var affRows = affiliates.length
+      ? affiliates.map(function (a, i) {
+          return '<div class="aff-row">' +
+            '<div class="grid-2" style="flex:1;margin:0">' +
+              U.field({ label: "Affiliate name", bind: "franchiseForm.affiliates." + i + ".name", value: a.name, placeholder: "Registered name of the affiliate" }) +
+              U.field({ label: "TIN", bind: "franchiseForm.affiliates." + i + ".tin", value: a.tin, placeholder: "000-000-000-000" }) +
+            '</div>' +
+            '<button type="button" class="btn btn-ghost btn-sm aff-del" data-act="franchise:delaffiliate" data-arg="' + i + '" aria-label="Remove affiliate">' + icon("x", 16) + '</button>' +
+            '</div>';
+        }).join("")
+      : '<p class="muted tiny" style="margin:0 0 12px">No affiliates added. Add any companies that share this account.</p>';
+    var affSec = '<section id="frsec-affiliates" class="card frsec">' +
+      secHead("affiliates", "Affiliates", affiliates.length + (affiliates.length === 1 ? " affiliate" : " affiliates")) +
+      '<p class="frsec-sub">Optional — list affiliate companies covered under this franchise.</p>' +
+      affRows +
+      '<button type="button" class="btn btn-sm" data-act="franchise:addaffiliate">' + icon("plus", 15) + '<span>Add affiliate</span></button>' +
+      '</section>';
+
+    var body = '<div class="frform">' +
+      '<aside class="frside">' + nav +
+        '<div class="frside-save">' + U.saveBar(c._savedAt ? "saved" : "idle", c._savedAt) + '</div>' +
+      '</aside>' +
+      '<div class="frmain">' +
+        errorSummary(c) +
+        account + other + docsSec + affSec +
+        '<div class="frsubmit">' +
+          btn("Create franchise", { variant: "primary", icon: "check", act: "franchise:create" }) +
+          btn("Save draft", { variant: "ghost", icon: "save", act: "form:savedraft", arg: "Franchise" }) +
+        '</div>' +
+      '</div>' +
+      '</div>';
+
+    return sectionShell("Create the franchise", "Set up the company so it exists in HMS3. Fields from the lead are prefilled.", body);
+  }
+
+  /* ============================================================
      CASE · FRANCHISE
      ============================================================ */
   function caseFranchise(c) {
     var f = c.flags;
     if (!f.channelValidated) return gatePage("Franchise", "Validate the sales channel first.", "Go to Lead", "#/case/lead");
     if (!f.franchiseCreated) {
-      return sectionShell("Create the franchise", "A short guided form. We reuse the lead details — you only confirm coverage.",
-        card(U.wizardSteps(["Company", "Sales channel", "Coverage request", "Review"], 2) +
-          '<h2 class="section-title">Coverage request</h2>' +
-          '<p class="muted mt-2" style="margin-bottom:18px">Company and channel came from the lead. Tell us the coverage you\'re requesting.</p>' +
-          '<div class="grid-2" style="margin-top:0">' +
-            U.field({ label: "Product", type: "select", value: c.meta.product, options: ["Corporate Health Plan", "Corporate Health Plan + Dental"] }) +
-            U.field({ label: "Estimated members", type: "number", value: c.meta.members }) +
-          '</div>' +
-          U.field({ label: "Requested effectivity", value: fmtDate(c.meta.effectivity), readonly: true }) +
-          '<div class="divider"></div>' +
-          U.dl([["Company", c.meta.client], ["Channel", c.meta.channel], ["Contact", c.meta.contactName]], true) +
-          actionbar(btn("Create franchise", { variant: "primary", icon: "check", act: "franchise:create" }),
-            btn("Save draft", { variant: "ghost", act: "noop" }))));
+      return franchiseForm(c);
     }
     if (!f.franchiseApproved) {
       return sectionShell("Franchise approval", "The company record is ready for a maker-checker approval.",
@@ -1422,26 +1657,29 @@
       '</div>';
 
     var views = '<div class="savedviews" role="tablist" aria-label="Saved views">' + M.SAVED_VIEWS.map(function (v) {
-      var on = (st.view || "My Work") === v;
+      var on = (st.view || "My Cases") === v;
       var n = counts[v];
-      var showN = n > 0 && v !== "All Permitted Records";
+      var showN = n > 0 && v !== "All Cases";
       return '<button type="button" role="tab" aria-selected="' + (on ? "true" : "false") + '" class="sv' + (on ? " on" : "") + '" ' +
         'data-act="queue:view" data-arg="' + esc(cfg.key + "|" + v) + '">' + esc(v) +
         (showN ? '<span class="sv-n">' + n + '</span>' : '') + '</button>';
     }).join("") + '</div>';
 
-    // ---- filters -----------------------------------------------------------
+    // ---- filters (behind a "Filters" button so the toolbar stays calm) -----
     var owners = ["All"].concat(items.map(function (r) { return r.owner; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }));
     var inters = ["All"].concat(items.map(function (r) { return r.intermediary; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }));
     var stageOpts = [{ v: "All", t: "All stages" }].concat(M.STAGES.map(function (s) { return { v: s.id, t: s.id + " · " + s.name }; }));
     var statusOpts = ["All", "Not started", "In progress", "Waiting for client", "Waiting for another team", "Returned for correction", "Blocked", "Ready for approval", "Completed"];
-    var filters = '<div class="qfilters">' +
+    var activeFilterCount = ["owner", "status", "stage", "intermediary", "eff"].filter(function (k) { return st[k] && st[k] !== "All"; }).length;
+    var filtersBtn = '<button type="button" class="btn btn-ghost btn-sm' + (activeFilterCount ? " has-active" : "") + '" data-act="queue:filters" data-arg="' + esc(cfg.key) + '" aria-expanded="' + (st._filtersOpen ? "true" : "false") + '" aria-controls="qfilters-' + esc(cfg.key) + '">' +
+      icon("filter", 15) + '<span>Filters</span>' + (activeFilterCount ? '<span class="sv-n">' + activeFilterCount + '</span>' : '') + '</button>';
+    var filters = '<div class="qfilters" id="qfilters-' + esc(cfg.key) + '"' + (st._filtersOpen ? "" : " hidden") + '>' +
       qSelect(cfg.key, "owner", "Owner", st.owner, owners) +
       qSelect(cfg.key, "status", "Status", st.status, statusOpts) +
       qSelect(cfg.key, "stage", "Stage", st.stage, stageOpts) +
       qSelect(cfg.key, "intermediary", "Intermediary", st.intermediary, inters) +
       qSelect(cfg.key, "eff", "Effectivity", st.eff, ["All", "Overdue", "Next 30 days", "This quarter"]) +
-      ((st.owner !== "All" || st.status !== "All" || st.stage !== "All" || st.intermediary !== "All" || st.eff !== "All" || st.view !== "My Work" || st.q)
+      ((st.owner !== "All" || st.status !== "All" || st.stage !== "All" || st.intermediary !== "All" || st.eff !== "All" || st.view !== "My Cases" || st.q)
         ? '<button type="button" class="btn btn-ghost btn-sm qclear" data-act="queue:reset" data-arg="' + esc(cfg.key) + '">' + icon("x", 15) + '<span>Clear</span></button>' : '') +
       '</div>';
 
@@ -1530,47 +1768,65 @@
 
     return '<div class="stack-5">' +
       U.pageHead(cfg.title, cfg.sub) +
-      card('<div class="qtoolbar">' + '<div class="qtoolbar-top">' + search + tools + '</div>' + views + filters + '</div>') +
+      card('<div class="qtoolbar">' + '<div class="qtoolbar-top">' + search + tools + '</div>' +
+        '<div class="qviews-row">' + views + '<span class="spacer"></span>' + filtersBtn + '</div>' + filters + '</div>') +
       body +
       '<p class="tiny muted">All displayed client data is fictional, for demonstration only. ' +
         'Tip: Ctrl/Cmd-click or middle-click a row to open it in a new tab. ' +
         'Facilitator hooks: search “error” to see the error state, “slow” for a longer load.</p></div>';
   }
 
-  // Sales Tracker — New Business: the flagship compact queue.
+  // The one clear next action for a record, in plain language. Blockers and
+  // waits take priority so the column tells the user what to do, not just
+  // where the case sits.
+  function nextActionText(r) {
+    if (r.blocker) return "Resolve blocker";
+    if (r.status === "Returned for correction") return "Revise and resubmit";
+    if (r.status === "Ready for approval") return "Review and approve";
+    if (r.waiting === "client") return "Follow up with client";
+    if (r.waiting === "team") return "Awaiting " + (r.owner === "A. Reyes" ? "another team" : r.owner);
+    if (r.status === "Completed") return "—";
+    return "Continue " + r.stage;
+  }
+  function nextActionCell(r) {
+    if (r.blocker) return '<span class="q-blk">' + icon("alert", 14) + esc(nextActionText(r)) + '</span>';
+    if (r.waiting) return '<span class="q-wait">' + icon("clock", 14) + esc(nextActionText(r)) + '</span>';
+    if (r.status === "Completed") return '<span class="muted">—</span>';
+    return esc(nextActionText(r));
+  }
+
+  // New Business — one searchable table. Default columns match the spec:
+  // Company, Current stage, Status, Next action, Owner, Due date. Reference
+  // numbers and other detail stay available through column settings.
   function salesTrackerNB(c) {
     var columns = [
       { key: "company", label: "Company", always: true, sortCol: "company", get: function (r) {
         return '<a class="q-co" href="' + recordHref(r) + '" data-nav="' + recordHref(r) + '" data-qkey="salesnb">' + esc(r.company) + '</a>' +
           '<div class="q-sub">' + esc(r.caseNo) + (r.live ? ' · <span class="q-livetag">Live</span>' : '') + '</div>'; } },
-      { key: "refs", label: "References", get: function (r) {
+      { key: "stage", label: "Current stage", sortCol: "stageId", get: function (r) { return '<span class="q-stage"><b>' + r.stageId + '</b> ' + esc(r.stage) + '</span>'; } },
+      { key: "status", label: "Status", sortCol: "status", get: function (r) { return pill(r.status); } },
+      { key: "nextaction", label: "Next action", get: nextActionCell },
+      { key: "owner", label: "Owner", sortCol: "owner", get: function (r) { return esc(r.owner); } },
+      { key: "due", label: "Due date", sortCol: "due", get: function (r) {
+        var d = M.daysUntil(r.due);
+        return fmtDate(r.due) + (d < 0 ? ' <span class="q-od">late</span>' : d <= 2 ? ' <span class="q-soon">soon</span>' : ''); } },
+      { key: "refs", label: "References", hiddenByDefault: true, get: function (r) {
         return '<div class="q-refs">' +
           (r.franchiseCode ? '<span title="Franchise code">' + esc(r.franchiseCode) + '</span>' : '<span class="muted">no franchise</span>') +
           (r.mainAccountCode ? '<span title="Main account code">' + esc(r.mainAccountCode) + '</span>' : '') +
           (r.accountCode ? '<span title="Account code">' + esc(r.accountCode) + '</span>' : '') + '</div>'; } },
-      { key: "stage", label: "Stage", sortCol: "stageId", get: function (r) { return '<span class="q-stage"><b>' + r.stageId + '</b> ' + esc(r.stage) + '</span>'; } },
-      { key: "status", label: "Status", sortCol: "status", get: function (r) { return pill(r.status); } },
-      { key: "waiting", label: "Next / blocker", get: function (r) {
-        if (r.blocker) return '<span class="q-blk">' + icon("alert", 14) + esc(r.blocker) + '</span>';
-        if (r.waiting === "client") return '<span class="q-wait">' + icon("clock", 14) + 'Waiting on client</span>';
-        if (r.waiting === "team") return '<span class="q-wait">' + icon("clock", 14) + 'Waiting on ' + esc(r.owner === "A. Reyes" ? "another team" : r.owner) + '</span>';
-        return '<span class="muted">On track</span>'; } },
-      { key: "owner", label: "Owner", sortCol: "owner", get: function (r) { return esc(r.owner); } },
       { key: "intermediary", label: "Intermediary", hiddenByDefault: true, get: function (r) { return r.intermediary === "Direct" ? '<span class="muted">Direct</span>' : esc(r.intermediary); } },
       { key: "members", label: "Members", align: "right", sortCol: "members", hiddenByDefault: true, get: function (r) { return Number(r.members).toLocaleString("en-PH"); } },
       { key: "premium", label: "Est. premium", align: "right", sortCol: "premium", hiddenByDefault: true, get: function (r) { return fmtPHP(r.premium); } },
-      { key: "effectivity", label: "Effectivity", sortCol: "effectivity", get: function (r) {
+      { key: "effectivity", label: "Effectivity", sortCol: "effectivity", hiddenByDefault: true, get: function (r) {
         var d = M.daysUntil(r.effectivity);
-        return fmtDate(r.effectivity) + (d < 0 ? ' <span class="q-od">overdue</span>' : d <= 30 ? ' <span class="q-soon">' + d + 'd</span>' : ''); } },
-      { key: "due", label: "Next due", sortCol: "due", get: function (r) {
-        var d = M.daysUntil(r.due);
-        return fmtDate(r.due) + (d < 0 ? ' <span class="q-od">late</span>' : d <= 2 ? ' <span class="q-soon">soon</span>' : ''); } }
+        return fmtDate(r.effectivity) + (d < 0 ? ' <span class="q-od">overdue</span>' : d <= 30 ? ' <span class="q-soon">' + d + 'd</span>' : ''); } }
     ];
     var createBtn = '<a class="btn btn-primary btn-sm" href="#/new" data-nav="#/new">' + icon("plus", 16) + '<span>Create New Business</span></a>';
     return dataQueue(c, {
       key: "salesnb", items: M.WORKITEMS, columns: columns, createBtn: createBtn,
-      title: "Sales Tracker — New Business",
-      sub: "Every Corporate New Business record you can act on. Search, pick a saved view, filter and open."
+      title: "New Business",
+      sub: "Every Corporate New Business case you can act on. Search, pick a view, then open a company."
     });
   }
 
@@ -1702,7 +1958,29 @@
     return { title: title, body: body };
   }
 
+  // Reports landing — a short, scannable menu of the available reports.
+  function reportsIndex(c) {
+    var reports = [
+      { key: "pipeline", title: "New Business Pipeline", desc: "Active Corporate cases grouped by stage.", icon: "layers" },
+      { key: "approaching-effectivity", title: "Accounts Approaching Effectivity", desc: "Cases ordered by target go-live date.", icon: "rocket" },
+      { key: "franchise-by-sales", title: "Franchise by Sales", desc: "Franchise register summarised by sales owner.", icon: "building" },
+      { key: "franchise-by-agent", title: "Franchise by Agent", desc: "Franchise register summarised by agent/broker.", icon: "users" }
+    ];
+    var cards = '<div class="grid-2">' + reports.map(function (r) {
+      return '<a class="report-card" href="#/report/' + r.key + '" data-nav="#/report/' + r.key + '">' +
+        U.medallion(r.icon, "blue") +
+        '<div><div class="section-title">' + esc(r.title) + '</div>' +
+        '<div class="muted" style="font-size:13px">' + esc(r.desc) + '</div></div>' +
+        icon("arrowRight", 16, "report-arrow") + '</a>';
+    }).join("") + '</div>';
+    return '<div class="stack-5">' +
+      U.pageHead("Reports", "Live views over your Corporate New Business data.") +
+      cards +
+      '<p class="tiny muted">All displayed data is fictional, for demonstration only.</p></div>';
+  }
+
   global.VIEWS = {
+    caseOverview: caseOverview, caseAccountSetup: caseAccountSetup, reportsIndex: reportsIndex,
     home: home, newBusiness: newBusiness, searchPage: searchPage, tasks: tasks, approvals: approvals,
     myCases: myCases, notificationsPage: notificationsPage, sampleCase: sampleCase,
     franchiseList: franchiseList, addFranchise: addFranchise, modulePage: modulePage, reportPage: reportPage,
@@ -1712,6 +1990,6 @@
     caseBilling: caseBilling, caseActivation: caseActivation, caseHistory: caseHistory,
     salesTracker: salesTracker, workQueue: workQueue,
     salesTrackerNB: salesTrackerNB, dataQueue: dataQueue, workItemCase: workItemCase,
-    stageIcon: stageIcon, fmtDate: fmtDate
+    stageIcon: stageIcon, fmtDate: fmtDate, fmtPHP: fmtPHP
   };
 })(window);

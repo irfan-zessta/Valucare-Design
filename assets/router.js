@@ -11,7 +11,7 @@
   var M = global.HMS, U = global.UI, V = global.VIEWS;
   var icon = U.icon, esc = U.esc;
   var C = null;                     // the one live case
-  var ui = { notif: false, menu: false, navGroup: null, collapsed: false };   // transient chrome state
+  var ui = { notif: false, menu: false, more: false, caseDetails: false };   // transient chrome state
   var lastFocusId = null;           // for dialog focus return
   var dialogOnConfirm = null;
 
@@ -29,77 +29,50 @@
      those inside the case as statuses, tasks, blockers and handoffs.
      Corporate New Business only — no Renewal / IFG / ACUSA / MDA / Claims
      departmental menus. */
-  var NAV_HOME = { hash: "#/home", label: "Home", icon: "home" };
-  // Top-level items that sit between Home and the groups — kept to the few
-  // destinations a Commercial user needs every day. Approvals are NOT a
-  // separate item; authorized reviewers see them inside My Tasks.
-  var NAV_TOP = [
-    { hash: "#/tasks", label: "My Tasks", icon: "tasks", countKey: "tasks" }
+  // Five primary destinations — the whole menu for a busy Commercial user.
+  // Everything infrequent (tools, franchise maintenance) lives under "More".
+  var NAV_MAIN = [
+    { hash: "#/home",         label: "Home",         icon: "home" },
+    { hash: "#/new-business", label: "New Business", icon: "layers" },
+    { hash: "#/tasks",        label: "My Tasks",     icon: "tasks", countKey: "tasks" },
+    { hash: "#/accounts",     label: "Accounts",     icon: "building" },
+    { hash: "#/reports",      label: "Reports",      icon: "doc" }
   ];
-  var NAV_GROUPS = [
-    { id: "sales", label: "Sales", icon: "briefcase", items: [
-      { hash: "#/sales-tracker", label: "Sales Tracker — New Business", icon: "layers" },
-      { hash: "#/franchise-list", label: "Franchise",                   icon: "building" },
-      { hash: "#/work/quotation", label: "Quotations and Proposals",    icon: "calc" },
-      { hash: "#/new",            label: "Account Enrollment — New",     icon: "flag" },
-      { hash: "#/search",         label: "Accounts Inquiry",            icon: "search" }
-    ]},
-    { id: "tools", label: "Tools", icon: "layers", sepBefore: true, items: [
-      { hash: "#/module/agent-broker",          label: "Agent/Broker Maintenance", icon: "users" },
-      { hash: "#/module/sob-plancodes",         label: "SOB and Plan Codes",       icon: "calc" },
-      { hash: "#/module/additional-affiliates", label: "Additional Affiliates",    icon: "users" }
-    ]},
-    { id: "reports", label: "Reports", icon: "doc", items: [
-      { hash: "#/report/pipeline",                label: "New Business Pipeline",           icon: "layers" },
-      { hash: "#/report/franchise-by-sales",      label: "Franchise by Sales",              icon: "doc" },
-      { hash: "#/report/franchise-by-agent",      label: "Franchise by Agent",              icon: "doc" },
-      { hash: "#/report/approaching-effectivity", label: "Accounts Approaching Effectivity", icon: "rocket" }
-    ]}
+  // Infrequent tools — reached through the "More" menu at the foot of the sidebar.
+  var NAV_MORE = [
+    { hash: "#/franchise-list",               label: "Franchise",                icon: "building" },
+    { hash: "#/module/agent-broker",          label: "Agent/Broker Maintenance", icon: "users" },
+    { hash: "#/module/sob-plancodes",         label: "SOB and Plan Codes",       icon: "calc" },
+    { hash: "#/module/additional-affiliates", label: "Additional Affiliates",    icon: "users" }
   ];
 
-  // Which group owns the current route (for auto-expand + highlight). Top-level
-  // items (My Tasks) and Home belong to no group, so they return null.
-  function groupForHash(hash) {
-    for (var i = 0; i < NAV_GROUPS.length; i++) {
-      var g = NAV_GROUPS[i];
-      for (var j = 0; j < g.items.length; j++) {
-        if (g.items[j].hash === hash) return g.id;
-      }
-    }
-    if (hash.indexOf("#/case/") === 0) return "sales";      // any case section → Sales
-    if (hash.indexOf("#/wi/") === 0) return "sales";        // a work-item record
-    if (hash.indexOf("#/work/") === 0) return "sales";      // Sales-owned work queues
-    if (hash.indexOf("#/sample/") === 0) return "sales";    // a case the user owns
-    if (hash === "#/add-franchise") return "sales";         // Add Franchise is a Franchise-page action
-    if (hash.indexOf("#/report/") === 0) return "reports";
-    if (hash.indexOf("#/module/") === 0) return "tools";
-    return null;
+  // Which primary item owns the current route (for highlight). Cases, work
+  // items and queues all belong to New Business; reports to Reports; etc.
+  function activeMain(hash) {
+    if (hash === "#/home") return "#/home";
+    if (hash.indexOf("#/case/") === 0 || hash.indexOf("#/wi/") === 0 ||
+        hash.indexOf("#/work/") === 0 || hash.indexOf("#/sample/") === 0 ||
+        hash === "#/new-business" || hash === "#/new" || hash === "#/sales-tracker" ||
+        hash === "#/cases") return "#/new-business";
+    if (hash === "#/tasks" || hash === "#/approvals") return "#/tasks";
+    if (hash === "#/accounts" || hash === "#/search") return "#/accounts";
+    if (hash === "#/reports" || hash.indexOf("#/report/") === 0) return "#/reports";
+    return hash;
   }
 
-  /* My Tasks badge — only counts work that genuinely needs this user to act
-     (returned, blocked, awaiting their approval, or due within 2 days). Items
-     merely waiting on the client or another team are NOT counted, so the badge
-     always represents actionable work. */
+  /* My Tasks badge — only counts work that genuinely needs this user to act.
+     Shares M.needsAction with the New Business "Needs My Action" view so the
+     badge and that view always agree. */
   function taskCount() {
-    var items = M.WORKITEMS || [];
-    var n = 0;
-    items.forEach(function (r) {
-      if (r.owner !== "A. Reyes") return;
-      if (r.status === "Returned for correction" || r.status === "Blocked" || r.status === "Ready for approval") n++;
-      else if (r.status !== "Completed" && r.status !== "Waiting for client" &&
-               r.status !== "Waiting for another team" && M.daysUntil(r.due) <= 2) n++;
-    });
-    return n;
+    return (M.WORKITEMS || []).filter(M.needsAction).length;
   }
 
   /* Remembered last-expanded group (persists across sessions). Default
      "sales" so the Commercial user lands with Sales expanded. */
-  var NAV_PREF_KEY = "hms3_nav_group";
-  function loadNavPref() { try { return global.localStorage.getItem(NAV_PREF_KEY) || "sales"; } catch (e) { return "sales"; } }
-  function saveNavPref(g) { try { global.localStorage.setItem(NAV_PREF_KEY, g); } catch (e) {} }
-  var navPref = loadNavPref();
   var CASE_SECTIONS = [
     { id: "summary", label: "Summary", icon: "home", view: "caseSummary", stage: null },
+    { id: "overview", label: "Overview", icon: "home", view: "caseOverview", stage: null },
+    { id: "account", label: "Account Setup", icon: "layers", view: "caseAccountSetup", stage: null },
     { id: "lead", label: "Lead", icon: "flag", view: "caseLead", stage: 1 },
     { id: "franchise", label: "Franchise", icon: "building", view: "caseFranchise", stage: 1 },
     { id: "quotation", label: "Quotation", icon: "calc", view: "caseQuotation", stage: 2 },
@@ -117,71 +90,82 @@
   var SECTION_TITLE = {};
   CASE_SECTIONS.forEach(function (s) { SECTION_TITLE[s.id] = s.label; });
 
+  /* Five case tabs group the sections for busy users. This changes NAVIGATION
+     ONLY — each section keeps its own record, view, approvals and status.
+     `members` lists the section ids a tab owns (first = the tab's landing). */
+  var CASE_TABS = [
+    { id: "overview",  label: "Overview",               home: "overview",  members: ["overview", "history"] },
+    { id: "franchise", label: "Franchise",              home: "franchise", members: ["lead", "franchise"] },
+    { id: "proposal",  label: "Quotation and Proposal", home: "quotation", members: ["quotation", "proposal", "negotiation"] },
+    { id: "contract",  label: "Contract",               home: "contract",  members: ["contract", "onboarding"] },
+    { id: "account",   label: "Account Setup",          home: "account",   members: ["account", "sob", "plancodes", "memberdata", "billing", "activation"] }
+  ];
+  var TAB_OF = {};              // sectionId → tab object
+  CASE_TABS.forEach(function (t) { t.members.forEach(function (sid) { TAB_OF[sid] = t; }); });
+  TAB_OF.summary = CASE_TABS[0];   // legacy #/case/summary → Overview
+
+  // Human label for the sub-section within a tab (used by the secondary nav).
+  var SUBNAV_LABEL = {
+    lead: "Lead", franchise: "Franchise form",
+    quotation: "Quotation", proposal: "Proposal", negotiation: "Negotiation",
+    contract: "Contract and DSA", onboarding: "KYC and compliance",
+    account: "Checklist", sob: "SOB and Benefits", plancodes: "Plan Codes",
+    memberdata: "Member Data", billing: "Billing", activation: "Activation"
+  };
+
   /* ============================================================
      App chrome
      ============================================================ */
-  // A nav row: icon (left) · label (middle, may wrap) · count/arrow (right).
-  // `counts` resolves dynamic badges; collapsed rows expose label + count
-  // through title/aria so nothing is an unexplained dot.
-  function navItem(it, activeHash, expanded, counts) {
-    var active = it.hash === activeHash;
+  // A nav row: icon · label · optional actionable count. `counts` resolves the
+  // dynamic badge (My Tasks). Labels always visible, so nothing is an
+  // unexplained dot.
+  function navItem(it, activeMainHash, counts) {
+    var active = it.hash === activeMainHash;
     var n = it.countKey && counts ? (counts[it.countKey] || 0) : 0;
-    var attn = it.badgeTone === "attention";
-    var badge = n > 0 ? '<span class="nav-badge' + (attn ? " attention" : "") + '" aria-hidden="true">' + n + '</span>' : "";
-    var pip = n > 0 ? '<span class="nav-pip' + (attn ? " attention" : "") + '" aria-hidden="true"></span>' : "";
-    var full = it.label + (n > 0 ? " (" + n + (attn ? " awaiting approval" : " pending") + ")" : "");
+    var badge = n > 0 ? '<span class="nav-badge attention" aria-hidden="true">' + n + '</span>' : "";
+    var full = it.label + (n > 0 ? " (" + n + " need action)" : "");
     return '<a class="nav-link' + (active ? " active" : "") + '" href="' + it.hash + '"' +
-      (active ? ' aria-current="page"' : "") + (expanded ? "" : ' tabindex="-1"') +
+      (active ? ' aria-current="page"' : "") +
       ' title="' + esc(full) + '"' + (n > 0 ? ' aria-label="' + esc(full) + '"' : "") + '>' +
-      icon(it.icon, 18) + '<span class="lbl">' + esc(it.label) + '</span>' + badge + pip + '</a>';
-  }
-
-  // Which group is open: an explicit toggle this render wins; otherwise the
-  // group owning the route; otherwise the remembered preference (My Work).
-  function expandedGroup(hash) {
-    if (ui.navGroup !== null) return ui.navGroup;
-    var g = groupForHash(hash);
-    return g || navPref;
+      icon(it.icon, 18) + '<span class="lbl">' + esc(it.label) + '</span>' + badge + '</a>';
   }
 
   function sidebar(activeHash) {
-    var expandedId = expandedGroup(activeHash);
-    if (expandedId) { navPref = expandedId; saveNavPref(expandedId); }   // remember last-expanded
+    var am = activeMain(activeHash);
     var counts = { tasks: taskCount() };
 
-    var homeActive = activeHash === NAV_HOME.hash;
-    var homeLink = '<a class="nav-link nav-home' + (homeActive ? " active" : "") + '" href="' +
-      NAV_HOME.hash + '"' + (homeActive ? ' aria-current="page"' : "") + ' title="Home">' +
-      icon(NAV_HOME.icon, 18) + '<span class="lbl">' + esc(NAV_HOME.label) + '</span></a>';
+    var create = '<a class="nav-create btn btn-primary" href="#/new" data-nav="#/new"' +
+      (am === "#/new-business" && (global.location.hash === "#/new") ? ' aria-current="page"' : "") + '>' +
+      icon("plus", 18) + '<span>Create New Business</span></a>';
 
-    // Top-level items (My Tasks) — always reachable, never buried in a group.
-    var topLinks = NAV_TOP.map(function (it) { return navItem(it, activeHash, true, counts); }).join("");
+    var links = NAV_MAIN.map(function (it) { return navItem(it, am, counts); }).join("");
 
-    var groups = NAV_GROUPS.map(function (g) {
-      var open = g.id === expandedId;
-      var panelId = "navgrp-" + g.id;
-      var sep = g.sepBefore ? '<div class="nav-sep" role="separator" aria-hidden="true"></div>' : "";
-      var header = '<button type="button" class="nav-group-h" data-ui="navgroup:' + g.id + '"' +
-        ' aria-expanded="' + (open ? "true" : "false") + '" aria-controls="' + panelId + '" title="' + esc(g.label) + '">' +
-        icon(g.icon, 18) + '<span class="lbl">' + esc(g.label) + '</span>' +
-        '<span class="nav-caret' + (open ? " open" : "") + '" aria-hidden="true">' + icon("chevron", 16) + '</span>' +
-        '</button>';
-      var items = '<div class="nav-group-items" id="' + panelId + '"' + (open ? "" : " hidden") + '>' +
-        g.items.map(function (it) { return navItem(it, activeHash, open, counts); }).join("") + '</div>';
-      return sep + '<div class="nav-group' + (open ? " open" : "") + '">' + header + items + '</div>';
-    }).join("");
+    // "More" — infrequent tools, collapsed by default to keep the menu short.
+    var moreActive = NAV_MORE.some(function (it) { return it.hash === activeHash; }) ||
+      activeHash.indexOf("#/module/") === 0 || activeHash === "#/franchise-list" || activeHash === "#/add-franchise";
+    var moreOpen = ui.more || moreActive;
+    var moreItems = '<div class="nav-more-items" id="nav-more"' + (moreOpen ? "" : " hidden") + '>' +
+      NAV_MORE.map(function (it) {
+        var active = it.hash === activeHash;
+        return '<a class="nav-link nav-sub' + (active ? " active" : "") + '" href="' + it.hash + '"' +
+          (active ? ' aria-current="page"' : "") + ' title="' + esc(it.label) + '">' +
+          icon(it.icon, 18) + '<span class="lbl">' + esc(it.label) + '</span></a>';
+      }).join("") + '</div>';
+    var more = '<div class="nav-more' + (moreOpen ? " open" : "") + '">' +
+      '<button type="button" class="nav-group-h" data-ui="more-menu" aria-expanded="' + (moreOpen ? "true" : "false") +
+      '" aria-controls="nav-more" title="More">' + icon("more", 18) + '<span class="lbl">More</span>' +
+      '<span class="nav-caret' + (moreOpen ? " open" : "") + '" aria-hidden="true">' + icon("chevron", 16) + '</span></button>' +
+      moreItems + '</div>';
 
-    var collapsed = ui.collapsed;
-    return '<nav class="sidebar' + (collapsed ? " collapsed" : "") + '" aria-label="Primary">' +
+    return '<nav class="sidebar" aria-label="Primary">' +
       '<div class="brand">' +
         '<span class="mark">VC</span>' +
         '<span class="name">ValuCare<small>HMS3 · New Business</small></span>' +
-        '<button type="button" class="nav-collapse" data-ui="navcollapse" aria-label="' +
-          (collapsed ? "Expand sidebar" : "Collapse sidebar") + '" aria-pressed="' + (collapsed ? "true" : "false") + '">' +
-          icon("chevron", 18) + '</button>' +
       '</div>' +
-      '<div class="nav">' + homeLink + topLinks + groups + '</div>' +
+      create +
+      '<div class="nav">' + links + '</div>' +
       '<div class="spacer"></div>' +
+      '<div class="nav nav-foot">' + more + '</div>' +
       '</nav>';
   }
 
@@ -229,69 +213,82 @@
       '</div></div>';
   }
 
-  /* Case progress component — the Commercial user's at-a-glance read on an
-     open case: current stage, owner, next action, due, waiting party and
-     blocker, with the plain-language status. Back-office work shows here as
-     status/owner/waiting — Sales tracks it, another team owns it. */
-  function caseProgress(c) {
-    var cur = M.currentStage(c), ns = M.nextStep(c);
+  /* Minimal case header — Company, Case reference, Current status only.
+     Everything else (owner, effectivity, channel, intermediary, members,
+     premium) lives behind "View case details" so the header stays calm. */
+  function caseHeader(c) {
+    var cur = M.currentStage(c);
     var st = cur.statusText;
-    var waiting = st.indexOf("client") >= 0 ? "Client"
-      : st.indexOf("another team") >= 0 ? (ns.owner || "Another team") : "—";
-    var blocker = st === "Blocked" ? (c.declined ? "Client declined — reopen in Negotiation" : "See current stage")
-      : (c.declined ? "Client declined — paused" : "None");
-    function cell(label, val, tone) {
-      return '<div class="cp-cell"><div class="cp-l">' + esc(label) + '</div>' +
-        '<div class="cp-v"' + (tone ? ' style="color:var(--' + tone + ')"' : "") + '>' + val + '</div></div>';
+    var open = ui.caseDetails;
+
+    var details = "";
+    if (open) {
+      var ns = M.nextStep(c);
+      function row(label, val) {
+        return '<div class="cd-cell"><div class="cd-l">' + esc(label) + '</div><div class="cd-v">' + val + '</div></div>';
+      }
+      details = '<div class="case-details" id="case-details">' +
+        row("Owner", esc(cur.stage.owner)) +
+        row("Current stage", 'Stage ' + cur.stage.id + ' of 7 — ' + esc(cur.stage.name)) +
+        row("Next action", esc(ns.title) + (ns.owner ? ' <span class="muted">· ' + esc(ns.owner) + '</span>' : "")) +
+        row("Effectivity", esc(V.fmtDate(c.meta.effectivity))) +
+        row("Channel", esc(c.meta.channel || "—")) +
+        row("Intermediary", esc(c.meta.intermediary || "—")) +
+        row("Members", esc(String(c.meta.members || "—"))) +
+        row("Est. premium", c.meta.premium ? esc(V.fmtPHP(c.meta.premium)) : "—") +
+        '</div>';
     }
-    return '<section class="caseprog" aria-label="Case progress">' +
-      cell("Current stage", '<b>Stage ' + cur.stage.id + ' of 7</b> — ' + esc(cur.stage.name)) +
-      cell("Current owner", esc(cur.stage.owner)) +
-      cell("Next action", esc(ns.title)) +
-      cell("Due", esc(V.fmtDate(c.meta.effectivity))) +
-      cell("Waiting on", esc(waiting), waiting !== "—" ? "amber" : null) +
-      cell("Blocker", blocker === "None" ? '<span class="muted">None</span>' : esc(blocker), blocker === "None" ? null : "amber") +
-      '<div class="cp-status">' + U.statusPill(st) + '</div>' +
-      '</section>';
+
+    return '<header class="case-head">' +
+      '<div class="case-head-main">' +
+        '<div class="case-head-id">' +
+          '<h1 class="case-title">' + esc(c.meta.tradeName) + '</h1>' +
+          '<span class="case-ref">' + esc(c.meta.caseNo || "NEW CASE") + '</span>' +
+        '</div>' +
+        U.statusPill(st) +
+        '<div class="spacer"></div>' +
+        '<button type="button" class="btn btn-ghost" data-ui="casedetails" aria-expanded="' + (open ? "true" : "false") +
+          '" aria-controls="case-details">' + (open ? "Hide case details" : "View case details") + '</button>' +
+      '</div>' + details +
+      '</header>';
   }
 
   /* ============================================================
-     Case layout (stage chips + 14-section menu + body)
+     Case layout — minimal header + five tabs + body.
+     Tabs group sections for navigation only; each section keeps its own
+     record and status. A tab with more than one section shows a light
+     secondary nav so every section stays directly reachable.
      ============================================================ */
   function caseLayout(sectionId, activeHash) {
     var sec = CASE_SECTIONS.find(function (s) { return s.id === sectionId; }) || CASE_SECTIONS[0];
-    var summary = M.stageSummary(C);
-    var stageState = {};
-    summary.forEach(function (o) { stageState[o.stage.id] = o.state; });
+    var tab = TAB_OF[sec.id] || CASE_TABS[0];
 
-    var chips = summary.map(function (o) {
-      var cls = o.state === "done" ? "done" : o.state === "current" ? "current" : "";
-      return '<span class="stagechip ' + cls + '">' + (o.state === "done" ? icon("check", 13) : ('<b>' + o.stage.id + '</b>')) +
-        '<span>' + esc(o.stage.name) + '</span></span>';
-    }).join("");
-
-    var menu = '<nav class="casemenu" aria-label="Case sections">' +
-      '<div class="cm-head"><div class="ref">' + esc(C.meta.caseNo || "NEW CASE") + '</div>' +
-      '<div class="nm">' + esc(C.meta.tradeName) + '</div></div>' +
-      CASE_SECTIONS.map(function (s) {
-        var active = s.id === sectionId;
-        var dot = "";
-        if (s.stage) {
-          var st = stageState[s.stage];
-          var kind = st === "done" ? "success" : st === "current" ? "info" : "neutral";
-          var lbl = st === "done" ? "Completed" : st === "current" ? "In progress" : "Not started";
-          dot = '<span class="dot">' + U.statusDot(kind, lbl) + '</span>';
-        }
-        return '<a class="cm-link' + (active ? " active" : "") + '" href="#/case/' + s.id + '">' +
-          icon(s.icon, 18) + '<span>' + esc(s.label) + '</span>' + dot + '</a>';
+    // Primary tab bar.
+    var tabs = '<nav class="case-tabs" aria-label="Case sections" role="tablist">' +
+      CASE_TABS.map(function (t) {
+        var active = t.id === tab.id;
+        return '<a class="case-tab' + (active ? " active" : "") + '" role="tab" href="#/case/' + t.home + '"' +
+          (active ? ' aria-selected="true" aria-current="page"' : ' aria-selected="false"') + '>' +
+          esc(t.label) + '</a>';
       }).join("") + '</nav>';
 
-    var body = '<div class="case-body">' + V[sec.view](C) + '</div>';
-    var content = caseProgress(C) +
-      '<div class="stagebar" style="margin-bottom:var(--s5)">' + chips + '</div>' +
-      '<div class="case">' + menu + body + '</div>';
+    // Secondary nav within multi-section tabs (hidden when the tab owns one).
+    var subnav = "";
+    var subs = tab.members.filter(function (sid) { return sid !== "history"; });
+    if (subs.length > 1) {
+      subnav = '<nav class="case-subnav" aria-label="' + esc(tab.label) + ' sections">' +
+        subs.map(function (sid) {
+          var active = sid === sectionId;
+          var lbl = SUBNAV_LABEL[sid] || SECTION_TITLE[sid] || sid;
+          return '<a class="case-subtab' + (active ? " active" : "") + '" href="#/case/' + sid + '"' +
+            (active ? ' aria-current="page"' : "") + '>' + esc(lbl) + '</a>';
+        }).join("") + '</nav>';
+    }
 
-    var crumbs = '<b>' + esc(C.meta.tradeName) + '</b><span class="sep">/</span><span>' + esc(sec.label) + '</span>';
+    var body = '<div class="case-body">' + V[sec.view](C) + '</div>';
+    var content = caseHeader(C) + tabs + subnav + body;
+
+    var crumbs = '<b>' + esc(C.meta.tradeName) + '</b><span class="sep">/</span><span>' + esc(tab.label) + '</span>';
     return shell(content, activeHash, crumbs);
   }
 
@@ -305,8 +302,9 @@
     var html;
 
     if (hash.indexOf("#/case/") === 0) {
-      var sectionId = hash.split("/")[2] || "summary";
-      if (!CASE_SECTIONS.some(function (s) { return s.id === sectionId; })) sectionId = "summary";
+      var sectionId = hash.split("/")[2] || "overview";
+      if (sectionId === "summary") sectionId = "overview";   // legacy landing → Overview
+      if (!CASE_SECTIONS.some(function (s) { return s.id === sectionId; })) sectionId = "overview";
       html = caseLayout(sectionId, hash);
       title = (SECTION_TITLE[sectionId] || "Case") + " · " + C.meta.tradeName + " · HMS3";
     } else {
@@ -329,10 +327,13 @@
         var rep = V.reportPage(C, hash.slice("#/report/".length));
         content = rep.body; crumbs = '<b>Reports</b><span class="sep">/</span><span>' + esc(rep.title) + '</span>'; title = rep.title + " · HMS3";
       } else switch (hash) {
-        case "#/new": content = V.newBusiness(C); crumbs = '<b>New Business</b>'; title = "New Business · HMS3"; break;
-        case "#/sales-tracker": content = V.salesTrackerNB(C); crumbs = '<b>Sales Tracker — New Business</b>'; title = "Sales Tracker — New Business · HMS3"; break;
+        case "#/new-business": content = V.salesTrackerNB(C); crumbs = '<b>New Business</b>'; title = "New Business · HMS3"; break;
+        case "#/sales-tracker": content = V.salesTrackerNB(C); crumbs = '<b>New Business</b>'; title = "New Business · HMS3"; break;
+        case "#/new": content = V.newBusiness(C); crumbs = '<b>New Business</b><span class="sep">/</span><span>Create</span>'; title = "Create New Business · HMS3"; break;
         case "#/cases": content = V.myCases(C); crumbs = '<b>My New Business Cases</b>'; title = "My New Business Cases · HMS3"; break;
-        case "#/search": content = V.searchPage(C); crumbs = '<b>Accounts Inquiry</b>'; title = "Accounts Inquiry · HMS3"; break;
+        case "#/accounts": content = V.searchPage(C); crumbs = '<b>Accounts</b>'; title = "Accounts · HMS3"; break;
+        case "#/search": content = V.searchPage(C); crumbs = '<b>Accounts</b>'; title = "Accounts · HMS3"; break;
+        case "#/reports": content = V.reportsIndex(C); crumbs = '<b>Reports</b>'; title = "Reports · HMS3"; break;
         case "#/tasks": content = V.tasks(C); crumbs = '<b>My Tasks</b>'; title = "My Tasks · HMS3"; break;
         case "#/approvals": content = V.approvals(C); crumbs = '<b>Approvals</b>'; title = "Approvals · HMS3"; break;
         case "#/notifications": content = V.notificationsPage(C); crumbs = '<b>Notifications</b>'; title = "Notifications · HMS3"; break;
@@ -480,9 +481,13 @@
       var st = M.loadQueueState(a);
       st._colsOpen = !st._colsOpen; M.saveQueueState(a, st); return { skipSave: true };
     },
+    "queue:filters": function (a) {
+      var st = M.loadQueueState(a);
+      st._filtersOpen = !st._filtersOpen; M.saveQueueState(a, st); return { skipSave: true };
+    },
     "queue:reset": function (a) {
       var st = M.loadQueueState(a);
-      st.q = ""; st.view = "My Work"; st.owner = "All"; st.status = "All";
+      st.q = ""; st.view = "My Cases"; st.owner = "All"; st.status = "All";
       st.stage = "All"; st.intermediary = "All"; st.eff = "All"; st.page = 1;
       M.saveQueueState(a, st); queueLoad(a); return { skipSave: true, toast: "Filters cleared" };
     },
@@ -627,11 +632,53 @@
 
     /* ---- Franchise ---- */
     "franchise:create": function () {
+      var errs = {}, m = C.meta;
+      function need(path, val, msg) { if (val == null || String(val).trim() === "") errs[path] = msg; }
+      need("meta.client", m.client, "Enter the registered company name.");
+      need("meta.tin", m.tin, "Enter the TIN.");
+      need("meta.industry", m.industry, "Enter the nature of business.");
+      need("meta.regAddress", m.regAddress, "Enter the registered address.");
+      need("meta.product", m.product, "Select the product.");
+      need("meta.members", m.members, "Enter the estimated members.");
+      need("meta.billingFreq", m.billingFreq, "Select a billing frequency.");
+      C._errors = errs;
+      C._fieldLabels = {
+        "meta.client": "Registered company name — required",
+        "meta.tin": "TIN — required",
+        "meta.industry": "Nature of business — required",
+        "meta.regAddress": "Registered address — required",
+        "meta.product": "Product — required",
+        "meta.members": "Estimated members — required",
+        "meta.billingFreq": "Billing frequency — required"
+      };
+      if (Object.keys(errs).length) {
+        return { skipSave: true, toast: "Please complete the required fields", focusErr: true };
+      }
       C.flags.franchiseCreated = true;
       C.meta.franchiseRef = "FR-2026-00142";
+      C._savedAt = fmtNow(); C._dirty = false;
       log("Franchise created", { detail: C.meta.franchiseRef });
       M.notify(C, "Franchise " + C.meta.franchiseRef + " submitted for approval", "info");
       return { toast: "Franchise " + C.meta.franchiseRef + " created" };
+    },
+    "franchise:doc": function (key) {
+      if (!C.franchiseForm) C.franchiseForm = {};
+      if (!C.franchiseForm.docs) C.franchiseForm.docs = {};
+      C.franchiseForm.docs[key] = !C.franchiseForm.docs[key];
+      return { toast: C.franchiseForm.docs[key] ? "Document attached" : "Document removed" };
+    },
+    "franchise:addaffiliate": function () {
+      if (!C.franchiseForm) C.franchiseForm = {};
+      if (!C.franchiseForm.affiliates) C.franchiseForm.affiliates = [];
+      C.franchiseForm.affiliates.push({ name: "", tin: "" });
+      return {};
+    },
+    "franchise:delaffiliate": function (i) {
+      var idx = parseInt(i, 10);
+      if (C.franchiseForm && C.franchiseForm.affiliates && idx >= 0) {
+        C.franchiseForm.affiliates.splice(idx, 1);
+      }
+      return { toast: "Affiliate removed" };
     },
     "franchise:approve": function () {
       C.flags.franchiseApproved = true;
@@ -940,7 +987,6 @@
      Events
      ============================================================ */
   function go(hash) {
-    ui.navGroup = null;   // let the destination's group auto-expand
     if (global.location.hash === hash) render(); else global.location.hash = hash;
   }
 
@@ -988,20 +1034,9 @@
       e.preventDefault();
       var u = uiEl.getAttribute("data-ui");
       if (u === "notif") { ui.notif = !ui.notif; if (ui.notif) markNotifsRead(); render(); }
-      else if (u === "more") { ui.menu = !ui.menu; render(); }
-      else if (u === "navcollapse") {
-        ui.collapsed = !ui.collapsed;
-        render();
-      }
-      else if (u.indexOf("navgroup:") === 0) {
-        var gid = u.slice("navgroup:".length);
-        if (ui.collapsed) { ui.collapsed = false; ui.navGroup = gid; }
-        else {
-          var cur = ui.navGroup !== null ? ui.navGroup : groupForHash(global.location.hash || "#/home");
-          ui.navGroup = cur === gid ? "" : gid;   // "" = all collapsed
-        }
-        render();
-      }
+      else if (u === "more") { ui.menu = !ui.menu; render(); }          // header profile menu
+      else if (u === "more-menu") { ui.more = !ui.more; render(); }     // sidebar "More" group
+      else if (u === "casedetails") { ui.caseDetails = !ui.caseDetails; render(); }
       return;
     }
     var ch = close("[data-choice]");
@@ -1090,7 +1125,7 @@
 
   function markNotifsRead() { C.notifications.forEach(function (n) { n.read = true; }); M.save(C); }
 
-  global.addEventListener("hashchange", function () { ui.navGroup = null; render(); focusMain(); });
+  global.addEventListener("hashchange", function () { ui.more = false; render(); focusMain(); });
 
   // Unsaved-change protection: only warns when a write genuinely failed to
   // persist (C._dirty stays true after a failed save). With write-through

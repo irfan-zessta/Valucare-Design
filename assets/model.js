@@ -330,15 +330,21 @@
   // Generic query over any work-item-shaped array. Returns a paginated,
   // filtered, sorted slice plus the counts a toolbar/pager needs. The
   // caller owns the state object; this function is pure.
-  var SAVED_VIEWS = ["My Work", "Returned", "Waiting on Client", "Waiting on Another Team", "Due Soon", "All Permitted Records"];
+  // Four plain-language views for the New Business table. "Needs My Action"
+  // uses the same actionable test as the My Tasks badge, so the two always agree.
+  var SAVED_VIEWS = ["My Cases", "Needs My Action", "Waiting", "All Cases"];
+  function needsAction(r) {
+    if (r.owner !== "A. Reyes") return false;
+    if (r.status === "Returned for correction" || r.status === "Blocked" || r.status === "Ready for approval") return true;
+    return r.status !== "Completed" && r.status !== "Waiting for client" &&
+      r.status !== "Waiting for another team" && daysUntil(r.due) <= 2;
+  }
   function viewPredicate(view) {
     switch (view) {
-      case "Returned": return function (r) { return r.status === "Returned for correction"; };
-      case "Waiting on Client": return function (r) { return r.status === "Waiting for client"; };
-      case "Waiting on Another Team": return function (r) { return r.status === "Waiting for another team"; };
-      case "Due Soon": return function (r) { return daysUntil(r.due) <= 5 && r.status !== "Completed"; };
-      case "All Permitted Records": return function () { return true; };
-      case "My Work": default: return function (r) { return r.owner === "A. Reyes" && r.status !== "Completed"; };
+      case "Needs My Action": return needsAction;
+      case "Waiting": return function (r) { return r.status === "Waiting for client" || r.status === "Waiting for another team"; };
+      case "All Cases": return function () { return true; };
+      case "My Cases": default: return function (r) { return r.owner === "A. Reyes" && r.status !== "Completed"; };
     }
   }
   function effBucket(bucket) {
@@ -390,7 +396,7 @@
   // density, visible columns, scroll). Keyed by queue id.
   var QUEUE_PREFIX = "hms3_queue_";
   function queueDefaults() {
-    return { q: "", view: "My Work", owner: "All", status: "All", stage: "All", intermediary: "All",
+    return { q: "", view: "My Cases", owner: "All", status: "All", stage: "All", intermediary: "All",
       eff: "All", sortCol: "due", sortDir: "asc", page: 1, size: 10, density: "comfortable",
       hidden: [], scroll: 0 };
   }
@@ -621,7 +627,7 @@
     STAGES: STAGES, SAMPLE_CASES: SAMPLE_CASES, SAMPLE_FRANCHISES: SAMPLE_FRANCHISES,
     COMPANIES: COMPANIES, findCompany: findCompany, franchiseRows: franchiseRows,
     WORKITEMS: WORKITEMS, SAVED_VIEWS: SAVED_VIEWS, TODAY: TODAY, daysUntil: daysUntil,
-    queryItems: queryItems, viewCounts: viewCounts,
+    queryItems: queryItems, viewCounts: viewCounts, needsAction: needsAction,
     loadQueueState: loadQueueState, saveQueueState: saveQueueState, queueDefaults: queueDefaults,
     createInitialCase: createInitialCase, gatePassed: gatePassed,
     stageSummary: stageSummary, currentStage: currentStage, nextStep: nextStep,

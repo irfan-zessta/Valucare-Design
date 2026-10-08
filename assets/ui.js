@@ -41,6 +41,7 @@
     chevron:     '<path '+P.f+' d="M9 6l6 6-6 6"/>',
     plus:        '<path '+P.f+' d="M12 5v14M5 12h14"/>',
     search:      '<circle cx="11" cy="11" r="6.5" '+P.f+'/><path '+P.f+' d="M20 20l-3.5-3.5"/>',
+    filter:      '<path '+P.f+' d="M3 5h18l-7 8v6l-4-2v-4L3 5Z"/>',
     upload:      '<path '+P.f+' d="M12 16V4M7 9l5-5 5 5M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/>',
     sparkle:     '<path '+P.f+' d="M12 3l1.8 4.9L19 10l-5.2 2.1L12 17l-1.8-4.9L5 10l5.2-2.1L12 3Z"/>',
     user:        '<circle cx="12" cy="8" r="3.5" '+P.f+'/><path '+P.f+' d="M5 20a7 7 0 0 1 14 0"/>',
