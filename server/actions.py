@@ -11,6 +11,11 @@ from .domain import (Bundle, ApiError, account_gates, add_workdays, compare_bene
 
 ACTIONS = {}
 
+
+def _today():
+    from .domain import Ctx
+    return (Ctx.fixed_now or dt.datetime.now()).date()
+
 # Server-side test hook (per user): make the next save fail to exercise recovery.
 FAIL_NEXT_SAVE = set()
 
@@ -502,7 +507,7 @@ def franchise_conflicts(s, fr):
                         "status": other.get("status"), "ownerName": user_name(oc.get("ownerId") if oc else None),
                         "intermediary": (s.store.get(other.get("otherInfo", {}).get("businessSourceName")) or {}).get("name"),
                         "validFrom": other.get("validFrom"), "validUntil": other.get("validUntil"), "reasons": reasons,
-                        "blocking": other.get("status") in ("Approved",) and (vu is None or vu >= dt.date.today())
+                        "blocking": other.get("status") in ("Approved",) and (vu is None or vu >= _today())
                         or other.get("status") == "Converted to Account"})
     return out
 
@@ -747,7 +752,7 @@ def _approved_franchise(s, b):
     if not fr or fr.get("status") not in ("Approved", "Converted to Account"):
         raise ApiError(409, "franchise_not_approved", "The franchise must be approved first.")
     vu = parse_date(fr.get("validUntil"))
-    if fr.get("status") == "Approved" and vu and vu < dt.date.today():
+    if fr.get("status") == "Approved" and vu and vu < _today():
         raise ApiError(409, "franchise_expired", "The franchise has expired. Request an extension or a new franchise.")
     return fr
 
@@ -1910,7 +1915,7 @@ def _proposal_combos(s, acc):
                        "roomLimit": None, "modeOfPayment": None if decouple else it["paymentMode"], "memberType": it["memberType"],
                        "principalPosition": "", "civilStatus": "Any", "beforeVat": it.get("proposedRate"), "vatInclusive": False,
                        "vatAmount": None, "vatDesc": "", "premium": it.get("proposedRate"), "hospitalCodes": [], "clinicCodes": [],
-                       "remarks": f"Generated from SOB and proposal plan {it['plan']}", "dentalRemarks": "", "contractYear": (parse_date(ci.get("effectivityDate")) or dt.date.today()).year,
+                       "remarks": f"Generated from SOB and proposal plan {it['plan']}", "dentalRemarks": "", "contractYear": (parse_date(ci.get("effectivityDate")) or _today()).year,
                        "effectiveFrom": ci.get("effectivityDate"), "effectiveTo": ci.get("expiryDate"), "_label": " / ".join(str(x) for x in key)}
     return list(combos.values())
 
@@ -2241,7 +2246,7 @@ def comm_decide(s, ctx, p):
 def member_ctx(s, batch):
     b = s.bundle(batch["caseId"])
     approved = {r["planCode"] for r in s.store.list("planCode", batch["caseId"]) if r.get("status") == "Approved"}
-    eff = parse_date(b.effectivity()) or dt.date.today()
+    eff = parse_date(b.effectivity()) or _today()
     return {"purpose": batch.get("purpose"), "effectiveDate": eff, "approvedPlans": approved, "ageLimits": s.cfg["memberAgeLimits"],
             "approvedExceptions": batch.get("approvedExceptions", {})}
 
