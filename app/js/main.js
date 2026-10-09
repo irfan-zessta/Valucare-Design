@@ -81,7 +81,6 @@ function renderLogin(reason) {
 // Cross-cutting surfaces that are not tied to one business line.
 const NAV_PRIMARY = [
   { key: "home", label: "Dashboard", icon: "grid", href: "#/home" },
-  { key: "tasks", label: "My Tasks", icon: "tasks", href: "#/tasks", count: true },
   { key: "reports", label: "Reports", icon: "chart", href: "#/reports" },
 ];
 const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 tasks">0</span>` : html`<span></span>`}</a>`;
