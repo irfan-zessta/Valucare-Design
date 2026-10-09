@@ -165,7 +165,14 @@ def visible_case(ctx, case):
         return case.get("ownerId") == ctx.uid
     if r == "sm":
         owner = USERS.get(case.get("ownerId"))
-        return case.get("ownerId") == ctx.uid or (owner and owner.get("team") == ctx.user.get("team")) or case.get("salesManagerId") == ctx.uid
+        if case.get("ownerId") == ctx.uid or (owner and owner.get("team") == ctx.user.get("team")) or case.get("salesManagerId") == ctx.uid:
+            return True
+        # A proposal awaiting internal pricing review can be reviewed by any Sales
+        # Manager (so segregation of duties never dead-ends when the submitter is the
+        # only same-team SM). Make such a case visible to every SM while it is in that
+        # state, regardless of team/portfolio.
+        return any(p.get("status") == "For Internal Review"
+                   for p in ctx.store.list("proposal", case["id"]))
     return True
 
 
