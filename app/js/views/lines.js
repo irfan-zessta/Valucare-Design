@@ -101,6 +101,23 @@ export function addLine(form, key = "lines") {
     frequency: "", waitingPeriod: "", preExisting: "", copay: "", exclusions: "", notes: "", dept: "", deptInstruction: "", plans: "All", affiliates: "All" });
   form.set(key, arr);
 }
+// DEMO: add one fully-populated benefit line using the next unused library benefit,
+// so "Fill sample" works on the TOR / SOB tables (which fillSampleData can't fill -
+// they are row-based, not scalar inputs). Returns false if nothing was added.
+export function addSampleLine(form, kind = "sob", key = "lines") {
+  const arr = clone(form.draft[key] || []);
+  const used = new Set(arr.map((l) => l.code));
+  const b = lib().find((x) => !used.has(x.code)) || lib()[0];
+  if (!b) return false;
+  const freq = opt("frequency")[0]?.value || "";
+  const limit = b.limitType || opt("limitType")[0]?.value || "";
+  arr.push({ id: `N${arr.length}-${b.code}`, code: b.code, category: b.category, service: b.service, subcategory: b.subcategory,
+    mbl: 200000, benefitLimit: limit, limitDescription: "Sample benefit limit", innerLimit: 50000, percentage: 100,
+    frequency: freq, waitingPeriod: "None", preExisting: "Covered after 12 months", copay: "None", exclusions: "",
+    notes: "Demo sample line.", dept: "", deptInstruction: "", plans: "All", affiliates: "All" });
+  form.set(key, arr);
+  return true;
+}
 
 export function comparisonTable(rows) {
   if (!rows?.length) return html`<p class="tiny">No comparison yet - enter the structured TOR and the SOB draft.</p>`;

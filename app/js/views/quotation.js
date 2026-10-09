@@ -1,8 +1,8 @@
 import { html, raw, api, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, money, dialog, toast, RecordForm, saveStateHtml, pickFile,
-  showError, upload, docUrl, clone, int, confirmDialog, esc, fileOrSample } from "../core.js";
-import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, simNote } from "../components.js";
+  showError, upload, docUrl, clone, int, confirmDialog, esc, fileOrSample, DEMO_BYPASS } from "../core.js";
+import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, simNote, sampleBtn, fillSampleData } from "../components.js";
 import { subnav, ownerBanner } from "./case.js";
-import { linesTable, wireLines, addLine, comparisonTable } from "./lines.js";
+import { linesTable, wireLines, addLine, addSampleLine, comparisonTable } from "./lines.js";
 import { renderMemberData } from "./members.js";
 
 export async function render(ctx) {
@@ -80,7 +80,7 @@ function tor(ctx) {
     return;
   }
   body.innerHTML = html`<section class="panel"><div class="ph"><div><h2>Structured TOR (${(t.lines || []).length} benefit lines)</h2><div class="tiny">OCR import of TOR PDFs is optional (C priority) and not built; use structured entry or the CSV/Excel template.</div></div>
-      <div class="row">${can ? html`<a class="btn sm" href="/api/templates/tor.csv" download>${icon("download", 14)} Template</a><button class="btn sm" id="imp">${icon("upload", 14)} Import CSV/Excel</button><button class="btn sm" id="add">${icon("plus", 14)} Add line</button>` : ""}<span id="st"></span></div></div>
+      <div class="row">${can ? html`<a class="btn sm" href="/api/templates/tor.csv" download>${icon("download", 14)} Template</a><button class="btn sm" id="imp">${icon("upload", 14)} Import CSV/Excel</button><button class="btn sm" id="add">${icon("plus", 14)} Add line</button>${DEMO_BYPASS ? html`<button class="btn sm ghost" id="fillSampleTor" type="button" title="Add a filled sample benefit line">Fill sample</button>` : ""}` : ""}<span id="st"></span></div></div>
     <div class="pb flush" id="lines"></div>
     <div class="pb" style="border-top:1px solid var(--border-2)">${docSlot({ label: "Original TOR document", slot: "tor_original", docs: data.documents, linkedType: "tor", linkedId: t.id, caseId: id, canUpload: can })}</div></section>`.s;
   wireUploads(body, () => ctx.reload());
@@ -93,6 +93,7 @@ function tor(ctx) {
   const draw = () => { box.innerHTML = linesTable({ lines: form ? form.draft.lines : t.lines, editable: can, kind: "tor" }).s; wireLines(box, form, draw); };
   draw();
   body.querySelector("#add")?.addEventListener("click", () => { addLine(form); draw(); box.querySelector(`#lc-tor-${form.draft.lines.length - 1}`)?.focus(); });
+  body.querySelector("#fillSampleTor")?.addEventListener("click", () => { if (addSampleLine(form, "tor")) { draw(); toast("Added a sample benefit line.", "ok"); form.save(); } });
   body.querySelector("#imp")?.addEventListener("click", () => importFlow(ctx, "tor", async (imp) => {
     const r = await dialog({ title: "Apply TOR import", body: html`<p>${imp.valid} valid line(s), ${imp.errorCount} rejected.</p><fieldset style="border:0;padding:0" class="mt"><legend class="sr-only">Mode</legend>
       <label class="check"><input type="radio" name="mode" value="append" checked> Add to existing lines</label><label class="check"><input type="radio" name="mode" value="replace"> Replace existing lines</label></fieldset>`,
@@ -149,7 +150,7 @@ function rates(ctx) {
       ${F("specialRequirements", "Special requirements", "textarea")}
     </div>
     <div class="mt">${docSlot({ label: "Attachments", slot: "rr_attach", docs: data.documents, linkedType: "rateRequest", linkedId: rr.id, caseId: id, canUpload: am && !["Rate Sheet Issued"].includes(rr.status), hint: "Member Data, utilization and TOR files are already on the franchise checklist." })}</div></div>
-    ${editable ? html`<div class="savebar"><span id="st"></span><div class="row"><button class="btn primary" id="sub">Submit to Actuarial</button></div></div>` : ""}</section>
+    ${editable ? html`<div class="savebar"><span id="st"></span><div class="row">${sampleBtn("fillSampleRr")}<button class="btn primary" id="sub">Submit to Actuarial</button></div></div>` : ""}</section>
     <section class="panel"><div class="ph"><h2>Clarifications</h2></div><div class="pb">${(rr.clarifications || []).length ? html`<ul class="timeline">${rr.clarifications.map((c) => html`<li><span class="when">${fmtDateTime(c.askedAt)}</span><div><b>${c.askedByName} (Actuarial) asked:</b> ${c.question}
       ${c.answer ? html`<div class="mt"><b>${c.answeredByName} answered:</b> ${c.answer} <span class="tiny">${fmtDateTime(c.answeredAt)}</span></div>` : html`<div class="tiny mt">Awaiting the Account Manager's answer.</div>`}</div></li>`)}</ul>` : html`<p class="tiny">No clarifications.</p>`}</div></section>
     <section class="panel"><div class="ph"><h2>Rate sheet versions (${sheets.length})</h2><span class="tiny">Actuarial calculation is external; HMS stores imported results and versions.</span></div><div class="pb">
@@ -192,6 +193,13 @@ function rates(ctx) {
   formEl.addEventListener("change", (e) => {
     if (e.target.dataset.pm !== undefined) form.set("paymentModes", [...formEl.querySelectorAll("[data-pm]:checked")].map((x) => x.value));
     else if (e.target.name) form.set(e.target.name, controlValue(e.target));
+  });
+  body.querySelector("#fillSampleRr")?.addEventListener("click", () => {
+    fillSampleData(formEl);
+    // Payment-mode checkboxes have no name (grouped via data-pm), so fillSampleData
+    // skips them; tick the first option so this required field has a value.
+    const pms = [...formEl.querySelectorAll("[data-pm]")];
+    if (pms.length && !pms.some((x) => x.checked)) { pms[0].checked = true; pms[0].dispatchEvent(new Event("change", { bubbles: true })); }
   });
   body.querySelector("#sub").onclick = async (e) => {
     if (!(await form.save())) return;
@@ -259,7 +267,7 @@ function proposal(ctx) {
         ${field({ key: "recommendation", label: "Sales recommendation", type: "textarea", src: "proposed" }, prop.recommendation, { editable })}
         ${field({ key: "justification", label: "Rates justification", type: "textarea", required: true, src: "proposed" }, prop.justification, { editable })}
       </div></div>
-      ${editable ? html`<div class="savebar"><span class="tiny">Submitting binds the current rate-sheet and SOB versions for review.</span><div class="row"><button class="btn primary" id="submit">Submit for internal review</button></div></div>` : ""}</section>
+      ${editable ? html`<div class="savebar"><span class="tiny">Submitting binds the current rate-sheet and SOB versions for review.</span><div class="row">${sampleBtn("fillSampleProp")}<button class="btn primary" id="submit">Submit for internal review</button></div></div>` : ""}</section>
     <section class="panel"><div class="ph"><div><h2>TOR vs SOB comparison</h2><div class="tiny">${sob ? html`SOB v${sob.version} (${sob.status}) · <a href="#/case/${id}/setup/sob">Edit SOB draft</a>` : html`<a href="#/case/${id}/setup/sob">Create the SOB draft</a>`} · <a href="#/case/${id}/quotation/tor">Edit TOR</a></div></div></div>
       <div class="pb">${reduced.length ? html`<div class="note warn mb"><b>${reduced.length} benefit(s) are missing or lower than the TOR.</b> Each needs a documented justification (on the SOB line or below) and the Sales Manager must confirm the override (BR-10).</div>
         <div class="fgrid two mb" id="justBox">${reduced.map((r) => html`<div class="field"><label for="rj-${r.code}">Justification - ${r.benefit} (${r.flags.join(", ")})</label>
@@ -293,6 +301,17 @@ function proposal(ctx) {
     const pf = body.querySelector("#pForm");
     pf.addEventListener("input", (e) => { if (e.target.name) form.set(e.target.name, controlValue(e.target)); });
     body.querySelector("#justBox")?.addEventListener("input", (e) => { const k = e.target.dataset.just; if (!k) return; const j = { ...(form.draft.reducedJustifications || {}) }; j[k] = e.target.value; form.set("reducedJustifications", j); });
+    body.querySelector("#fillSampleProp")?.addEventListener("click", () => {
+      fillSampleData(pf);
+      // Proposed-rate cells (data-item, no name) and reduced-coverage justifications
+      // (data-just, no name) are skipped by fillSampleData; set empty ones so the
+      // proposal has values to submit.
+      const its = clone(form.draft.items);
+      let touched = false;
+      its.forEach((it) => { if (it.proposedRate == null || it.proposedRate === "") { it.proposedRate = it.actuarialRate ?? null; touched = true; } });
+      if (touched) { form.set("items", its); drawItems(); }
+      body.querySelectorAll("[data-just]").forEach((t) => { if (!t.value.trim()) { t.value = "Demo: reduction accepted for the walkthrough."; t.dispatchEvent(new Event("input", { bubbles: true })); } });
+    });
     body.querySelector("#submit").onclick = async (e) => { if (!(await form.save())) return; if (await act("proposal.submit", { id: prop.id, baseVersion: form.base.v }, { button: e.currentTarget, success: "Submitted to the Sales Manager." })) { form.dispose(); ctx.reload(); } };
   }
   const bar = body.querySelector("#pAct");

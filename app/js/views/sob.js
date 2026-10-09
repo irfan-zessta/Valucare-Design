@@ -1,6 +1,6 @@
-import { html, raw, state, act, roleLabel, userName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, showError, docUrl, clone, money, go, confirmDialog } from "../core.js";
+import { html, raw, state, act, roleLabel, userName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, showError, docUrl, clone, money, go, confirmDialog, DEMO_BYPASS, toast } from "../core.js";
 import { icon, pill, docSlot, wireUploads } from "../components.js";
-import { linesTable, wireLines, addLine, comparisonTable } from "./lines.js";
+import { linesTable, wireLines, addLine, addSampleLine, comparisonTable } from "./lines.js";
 import { ownerBanner } from "./case.js";
 
 const FLOW = ["Draft", "Sales Review", "Independent Validation", "Approved", "Client Signed", "Codified"];
@@ -39,7 +39,7 @@ export async function render(ctx) {
         ${sob.returnReason && sob.status === "Draft" ? html`<div class="note warn mt"><b>Returned:</b> ${sob.returnReason}</div>` : ""}
         ${approvals.length ? html`<ul class="timeline mt">${approvals.map((a) => html`<li><span class="when">${fmtDateTime(a.at)}</span><div><b>${a.stage === "sales" ? "Sales review" : "Independent validation"}: ${a.decision}</b> by ${a.byName} (v${a.version})${a.remarks ? html`<div class="tiny">${a.remarks}</div>` : ""}</div></li>`)}</ul>` : ""}
         <p class="tiny mt">Sending for validation does not approve, sign or codify the SOB - each step is a separate decision by a different person.</p></div></section>
-    <section class="panel"><div class="ph"><h2>Schedule of benefits (${(sob.lines || []).length})</h2><div class="row">${editable ? html`<button class="btn sm" id="addL">${icon("plus", 14)} Add benefit</button>` : ""}<span id="st"></span></div></div><div class="pb flush" id="lines"></div></section>
+    <section class="panel"><div class="ph"><h2>Schedule of benefits (${(sob.lines || []).length})</h2><div class="row">${editable ? html`<button class="btn sm" id="addL">${icon("plus", 14)} Add benefit</button>${DEMO_BYPASS ? html`<button class="btn sm ghost" id="fillSampleSob" type="button" title="Add a filled sample benefit line">Fill sample</button>` : ""}` : ""}<span id="st"></span></div></div><div class="pb flush" id="lines"></div></section>
     <div class="grid2 mt">
       <section class="panel"><div class="ph"><h2>Exclusions</h2></div><div class="pb"><p class="tiny">Standard exclusions (template)</p><ul>${(sob.exclusions || []).map((e) => html`<li>${e}</li>`)}</ul>
         <p class="tiny mt">Client-specific exclusions</p><div id="cex"></div></div></section>
@@ -62,6 +62,7 @@ export async function render(ctx) {
   const drawLines = () => { linesBox.innerHTML = linesTable({ lines: form ? form.draft.lines : sob.lines, editable, kind: "sob", comparison: (sob.scope || "parent") === "parent" ? cmp : null, plans, affiliates: affs.map((a) => a.accountInfo.accountName) }).s; wireLines(linesBox, form, drawLines); };
   drawLines();
   body.querySelector("#addL")?.addEventListener("click", () => { addLine(form); drawLines(); linesBox.querySelector(`#lc-sob-${form.draft.lines.length - 1}`)?.focus(); });
+  body.querySelector("#fillSampleSob")?.addEventListener("click", () => { if (addSampleLine(form, "sob")) { drawLines(); toast("Added a sample benefit line.", "ok"); form.save(); } });
   // custom exclusions
   const cex = body.querySelector("#cex");
   const drawCex = () => {

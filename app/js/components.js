@@ -358,7 +358,7 @@ function sampleValue(el) {
   if (name.includes("position") || name.includes("designation") || name.includes("jobtitle")) return "HR Manager";
   if (name.includes("shortname") || (name.includes("short") && name.includes("name"))) return "Demo Corp";
   if (name.includes("addressee")) return "Ms. Andrea Go";
-  if (name.includes("contactperson") || name.includes("person")) return "Teresa Uy";
+  if (name.includes("contactperson") || name.includes("contactname") || name.includes("person") || name.includes("signatory") || name.includes("authorizedrep") || name.includes("attention")) return "Teresa Uy";
   if (name.includes("email")) return "demo.contact@example.com";
   if (name.includes("phone") || name.includes("mobile") || name.includes("contactno") || name.includes("contactnumber")) return "+63 917 123 4567";
   if (name.includes("name")) return "Demo Sample Corporation";
@@ -369,10 +369,24 @@ function sampleValue(el) {
 }
 export function fillSampleData(root) {
   let n = 0;
+  // 1) Comboboxes (industry, province, city, intermediary, user, account): pick the
+  //    first real, selectable option. Fill dependent combos (city needs a province)
+  //    last so the parent is already set when we read its options.
+  const combos = Array.from(root.querySelectorAll("[data-combo]"))
+    .sort((a, b) => (a.dataset.source.startsWith("city") ? 1 : 0) - (b.dataset.source.startsWith("city") ? 1 : 0));
+  combos.forEach((box) => {
+    const hid = box.querySelector('input[type="hidden"]');
+    if (!hid || hid.value) return; // keep a choice the user already made
+    const form = box.closest("form,[data-form]") || root;
+    const accountOpts = box.dataset.accounts ? JSON.parse(box.dataset.accounts) : null;
+    const opt = sourceOptions(box.dataset.source, form, accountOpts).find((o) => o.value && !o.disabled);
+    if (opt) { setComboValue(box, opt.value); hid.dispatchEvent(new Event("change", { bubbles: true })); n++; }
+  });
+  // 2) Plain inputs / selects / textareas / checkboxes.
   root.querySelectorAll("input, select, textarea").forEach((el) => {
     if (el.disabled || el.readOnly || !el.name) return;
     if (el.type === "file" || el.type === "hidden" || el.type === "radio") return;
-    if (el.closest("[data-combo]") || el.dataset.combo) return; // combos need real option ids
+    if (el.closest("[data-combo]") || el.closest("[data-provider]") || el.dataset.combo) return; // handled above / remote picker
     if (el.type === "checkbox") { if (!el.checked) { el.checked = true; fireInput(el); n++; } return; }
     if (el.tagName === "SELECT") {
       if (!el.value || el.selectedIndex <= 0) {
@@ -386,9 +400,28 @@ export function fillSampleData(root) {
     fireInput(el);
     n++;
   });
+  // 3) Radio groups: select the first option if none chosen. Done last because a
+  //    radio change can trigger a re-render that rebuilds the form from state — by
+  //    now that state already holds everything we filled above.
+  const seen = new Set();
+  root.querySelectorAll('input[type="radio"]').forEach((r) => {
+    if (!r.name || r.disabled || seen.has(r.name)) return;
+    seen.add(r.name);
+    const group = Array.from(root.querySelectorAll(`input[type="radio"][name="${CSS.escape(r.name)}"]`));
+    if (!group.some((g) => g.checked)) {
+      const pick = group.find((g) => !g.disabled);
+      if (pick) { pick.checked = true; fireInput(pick); n++; }
+    }
+  });
   if (n) toast(`Filled ${n} empty field${n === 1 ? "" : "s"} with sample data.`, "ok");
   else toast("Nothing to fill — all fields already have values.", "info");
   return n;
+}
+// Reusable "Fill sample" button for a form/section savebar (demo mode only).
+// Wire it with: root.querySelector(selector).addEventListener("click", () => fillSampleData(formEl))
+export function sampleBtn(id = "fillSample", label = "Fill sample") {
+  if (!DEMO_BYPASS) return "";
+  return html`<button class="btn ghost" id="${id}" type="button" title="Fill empty fields with demo data">${label}</button>`;
 }
 
 // ---------------------------------------------------------------- stage progress

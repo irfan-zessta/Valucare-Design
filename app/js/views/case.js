@@ -1,6 +1,6 @@
 import { html, raw, api, state, act, roleLabel, userName, industryName, interName, fmtDate, fmtDateTime, dueHtml, money, int, go, dialog, toast, can, esc, daysUntil,
   RecordForm, saveStateHtml, flushForms, disposeForms, confirmDialog, DEMO_BYPASS } from "../core.js";
-import { icon, pill, stageBar, ownerText, docRow, wireUploads, field, mountCombos, controlValue } from "../components.js";
+import { icon, pill, stageBar, ownerText, docRow, wireUploads, field, mountCombos, controlValue, sampleBtn, fillSampleData } from "../components.js";
 import { switchUser } from "../main.js";
 
 export const TABS = [
@@ -149,7 +149,7 @@ function leadPanel(ctx, below) {
   const c = ctx.data.case;
   const canEdit = c.status === "Open" && (state.me.role === "sm" || (state.me.role === "am" && c.ownerId === state.me.id));
   const stages = state.meta.config.pipelineStages.filter((x) => !x.startsWith("Closed"));
-  return html`<section class="panel" data-form id="leadForm"><div class="ph"><h2>Lead and pipeline</h2>${canEdit ? html`<span class="tiny" id="leadState"></span>` : html`<span class="tiny">${icon("lock", 12)} View only</span>`}</div>
+  return html`<section class="panel" data-form id="leadForm"><div class="ph"><h2>Lead and pipeline</h2>${canEdit ? html`<div class="row tight">${sampleBtn("fillSampleLeadC")}<span class="tiny" id="leadState"></span></div>` : html`<span class="tiny">${icon("lock", 12)} View only</span>`}</div>
     <div class="pb"><div class="fgrid two">
       ${canEdit ? html`<div class="field"><label for="pst">Pipeline stage <span class="tag proposed">v1.1</span></label><select id="pst" name="pipelineStage" class="inp">${stages.map((x) => html`<option ${c.pipelineStage === x ? "selected" : ""}>${x}</option>`)}${c.pipelineStage === "Closed Won" ? html`<option selected disabled>Closed Won</option>` : ""}</select></div>`
         : field({ key: "pipelineStage", label: "Pipeline stage", src: "proposed" }, c.pipelineStage, { editable: false })}
@@ -187,6 +187,7 @@ function wireLead(ctx) {
     form.onState(form);
     box.addEventListener("input", (e) => { if (e.target.name) form.set(e.target.name, controlValue(e.target)); });
     box.addEventListener("change", (e) => { if (e.target.name) { form.set(e.target.name, controlValue(e.target)); form.save(); } });
+    box.querySelector("#fillSampleLeadC")?.addEventListener("click", () => fillSampleData(box));
   }
   box.querySelector("#logAct")?.addEventListener("click", async (e) => {
     const r = await dialog({ title: "Log activity", body: html`<div class="field"><label for="ak">Type</label><select id="ak" name="kind" class="inp">${["Call", "Meeting", "Email", "Presentation", "Other"].map((k) => html`<option>${k}</option>`)}</select></div>

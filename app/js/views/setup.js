@@ -1,6 +1,6 @@
 import { html, raw, state, act, api, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, docUrl, errorSummaryHtml,
-  wireErrorLinks, paintFieldErrors, toast, clone, money, int, daysUntil, confirmDialog, fileOrSample } from "../core.js";
-import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, simNote, gateList, setComboValue } from "../components.js";
+  wireErrorLinks, paintFieldErrors, toast, clone, money, int, daysUntil, confirmDialog, fileOrSample, DEMO_BYPASS } from "../core.js";
+import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, simNote, gateList, setComboValue, sampleBtn, fillSampleData } from "../components.js";
 import { subnav, ownerBanner } from "./case.js";
 import { renderMemberData } from "./members.js";
 
@@ -56,13 +56,14 @@ export function accountForm(ctx, a, box, { isAffiliate = false } = {}) {
       <p class="tiny">Onboarding documents (KYC, GIS, registrations, VAT evidence) are on the <a href="#/case/${ctx.id}/contract#onboarding">Contract tab</a>; franchise documents on the <a href="#/case/${ctx.id}/franchise#sec-documents">Franchise tab</a>.</p>
       ${docSlot({ label: "Other account documents", slot: "onb:account_misc", docs: ctx.data.documents, linkedType: "account", linkedId: a.id, caseId: ctx.id, canUpload: me.role === "as" && ctx.data.case.status === "Open" })}</div></section>
     </div>
-    ${editable ? html`<div class="savebar"><span data-st></span><div class="row"><button class="btn primary" data-submit>Submit for approval (maker)</button></div></div>` : ""}`.s;
+    ${editable ? html`<div class="savebar"><span data-st></span><div class="row">${sampleBtn("fillSampleAcc")}<button class="btn primary" data-submit>Submit for approval (maker)</button></div></div>` : ""}`.s;
   wireErrorLinks(box);
   wireUploads(box, () => ctx.reload());
   box.querySelectorAll("[data-jump]").forEach((x) => (x.onclick = (e) => { e.preventDefault(); document.getElementById(x.dataset.jump).scrollIntoView({ block: "start" }); }));
   const formEl = box.querySelector("[data-form]");
   mountCombos(formEl);
   if (!editable) return;
+  box.querySelector("#fillSampleAcc")?.addEventListener("click", () => fillSampleData(formEl));
   const form = new RecordForm({ record: a, keys: ["accountInfo", "contractInfo", "agentInfo", "otherInfo", "vcAppExclusions"],
     onState: (f) => { const s = box.querySelector("[data-st]"); if (s) s.innerHTML = saveStateHtml(f).s; }, onSaved: (r, f, o) => { if (o?.rerender) ctx.reload(); } });
   form.onState(form);
@@ -217,6 +218,7 @@ function cocCommission(ctx, acc) {
     form.onState(form);
     cbody.querySelector("[data-form]").addEventListener("input", (e) => { if (e.target.name) form.set(e.target.name, controlValue(e.target)); });
     cbody.querySelector("[data-form]").addEventListener("change", (e) => { if (e.target.name) form.set(e.target.name, controlValue(e.target)); });
+    if (DEMO_BYPASS) btn(mbar, "Fill sample", "ghost", () => fillSampleData(cbody.querySelector("[data-form]")));
     btn(mbar, "Submit for approval", "primary", async (b) => { if (!(await form.save())) return; if (await act("commission.submit", { id: cm.id, baseVersion: form.base.v }, { button: b, success: "Commission Rate Form submitted." })) ctx.reload(); });
   }
   if (["as", "sm"].includes(me.role) && cm.status === "For Approval") cm.makerId === me.id ? mbar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared it; another person approves.</span>`) : btn(mbar, "Approve Commission Rate Form", "primary", async (b) => {
@@ -273,6 +275,7 @@ function billing(ctx, acc) {
     const fe = body.querySelector("[data-form]");
     fe.addEventListener("input", (e) => { if (e.target.name) form.set(e.target.name, controlValue(e.target)); });
     fe.addEventListener("change", (e) => { if (e.target.name) form.set(e.target.name, controlValue(e.target)); });
+    if (DEMO_BYPASS) btn(bar, "Fill sample", "ghost", () => fillSampleData(fe));
     btn(bar, "Submit for approval", "primary", async (b) => { if (!(await form.save())) return; if (await act("billing.submit", { id: bl.id, baseVersion: form.base.v }, { button: b, success: "Billing setup submitted for approval." })) ctx.reload(); });
   }
   if (me.role === "bc" && bl.status === "For Approval") bl.makerId === me.id ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared it; another B&C user approves.</span>`) : btn(bar, "Approve billing setup", "primary", async (b) => {

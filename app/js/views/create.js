@@ -1,5 +1,5 @@
 import { html, api, state, act, go, roleLabel, industryName, interName, toast, esc, paintFieldErrors, showError, fmtDate, DEMO_BYPASS } from "../core.js";
-import { icon, field, mountCombos, pill } from "../components.js";
+import { icon, field, mountCombos, pill, sampleBtn, fillSampleData } from "../components.js";
 
 export async function render(main) {
   document.title = "Create New Business · HMS3";
@@ -83,9 +83,10 @@ export async function render(main) {
         ${field({ key: "region", label: "Region", type: "region", src: "legacy" }, state.meta.geo[c.province]?.region || "")}
       </div>
       <div id="dups"></div></div>
-      <div class="savebar"><span class="tiny">Nothing is saved until the case is created in step 3.</span><button class="btn primary" id="chk">Check for duplicates and continue</button></div></form>`.s;
+      <div class="savebar"><span class="tiny">Nothing is saved until the case is created in step 3.</span><div class="row">${sampleBtn("fillSampleCo")}<button class="btn primary" id="chk">Check for duplicates and continue</button></div></div></form>`.s;
     const form = body.querySelector("#cf");
     mountCombos(form);
+    form.querySelector("#fillSampleCo")?.addEventListener("click", () => fillSampleData(form));
     form.addEventListener("change", (e) => {
       if (!e.target.name) return;
       c[e.target.name] = e.target.value;
@@ -158,9 +159,10 @@ export async function render(main) {
       </div>
       <div id="minWarn"></div>
       ${L.channel && L.channel !== "Direct" ? html`<div class="note mt">Intermediary account: client-facing communication will go only through the authorized agent/broker (BR-03).</div>` : ""}
-      </div><div class="savebar"><span class="tiny">Creates the lead and case; you continue to the franchise form next.</span><div class="row" id="btns"></div></div></form>`.s;
+      </div><div class="savebar"><span class="tiny">Creates the lead and case; you continue to the franchise form next.</span><div class="row">${sampleBtn("fillSampleLead")}<div class="row" id="btns"></div></div></div></form>`.s;
     const form = body.querySelector("#lf");
     mountCombos(form);
+    form.querySelector("#fillSampleLead")?.addEventListener("click", () => fillSampleData(form));
     const warn = () => {
       const n = Number(L.estHeadcount);
       const below = !DEMO_BYPASS && L.estHeadcount !== "" && L.estHeadcount !== null && !isNaN(n) && n < min;

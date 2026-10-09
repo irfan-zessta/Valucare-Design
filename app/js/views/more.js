@@ -1,6 +1,6 @@
-import { html, raw, api, state, act, roleLabel, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, toast, confirmDialog, docUrl, messageDialog, pickFile } from "../core.js";
+import { html, raw, api, state, act, roleLabel, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, toast, confirmDialog, docUrl, messageDialog, pickFile, DEMO_BYPASS } from "../core.js";
 import { icon, pill, srcTag } from "../components.js";
-import { linesTable, wireLines, addLine } from "./lines.js";
+import { linesTable, wireLines, addLine, addSampleLine } from "./lines.js";
 
 export async function render(main, { parts }) {
   const page = parts[1] || "intermediaries";
@@ -53,13 +53,14 @@ async function template(main) {
   const editable = state.me.role === "actuarial";
   main.innerHTML = html`<div class="page-head"><div><h1>SOB template</h1><p>Actuarial owns the standard SOB template (US-SOB-01). Sales starts every SOB draft from the approved template. Version ${t.v}.</p></div><span id="st"></span></div>
     ${editable ? "" : html`<div class="note mb">${icon("lock", 14)} Maintained by Actuarial. Read-only for ${roleLabel(state.me.role)}.</div>`}
-    <section class="panel"><div class="ph"><h2>${t.name} ${pill(t.status)}</h2>${editable ? html`<button class="btn sm" id="add">${icon("plus", 14)} Add benefit</button>` : ""}</div><div class="pb flush" id="lines"></div></section>`.s;
+    <section class="panel"><div class="ph"><h2>${t.name} ${pill(t.status)}</h2><div class="row">${editable ? html`<button class="btn sm" id="add">${icon("plus", 14)} Add benefit</button>${DEMO_BYPASS ? html`<button class="btn sm ghost" id="fillSampleTpl" type="button" title="Add a filled sample benefit line">Fill sample</button>` : ""}` : ""}</div></div><div class="pb flush" id="lines"></div></section>`.s;
   let form = null;
   if (editable) { form = new RecordForm({ record: t, keys: ["lines"], onState: (f) => { const s = main.querySelector("#st"); if (s) s.innerHTML = saveStateHtml(f).s; } }); form.onState(form); }
   const box = main.querySelector("#lines");
   const draw = () => { box.innerHTML = linesTable({ lines: form ? form.draft.lines : t.lines, editable, kind: "tor" }).s; wireLines(box, form, draw); };
   draw();
   main.querySelector("#add")?.addEventListener("click", () => { addLine(form); draw(); });
+  main.querySelector("#fillSampleTpl")?.addEventListener("click", () => { if (addSampleLine(form, "tor")) { draw(); toast("Added a sample benefit line.", "ok"); form.save(); } });
 }
 
 // ---------------------------------------------------------------- providers

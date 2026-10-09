@@ -1,5 +1,5 @@
 import { html, raw, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, docUrl, DEMO_BYPASS, fileOrSample } from "../core.js";
-import { icon, pill, field, controlValue, docSlot, wireUploads, simNote } from "../components.js";
+import { icon, pill, field, controlValue, docSlot, wireUploads, simNote, sampleBtn, fillSampleData } from "../components.js";
 
 export async function render(ctx) {
   const { data, el, id } = ctx;
@@ -55,7 +55,7 @@ function contractBlock(ctx, c, box) {
   const editable = ((me.role === "legal" && ["Requested", "Drafting", "Review"].includes(c.status)) || (me.role === "as" && c.status !== "Completed")) && ctx.data.case.status === "Open";
   const F = (k, label, type = "text", extra = {}) => field({ key: k, label, type, src: "proposed", ...extra }, c[k], { editable });
   box.innerHTML = html`<section class="panel"><div class="ph"><div><h2>${c.kind === "DSA" ? "DSA" : "Contract"} ${pill(c.status)}</h2><div class="tiny">${c.number ? `No. ${c.number} · ` : ""}Based on proposal v${c.proposalVersion}</div></div>
-    <div class="row">${nxt && me.role === nxt.role && ctx.data.case.status === "Open" ? html`<button class="btn primary" data-adv>Record '${nxt.key}'</button>` : nxt ? html`<span class="tiny">Next: '${nxt.key}' by ${roleLabel(nxt.role)}</span>` : ""}</div></div>
+    <div class="row">${editable ? sampleBtn("fillSampleContract") : ""}${nxt && me.role === nxt.role && ctx.data.case.status === "Open" ? html`<button class="btn primary" data-adv>Record '${nxt.key}'</button>` : nxt ? html`<span class="tiny">Next: '${nxt.key}' by ${roleLabel(nxt.role)}</span>` : ""}</div></div>
     <div class="pb"><ol class="steps-h" aria-label="${c.kind} progress">${steps.map((s, i) => { const ev = (c.events || []).find((e) => e.step === s.key);
       return html`<li class="${i < cur ? "done" : i === cur ? (c.status === "Completed" ? "done" : "cur") : ""}" ${i === cur ? raw('aria-current="step"') : ""}>${s.key}<small>${ev ? `${fmtDate(ev.eventDate)} · ${ev.byName}` : roleLabel(s.role)}</small></li>`; })}</ol>
       <div class="fgrid mt" data-form>${F("number", "Contract number", "text", { required: true })}${F("effectiveDate", "Effectivity", "date", { required: true })}${F("expiryDate", "Expiry", "date", { required: true })}
@@ -74,6 +74,7 @@ function contractBlock(ctx, c, box) {
     form.onState(form);
     box.querySelector("[data-form]").addEventListener("input", (e) => { if (e.target.name) form.set(e.target.name, controlValue(e.target)); });
     box.querySelector("[data-form]").addEventListener("change", (e) => { if (e.target.name) form.set(e.target.name, controlValue(e.target)); });
+    box.querySelector("#fillSampleContract")?.addEventListener("click", () => fillSampleData(box.querySelector("[data-form]")));
     box._form = form;
   }
   box.querySelector("[data-adv]")?.addEventListener("click", async (e) => {
