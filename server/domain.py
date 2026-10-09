@@ -366,7 +366,8 @@ def onboarding_status(b, cfg):
         if it["key"] == "kyc_form" and kyc and kyc.get("formDocId") and st.get("status") != "Waived":
             # single source: the KYC form uploaded on the KYC record satisfies the checklist item
             st = {"status": "Received", "docId": kyc["formDocId"], "source": "KYC record"}
-        items.append({**it, "status": st.get("status", "Missing"), "docId": st.get("docId"), "waiver": st.get("waiver"), "source": st.get("source")})
+        mandatory = it["mandatory"] and not DEMO_BYPASS  # demo: onboarding documents are optional
+        items.append({**it, "mandatory": mandatory, "status": st.get("status", "Missing"), "docId": st.get("docId"), "waiver": st.get("waiver"), "source": st.get("source")})
     return items
 
 

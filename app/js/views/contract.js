@@ -30,7 +30,7 @@ export async function render(ctx) {
     ${data.summary.signedUnpaid ? html`<div class="note warn mb"><b>Signed - unpaid.</b> The client signed but the first payment is not posted. The client can still switch providers until payment (BR-21). Payment status is recorded by B&C (billing integration simulated).</div>` : ""}
     <div id="c-Contract"></div><div id="c-DSA"></div>
     <section class="panel" id="kyc"><div class="ph"><div><h2>KYC ${pill(kyc?.status)}</h2><div class="tiny">Form and evidence by the Account Manager; check result by Compliance.</div></div><div class="row" id="kAct"></div></div><div class="pb" id="kBody"></div></section>
-    <section class="panel" id="onboarding"><div class="ph"><div><h2>Onboarding documents</h2><div class="tiny">Mandatory items block account creation unless an authorized waiver is recorded (configurable - OQ-02).</div></div></div><div class="pb" id="oBody"></div></section>
+    <section class="panel" id="onboarding"><div class="ph"><div><h2>Onboarding documents</h2><div class="tiny">${DEMO_BYPASS ? "Demo: all onboarding documents are optional and do not block account creation." : "Mandatory items block account creation unless an authorized waiver is recorded (configurable - OQ-02)."}</div></div></div><div class="pb" id="oBody"></div></section>
     <section class="panel"><div class="ph"><h2>Agent / broker on record</h2><div class="row" id="aorAct"></div></div><div class="pb">${aorBlock(data)}</div></section>`.s;
   contractBlock(ctx, con, el.querySelector("#c-Contract"));
   if (dsa) contractBlock(ctx, dsa, el.querySelector("#c-DSA"));
