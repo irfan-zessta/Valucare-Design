@@ -1,5 +1,5 @@
 import { html, raw, state, act, api, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, docUrl, errorSummaryHtml,
-  wireErrorLinks, paintFieldErrors, toast, clone, money, int, daysUntil, confirmDialog } from "../core.js";
+  wireErrorLinks, paintFieldErrors, toast, clone, money, int, daysUntil, confirmDialog, fileOrSample } from "../core.js";
 import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, simNote, gateList, setComboValue } from "../components.js";
 import { subnav, ownerBanner } from "./case.js";
 import { renderMemberData } from "./members.js";
@@ -289,7 +289,7 @@ function billing(ctx, acc) {
       actions: [{ label: "Cancel" }, { label: "Resolve", kind: "primary", value: "ok", validate: (v) => (!v.resolution.trim() || !v.file?.length ? "Resolution and evidence are required." : null) }] });
     if (r?.action !== "ok") return;
     try {
-      const up = await upload(r.values.file[0], { caseId: id, linkedType: "billing", linkedId: bl.id, slot: "billing" });
+      const up = await upload(fileOrSample(r.values.file, "billing-evidence.pdf", "Billing exception evidence"), { caseId: id, linkedType: "billing", linkedId: bl.id, slot: "billing" });
       if (await act("billing.resolveException", { id: bl.id, exceptionId: b.dataset.resx, resolution: r.values.resolution, evidenceDocId: up.document.id }, { button: b, success: "Exception resolved with evidence." })) ctx.reload();
     } catch (e) { showError(e); }
   }));

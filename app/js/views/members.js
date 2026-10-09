@@ -1,4 +1,4 @@
-import { html, raw, api, state, act, pickFile, showError, toast, dialog, fmtDateTime, roleLabel, int, upload, docUrl, esc } from "../core.js";
+import { html, raw, api, state, act, pickFile, showError, toast, dialog, fmtDateTime, roleLabel, int, upload, docUrl, esc, fileOrSample } from "../core.js";
 import { icon, pill, simNote } from "../components.js";
 
 export async function renderMemberData(ctx, box, purpose) {
@@ -118,7 +118,7 @@ export async function renderMemberData(ctx, box, purpose) {
       actions: [{ label: "Cancel" }, { label: "Approve exception", kind: "primary", value: "ok", validate: (v) => (!v.file?.length ? "Attach the supporting document." : !v.reason.trim() ? "Enter the reason." : null) }] });
     if (r?.action !== "ok") return;
     try {
-      const up = await upload(r.values.file[0], { caseId: id, linkedType: "memberBatch", linkedId: batch.id, slot: "member_exception" });
+      const up = await upload(fileOrSample(r.values.file, "member-exception.pdf", "Member exception support"), { caseId: id, linkedType: "memberBatch", linkedId: batch.id, slot: "member_exception" });
       if (await act("members.approveException", { batchId: batch.id, rowNo: row.rowNo, reason: r.values.reason, docId: up.document.id }, { success: "Exception approved with evidence." })) ctx.reload();
     } catch (e) { showError(e); }
   }

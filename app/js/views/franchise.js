@@ -1,6 +1,7 @@
 import { html, raw, state, act, api, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, toast, RecordForm, saveStateHtml, errorSummaryHtml,
   wireErrorLinks, paintFieldErrors, showError, daysUntil, clone, confirmDialog } from "../core.js";
-import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, setComboValue, srcTag } from "../components.js";
+import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, setComboValue, srcTag, fillSampleData } from "../components.js";
+import { DEMO_BYPASS } from "../core.js";
 
 export async function render(ctx) {
   const { data, el, id } = ctx;
@@ -64,7 +65,7 @@ export async function render(ctx) {
         <div class="pb flush" id="affBox"></div></section>
       <section class="panel form-sec" id="sec-decisions"><div class="ph"><h2>Decisions and extensions</h2></div><div class="pb">${decisions(fr)}</div></section>
     </div>
-    ${editable ? html`<div class="savebar"><span id="saveState"></span><div class="row"><button class="btn" id="saveBtn">Save draft</button><button class="btn primary" id="submitBtn">Submit to Account Services</button></div></div>` : ""}`.s;
+    ${editable ? html`<div class="savebar"><span id="saveState"></span><div class="row">${DEMO_BYPASS ? html`<button class="btn ghost" id="fillSample" type="button" title="Fill empty fields with demo data">Fill sample data</button>` : ""}<button class="btn" id="saveBtn">Save draft</button><button class="btn primary" id="submitBtn">Submit to Account Services</button></div></div>` : ""}`.s;
 
   wireErrorLinks(el);
   el.querySelectorAll("[data-jump]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); const t = document.getElementById(a.dataset.jump); t.scrollIntoView({ block: "start" }); t.querySelector("h2")?.setAttribute("tabindex", "-1"); t.querySelector("h2")?.focus({ preventScroll: true }); }));
@@ -175,6 +176,7 @@ export async function render(ctx) {
     drawAff();
     affBox.querySelector(`#af-${arr.length - 1}-name`)?.focus();
   });
+  el.querySelector("#fillSample")?.addEventListener("click", () => { fillSampleData(formEl); });
   el.querySelector("#saveBtn").onclick = async (e) => { const b = e.currentTarget; b.setAttribute("aria-busy", "true"); const ok = await form.save(); b.removeAttribute("aria-busy"); if (ok) toast("Draft saved.", "ok"); };
   el.querySelector("#submitBtn").onclick = async (e) => {
     const b = e.currentTarget;

@@ -1,5 +1,5 @@
 import { html, raw, esc, state, optLabel, industryName, interName, userName, fmtDate, fmtDateTime, money, int, getPath, upload, pickFile,
-  docUrl, toast, showError, api, act, dialog } from "./core.js";
+  docUrl, toast, showError, api, act, dialog, DEMO_BYPASS, sampleFile } from "./core.js";
 
 // ---------------------------------------------------------------- icons
 const P = {
@@ -292,7 +292,10 @@ export function docSlot({ label, slot, docs, linkedType, linkedId, caseId, canUp
   return html`<div class="slot" data-field="docs.${slot}">
     <div class="row between"><div><b>${label}</b> ${required ? html`<span class="req" style="color:var(--red)">* required</span>` : ""} ${srcTag(src)}
       ${hint ? html`<div class="tiny">${hint}</div>` : ""}</div>
-      ${canUpload ? html`<button type="button" class="btn sm" data-upload="${slot}" data-linked-type="${linkedType}" data-linked-id="${linkedId}" data-case="${caseId || ""}" data-label="${label}">${icon("upload", 14)} ${mine.length ? "Upload new version" : "Upload"}</button>` : ""}</div>
+      ${canUpload ? html`<div class="row tight">
+        <button type="button" class="btn sm" data-upload="${slot}" data-linked-type="${linkedType}" data-linked-id="${linkedId}" data-case="${caseId || ""}" data-label="${label}">${icon("upload", 14)} ${mine.length ? "Upload new version" : "Upload"}</button>
+        ${DEMO_BYPASS ? html`<button type="button" class="btn sm ghost" data-sample="${slot}" data-linked-type="${linkedType}" data-linked-id="${linkedId}" data-case="${caseId || ""}" data-label="${label}" title="Attach a generated demo file">Use sample</button>` : ""}
+      </div>` : ""}</div>
     ${mine.length ? html`<ul class="doclist">${mine.map((d) => docRow(d, { canReview: !["am", "sm"].includes(state.me.role) }))}</ul>` : html`<div class="tiny mt">No file uploaded.</div>`}
     ${hist.length ? html`<details class="tiny"><summary>${hist.length} earlier version(s)</summary><ul class="doclist">${hist.map((d) => docRow(d))}</ul></details>` : ""}
   </div>`;
@@ -308,6 +311,15 @@ export function wireUploads(root, onDone) {
       onDone && onDone(r.document);
     } catch (e) { await showError(e); } finally { if (b.isConnected) { b.removeAttribute("aria-busy"); b.disabled = false; } }
   }));
+  root.querySelectorAll("[data-sample]").forEach((b) => (b.onclick = async () => {
+    b.setAttribute("aria-busy", "true"); b.disabled = true;
+    try {
+      const f = sampleFile("sample.pdf", b.dataset.label || "Sample document");
+      const r = await upload(f, { caseId: b.dataset.case, linkedType: b.dataset.linkedType, linkedId: b.dataset.linkedId, slot: b.dataset.sample });
+      toast(`Added a sample file for ${b.dataset.label || "this document"} (version ${r.document.version}).`, "ok");
+      onDone && onDone(r.document);
+    } catch (e) { await showError(e); } finally { if (b.isConnected) { b.removeAttribute("aria-busy"); b.disabled = false; } }
+  }));
   root.querySelectorAll("[data-review]").forEach((b) => (b.onclick = async () => {
     const r = await dialog({ title: "Review document", body: html`<fieldset class="stack sm" style="border:0;padding:0"><legend class="sr-only">Decision</legend>
         <label class="check"><input type="radio" name="decision" value="Accepted" checked> Accept</label>
@@ -318,6 +330,56 @@ export function wireUploads(root, onDone) {
     const res = await act("document.review", { id: b.dataset.review, decision: r.values.decision, reason: r.values.reason }, { success: "Document review recorded." });
     if (res) onDone && onDone();
   }));
+}
+
+// DEMO MOCK MODE — fill empty form fields with format-appropriate dummy values and
+// dispatch input/change so the RecordForm write-through bind picks them up. Leaves
+// fields the user already typed untouched; skips combos (ids must be real).
+function fireInput(el) {
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+}
+function sampleValue(el) {
+  const name = (el.name || "").toLowerCase();
+  const kind = el.dataset.kind;
+  if (kind === "money") return name.includes("premium") ? "185000" : "250000";
+  if (kind === "int") return name.includes("head") || name.includes("principal") || name.includes("member") ? "120" : "25";
+  const t = el.type;
+  if (t === "email") return "demo.contact@example.com";
+  if (t === "tel") return "+63 2 8123 4567";
+  if (t === "number") return "100";
+  if (t === "date") { const d = new Date(); return d.toISOString().slice(0, 10); }
+  if (name.includes("tin")) return "000-123-456-789";
+  if (name.includes("email")) return "demo.contact@example.com";
+  if (name.includes("phone") || name.includes("mobile") || name.includes("contactno")) return "+63 917 123 4567";
+  if (name.includes("name")) return "Demo Sample Corporation";
+  if (name.includes("address")) return "123 Ayala Avenue, Makati City";
+  if (name.includes("city")) return "Makati City";
+  if (name.includes("note") || name.includes("remark") || name.includes("reason") || name.includes("comment")) return "Demo sample entry for mock walkthrough.";
+  return "Sample " + (el.name || "value");
+}
+export function fillSampleData(root) {
+  let n = 0;
+  root.querySelectorAll("input, select, textarea").forEach((el) => {
+    if (el.disabled || el.readOnly || !el.name) return;
+    if (el.type === "file" || el.type === "hidden" || el.type === "radio") return;
+    if (el.closest("[data-combo]") || el.dataset.combo) return; // combos need real option ids
+    if (el.type === "checkbox") { if (!el.checked) { el.checked = true; fireInput(el); n++; } return; }
+    if (el.tagName === "SELECT") {
+      if (!el.value || el.selectedIndex <= 0) {
+        const opt = Array.from(el.options).find((o) => o.value && !o.disabled);
+        if (opt) { el.value = opt.value; fireInput(el); n++; }
+      }
+      return;
+    }
+    if (el.value && el.value.trim()) return; // don't overwrite the user's own input
+    el.value = sampleValue(el);
+    fireInput(el);
+    n++;
+  });
+  if (n) toast(`Filled ${n} empty field${n === 1 ? "" : "s"} with sample data.`, "ok");
+  else toast("Nothing to fill — all fields already have values.", "info");
+  return n;
 }
 
 // ---------------------------------------------------------------- stage progress

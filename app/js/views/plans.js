@@ -1,4 +1,4 @@
-import { html, raw, api, state, act, userName, fmtDate, fmtDateTime, dialog, money, showError, toast, prefs, esc, messageDialog, ApiErr } from "../core.js";
+import { html, raw, api, state, act, userName, fmtDate, fmtDateTime, dialog, money, showError, toast, prefs, esc, messageDialog, ApiErr, DEMO_BYPASS } from "../core.js";
 import { icon, pill, field, mountCombos, mountProviders, controlValue } from "../components.js";
 import { ownerBanner } from "./case.js";
 import { importFlow } from "./quotation.js";
@@ -21,7 +21,7 @@ export async function render(ctx) {
     <section class="panel"><div class="ph"><div><h2>Plan Codes</h2><div class="tiny">Account Services is the maker; a different Account Services user is the checker. Approved versions are kept for date-of-service adjudication.
       Payment-mode decoupling: <b>${state.meta.config.decouplePaymentMode ? "on" : "off"}</b> <span class="tag pending">configurable (OQ-05)</span> · VAT model: <b>${state.meta.config.vatModel}</b> <span class="tag pending">no formula applied</span></div></div>
       ${isAS ? html`<div class="row"><button class="btn primary" id="add">${icon("plus", 14)} Add Plan Code</button><button class="btn" id="gen">Generate from approved SOB</button>
-        <button class="btn" id="imp">${icon("upload", 14)} Bulk import</button><a class="btn" href="/api/templates/plan-codes.csv" download>Template</a></div>` : ""}</div>
+        <button class="btn" id="imp">${icon("upload", 14)} Bulk import</button><a class="btn" href="/api/templates/plan-codes.csv" download>Template</a>${DEMO_BYPASS ? html`<button class="btn ghost" id="impSample" title="Import a few generated demo plan codes">Add sample plan codes</button>` : ""}</div>` : ""}</div>
     <div class="views" role="tablist" aria-label="Status" id="stTabs"></div>
     <div class="toolbar"><div class="search">${icon("search", 16)}<label class="sr-only" for="pq">Search Plan Codes</label><input id="pq" type="search" value="${st.q}" placeholder="Plan Code, description, position, provider code"></div>
       <label class="sr-only" for="pa">Account</label><select id="pa" class="inp" style="width:auto"><option value="">All accounts</option>${accountOpts.map((o) => html`<option value="${o.value}" ${st.account === o.value ? "selected" : ""}>${o.label}</option>`)}</select>
@@ -192,6 +192,10 @@ export async function render(ctx) {
     await partial(`Import ${imp.filename}`, out.created, out.failed, `${((performance.now() - t0) / 1000).toFixed(1)} s`);
     st.status = "Draft"; load();
   }));
+  body.querySelector("#impSample")?.addEventListener("click", async (e) => {
+    const out = await act("planCode.sample", { caseId: id }, { button: e.currentTarget, quiet: true });
+    if (out) { toast(`${out.created.length} sample Plan Code(s) created on ${out.accountCode}.`, "ok"); st.status = "Draft"; load(); }
+  });
   body.querySelector("#bulk").addEventListener("click", async (e) => {
     const b = e.target.closest("[data-b]");
     if (!b) return;

@@ -1,6 +1,7 @@
 import { html, raw, api, state, act, roleLabel, userName, industryName, interName, fmtDate, fmtDateTime, dueHtml, money, int, go, dialog, toast, can, esc, daysUntil,
-  RecordForm, saveStateHtml, flushForms, disposeForms } from "../core.js";
+  RecordForm, saveStateHtml, flushForms, disposeForms, confirmDialog, DEMO_BYPASS } from "../core.js";
 import { icon, pill, stageBar, ownerText, docRow, wireUploads, field, mountCombos, controlValue } from "../components.js";
+import { switchUser } from "../main.js";
 
 export const TABS = [
   { key: "overview", label: "Overview" },
@@ -43,7 +44,8 @@ export async function render(main, { parts, query, force }) {
         <div class="refs"><span>Case <b>${s.id}</b></span><span>Lead ${s.leadRef}</span>${s.franchiseCode ? html`<span>Franchise ${s.franchiseCode}</span>` : ""}${s.maCode ? html`<span>MA Code ${s.maCode}</span>` : ""}
           <span>Stage ${s.stage}. ${s.stageLabel}</span></div></div>
       <div class="row"><button class="btn" id="docsBtn">${icon("file", 16)} Documents <span class="pill neutral plain">${data.documents.filter((d) => !d.supersededBy).length}</span></button>
-        <button class="btn" id="histBtn">${icon("history", 16)} History</button></div>
+        <button class="btn" id="histBtn">${icon("history", 16)} History</button>
+        ${DEMO_BYPASS ? html`<button class="btn ghost danger" id="delCaseBtn" title="Permanently delete this case and its company (demo only)">Delete case</button>` : ""}</div>
     </div>
     <details class="case-details" ${raw(localStorage.getItem("hms-pref:caseDetailsOpen") === "true" ? "open" : "")}><summary>View case details</summary>${caseDetails(data)}</details>
     <nav class="tabs" aria-label="Case sections">${TABS.map((t) => html`<a href="#/case/${id}/${t.key}" ${t.key === tab ? raw('aria-current="page"') : ""}>${t.label}${tabHasTask(t.key) ? html`<span class="mark" title="Has a task for you"></span><span class="sr-only">(has a task for you)</span>` : ""}</a>`)}</nav>
@@ -51,6 +53,16 @@ export async function render(main, { parts, query, force }) {
   main.querySelector(".case-details").addEventListener("toggle", (e) => localStorage.setItem("hms-pref:caseDetailsOpen", e.target.open));
   main.querySelector("#docsBtn").onclick = () => documentsDrawer(ctx);
   main.querySelector("#histBtn").onclick = () => historyDrawer(ctx);
+  main.querySelector("#delCaseBtn")?.addEventListener("click", async (e) => {
+    const ok = await confirmDialog("Delete this case?",
+      html`This permanently removes <b>${s.company}</b> — the case, every linked record (franchise, proposals, contract, account, plan codes) and all uploaded documents. The company record is removed too if no other case uses it.<br><br>This cannot be undone and is intended for resetting the demo.`,
+      { confirm: "Delete permanently", kind: "danger" });
+    if (!ok) return;
+    const b = e.currentTarget; b.setAttribute("aria-busy", "true"); b.disabled = true;
+    const r = await act("case.delete", { caseId: id }, { button: b, success: `Deleted ${s.company}.` });
+    if (r) { if (!(await flushForms())) return; disposeForms(); go("#/new-business"); }
+    else { b.removeAttribute("aria-busy"); b.disabled = false; }
+  });
   const el = main.querySelector("#tab");
   ctx.el = el;
   if (tab === "overview") return overview(ctx);
@@ -87,6 +99,16 @@ function overview(ctx) {
   const n = s.next;
   const others = s.tasks.filter((t) => t !== n && t.key !== n?.key);
   const mine = n && s.myTasks.some((t) => t.key === n.key);
+  // Who should take the next step? Suggest the assignee, else the first demo user
+  // in that role — so the person driving the demo knows which user to switch to.
+  const suggested = (() => {
+    if (!DEMO_BYPASS || !n || mine || n.waiting === "client") return null;
+    const uid = n.assigneeId || state.meta.users.find((u) => u.role === n.role)?.id;
+    if (!uid || uid === state.me.id) return null;
+    const u = state.meta.users.find((x) => x.id === uid);
+    return u ? { id: u.id, name: u.name, role: u.role } : null;
+  })();
+  state.suggestedUser = suggested;
   const min = state.meta.config.corporateMinPrincipals;
   const below = c.estHeadcount != null && c.estHeadcount < min;
   el.innerHTML = html`<div class="home-grid">
@@ -98,7 +120,8 @@ function overview(ctx) {
             <span>Due: <b>${dueHtml(n.due)}</b></span>${mine ? html`<span class="pill info plain">Your task</span>` : ""}</div>
           ${s.blocker ? html`<div class="note warn mt">${icon("alert", 14)} <b>Blocker:</b> ${s.blocker}</div>` : ""}
           <div class="row mt"><a class="btn ${mine ? "primary" : ""}" href="${n.link}">${mine ? "Go to task" : "Open"} ›</a>
-            ${!mine ? html`<span class="tiny">${n.waiting ? "Waiting - no action from you is needed now." : `This step belongs to ${ownerText(n)}. You can view it; editing is limited to that role.`}</span>` : ""}</div></section>`
+            ${suggested ? html`<button type="button" class="btn primary blink-switch" id="switchNext">Switch to ${suggested.name} (${roleLabel(suggested.role)})</button>` : ""}
+            ${!mine ? html`<span class="tiny">${suggested ? html`To continue, switch to <b>${suggested.name}</b> and open the task.` : n.waiting ? "Waiting - no action from you is needed now." : `This step belongs to ${ownerText(n)}. You can view it; editing is limited to that role.`}</span>` : ""}</div></section>`
       : html`<div class="next-card"><h2>No open work</h2></div>`}
       ${others.length ? html`<section class="panel"><div class="ph"><h2>Other open work in parallel (${others.length})</h2></div><div class="pb flush"><div class="tbl-wrap"><table class="tbl compact">
         <caption class="sr-only">Parallel tasks</caption><thead><tr><th scope="col">Task</th><th scope="col">Owner</th><th scope="col">Due</th></tr></thead><tbody>
@@ -108,6 +131,12 @@ function overview(ctx) {
       <section class="panel"><div class="ph"><h2>Recent activity</h2><button class="btn ghost sm" id="allHist">Full history</button></div><div class="pb" id="recent"><div class="skeleton"></div></div></section>
     </div>
     <div class="stack">${leadPanel(ctx, below)}${activities(c)}</div></div>`.s;
+  if (suggested) document.getElementById("whoBtn")?.classList.add("blink-switch");
+  el.querySelector("#switchNext")?.addEventListener("click", async (e) => {
+    const b = e.currentTarget; b.setAttribute("aria-busy", "true"); b.disabled = true;
+    const ok = await switchUser(suggested.id);
+    if (ok) go(n.link); else { b.removeAttribute("aria-busy"); b.disabled = false; }
+  });
   el.querySelector("#allHist").onclick = () => historyDrawer(ctx);
   api(`cases/${id}/history?limit=8`).then((h) => {
     const box = el.querySelector("#recent");

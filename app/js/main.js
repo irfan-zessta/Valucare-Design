@@ -181,24 +181,39 @@ function renderShell() {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && app.classList.contains("drawer-open")) { closeDrawer(); menuBtn.focus(); } });
   document.getElementById("qsearch").onsubmit = (e) => { e.preventDefault(); const q = document.getElementById("qs").value.trim(); go(`#/new-business?q=${encodeURIComponent(q)}&view=all`); };
   document.getElementById("whoBtn").onclick = (e) => userMenu(e.currentTarget);
+  if (state.suggestedUser?.id && state.suggestedUser.id !== me.id) document.getElementById("whoBtn").classList.add("blink-switch");
   refreshCounts();
 }
 
-async function userMenu(btn) {
-  const r = await dialog({
-    title: "Switch demo user",
-    body: html`<p class="muted">You are <b>${state.me.name}</b> (${roleLabel(state.me.role)}). Switching user keeps your place; unsaved changes are saved first.</p>
-      <div class="field mt"><label for="sw">Sign in as</label><select id="sw" name="user" class="inp">${state.meta.users.map((u) => html`<option value="${u.id}" ${u.id === state.me.id ? "selected" : ""}>${u.name} - ${roleLabel(u.role)}${u.team ? " (" + u.team + ")" : ""}</option>`)}</select></div>`,
-    actions: [{ label: "Sign out", value: "out" }, { label: "Cancel" }, { label: "Switch user", kind: "primary", value: "ok" }],
-  });
-  if (!r || (r.action !== "ok" && r.action !== "out")) return;
-  if (!(await flushForms())) return;
-  if (r.action === "out") { await api("logout", { method: "POST" }); state.me = null; return renderLogin(); }
-  await api("login", { method: "POST", body: { userId: r.values.user } });
+// Perform the real server-side session switch for the demo, then re-render.
+// Exported so screens (e.g. the case overview "Switch to …" cue) can drive it.
+export async function switchUser(userId) {
+  if (!userId || userId === state.me?.id) return false;
+  if (!(await flushForms())) return false;
+  await api("login", { method: "POST", body: { userId } });
   state.me = (await api("me")).user;
+  state.suggestedUser = null; // the cue is resolved once we've switched
   toast(`Signed in as ${state.me.name} (${roleLabel(state.me.role)}).`, "ok");
   renderShell();
   route(true);
+  return true;
+}
+
+async function userMenu(btn) {
+  const sug = state.suggestedUser;
+  const r = await dialog({
+    title: "Switch demo user",
+    body: html`<p class="muted">You are <b>${state.me.name}</b> (${roleLabel(state.me.role)}). Switching user keeps your place; unsaved changes are saved first.</p>
+      ${sug && sug.id && sug.id !== state.me.id ? html`<p class="note info mt">Next step needs <b>${sug.name}</b> (${roleLabel(sug.role)}). It's pre-selected below.</p>` : ""}
+      <div class="field mt"><label for="sw">Sign in as</label><select id="sw" name="user" class="inp">${state.meta.users.map((u) => {
+        const pick = sug && sug.id ? u.id === sug.id : u.id === state.me.id;
+        return html`<option value="${u.id}" ${pick ? "selected" : ""}>${sug && u.id === sug.id ? "➜ " : ""}${u.name} - ${roleLabel(u.role)}${u.team ? " (" + u.team + ")" : ""}${sug && u.id === sug.id ? " — suggested next" : ""}</option>`;
+      })}</select></div>`,
+    actions: [{ label: "Sign out", value: "out" }, { label: "Cancel" }, { label: "Switch user", kind: "primary", value: "ok" }],
+  });
+  if (!r || (r.action !== "ok" && r.action !== "out")) return;
+  if (r.action === "out") { if (!(await flushForms())) return; await api("logout", { method: "POST" }); state.me = null; return renderLogin(); }
+  await switchUser(r.values.user);
 }
 
 export async function refreshCounts() {

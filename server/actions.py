@@ -2,6 +2,7 @@
 version binding and gates here - never only in the UI."""
 import copy
 import datetime as dt
+import os
 
 from . import meta, pdf, providers, members
 from .domain import (Bundle, ApiError, DEMO_BYPASS, account_gates, add_workdays, compare_benefits, config, derive, iso,
@@ -413,6 +414,36 @@ def case_log_activity(s, ctx, p):
                  "byName": ctx.user["name"], "at": ctx.now_iso()})
     _set(s, ctx, c, {"activities": acts}, "lead.activity", reason=f"{p['kind']}: {p['notes'][:80]}")
     return {}
+
+
+@action("case.delete", None if DEMO_BYPASS else ["sm"])
+def case_delete(s, ctx, p):
+    """Demo housekeeping: permanently remove a case, all its linked records and
+    documents, and its company when no other case references it. Not part of the
+    real workflow - exposed only so the mock can be reset to a clean slate."""
+    c = s.store.must(p["caseId"], "case")
+    if not visible_case(ctx, c) and not DEMO_BYPASS:
+        raise ApiError(403, "forbidden", "This case belongs to another Account Manager's portfolio.")
+    reason = (p.get("reason") or "").strip() or "Demo: case and company removed."
+    company_id = c.get("companyId")
+    recs = s.store.list_case(c["id"]) + s.store.list("planCode", c["id"])
+    for r in recs:
+        if r.get("type") == "document":
+            try:
+                os.remove(s.store.file_path(r["id"]))
+            except OSError:
+                pass
+    for r in recs:
+        if r["id"] != c["id"]:
+            s.store.delete(r, ctx, "case.delete", reason=reason)
+    s.store.delete(c, ctx, "case.delete", reason=reason)
+    removed_company = False
+    if company_id and not [x for x in s.store.list("case") if x.get("companyId") == company_id]:
+        co = s.store.get(company_id)
+        if co:
+            s.store.delete(co, ctx, "company.delete", reason=reason)
+            removed_company = True
+    return {"deletedCase": c["id"], "deletedCompany": removed_company, "company": company_id}
 
 
 # ======================================================================== franchise
@@ -1879,7 +1910,7 @@ def _pc_validate(s, pc):
 def _pc_account_ok(s, account_id):
     acc = s.store.must(account_id, "account")
     par = acc if not acc.get("parentId") else s.store.get(acc["parentId"])
-    if par.get("status") not in ("Approved", "Scheduled", "Active"):
+    if par.get("status") not in ("Approved", "Scheduled", "Active") and not DEMO_BYPASS:
         raise ApiError(409, "gate", "Plan Codes are created only after the account is approved (BR-12).")
     return acc
 
@@ -1898,12 +1929,13 @@ def _sob_of_account(s, acc):
 
 def _pc_insert(s, ctx, acc, fields, action_name="planCode.create", reason=None):
     sob = _sob_of_account(s, acc)
-    if not sob or sob.get("status") not in ("Approved", "Client Signed", "Codified"):
+    if (not sob or sob.get("status") not in ("Approved", "Client Signed", "Codified")) and not DEMO_BYPASS:
         raise ApiError(409, "gate", "Plan Codes are generated from an approved SOB. The SOB for this account is not approved yet.")
     code = _pc_next_code(s, acc)
     rec = {k: fields.get(k) for k in PC_KEYS}
     rec.update(planCode=code, seriesId=code, accountId=acc["id"], accountCode=acc["accountCode"],
-               accountName=acc["accountInfo"].get("accountName"), sobId=sob["id"], sobVersion=sob["version"], status="Draft",
+               accountName=acc["accountInfo"].get("accountName"), sobId=sob["id"] if sob else None,
+               sobVersion=sob["version"] if sob else None, status="Draft",
                statusAt=ctx.now_iso(), pcVersion=1, makerId=None, corporIfg="CORPORATE")
     for k in ("hospitalCodes", "clinicCodes"):
         if isinstance(rec.get(k), str):
@@ -2154,6 +2186,30 @@ def pc_import_commit(s, ctx, p):
     s.store.audit(ctx, "planCode.bulkImport", "import", imp["id"], imp["caseId"], 1,
                   [{"field": "result", "from": None, "to": f"{len(created)} created, {len(failed)} failed"}], imp.get("filename"), imp.get("docId"))
     return {"created": len(created), "failed": failed}
+
+
+@action("planCode.sample", None if DEMO_BYPASS else ["as"])
+def pc_sample(s, ctx, p):
+    """Demo helper: create a couple of ready-made draft Plan Codes on the case's
+    account so the flow can be walked without hand-entering every field."""
+    c = _case(s, ctx, p["caseId"])
+    accounts = s.store.list("account", c["id"])
+    acc = next((a for a in accounts if not a.get("parentId")), None) or (accounts[0] if accounts else None)
+    if not acc:
+        raise ApiError(409, "no_account", "Create the account first - Plan Codes attach to an account.")
+    src = (acc.get("agentInfo") or {}).get("businessSource") or "Direct"
+    eff = (acc.get("contractInfo") or {}).get("effectivityDate") or _today().isoformat()
+    base = {"businessSource": src, "modeOfPayment": "Annual", "civilStatus": "Any", "vatInclusive": False,
+            "vatDesc": "VAT 12%", "hospitalCodes": [], "clinicCodes": [], "dentalRemarks": "None",
+            "remarks": "Demo sample Plan Code.", "contractYear": _today().year, "effectiveFrom": eff}
+    samples = [
+        {**base, "planType": "CORP-STD", "mbl": 200000, "mblDescription": "Standard inpatient - MBL 200,000",
+         "roomType": "Semi-private", "roomLimit": 3000, "memberType": "Principal", "beforeVat": 16518, "vatAmount": 1982, "premium": 18500},
+        {**base, "planType": "CORP-DEP", "mbl": 150000, "mblDescription": "Dependent inpatient - MBL 150,000",
+         "roomType": "Ward", "roomLimit": 2000, "memberType": "Dependent", "beforeVat": 12679, "vatAmount": 1521, "premium": 14200},
+    ]
+    created = [_pc_insert(s, ctx, acc, f, "planCode.sample", reason="Demo sample Plan Code")["id"] for f in samples]
+    return {"created": created, "accountCode": acc["accountCode"]}
 
 
 # ======================================================================== COC / commission

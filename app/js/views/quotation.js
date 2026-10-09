@@ -1,5 +1,5 @@
 import { html, raw, api, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, money, dialog, toast, RecordForm, saveStateHtml, pickFile,
-  showError, upload, docUrl, clone, int, confirmDialog, esc } from "../core.js";
+  showError, upload, docUrl, clone, int, confirmDialog, esc, fileOrSample } from "../core.js";
 import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, simNote } from "../components.js";
 import { subnav, ownerBanner } from "./case.js";
 import { linesTable, wireLines, addLine, comparisonTable } from "./lines.js";
@@ -102,8 +102,8 @@ function tor(ctx) {
 }
 
 // generic import with preview + error report
-export async function importFlow(ctx, kind, onCommit, accept = ".csv,.xlsx") {
-  const f = await pickFile(accept);
+export async function importFlow(ctx, kind, onCommit, accept = ".csv,.xlsx", preFile = null) {
+  const f = preFile || await pickFile(accept);
   if (!f) return;
   toast(`Reading ${f.name}…`);
   let r;

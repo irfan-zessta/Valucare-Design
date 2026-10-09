@@ -316,6 +316,39 @@ export function pickFile(accept = "") {
 }
 export const docUrl = (id, inline = false) => `/api/documents/${id}/download${inline ? "?inline=1" : ""}`;
 
+// DEMO MOCK MODE — generate a format-appropriate dummy file so every upload point
+// can be exercised without a real document on hand. Mirrors DEMO_BYPASS.
+function pdfBytes(text = "Sample document") {
+  const line = String(text).replace(/[\\()]/g, (c) => "\\" + c).slice(0, 80);
+  const objs = [
+    "<</Type/Catalog/Pages 2 0 R>>",
+    "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+    "<</Type/Page/Parent 2 0 R/MediaBox[0 0 380 150]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>",
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+  ];
+  const stream = `BT /F1 16 Tf 24 100 Td (${line}) Tj 0 -30 Td /F1 10 Tf (HMS3 demo sample - not a real document.) Tj ET`;
+  objs.push(`<</Length ${stream.length}>>\nstream\n${stream}\nendstream`);
+  let pdf = "%PDF-1.4\n";
+  const offsets = [];
+  objs.forEach((body, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${body}\nendobj\n`; });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  offsets.forEach((o) => { pdf += String(o).padStart(10, "0") + " 00000 n \n"; });
+  pdf += `trailer\n<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`;
+  return pdf;
+}
+const PLAN_CODE_CSV = "planCode,mblDescription,memberType,modeOfPayment,premium\n" +
+  "DEMO-PC-001,Standard Inpatient,Principal,Annual,18500\n" +
+  "DEMO-PC-002,Standard Inpatient,Dependent,Annual,14200\n" +
+  "DEMO-PC-003,Premium Inpatient + OP,Principal,Semi-Annual,26750\n";
+export function sampleFile(name = "sample.pdf", label = "Sample document") {
+  if (name.toLowerCase().endsWith(".csv")) return new File([PLAN_CODE_CSV], name, { type: "text/csv" });
+  return new File([pdfBytes(label)], name, { type: "application/pdf" });
+}
+export function fileOrSample(fileList, name = "sample.pdf", label = "Sample document") {
+  return fileList && fileList.length ? fileList[0] : sampleFile(name, label);
+}
+
 // ---------------------------------------------------------------- record form (reliable saving)
 // Tracks a draft against the server version; autosaves; backs up locally;
 // resolves concurrent edits field-by-field instead of overwriting silently.

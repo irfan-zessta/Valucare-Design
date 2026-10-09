@@ -1,4 +1,4 @@
-import { html, raw, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, docUrl, DEMO_BYPASS } from "../core.js";
+import { html, raw, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, docUrl, DEMO_BYPASS, fileOrSample } from "../core.js";
 import { icon, pill, field, controlValue, docSlot, wireUploads, simNote } from "../components.js";
 
 export async function render(ctx) {
@@ -122,7 +122,7 @@ function kycBlock(ctx, k, am) {
       actions: [{ label: "Cancel" }, { label: "Resolve", kind: "primary", value: "ok", validate: (v) => (!v.resolution.trim() || !v.file?.length ? "Resolution and evidence are required." : null) }] });
     if (r?.action !== "ok") return;
     try {
-      const up = await upload(r.values.file[0], { caseId: ctx.id, linkedType: "kyc", linkedId: k.id, slot: "kyc_flag" });
+      const up = await upload(fileOrSample(r.values.file, "kyc-evidence.pdf", "KYC flag evidence"), { caseId: ctx.id, linkedType: "kyc", linkedId: k.id, slot: "kyc_flag" });
       if (await act("kyc.resolveFlag", { id: k.id, flagId: b.dataset.resolve, resolution: r.values.resolution, evidenceDocId: up.document.id }, { button: b, success: "Flag resolved. Record the final result to clear KYC." })) ctx.reload();
     } catch (e) { showError(e); }
   }));
@@ -166,7 +166,7 @@ async function borChange(ctx, b) {
     actions: [{ label: "Cancel" }, { label: "Record BOR change", kind: "primary", value: "ok", validate: (v) => (!v.intermediaryId || !v.signatory || !v.effectiveDate || !v.file?.length ? "All fields and the letter are required." : null) }] });
   if (r?.action !== "ok") return;
   try {
-    const up = await upload(r.values.file[0], { caseId: ctx.id, linkedType: "case", linkedId: ctx.id, slot: "bor_letter" });
+    const up = await upload(fileOrSample(r.values.file, "bor-letter.pdf", "BOR letter"), { caseId: ctx.id, linkedType: "case", linkedId: ctx.id, slot: "bor_letter" });
     if (await act("aor.change", { caseId: ctx.id, intermediaryId: r.values.intermediaryId, signatory: r.values.signatory, effectiveDate: r.values.effectiveDate, letterDocId: up.document.id }, { button: b, success: "BOR change recorded." })) ctx.reload();
   } catch (e) { showError(e); }
 }
