@@ -13,6 +13,16 @@ SYSTEM_USER = {"id": "system", "name": "HMS scheduler", "role": "system", "team"
 USERS = {u["id"]: u for u in meta.USERS}
 SIM_NOTE = "Simulated - no email service connected; not delivered"
 
+# DEMO MOCK MODE --------------------------------------------------------------
+# This prototype is a click-through demo, not the production system. When True,
+# the workflow stops blocking you: mandatory-field checks, status-order checks,
+# maker-checker segregation, version-staleness checks and the big account/
+# activation gates all pass, so you can walk a case through every stage on your
+# own and approvals go through instantly. Set to False to restore real HMS3
+# enforcement (every rule lives in domain.py / actions.py and is re-activated
+# by this one switch).
+DEMO_BYPASS = True
+
 
 # ------------------------------------------------------------------ context
 class Ctx:
@@ -113,11 +123,15 @@ def require_role(ctx, *roles):
 
 
 def require_not_maker(ctx, maker_id, what="record"):
+    if DEMO_BYPASS:
+        return  # demo: let the same person approve their own work
     if maker_id and maker_id == ctx.uid:
         raise ApiError(403, "same_maker", f"You prepared this {what}. A different authorized person must review it (maker-checker).")
 
 
 def require_status(rec, *statuses, what=None):
+    if DEMO_BYPASS:
+        return  # demo: allow out-of-order transitions
     if rec.get("status") not in statuses:
         raise ApiError(409, "invalid_state",
                        f"{what or rec['type']} is '{rec.get('status')}'. This action needs: {', '.join(statuses)}.")
@@ -372,7 +386,7 @@ def account_gates(b, cfg):
     onb = onboarding_status(b, cfg)
     missing = [i["label"] for i in onb if i["mandatory"] and i["status"] not in ("Received", "Waived")]
     L = lambda tab: f"#/case/{case_id}/{tab}"
-    return [
+    gates = [
         gate("pricing", "Final pricing approved by Senior Management", approved_pricing, "senior", L("quotation/proposal"),
              "" if approved_pricing else "Senior Management has not approved the current proposal version."),
         gate("accepted", "Client accepted the proposal", accepted, "am", L("quotation/negotiation"),
@@ -384,6 +398,17 @@ def account_gates(b, cfg):
         gate("docs", "Mandatory onboarding documents received or waived", not missing, "am", L("contract#onboarding"),
              ("Missing: " + ", ".join(missing)) if missing else ""),
     ]
+    if DEMO_BYPASS:
+        gates = _demo_pass_gates(gates)
+    return gates
+
+
+def _demo_pass_gates(gates):
+    """Demo: mark every gate satisfied so creation/activation is never blocked."""
+    for g in gates:
+        g["ok"], g["blocker"] = True, None
+        g["detail"] = (g.get("detail") or "") and (g["detail"] + " (demo: gate bypassed)")
+    return gates
 
 
 def readiness(b, cfg):
@@ -435,6 +460,8 @@ def readiness(b, cfg):
         gate("billing", "Billing setup completed", bool(bill and bill.get("status") == "Completed"), "bc", L("setup/billing"),
              f"Billing is '{(bill or {}).get('status', 'not started')}'."),
     ]
+    if DEMO_BYPASS:
+        items = _demo_pass_gates(items)
     return items
 
 

@@ -4,8 +4,8 @@ import copy
 import datetime as dt
 
 from . import meta, pdf, providers, members
-from .domain import (Bundle, ApiError, account_gates, add_workdays, compare_benefits, config, derive, iso, ma_code,
-                     name_similarity, next_id, norm_addr, norm_tin, notify, num, onboarding_status, parse_date,
+from .domain import (Bundle, ApiError, DEMO_BYPASS, account_gates, add_workdays, compare_benefits, config, derive, iso,
+                     ma_code, name_similarity, next_id, norm_addr, norm_tin, notify, num, onboarding_status, parse_date,
                      readiness, reduced_codes, require_not_maker, require_role, require_status, user_name, valid_email,
                      valid_tel, visible_case, USERS)
 
@@ -70,6 +70,8 @@ def _set(s, ctx, rec, changes, action_name, reason=None, base=None, doc_id=None,
 
 
 def _check_version(rec, reviewed):
+    if DEMO_BYPASS:
+        return  # demo: never block a decision on a stale/missing reviewed version
     if reviewed is None:
         raise ApiError(400, "missing_version", "The reviewed version is required for this decision.")
     if int(reviewed) != rec["v"]:
@@ -79,6 +81,8 @@ def _check_version(rec, reviewed):
 
 
 def _need(p, *keys, msg=None):
+    if DEMO_BYPASS:
+        return  # demo: mandatory fields never block advancing
     missing = [k for k in keys if p.get(k) in (None, "", [])]
     if missing:
         raise ApiError(422, "validation", msg or f"Required: {', '.join(missing)}.",
@@ -260,17 +264,23 @@ def case_create(s, ctx, p):
     lead = p.get("lead") or {}
     channel = lead.get("channel")
     if channel not in ("Direct", "Agent", "Broker"):
-        raise ApiError(422, "validation", "Choose the business source: Direct, Agent or Broker.", {"fields": [{"field": "channel", "message": "Required."}]})
+        if DEMO_BYPASS:
+            channel = "Direct"  # demo: default business source so the case can be created
+        else:
+            raise ApiError(422, "validation", "Choose the business source: Direct, Agent or Broker.", {"fields": [{"field": "channel", "message": "Required."}]})
     err = _intermediary_ok(s, lead.get("intermediaryId"), channel)
-    if err:
+    if err and not DEMO_BYPASS:
         raise ApiError(422, "validation", err, {"fields": [{"field": "intermediaryId", "message": err}]})
     if ctx.role == "am":
         owner = ctx.uid
     else:
         owner = lead.get("ownerId")
         if not owner or USERS.get(owner, {}).get("role") != "am":
-            raise ApiError(422, "validation", "Choose the Account Manager who will own this case.", {"fields": [{"field": "ownerId", "message": "Required."}]})
-    if not lead.get("leadSource"):
+            if DEMO_BYPASS:
+                owner = owner if USERS.get(owner, {}).get("role") == "am" else next((u["id"] for u in meta.USERS if u["role"] == "am"), ctx.uid)
+            else:
+                raise ApiError(422, "validation", "Choose the Account Manager who will own this case.", {"fields": [{"field": "ownerId", "message": "Required."}]})
+    if not lead.get("leadSource") and not DEMO_BYPASS:
         raise ApiError(422, "validation", "Lead source is required.", {"fields": [{"field": "leadSource", "message": "Required."}]})
     override = None
     if p.get("companyId"):
@@ -287,12 +297,20 @@ def case_create(s, ctx, p):
                            f"{co['registeredName']} is already an account ({live[0]['maCode']}). Renewal and account maintenance are outside Corporate New Business.")
     else:
         nc = p.get("newCompany") or {}
+        if DEMO_BYPASS:
+            # Fill any missing company fields with safe placeholders so a case can
+            # always be created without completing the form.
+            prov = nc.get("province") if nc.get("province") in meta.GEO else next(iter(meta.GEO))
+            cities = meta.GEO[prov]["cities"]
+            nc = {**nc, "registeredName": nc.get("registeredName") or "Demo Company",
+                  "industry": nc.get("industry") or "Other", "address": nc.get("address") or "N/A",
+                  "province": prov, "city": nc.get("city") if nc.get("city") in cities else (cities[0] if cities else "")}
         _need(nc, "registeredName", "industry", "address", "province", "city",
               msg="Enter the company's registered name, industry, address, province and city.")
-        if nc["city"] not in meta.GEO.get(nc["province"], {}).get("cities", []):
+        if nc["city"] not in meta.GEO.get(nc["province"], {}).get("cities", []) and not DEMO_BYPASS:
             raise ApiError(422, "validation", "The city does not belong to the selected province.", {"fields": [{"field": "city", "message": "Choose a city in the province."}]})
         dups = find_duplicates(s, nc)
-        if dups:
+        if dups and not DEMO_BYPASS:
             ov = p.get("override") or {}
             if not ov:
                 raise ApiError(409, "possible_duplicate", "Possible duplicate company found. Use the existing record, or record an authorized override.",
@@ -443,6 +461,8 @@ def franchise_start(s, ctx, p):
 
 
 def validate_franchise(s, fr):
+    if DEMO_BYPASS:
+        return []  # demo: accept the franchise form as-is
     errs = []
     ai, oi = fr.get("accountInfo", {}), fr.get("otherInfo", {})
     inter = oi.get("businessSource") in ("Agent", "Broker")
@@ -530,14 +550,14 @@ def franchise_submit(s, ctx, p):
         raise ApiError(422, "validation", f"{len(errs)} field(s) need attention before submitting.", {"fields": errs})
     oi = fr["otherInfo"]
     n = num(oi.get("employeeCount")) or 0
-    if n < s.cfg["corporateMinPrincipals"]:
+    if n < s.cfg["corporateMinPrincipals"] and not DEMO_BYPASS:
         raise ApiError(422, "below_minimum", below_min_message(s.cfg, n),
                        {"fields": [{"field": "otherInfo.employeeCount", "message": f"Below the corporate minimum of {s.cfg['corporateMinPrincipals']}."}]})
     channel = oi.get("businessSource")
     err = _intermediary_ok(s, oi.get("businessSourceName"), channel)
-    if err:
+    if err and not DEMO_BYPASS:
         raise ApiError(422, "validation", err, {"fields": [{"field": "otherInfo.businessSourceName", "message": err}]})
-    if channel != "Direct":
+    if channel != "Direct" and not DEMO_BYPASS:
         if not any(_doc_ok(d) for d in _docs(s, fr["id"], "aor_bor")):
             raise ApiError(422, "validation", "Upload the AOR/BOR letter for an intermediary account.",
                            {"fields": [{"field": "docs.aor_bor", "message": "AOR/BOR is required."}]})
@@ -549,7 +569,7 @@ def franchise_submit(s, ctx, p):
                            "Account Services must record a BOR change with the supporting letter and signatory first.")
     conflicts = franchise_conflicts(s, fr)
     blocking = [x for x in conflicts if x["blocking"]]
-    if blocking:
+    if blocking and not DEMO_BYPASS:
         x = blocking[0]
         raise ApiError(409, "franchise_conflict",
                        f"{x['name']} already has franchise {x['franchiseCode']} ({x['status']}, owner {x['ownerName']}, valid until {x['validUntil']}). "
@@ -593,10 +613,10 @@ def franchise_decide(s, ctx, p):
     c = s.store.get(fr["caseId"])
     dec = {"decision": d, "by": ctx.uid, "byName": ctx.user["name"], "at": ctx.now_iso(), "remarks": p.get("remarks", ""), "version": fr["v"]}
     if d == "approve":
-        if fr.get("conflicts") and not p.get("conflictAck"):
+        if fr.get("conflicts") and not p.get("conflictAck") and not DEMO_BYPASS:
             raise ApiError(422, "validation", "Confirm you reviewed the conflicting franchise(s) before approving.",
                            {"fields": [{"field": "conflictAck", "message": "Required."}]})
-        if fr.get("highRisk") and len((p.get("highRiskRemark") or "").strip()) < 5:
+        if fr.get("highRisk") and len((p.get("highRiskRemark") or "").strip()) < 5 and not DEMO_BYPASS:
             raise ApiError(422, "validation", "High-risk industry: an approver remark is required (NB-FRN-03).",
                            {"fields": [{"field": "highRiskRemark", "message": "Required."}]})
         vu = franchise_validity(s, ctx, fr)
@@ -793,7 +813,7 @@ def rr_submit(s, ctx, p):
     mb = b.member_batch("quotation")
     if mb and mb.get("status") == "Has errors":
         errs.append({"field": "memberData", "message": "The quotation Member Data file has validation errors."})
-    if errs:
+    if errs and not DEMO_BYPASS:
         raise ApiError(422, "validation", f"{len(errs)} item(s) need attention before submitting.", {"fields": errs})
     _set(s, ctx, rr, {"status": "Submitted", "submittedBy": ctx.uid, "submittedAt": ctx.now_iso()}, "rateRequest.submit", base=p.get("baseVersion"))
     _set(s, ctx, c, {"pipelineStage": "For Rates Creation"}, "lead.stage")
@@ -878,11 +898,11 @@ def rs_issue(s, ctx, p):
     imp = s.store.must(p["importId"], "import")
     if imp.get("kind") != "rateSheet":
         raise ApiError(400, "bad_request", "Wrong import type.")
-    if imp.get("errors"):
+    if imp.get("errors") and not DEMO_BYPASS:
         raise ApiError(422, "validation", f"The rate sheet has {len(imp['errors'])} row error(s). Correct the file and preview again.")
     a = p.get("assumptions") or {}
     missing = [k for k in ("ibnr", "medicalInflation", "commission", "brokerMargin", "adminLoading") if num(a.get(k)) is None]
-    if missing:
+    if missing and not DEMO_BYPASS:
         raise ApiError(422, "validation", "Record the pricing assumptions (NB-QTE-06): " + ", ".join(missing),
                        {"fields": [{"field": f"assumptions.{k}", "message": "Required number."} for k in missing]})
     b = s.bundle(rr["caseId"])
@@ -1017,7 +1037,7 @@ def _sob_comparison(s, sob):
 def sob_submit(s, ctx, p):
     sob = _sob(s, ctx, p["id"])
     require_status(sob, "Draft", what="SOB")
-    if not sob.get("lines"):
+    if not sob.get("lines") and not DEMO_BYPASS:
         raise ApiError(422, "validation", "Add at least one benefit line.")
     errs = []
     for l in sob["lines"]:
@@ -1032,7 +1052,7 @@ def sob_submit(s, ctx, p):
         just = (by.get(code) or {}).get("justification") or (sob.get("reducedJustifications") or {}).get(code)
         if not (just or "").strip():
             errs.append({"field": f"justification.{code}", "message": f"{code}: coverage is missing or lower than TOR - justification required (BR-10)."})
-    if errs:
+    if errs and not DEMO_BYPASS:
         raise ApiError(422, "validation", f"{len(errs)} item(s) need attention.", {"fields": errs})
     _set(s, ctx, sob, {"status": "Sales Review", "preparedBy": sob.get("preparedBy") or ctx.uid, "returnReason": None,
                        "reducedCount": len(reduced_codes(cmp_))}, "sob.submitReview", content_version=sob["version"])
@@ -1068,13 +1088,13 @@ def sob_validate(s, ctx, p):
     sob = s.store.must(p["id"], "sob")
     require_status(sob, "Independent Validation", what="SOB")
     _check_version(sob, p.get("reviewedVersion"))
-    if ctx.uid in (sob.get("preparedBy"), sob.get("salesReviewBy")):
+    if ctx.uid in (sob.get("preparedBy"), sob.get("salesReviewBy")) and not DEMO_BYPASS:
         raise ApiError(403, "segregation", "The SOB preparer and Sales reviewer cannot be the independent validator (NB-AUD-03).")
     d = p.get("decision")
     ap = sob.get("approvals", []) + [{"stage": "validation", "decision": d, "by": ctx.uid, "byName": ctx.user["name"], "at": ctx.now_iso(),
                                       "remarks": p.get("remarks", ""), "version": sob["version"]}]
     if d == "approve":
-        if sob.get("reducedCount") and not p.get("overrideAck"):
+        if sob.get("reducedCount") and not p.get("overrideAck") and not DEMO_BYPASS:
             raise ApiError(422, "validation", "This SOB has coverage below the TOR. Confirm the approval override with its justifications (NB-SOB-08).",
                            {"fields": [{"field": "overrideAck", "message": "Required."}]})
         _set(s, ctx, sob, {"status": "Approved", "validatedBy": ctx.uid, "approvedAt": ctx.now_iso(), "approvals": ap}, "sob.validate",
@@ -1248,7 +1268,7 @@ def prop_submit(s, ctx, p):
     for code in reduced:
         if not (just.get(code) or sob_just.get(code) or "").strip():
             errs.append({"field": f"reducedJustifications.{code}", "message": f"{code}: reduced coverage vs TOR needs a documented justification."})
-    if errs:
+    if errs and not DEMO_BYPASS:
         raise ApiError(422, "validation", f"{len(errs)} item(s) need attention before review.", {"fields": errs})
     disc = []
     for it in prop["items"]:
@@ -1271,13 +1291,13 @@ def prop_sm(s, ctx, p):
     _check_version(prop, p.get("reviewedVersion"))
     require_not_maker(ctx, prop.get("submittedBy"), "proposal")
     b, sob = _prop_checks(s, prop)
-    if sob["version"] != prop.get("sobVersion"):
+    if sob["version"] != prop.get("sobVersion") and not DEMO_BYPASS:
         raise ApiError(409, "stale_sob", "The SOB changed after this proposal was submitted. The Account Manager must revise the proposal.")
     d = p.get("decision")
     rec = {"stage": "sm", "decision": d, "by": ctx.uid, "byName": ctx.user["name"], "at": ctx.now_iso(), "remarks": p.get("remarks", ""),
            "version": prop["version"]}
     if d == "approve":
-        if prop.get("reducedCodes") and not p.get("overrideAck"):
+        if prop.get("reducedCodes") and not p.get("overrideAck") and not DEMO_BYPASS:
             raise ApiError(422, "validation", "This proposal reduces coverage below the TOR. Confirm you approve the documented override.",
                            {"fields": [{"field": "overrideAck", "message": "Required."}]})
         _set(s, ctx, prop, {"status": "Sales Manager Approved", "approvals": prop.get("approvals", []) + [rec]}, "proposal.smApprove",
@@ -1419,15 +1439,16 @@ def prop_accept(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     c = _case(s, ctx, prop["caseId"])
     require_status(prop, "Sent", "Under Negotiation", what="Proposal")
-    if not any(a["stage"] == "senior" and a["decision"] == "approve" and a["version"] == prop["version"] for a in prop.get("approvals", [])):
+    if not any(a["stage"] == "senior" and a["decision"] == "approve" and a["version"] == prop["version"] for a in prop.get("approvals", [])) and not DEMO_BYPASS:
         raise ApiError(409, "not_approved", "This version has no Senior Management approval.")
-    _need(p, "docId", "date", msg="Attach the client's acceptance evidence and the acceptance date.")
-    s.store.must(p["docId"], "document")
-    if p.get("acceptedVersion") and int(p["acceptedVersion"]) != prop["version"]:
+    if not DEMO_BYPASS:
+        _need(p, "docId", "date", msg="Attach the client's acceptance evidence and the acceptance date.")
+        s.store.must(p["docId"], "document")
+    if p.get("acceptedVersion") and int(p["acceptedVersion"]) != prop["version"] and not DEMO_BYPASS:
         raise ApiError(409, "stale_review", "The client accepted a different version than the current one.")
-    _set(s, ctx, prop, {"status": "Accepted", "acceptance": {"docId": p["docId"], "date": p["date"], "version": prop["version"],
+    _set(s, ctx, prop, {"status": "Accepted", "acceptance": {"docId": p.get("docId"), "date": p.get("date"), "version": prop["version"],
                                                              "recordedBy": ctx.uid, "recordedAt": ctx.now_iso(), "notes": p.get("notes", "")}},
-         "proposal.accept", doc_id=p["docId"], content_version=prop["version"])
+         "proposal.accept", doc_id=p.get("docId"), content_version=prop["version"])
     _set(s, ctx, c, {"pipelineStage": "Contract"}, "lead.stage")
     return {}
 
@@ -1530,12 +1551,12 @@ def contract_advance(s, ctx, p):
         raise ApiError(403, "forbidden", f"'{nxt['key']}' is recorded by {meta.ROLES[nxt['role']]}.")
     if p.get("baseVersion") is not None and int(p["baseVersion"]) != con["v"]:
         raise ApiError(409, "stale_version", "This contract changed after you opened it. Reload first.", {"current": con})
-    if nxt["key"] in ("Review", "Endorsed"):
+    if nxt["key"] in ("Review", "Endorsed") and not DEMO_BYPASS:
         if not con.get("number"):
             raise ApiError(422, "validation", "Enter the contract number first.", {"fields": [{"field": "number", "message": "Required."}]})
         if not _docs(s, con["id"], "draft"):
             raise ApiError(422, "validation", "Upload the draft contract document first.", {"fields": [{"field": "doc.draft", "message": "Required."}]})
-    if nxt.get("doc") and not any(_doc_ok(d) for d in _docs(s, con["id"], nxt["doc"])):
+    if nxt.get("doc") and not any(_doc_ok(d) for d in _docs(s, con["id"], nxt["doc"])) and not DEMO_BYPASS:
         raise ApiError(422, "validation", f"Upload the {nxt['doc']} {con['kind']} document before recording '{nxt['key']}'.",
                        {"fields": [{"field": f"doc.{nxt['doc']}", "message": "Required."}]})
     ed = parse_date(p.get("eventDate")) or ctx.today()
@@ -1622,7 +1643,7 @@ def doc_review(s, ctx, p):
         raise ApiError(400, "bad_request", "decision must be Accepted or Needs correction.")
     if dec == "Needs correction" and len((p.get("reason") or "").strip()) < 5:
         raise ApiError(422, "validation", "Explain what needs correcting.")
-    if d.get("uploaderId") == ctx.uid:
+    if d.get("uploaderId") == ctx.uid and not DEMO_BYPASS:
         raise ApiError(403, "same_maker", "You uploaded this document; another person must review it.")
     _set(s, ctx, d, {"validation": dec, "correctionReason": p.get("reason") if dec == "Needs correction" else None, "reviewedBy": ctx.uid,
                      "reviewedByName": ctx.user["name"], "reviewedAt": ctx.now_iso()}, "document.review", reason=p.get("reason"), doc_id=d["id"])
@@ -1705,6 +1726,8 @@ def _make_affiliate(s, ctx, case_id, parent, a, i, sob):
 
 
 def validate_account(acc):
+    if DEMO_BYPASS:
+        return []  # demo: accept the account form as-is
     errs = []
     for sec in meta.account_schema():
         vals = acc.get(sec["key"], {})
@@ -1814,6 +1837,8 @@ PC_KEYS = [f[0] for f in meta.PLAN_CODE_FIELDS]
 
 
 def _pc_validate(s, pc):
+    if DEMO_BYPASS:
+        return []  # demo: accept plan codes as-is
     errs = []
     prov = providers.by_code()
     decouple = s.cfg["decouplePaymentMode"]
@@ -2225,7 +2250,7 @@ def comm_submit(s, ctx, p):
         errs.append({"field": "basis", "message": "Choose the basis: Premium or Net."})
     if not parse_date(cm.get("effectiveFrom")):
         errs.append({"field": "effectiveFrom", "message": "Effective date required."})
-    if errs:
+    if errs and not DEMO_BYPASS:
         raise ApiError(422, "validation", "Complete the Commission Rate Form.", {"fields": errs})
     _set(s, ctx, cm, {"status": "For Approval", "makerId": ctx.uid}, "commission.submit", base=p.get("baseVersion"))
     return {}
@@ -2466,7 +2491,7 @@ def billing_submit(s, ctx, p):
             errs.append({"field": "commissionId", "message": "Link the Commission Rate Form (intermediary account)."})
     if bl.get("vatTreatment") in ("VAT exempt", "Zero Rated") and not _docs(s, bl["id"], "vat_doc"):
         errs.append({"field": "vat_doc", "message": "Upload the VAT exemption / zero-rating certificate (BR-23)."})
-    if errs:
+    if errs and not DEMO_BYPASS:
         raise ApiError(422, "validation", f"{len(errs)} item(s) need attention.", {"fields": errs})
     cm = b.one("commission")
     _set(s, ctx, bl, {"status": "For Approval", "makerId": ctx.uid, "commissionId": bl.get("commissionId") or (cm or {}).get("id")}, "billing.submit",
