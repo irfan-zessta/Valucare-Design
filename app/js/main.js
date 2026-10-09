@@ -109,15 +109,6 @@ const SECTIONS = [
   ] },
 ];
 
-// Flat index for the "Search menu" box: every reachable menu name, plus the
-// Renewal/IFG section names so a search for them surfaces the honest note.
-const SEARCH_INDEX = [];
-NAV_PRIMARY.forEach((n) => SEARCH_INDEX.push({ label: n.label, href: n.href }));
-SECTIONS.forEach((sec) => {
-  if (sec.items) sec.items.forEach((it) => SEARCH_INDEX.push({ label: it.label, href: it.href, section: sec.key, context: sec.label }));
-  if (sec.note) SEARCH_INDEX.push({ label: sec.label, note: sec.note, context: sec.label });
-});
-
 // Which primary item / accordion section + item is active for the current route.
 function activeInfo(parts) {
   const p = parts[0];
@@ -153,11 +144,6 @@ function renderShell() {
       ${["am", "sm"].includes(me.role) ? html`<a class="btn primary create-btn" href="#/new-business/create" title="Create New Business">${icon("plus")}<span class="lbl">Create New Business</span></a>` : ""}
       <div class="nav">
         ${NAV_PRIMARY.map(navLink)}
-        <div class="nav-search" role="search">
-          <label class="sr-only" for="navSearch">Search menu</label>${icon("search", 15)}
-          <input id="navSearch" type="search" placeholder="Search menu…" autocomplete="off" aria-controls="navResults">
-        </div>
-        <div id="navResults" class="nav-results hidden" role="region" aria-label="Menu search results" aria-live="polite"></div>
         <div id="navAccordion">${SECTIONS.map((sec) => sectionHtml(sec, openSection === sec.key))}</div>
       </div>
       <div class="spacer"></div>
@@ -192,25 +178,6 @@ function renderShell() {
     if (isOpen) { document.getElementById("acc-" + key).classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); setChev(btn, false); prefs.set("openSection", ""); }
     else openAccordion(key);
   });
-  // Search menu: filters names across all sections without changing the page.
-  const navSearch = document.getElementById("navSearch");
-  const accWrap = document.getElementById("navAccordion");
-  const results = document.getElementById("navResults");
-  const clearSearch = () => { navSearch.value = ""; results.classList.add("hidden"); results.innerHTML = ""; accWrap.classList.remove("hidden"); };
-  navSearch.oninput = () => {
-    const q = navSearch.value.trim().toLowerCase();
-    if (!q) { clearSearch(); return; }
-    accWrap.classList.add("hidden");
-    results.classList.remove("hidden");
-    const hits = SEARCH_INDEX.filter((e) => e.label.toLowerCase().includes(q) || (e.context && e.context.toLowerCase().includes(q)));
-    results.innerHTML = (hits.length
-      ? html`${hits.map((e) => e.href
-          ? html`<a href="${e.href}" class="acc-link res" data-res data-section="${e.section || ""}">${e.label}${e.context ? html`<span class="ctx">${e.context}</span>` : ""}</a>`
-          : html`<div class="acc-note res">${e.label}<span class="ctx">${e.note}</span></div>`)}`
-      : html`<p class="nav-empty">No matching menu</p>`).s;
-  };
-  navSearch.addEventListener("keydown", (e) => { if (e.key === "Escape" && navSearch.value) { e.stopPropagation(); clearSearch(); } });
-  results.addEventListener("click", (e) => { const a = e.target.closest("a[data-res]"); if (!a) return; if (a.dataset.section) openAccordion(a.dataset.section); clearSearch(); });
   const menuBtn = document.getElementById("menuBtn");
   const closeDrawer = () => { app.classList.remove("drawer-open"); menuBtn.setAttribute("aria-expanded", "false"); };
   menuBtn.onclick = () => { app.classList.add("drawer-open"); menuBtn.setAttribute("aria-expanded", "true"); document.querySelector(".sidebar a").focus(); };
