@@ -1,4 +1,4 @@
-import { html, api, state, act, go, roleLabel, industryName, interName, toast, esc, paintFieldErrors, showError, fmtDate } from "../core.js";
+import { html, api, state, act, go, roleLabel, industryName, interName, toast, esc, paintFieldErrors, showError, fmtDate, DEMO_BYPASS } from "../core.js";
 import { icon, field, mountCombos, pill } from "../components.js";
 
 export async function render(main) {
@@ -102,7 +102,7 @@ export async function render(main) {
     form.onsubmit = async (e) => {
       e.preventDefault();
       const errs = [];
-      ["registeredName", "industry", "address", "province", "city"].forEach((k) => { if (!c[k]) errs.push({ field: k, message: "Required." }); });
+      if (!DEMO_BYPASS) ["registeredName", "industry", "address", "province", "city"].forEach((k) => { if (!c[k]) errs.push({ field: k, message: "Required." }); });
       paintFieldErrors(errs, form);
       if (errs.length) { form.querySelector('[aria-invalid="true"]')?.focus(); toast(`${errs.length} required field(s) missing.`, "err"); return; }
       if (s.override?.reason) { s.step = "lead"; draw(); return; }
@@ -129,8 +129,8 @@ export async function render(main) {
     box.querySelectorAll("[data-useco]").forEach((b) => (b.onclick = () => { s.company = s.dups[+b.dataset.useco].company; s.newCompany = null; s.step = "lead"; draw(); }));
     box.querySelector("#ovrBtn")?.addEventListener("click", () => {
       const r = box.querySelector("#ovr").value.trim();
-      if (r.length < 10) { paintFieldErrors([{ field: "ovr", message: "Enter at least 10 characters." }], box); box.querySelector("#ovr").setAttribute("aria-invalid", "true"); box.querySelector("#ovr").focus(); return; }
-      s.override = { reason: r }; s.step = "lead"; draw();
+      if (!DEMO_BYPASS && r.length < 10) { paintFieldErrors([{ field: "ovr", message: "Enter at least 10 characters." }], box); box.querySelector("#ovr").setAttribute("aria-invalid", "true"); box.querySelector("#ovr").focus(); return; }
+      s.override = { reason: r || "Demo: separate company." }; s.step = "lead"; draw();
     });
     box.querySelector(".note").scrollIntoView({ block: "start", behavior: "smooth" });
   }
@@ -163,7 +163,7 @@ export async function render(main) {
     mountCombos(form);
     const warn = () => {
       const n = Number(L.estHeadcount);
-      const below = L.estHeadcount !== "" && L.estHeadcount !== null && !isNaN(n) && n < min;
+      const below = !DEMO_BYPASS && L.estHeadcount !== "" && L.estHeadcount !== null && !isNaN(n) && n < min;
       form.querySelector("#minWarn").innerHTML = below ? html`<div class="note warn mt" role="status"><b>Below the corporate minimum.</b> ${n} principal(s) is fewer than ${min}.
         Corporate New Business needs at least ${min} principals (BR-01). This prospect must be routed to the IFG team, whose application is outside this system.
         You can record the lead and route it to IFG (the lead is closed here with the reason), or correct the headcount.</div>`.s : "";
@@ -184,11 +184,13 @@ export async function render(main) {
   async function create(btn, ifg) {
     const L = s.lead;
     const errs = [];
-    if (!L.channel) errs.push({ field: "channel", message: "Choose Direct, Agent or Broker." });
-    if (L.channel && L.channel !== "Direct" && !L.intermediaryId) errs.push({ field: "intermediaryId", message: "Choose the agent or broker." });
-    if (!L.leadSource) errs.push({ field: "leadSource", message: "Lead source is required." });
-    if (state.me.role === "sm" && !L.ownerId) errs.push({ field: "ownerId", message: "Choose the Account Manager." });
-    if (L.contactPhone && !/^\+?[0-9 ()./-]{3,}/.test(L.contactPhone)) errs.push({ field: "contactPhone", message: "Use digits, spaces, + ( ) -." });
+    if (!DEMO_BYPASS) {
+      if (!L.channel) errs.push({ field: "channel", message: "Choose Direct, Agent or Broker." });
+      if (L.channel && L.channel !== "Direct" && !L.intermediaryId) errs.push({ field: "intermediaryId", message: "Choose the agent or broker." });
+      if (!L.leadSource) errs.push({ field: "leadSource", message: "Lead source is required." });
+      if (state.me.role === "sm" && !L.ownerId) errs.push({ field: "ownerId", message: "Choose the Account Manager." });
+      if (L.contactPhone && !/^\+?[0-9 ()./-]{3,}/.test(L.contactPhone)) errs.push({ field: "contactPhone", message: "Use digits, spaces, + ( ) -." });
+    }
     paintFieldErrors(errs, main);
     if (errs.length) { toast(`${errs.length} item(s) need attention.`, "err"); (main.querySelector('[aria-invalid="true"]') || main.querySelector('input[name="channel"]'))?.focus(); return; }
     const payload = { lead: L };

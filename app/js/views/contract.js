@@ -1,4 +1,4 @@
-import { html, raw, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, docUrl } from "../core.js";
+import { html, raw, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, docUrl, DEMO_BYPASS } from "../core.js";
 import { icon, pill, field, controlValue, docSlot, wireUploads, simNote } from "../components.js";
 
 export async function render(ctx) {
@@ -20,7 +20,7 @@ export async function render(ctx) {
       : html`<p class="muted mt">The contract is requested after the client accepts the Senior-Management-approved proposal. Proposal is <b>${prop?.status || "not started"}</b>.</p>`}</div></section>`.s;
     el.querySelector("#req")?.addEventListener("click", async (e) => {
       const eff = el.querySelector("#ce").value, pm = el.querySelector("#cm").value;
-      if (!eff || !pm) return showError({ code: "validation", message: "Enter the effective date and payment mode.", details: {} });
+      if (!DEMO_BYPASS && (!eff || !pm)) return showError({ code: "validation", message: "Enter the effective date and payment mode.", details: {} });
       if (await act("contract.request", { caseId: id, effectiveDate: eff, paymentMode: pm }, { button: e.currentTarget, success: "Contract and DSA requested from Legal." })) ctx.reload();
     });
     return;

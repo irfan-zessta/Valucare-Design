@@ -1,5 +1,10 @@
 // Core utilities: safe templating, API client, dialogs, announcements, saving.
 
+// DEMO MOCK MODE — mirrors server/domain.py DEMO_BYPASS. When true, client-side
+// required-field validation never blocks submit/advance, so a user can walk any
+// case through every stage with blank mandatory fields. Set to false to restore.
+export const DEMO_BYPASS = true;
+
 // ---------------------------------------------------------------- templating
 const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 export const esc = (v) => (v === null || v === undefined ? "" : String(v).replace(/[&<>"']/g, (c) => ESC[c]));
@@ -128,7 +133,7 @@ export function dialog({ title, body, actions = [], wide = false, xwide = false,
       back.querySelector(`[data-i="${i}"]`).onclick = async () => {
         if (a.validate) {
           const vals = readDialog(dlg);
-          const err = a.validate(vals, dlg);
+          const err = DEMO_BYPASS ? null : a.validate(vals, dlg);
           if (err) { showDialogError(dlg, err); return; }
           close({ action: a.value ?? a.label, values: vals });
         } else close({ action: a.value ?? a.label, values: readDialog(dlg) });
