@@ -381,8 +381,8 @@ function negotiation(ctx) {
         actions: [{ label: "Cancel" }, { label: "Record acceptance", kind: "primary", value: "ok", validate: (v) => (!v.file?.length ? "Attach the acceptance evidence." : !v.date ? "Enter the date." : null) }] });
       if (r?.action !== "ok") return;
       try {
-        const up = await upload(r.values.file[0], { caseId: id, linkedType: "proposal", linkedId: prop.id, slot: "acceptance" });
-        if (await act("proposal.accept", { id: prop.id, docId: up.document.id, date: r.values.date, notes: r.values.notes, acceptedVersion: prop.version }, { button: b, success: "Acceptance recorded. Next: contract request and internal alignment." })) ctx.reload();
+        const up = r.values.file?.length ? await upload(r.values.file[0], { caseId: id, linkedType: "proposal", linkedId: prop.id, slot: "acceptance" }) : null;
+        if (await act("proposal.accept", { id: prop.id, docId: up?.document.id || null, date: r.values.date || new Date().toISOString().slice(0, 10), notes: r.values.notes, acceptedVersion: prop.version }, { button: b, success: "Acceptance recorded. Next: contract request and internal alignment." })) ctx.reload();
       } catch (e) { showError(e); }
     });
   }
