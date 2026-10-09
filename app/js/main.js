@@ -14,26 +14,67 @@ async function boot() {
 }
 
 // ---------------------------------------------------------------- sign-in
+// Demo flows, grouped by business (Corporate / IFG) and department. A flow with
+// a `user` signs in as that team's demo user and lands on their real work;
+// flows without one are part of HMS3 but not built in this prototype, so they
+// are shown for context but are not clickable (honest, no dead ends).
+const FLOWS = [
+  { key: "corporate", label: "Corporate", depts: [
+    { name: "Sales", items: [
+      { label: "New Business", user: "u-am1", href: "#/new-business" },
+      { label: "Renewal Business" },
+    ] },
+    { name: "Actuarial", full: "ACCUSA", items: [
+      { label: "New Business", user: "u-ac1", href: "#/tasks" },
+      { label: "Renewal Business" },
+    ] },
+    { name: "MDA", full: "Members Data Administration", items: [
+      { label: "New Closed Account" },
+      { label: "Additional or New Member" },
+      { label: "Renewal Member" },
+      { label: "Amendment Request" },
+      { label: "Lost Card Request" },
+      { label: "Cancellation Request" },
+      { label: "Reactivation and Reapplication" },
+    ] },
+    { name: "Billing", full: "Billing and Collection", items: [
+      { label: "Billing queue", user: "u-bc1", href: "#/tasks" },
+    ] },
+    { name: "Claims", items: [{ label: "Claims" }] },
+    { name: "CCD", full: "Customer Care", items: [
+      { label: "Customer Care queue", user: "u-cc1", href: "#/tasks" },
+    ] },
+    { name: "Accounting", items: [{ label: "Accounting" }] },
+  ] },
+  { key: "ifg", label: "IFG", note: "Individual / Family Group business runs in a separate application and is outside this build. Corporate leads below the minimum are routed to IFG from within a New Business case." },
+];
+
 function renderLogin(reason) {
-  document.title = "Sign in · HMS3 Corporate New Business";
-  const byRole = {};
-  state.meta.users.forEach((u) => (byRole[u.role] ||= []).push(u));
-  root.innerHTML = html`<div class="login"><div class="card" role="main" id="main">
-    <div class="brand"><span class="mark">VC</span><span class="nm">HMS3 · Corporate New Business<small>Commercial / Sales workspace</small></span></div>
-    <h1 style="font-size:20px;margin-top:8px">Choose a demo user</h1>
-    <p class="muted mt">This build uses <b>explicit role switching for testing</b>. Every user works on the same shared server data, so two people (or two browser windows) can edit the same case.
-    Production sign-in would use SSO/MFA (NFR-01); there are no passwords here.</p>
+  document.title = "Choose a demo flow · HMS3 Corporate New Business";
+  root.innerHTML = html`<div class="login"><div class="card wide" role="main" id="main">
+    <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3 · Corporate New Business<small>Choose a demo flow</small></span></div>
+    <h1 style="font-size:20px;margin-top:8px">Choose a demo flow</h1>
+    <p class="muted mt">Pick a department flow to sign in as that team's demo user and open their real work. Flows marked <b>Not in this build</b> are part of HMS3 but outside this Corporate New Business prototype. You can switch user any time from the top bar. Production sign-in would use SSO/MFA (NFR-01); there are no passwords here.</p>
     ${reason ? html`<div class="note warn mt">${reason}</div>` : ""}
-    <div class="userpick">${Object.entries(byRole).map(([r, us]) => us.map((u) => html`<button type="button" data-user="${u.id}"><b>${u.name}</b><span>${roleLabel(r)}${u.team ? " · " + u.team : ""}</span></button>`))}</div>
+    <div class="flowpick">${FLOWS.map((cat) => html`<section class="flow-cat" aria-label="${cat.label}">
+      <h2>${cat.label}</h2>
+      ${cat.note ? html`<p class="flow-note">${icon("lock", 13)} ${cat.note}</p>` : ""}
+      ${(cat.depts || []).map((d) => html`<div class="flow-dept">
+        <div class="dept-h">${d.name}${d.full ? html`<small>${d.full}</small>` : ""}</div>
+        <div class="dept-items">${d.items.map((it) => it.user
+          ? html`<button type="button" class="flow-item" data-flow data-user="${it.user}" data-href="${it.href}">${it.label}</button>`
+          : html`<span class="flow-item na" role="note" aria-label="${it.label}, not in this build" title="Not in this build">${it.label}<span class="tag">Not in this build</span></span>`)}</div>
+      </div>`)}
+    </section>`)}</div>
   </div></div>`.s;
-  root.querySelectorAll("[data-user]").forEach((b) => (b.onclick = async () => {
+  root.querySelectorAll("[data-flow]").forEach((b) => (b.onclick = async () => {
     await api("login", { method: "POST", body: { userId: b.dataset.user } });
     state.me = (await api("me")).user;
-    if (!location.hash || location.hash === "#/") location.hash = "#/home";
+    location.hash = b.dataset.href || "#/home";
     renderShell();
     route();
   }));
-  root.querySelector("[data-user]").focus();
+  root.querySelector("[data-flow]")?.focus();
 }
 
 // ---------------------------------------------------------------- shell
