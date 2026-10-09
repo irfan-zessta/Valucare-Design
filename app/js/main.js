@@ -96,10 +96,6 @@ const SECTIONS = [
     { key: "nb-enroll", label: "Franchise Enrollment", href: "#/new-business/create" },
     { key: "nb-accounts", label: "Account Enrollment & Maintenance", href: "#/accounts" },
   ] },
-  { key: "renewal-business", label: "Renewal Business",
-    note: "Renewals and account maintenance for active accounts are handled outside Corporate New Business." },
-  { key: "ifg", label: "IFG",
-    note: "Leads below the corporate minimum are routed to the IFG team from within a New Business case. The IFG application itself is outside this system." },
   { key: "shared-tools", label: "Shared Tools", items: [
     { key: "st-inter", label: "Agents and Brokers", href: "#/more/intermediaries" },
     { key: "st-sob", label: "SOB template", href: "#/more/template" },
