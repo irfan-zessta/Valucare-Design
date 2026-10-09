@@ -349,9 +349,18 @@ function sampleValue(el) {
   if (t === "tel") return "+63 2 8123 4567";
   if (t === "number") return "100";
   if (t === "date") { const d = new Date(); return d.toISOString().slice(0, 10); }
-  if (name.includes("tin")) return "000-123-456-789";
+  // A tax number belongs ONLY in the actual TIN field. Match it precisely so a
+  // tax-number-shaped value can never leak into a person's position, short name
+  // or any field that merely happens to contain the letters "tin".
+  if (name === "tin" || name.endsWith("tin")) return "000-123-456-789";
+  // Person-appropriate fields first, so they never fall through to a company
+  // name or a tax number.
+  if (name.includes("position") || name.includes("designation") || name.includes("jobtitle")) return "HR Manager";
+  if (name.includes("shortname") || (name.includes("short") && name.includes("name"))) return "Demo Corp";
+  if (name.includes("addressee")) return "Ms. Andrea Go";
+  if (name.includes("contactperson") || name.includes("person")) return "Teresa Uy";
   if (name.includes("email")) return "demo.contact@example.com";
-  if (name.includes("phone") || name.includes("mobile") || name.includes("contactno")) return "+63 917 123 4567";
+  if (name.includes("phone") || name.includes("mobile") || name.includes("contactno") || name.includes("contactnumber")) return "+63 917 123 4567";
   if (name.includes("name")) return "Demo Sample Corporation";
   if (name.includes("address")) return "123 Ayala Avenue, Makati City";
   if (name.includes("city")) return "Makati City";
@@ -396,12 +405,22 @@ export function ownerText(t) {
 }
 
 export function gateList(items) {
-  return html`<ul class="gate-list">${items.map((g) => html`<li>
-    <span class="${g.ok ? "ok" : "no"}" aria-hidden="true">${g.ok ? "✓" : "●"}</span>
-    <div><b>${g.label}</b> <span class="sr-only">${g.ok ? "met" : "not met"}</span>
+  // Three honest states: met (green ✓, real evidence), skipped-for-demo
+  // (amber ◐, allowed to proceed but NOT verified), not met (red ●, blocks).
+  // A demo skip must never read as "met" - it mirrors the server's ok /
+  // demoSkipped / satisfied shape so nothing looks complete without evidence.
+  return html`<ul class="gate-list">${items.map((g) => {
+    const cls = g.ok ? "ok" : g.demoSkipped ? "skip" : "no";
+    const mark = g.ok ? "✓" : g.demoSkipped ? "◐" : "●";
+    const sr = g.ok ? "met" : g.demoSkipped ? "skipped for demo, not verified" : "not met";
+    return html`<li>
+    <span class="${cls}" aria-hidden="true">${mark}</span>
+    <div><b>${g.label}</b> <span class="sr-only">${sr}</span>
+      ${g.demoSkipped ? html`<div class="tiny skip-tag">Skipped for demo - not verified</div>` : ""}
       ${!g.ok && g.detail ? html`<div class="tiny">${g.detail}</div>` : ""}
       ${g.evidence ? html`<div class="tiny">Evidence: ${String(g.evidence).startsWith("DOC-") ? html`<a href="${docUrl(g.evidence)}">${g.evidence}</a>` : g.evidence}</div>` : ""}</div>
-    <div class="right"><div class="tiny">Owner: ${g.ownerLabel}</div><a href="${g.link}" class="tiny">Open source record</a></div></li>`)}</ul>`;
+    <div class="right"><div class="tiny">Owner: ${g.ownerLabel}</div><a href="${g.link}" class="tiny">Open source record</a></div></li>`;
+  })}</ul>`;
 }
 
 export function table(cols, rows, { compact = false, caption } = {}) {

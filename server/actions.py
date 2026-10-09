@@ -5,10 +5,10 @@ import datetime as dt
 import os
 
 from . import meta, pdf, providers, members
-from .domain import (Bundle, ApiError, DEMO_BYPASS, account_gates, add_workdays, compare_benefits, config, derive, iso,
-                     ma_code, name_similarity, next_id, norm_addr, norm_tin, notify, num, onboarding_status, parse_date,
-                     readiness, reduced_codes, require_not_maker, require_role, require_status, user_name, valid_email,
-                     valid_tel, visible_case, USERS)
+from .domain import (Bundle, ApiError, DEMO_BYPASS, DEMO_SKIP_DATA, DEMO_SKIP_APPROVALS, account_gates, add_workdays,
+                     compare_benefits, config, derive, iso, ma_code, name_similarity, next_id, norm_addr, norm_tin,
+                     notify, num, onboarding_status, parse_date, readiness, reduced_codes, require_not_maker, require_role,
+                     require_status, user_name, valid_email, valid_tel, visible_case, USERS)
 
 ACTIONS = {}
 
@@ -71,8 +71,9 @@ def _set(s, ctx, rec, changes, action_name, reason=None, base=None, doc_id=None,
 
 
 def _check_version(rec, reviewed):
-    if DEMO_BYPASS:
-        return  # demo: never block a decision on a stale/missing reviewed version
+    # Approving a stale version is an integrity failure, enforced even in demo.
+    if DEMO_SKIP_APPROVALS:
+        return
     if reviewed is None:
         raise ApiError(400, "missing_version", "The reviewed version is required for this decision.")
     if int(reviewed) != rec["v"]:
@@ -832,6 +833,10 @@ def rr_submit(s, ctx, p):
     b = s.bundle(c["id"])
     fr = _approved_franchise(s, b)
     require_status(rr, "Draft", what="Rate request")
+    # Content requirements: these define a usable rate request. Actuarial cannot
+    # price an empty request, so these are ALWAYS enforced - even in demo, where
+    # the user fills fictional values with "Fill sample data". (Prevents the
+    # "empty rate request accepted" defect.)
     errs = []
     for k, lab in (("requestedPlans", "Requested plans"), ("roomBoard", "Room and board"), ("mblOptions", "MBL options"),
                    ("dependentCoverage", "Dependent coverage")):
@@ -839,13 +844,16 @@ def rr_submit(s, ctx, p):
             errs.append({"field": k, "message": f"{lab} is required."})
     if not rr.get("paymentModes"):
         errs.append({"field": "paymentModes", "message": "Choose at least one payment mode."})
-    if fr.get("requirements", {}).get("masterlist", {}).get("status") != "Received":
-        errs.append({"field": "requirements", "message": "Member Data (Master List) must be received before requesting rates."})
     mb = b.member_batch("quotation")
     if mb and mb.get("status") == "Has errors":
         errs.append({"field": "memberData", "message": "The quotation Member Data file has validation errors."})
-    if errs and not DEMO_BYPASS:
+    if errs:
         raise ApiError(422, "validation", f"{len(errs)} item(s) need attention before submitting.", {"fields": errs})
+    # Document requirement: the Master List upload. A real upload, so demo may
+    # skip it (the handoff to Actuarial will show it as "Skipped for demo").
+    if fr.get("requirements", {}).get("masterlist", {}).get("status") != "Received" and not DEMO_SKIP_DATA:
+        raise ApiError(422, "validation", "Member Data (Master List) must be received before requesting rates.",
+                       {"fields": [{"field": "requirements", "message": "Member Data (Master List) must be received before requesting rates."}]})
     _set(s, ctx, rr, {"status": "Submitted", "submittedBy": ctx.uid, "submittedAt": ctx.now_iso()}, "rateRequest.submit", base=p.get("baseVersion"))
     _set(s, ctx, c, {"pipelineStage": "For Rates Creation"}, "lead.stage")
     notify(s.store, ctx, c["id"], "rateRequest.submitted", ["Actuarial queue"], f"Rate request {rr['code']} submitted")
@@ -1119,13 +1127,13 @@ def sob_validate(s, ctx, p):
     sob = s.store.must(p["id"], "sob")
     require_status(sob, "Independent Validation", what="SOB")
     _check_version(sob, p.get("reviewedVersion"))
-    if ctx.uid in (sob.get("preparedBy"), sob.get("salesReviewBy")) and not DEMO_BYPASS:
-        raise ApiError(403, "segregation", "The SOB preparer and Sales reviewer cannot be the independent validator (NB-AUD-03).")
+    if ctx.uid in (sob.get("preparedBy"), sob.get("salesReviewBy")) and not DEMO_SKIP_APPROVALS:
+        raise ApiError(403, "segregation", "The SOB preparer and Sales reviewer cannot be the independent validator (NB-AUD-03). Switch to another authorized user to validate.")
     d = p.get("decision")
     ap = sob.get("approvals", []) + [{"stage": "validation", "decision": d, "by": ctx.uid, "byName": ctx.user["name"], "at": ctx.now_iso(),
                                       "remarks": p.get("remarks", ""), "version": sob["version"]}]
     if d == "approve":
-        if sob.get("reducedCount") and not p.get("overrideAck") and not DEMO_BYPASS:
+        if sob.get("reducedCount") and not p.get("overrideAck") and not DEMO_SKIP_DATA:
             raise ApiError(422, "validation", "This SOB has coverage below the TOR. Confirm the approval override with its justifications (NB-SOB-08).",
                            {"fields": [{"field": "overrideAck", "message": "Required."}]})
         _set(s, ctx, sob, {"status": "Approved", "validatedBy": ctx.uid, "approvedAt": ctx.now_iso(), "approvals": ap}, "sob.validate",
@@ -1299,7 +1307,7 @@ def prop_submit(s, ctx, p):
     for code in reduced:
         if not (just.get(code) or sob_just.get(code) or "").strip():
             errs.append({"field": f"reducedJustifications.{code}", "message": f"{code}: reduced coverage vs TOR needs a documented justification."})
-    if errs and not DEMO_BYPASS:
+    if errs and not DEMO_SKIP_DATA:
         raise ApiError(422, "validation", f"{len(errs)} item(s) need attention before review.", {"fields": errs})
     disc = []
     for it in prop["items"]:
@@ -1322,13 +1330,13 @@ def prop_sm(s, ctx, p):
     _check_version(prop, p.get("reviewedVersion"))
     require_not_maker(ctx, prop.get("submittedBy"), "proposal")
     b, sob = _prop_checks(s, prop)
-    if sob["version"] != prop.get("sobVersion") and not DEMO_BYPASS:
+    if sob["version"] != prop.get("sobVersion") and not DEMO_SKIP_APPROVALS:
         raise ApiError(409, "stale_sob", "The SOB changed after this proposal was submitted. The Account Manager must revise the proposal.")
     d = p.get("decision")
     rec = {"stage": "sm", "decision": d, "by": ctx.uid, "byName": ctx.user["name"], "at": ctx.now_iso(), "remarks": p.get("remarks", ""),
            "version": prop["version"]}
     if d == "approve":
-        if prop.get("reducedCodes") and not p.get("overrideAck") and not DEMO_BYPASS:
+        if prop.get("reducedCodes") and not p.get("overrideAck") and not DEMO_SKIP_DATA:
             raise ApiError(422, "validation", "This proposal reduces coverage below the TOR. Confirm you approve the documented override.",
                            {"fields": [{"field": "overrideAck", "message": "Required."}]})
         _set(s, ctx, prop, {"status": "Sales Manager Approved", "approvals": prop.get("approvals", []) + [rec]}, "proposal.smApprove",
@@ -1470,12 +1478,12 @@ def prop_accept(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     c = _case(s, ctx, prop["caseId"])
     require_status(prop, "Sent", "Under Negotiation", what="Proposal")
-    if not any(a["stage"] == "senior" and a["decision"] == "approve" and a["version"] == prop["version"] for a in prop.get("approvals", [])) and not DEMO_BYPASS:
-        raise ApiError(409, "not_approved", "This version has no Senior Management approval.")
-    if not DEMO_BYPASS:
+    if not any(a["stage"] == "senior" and a["decision"] == "approve" and a["version"] == prop["version"] for a in prop.get("approvals", [])) and not DEMO_SKIP_APPROVALS:
+        raise ApiError(409, "not_approved", "This version has no Senior Management approval. It must be approved by Senior Management before the client can accept it.")
+    if not DEMO_SKIP_DATA:
         _need(p, "docId", "date", msg="Attach the client's acceptance evidence and the acceptance date.")
         s.store.must(p["docId"], "document")
-    if p.get("acceptedVersion") and int(p["acceptedVersion"]) != prop["version"] and not DEMO_BYPASS:
+    if p.get("acceptedVersion") and int(p["acceptedVersion"]) != prop["version"] and not DEMO_SKIP_APPROVALS:
         raise ApiError(409, "stale_review", "The client accepted a different version than the current one.")
     _set(s, ctx, prop, {"status": "Accepted", "acceptance": {"docId": p.get("docId"), "date": p.get("date"), "version": prop["version"],
                                                              "recordedBy": ctx.uid, "recordedAt": ctx.now_iso(), "notes": p.get("notes", "")}},
@@ -1582,12 +1590,12 @@ def contract_advance(s, ctx, p):
         raise ApiError(403, "forbidden", f"'{nxt['key']}' is recorded by {meta.ROLES[nxt['role']]}.")
     if p.get("baseVersion") is not None and int(p["baseVersion"]) != con["v"]:
         raise ApiError(409, "stale_version", "This contract changed after you opened it. Reload first.", {"current": con})
-    if nxt["key"] in ("Review", "Endorsed") and not DEMO_BYPASS:
+    if nxt["key"] in ("Review", "Endorsed") and not DEMO_SKIP_DATA:
         if not con.get("number"):
             raise ApiError(422, "validation", "Enter the contract number first.", {"fields": [{"field": "number", "message": "Required."}]})
         if not _docs(s, con["id"], "draft"):
             raise ApiError(422, "validation", "Upload the draft contract document first.", {"fields": [{"field": "doc.draft", "message": "Required."}]})
-    if nxt.get("doc") and not any(_doc_ok(d) for d in _docs(s, con["id"], nxt["doc"])) and not DEMO_BYPASS:
+    if nxt.get("doc") and not any(_doc_ok(d) for d in _docs(s, con["id"], nxt["doc"])) and not DEMO_SKIP_DATA:
         raise ApiError(422, "validation", f"Upload the {nxt['doc']} {con['kind']} document before recording '{nxt['key']}'.",
                        {"fields": [{"field": f"doc.{nxt['doc']}", "message": "Required."}]})
     ed = parse_date(p.get("eventDate")) or ctx.today()
@@ -1674,8 +1682,8 @@ def doc_review(s, ctx, p):
         raise ApiError(400, "bad_request", "decision must be Accepted or Needs correction.")
     if dec == "Needs correction" and len((p.get("reason") or "").strip()) < 5:
         raise ApiError(422, "validation", "Explain what needs correcting.")
-    if d.get("uploaderId") == ctx.uid and not DEMO_BYPASS:
-        raise ApiError(403, "same_maker", "You uploaded this document; another person must review it.")
+    if d.get("uploaderId") == ctx.uid and not DEMO_SKIP_APPROVALS:
+        raise ApiError(403, "same_maker", "You uploaded this document; another person must review it. Switch to another authorized user to review.")
     _set(s, ctx, d, {"validation": dec, "correctionReason": p.get("reason") if dec == "Needs correction" else None, "reviewedBy": ctx.uid,
                      "reviewedByName": ctx.user["name"], "reviewedAt": ctx.now_iso()}, "document.review", reason=p.get("reason"), doc_id=d["id"])
     if dec == "Needs correction" and d.get("slot", "").startswith("onb:"):
@@ -1700,12 +1708,19 @@ def account_create(s, ctx, p):
     if b.parent_account:
         raise ApiError(409, "exists", "The account already exists.")
     gates = account_gates(b, s.cfg)
-    failed = [g for g in gates if not g["ok"]]
+    failed = [g for g in gates if not g["satisfied"]]
     if failed:
         raise ApiError(409, "gate", "Account creation is blocked: " + "; ".join(f"{g['label']} ({g['detail']})" for g in failed), {"gates": gates})
+    # Defensive: the gates above should guarantee these exist, but never let a
+    # missing dependency reach the field access below as a raw AttributeError.
     fr = b.franchise
-    ai, oi = fr["accountInfo"], fr["otherInfo"]
+    if not fr:
+        raise ApiError(409, "no_franchise", "There is no approved franchise to create the account from. Complete and approve the Franchise first.")
     con = b.contract()
+    if not con:
+        raise ApiError(409, "no_contract", "There is no contract yet. The account's effectivity, expiry and payment terms come from the contract - request and advance the Contract first.",
+                       {"link": f"#/case/{c['id']}/contract"})
+    ai, oi = fr["accountInfo"], fr["otherInfo"]
     code = ma_code(s.store, s.cfg, ctx)
     it = _intermediary_contact(s, b.intermediary_id) if b.channel != "Direct" else {}
     parent = {
@@ -1757,15 +1772,16 @@ def _make_affiliate(s, ctx, case_id, parent, a, i, sob):
 
 
 def validate_account(acc):
-    if DEMO_BYPASS:
-        return []  # demo: accept the account form as-is
+    # Demo may skip EMPTY mandatory fields (DEMO_SKIP_DATA), but wrong/mismatched
+    # data (bad formats, expiry before effectivity) is always reported so it
+    # cannot silently flow downstream.
     errs = []
     for sec in meta.account_schema():
         vals = acc.get(sec["key"], {})
         for f in sec["fields"]:
             v = vals.get(f["key"])
             req = f.get("required") or (f.get("requiredWhen") == "intermediary" and acc.get("agentInfo", {}).get("businessSource") in ("Agent", "Broker"))
-            if req and (v is None or str(v).strip() == ""):
+            if req and (v is None or str(v).strip() == "") and not DEMO_SKIP_DATA:
                 errs.append({"section": sec["key"], "field": f"{sec['key']}.{f['key']}", "message": f"{f['label']} is required."})
             if v and f["type"] == "tel" and not valid_tel(v):
                 errs.append({"section": sec["key"], "field": f"{sec['key']}.{f['key']}", "message": f"{f['label']} is not a valid number."})
@@ -1777,7 +1793,7 @@ def validate_account(acc):
     e, x = parse_date(ci.get("effectivityDate")), parse_date(ci.get("expiryDate"))
     if e and x and x <= e:
         errs.append({"section": "contractInfo", "field": "contractInfo.expiryDate", "message": "Expiry must be after effectivity."})
-    if acc.get("otherInfo", {}).get("vip") and not (acc["otherInfo"].get("vipReason") or "").strip():
+    if acc.get("otherInfo", {}).get("vip") and not (acc["otherInfo"].get("vipReason") or "").strip() and not DEMO_SKIP_DATA:
         errs.append({"section": "otherInfo", "field": "otherInfo.vipReason", "message": "VIP reason is required when VIP is set (NB-VIP-01)."})
     return errs
 
@@ -1868,8 +1884,9 @@ PC_KEYS = [f[0] for f in meta.PLAN_CODE_FIELDS]
 
 
 def _pc_validate(s, pc):
-    if DEMO_BYPASS:
-        return []  # demo: accept plan codes as-is
+    # Demo may skip EMPTY required fields, but mismatched/invalid values (unknown
+    # option, unknown provider code, wrong type, VAT off 12%) are ALWAYS detected
+    # so a malformed plan code never passes silently.
     errs = []
     prov = providers.by_code()
     decouple = s.cfg["decouplePaymentMode"]
@@ -1881,7 +1898,8 @@ def _pc_validate(s, pc):
             req = False
         empty = v in (None, "", []) or (isinstance(v, list) and not v)
         if req and empty:
-            errs.append({"field": key, "message": f"{label} is required."})
+            if not DEMO_SKIP_DATA:
+                errs.append({"field": key, "message": f"{label} is required."})
             continue
         if empty:
             continue
@@ -1910,8 +1928,8 @@ def _pc_validate(s, pc):
 def _pc_account_ok(s, account_id):
     acc = s.store.must(account_id, "account")
     par = acc if not acc.get("parentId") else s.store.get(acc["parentId"])
-    if par.get("status") not in ("Approved", "Scheduled", "Active") and not DEMO_BYPASS:
-        raise ApiError(409, "gate", "Plan Codes are created only after the account is approved (BR-12).")
+    if par.get("status") not in ("Approved", "Scheduled", "Active") and not DEMO_SKIP_APPROVALS:
+        raise ApiError(409, "gate", f"Plan Codes are created only after the account is approved (BR-12). The account is '{par.get('status')}'. Approve the account first.")
     return acc
 
 
@@ -1929,8 +1947,8 @@ def _sob_of_account(s, acc):
 
 def _pc_insert(s, ctx, acc, fields, action_name="planCode.create", reason=None):
     sob = _sob_of_account(s, acc)
-    if (not sob or sob.get("status") not in ("Approved", "Client Signed", "Codified")) and not DEMO_BYPASS:
-        raise ApiError(409, "gate", "Plan Codes are generated from an approved SOB. The SOB for this account is not approved yet.")
+    if (not sob or sob.get("status") not in ("Approved", "Client Signed", "Codified")) and not DEMO_SKIP_APPROVALS:
+        raise ApiError(409, "gate", f"Plan Codes are generated from an approved SOB. The SOB for this account is '{(sob or {}).get('status', 'not started')}' - approve the SOB first.")
     code = _pc_next_code(s, acc)
     rec = {k: fields.get(k) for k in PC_KEYS}
     rec.update(planCode=code, seriesId=code, accountId=acc["id"], accountCode=acc["accountCode"],
@@ -2615,11 +2633,11 @@ def activation_activate(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
     items = readiness(b, s.cfg)
-    failed = [g for g in items if not g["ok"]]
+    failed = [g for g in items if not g["satisfied"]]
     if failed:
         raise ApiError(409, "gate", "Activation is blocked: " + "; ".join(f"{g['label']} - {g['detail']}" for g in failed), {"readiness": items})
     act = b.one("activation")
-    if act and act.get("status") not in ("Pending", "Ready"):
+    if act and act.get("status") not in ("Pending", "Ready", "On Hold"):
         raise ApiError(409, "invalid_state", f"Activation is already '{act['status']}'.")
     eff = parse_date(b.effectivity())
     today = ctx.today()
@@ -2691,6 +2709,21 @@ def run_scheduler(store, ctx):
         for act in store.list("activation"):
             sf = parse_date(act.get("scheduledFor"))
             if act.get("status") == "Scheduled" and sf and sf <= today:
+                # Re-check readiness at the moment of activation: a prerequisite
+                # approved earlier may have been invalidated since scheduling
+                # (e.g. an approval was withdrawn or a downstream version changed).
+                # A previously-eligible account must NOT activate if it is no
+                # longer ready.
+                b = s.bundle(act["caseId"])
+                failed = [g for g in readiness(b, s.cfg) if not g["satisfied"]]
+                if failed:
+                    _set(s, ctx, act, {"status": "On Hold", "heldReason": "; ".join(f"{g['label']} - {g['detail']}" for g in failed)},
+                         "activation.autoHold", reason="Readiness lapsed before scheduled activation")
+                    c = store.get(act["caseId"])
+                    notify(store, ctx, act["caseId"], "account.activationHeld", [user_name(c.get("ownerId")), "Account Services"],
+                           f"Scheduled activation for {sf} was held: prerequisites are no longer met",
+                           note="; ".join(g["label"] for g in failed))
+                    continue
                 _set(s, ctx, act, {"status": "Active", "activeFrom": sf.isoformat()}, "activation.autoActivate", reason=f"Effective date {sf}")
                 for a in store.list("account", act["caseId"]):
                     if a.get("status") == "Scheduled":

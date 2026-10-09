@@ -21,6 +21,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ["HMS_QUIET"] = "1"
+os.environ["HMS_DEMO"] = "0"  # run the suite with real validations enabled (no demo bypass)
 
 from server import app as server_app  # noqa: E402
 from server import actions, seed  # noqa: E402

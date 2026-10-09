@@ -252,8 +252,10 @@ export async function showError(e) {
   }
   if (e.code === "gate") {
     const items = e.details?.gates || e.details?.readiness || [];
+    // Only genuinely unsatisfied gates block. A demo-skipped item is allowed
+    // to proceed server-side, so it is not a blocker and is not listed here.
     await messageDialog("Not ready yet", html`<p>${e.message.split(":")[0]}.</p>
-      <ul class="gate-list mt">${items.filter((g) => !g.ok).map((g) => html`<li><span class="no">●</span><div><b>${g.label}</b><div class="tiny">${g.detail}</div></div><span class="tiny">${g.ownerLabel}</span></li>`)}</ul>
+      <ul class="gate-list mt">${items.filter((g) => !g.satisfied).map((g) => html`<li><span class="no">●</span><div><b>${g.label}</b><div class="tiny">${g.blocker || g.detail}</div></div><span class="tiny">${g.ownerLabel}</span></li>`)}</ul>
       ${items.length ? "" : html`<p class="tiny">${e.message}</p>`}`);
     return;
   }

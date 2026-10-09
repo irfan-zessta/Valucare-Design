@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-10-08T12:07:29",
+  "runAt": "2026-10-09T14:56:05",
   "results": [
     {
       "test": "test_01_zero_result_search_then_new_company",
@@ -103,13 +103,13 @@
     }
   ],
   "performance": {
-    "planCodeImport1000Seconds": 2.45,
+    "planCodeImport1000Seconds": 2.41,
     "memberData10kRows": 10052,
-    "memberData10kSeconds": 0.33,
-    "memberProblemRowsQueryMs": 35,
+    "memberData10kSeconds": 0.32,
+    "memberProblemRowsQueryMs": 36,
     "companySearchMs": 3,
-    "providerSearchMs": 2,
+    "providerSearchMs": 1,
     "planCodeSearchMs": 22,
-    "queueLoadMs": 35
+    "queueLoadMs": 36
   }
 }

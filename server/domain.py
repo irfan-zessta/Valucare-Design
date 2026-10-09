@@ -3,6 +3,7 @@ the single case-state derivation used by every screen, queue, counter and report
 """
 import datetime as dt
 import difflib
+import os
 import re
 import time
 
@@ -15,13 +16,27 @@ SIM_NOTE = "Simulated - no email service connected; not delivered"
 
 # DEMO MOCK MODE --------------------------------------------------------------
 # This prototype is a click-through demo, not the production system. When True,
-# the workflow stops blocking you: mandatory-field checks, status-order checks,
-# maker-checker segregation, version-staleness checks and the big account/
-# activation gates all pass, so you can walk a case through every stage on your
-# own and approvals go through instantly. Set to False to restore real HMS3
-# enforcement (every rule lives in domain.py / actions.py and is re-activated
-# by this one switch).
-DEMO_BYPASS = True
+# the workflow still enforces the REAL rules - roles, maker-checker, status
+# order, version freshness, approvals and the existence of the contracts /
+# accounts / SOBs each step depends on - so a demo walks the genuine
+# departmental handoffs (switch users to move the work forward). What demo mode
+# relaxes is only DATA ENTRY: you may skip mandatory fields and document uploads
+# so you can demonstrate the flow without real paperwork. Anything skipped is
+# labelled "Skipped for demo - not verified" (never a false "Received" /
+# "Approved"), is given a safe fictional placeholder where a later step needs
+# one, and must never crash or dead-end. Readiness and every status indicator
+# are ALWAYS derived from saved evidence - a bypass never marks a gate complete.
+# Controlled by HMS_DEMO: unset/"1" = live demo (default), "0" = full production
+# enforcement (used by the automated test suite, which runs with real
+# validations enabled). Even when demo is ON, only data entry is relaxed.
+DEMO_BYPASS = os.environ.get("HMS_DEMO", "1") != "0"
+
+# Does demo mode relax a specific validation? Approvals / dependencies / state
+# transitions are NEVER relaxed (they define the handoffs the demo must show) -
+# so DEMO_SKIP_APPROVALS is always False. Only field + upload data entry is
+# relaxed, and only while demo mode is on. Helpers below name which is which.
+DEMO_SKIP_DATA = DEMO_BYPASS      # mandatory fields & document uploads
+DEMO_SKIP_APPROVALS = False       # maker-checker, roles, versions, state, gates
 
 
 # ------------------------------------------------------------------ context
@@ -123,15 +138,17 @@ def require_role(ctx, *roles):
 
 
 def require_not_maker(ctx, maker_id, what="record"):
-    if DEMO_BYPASS:
-        return  # demo: let the same person approve their own work
+    # Maker-checker is an approval rule, enforced even in demo (switch user to review).
+    if DEMO_SKIP_APPROVALS:
+        return
     if maker_id and maker_id == ctx.uid:
         raise ApiError(403, "same_maker", f"You prepared this {what}. A different authorized person must review it (maker-checker).")
 
 
 def require_status(rec, *statuses, what=None):
-    if DEMO_BYPASS:
-        return  # demo: allow out-of-order transitions
+    # Valid state transitions are a dependency rule, enforced even in demo.
+    if DEMO_SKIP_APPROVALS:
+        return
     if rec.get("status") not in statuses:
         raise ApiError(409, "invalid_state",
                        f"{what or rec['type']} is '{rec.get('status')}'. This action needs: {', '.join(statuses)}.")
@@ -352,9 +369,20 @@ def reduced_codes(comparison):
 
 
 # ------------------------------------------------------------------ gates
-def gate(key, label, ok, owner, link, detail="", evidence=None, blocker=None):
-    return {"key": key, "label": label, "ok": bool(ok), "owner": owner, "ownerLabel": meta.ROLES.get(owner, owner),
-            "link": link, "detail": detail, "evidence": evidence, "blocker": None if ok else (blocker or detail)}
+def gate(key, label, ok, owner, link, detail="", evidence=None, blocker=None, demo=False):
+    """A readiness/creation gate derived from saved evidence.
+
+    ok     - real evidence satisfies the requirement (shows "Done", green).
+    demo   - no real evidence, but demo mode lets the flow continue past a
+             *data/upload* requirement. Shows "Skipped for demo - not verified"
+             (amber). NEVER used for approvals/dependencies, and never rendered
+             as a genuine completion.
+    """
+    satisfied = bool(ok) or bool(demo)
+    return {"key": key, "label": label, "ok": bool(ok), "demoSkipped": bool(demo) and not bool(ok),
+            "satisfied": satisfied, "owner": owner, "ownerLabel": meta.ROLES.get(owner, owner),
+            "link": link, "detail": detail, "evidence": evidence,
+            "blocker": None if satisfied else (blocker or detail)}
 
 
 def onboarding_status(b, cfg):
@@ -366,8 +394,11 @@ def onboarding_status(b, cfg):
         if it["key"] == "kyc_form" and kyc and kyc.get("formDocId") and st.get("status") != "Waived":
             # single source: the KYC form uploaded on the KYC record satisfies the checklist item
             st = {"status": "Received", "docId": kyc["formDocId"], "source": "KYC record"}
-        mandatory = it["mandatory"] and not DEMO_BYPASS  # demo: onboarding documents are optional
-        items.append({**it, "mandatory": mandatory, "status": st.get("status", "Missing"), "docId": st.get("docId"), "waiver": st.get("waiver"), "source": st.get("source")})
+        # Report the honest production requirement. Demo can still SKIP uploading
+        # (the gate shows "Skipped for demo"), but we never pretend a doc isn't
+        # required or that a missing doc was received.
+        items.append({**it, "mandatory": it["mandatory"], "status": st.get("status", "Missing"),
+                      "docId": st.get("docId"), "waiver": st.get("waiver"), "source": st.get("source")})
     return items
 
 
@@ -397,18 +428,10 @@ def account_gates(b, cfg):
         gate("kyc", "KYC cleared" + ("" if cfg["kycRequiredForAccount"] else " (not required by configuration)"), kyc_ok,
              "compliance", L("contract#kyc"), f"KYC is '{(kyc or {}).get('status', 'not started')}'."),
         gate("docs", "Mandatory onboarding documents received or waived", not missing, "am", L("contract#onboarding"),
-             ("Missing: " + ", ".join(missing)) if missing else ""),
+             ("Not uploaded - Skipped for demo (not verified). Missing: " + ", ".join(missing)) if (missing and DEMO_SKIP_DATA)
+             else (("Missing: " + ", ".join(missing)) if missing else ""),
+             demo=bool(missing) and DEMO_SKIP_DATA),
     ]
-    if DEMO_BYPASS:
-        gates = _demo_pass_gates(gates)
-    return gates
-
-
-def _demo_pass_gates(gates):
-    """Demo: mark every gate satisfied so creation/activation is never blocked."""
-    for g in gates:
-        g["ok"], g["blocker"] = True, None
-        g["detail"] = (g.get("detail") or "") and (g["detail"] + " (demo: gate bypassed)")
     return gates
 
 
@@ -444,7 +467,9 @@ def readiness(b, cfg):
         gate("kyc", "KYC cleared", bool(kyc and kyc.get("status") == "Cleared"), "compliance", L("contract#kyc"),
              f"KYC is '{(kyc or {}).get('status', 'not started')}'.", evidence=(kyc or {}).get("externalRef")),
         gate("docs", "Mandatory documents received or waived", not missing, "am", L("contract#onboarding"),
-             ("Missing: " + ", ".join(missing)) if missing else ""),
+             ("Not uploaded - Skipped for demo (not verified). Missing: " + ", ".join(missing)) if (missing and DEMO_SKIP_DATA)
+             else (("Missing: " + ", ".join(missing)) if missing else ""),
+             demo=bool(missing) and DEMO_SKIP_DATA),
         gate("sob", "SOB client-signed and codified", sob_ok, "as", L("setup/sob"),
              f"SOB is '{(sob or {}).get('status', 'not started')}'."),
         gate("plans", "Plan Codes approved", approved > 0 and pending == 0, "as", L("setup/plans"),
@@ -461,8 +486,6 @@ def readiness(b, cfg):
         gate("billing", "Billing setup completed", bool(bill and bill.get("status") == "Completed"), "bc", L("setup/billing"),
              f"Billing is '{(bill or {}).get('status', 'not started')}'."),
     ]
-    if DEMO_BYPASS:
-        items = _demo_pass_gates(items)
     return items
 
 
@@ -663,7 +686,7 @@ def derive(b, cfg, today):
                         T.append(_task(b, f"alignment_{team}", "Confirm internal alignment details", team, at(al), "alignment", cfg,
                                        "quotation/alignment", stage=5))
             gates = account_gates(b, cfg)
-            if all(g["ok"] for g in gates):
+            if all(g["satisfied"] for g in gates):
                 milestones["contract_done"] = True
                 stage = 6
 
@@ -774,7 +797,7 @@ def derive(b, cfg, today):
         act = b.one("activation")
         acts = st(act) or "Pending"
         if milestones.get("account"):
-            ready = all(g["ok"] for g in readiness(b, cfg))
+            ready = all(g["satisfied"] for g in readiness(b, cfg))
             if acts in ("Pending", "Ready") and ready:
                 stage = 9
                 T.append(_task(b, "activate", "Activate the account", "as", iso(today), "activation", cfg, "setup/activation", stage=9))

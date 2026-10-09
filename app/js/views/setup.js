@@ -121,7 +121,10 @@ function account(ctx, acc) {
   const { data, body, id } = ctx;
   const me = state.me;
   if (!acc) {
-    const ok = data.gates.every((g) => g.ok);
+    // "satisfied" = may proceed (real evidence OR an allowed demo skip); the
+    // server re-checks. The gate list still shows each demo skip in amber, so
+    // nothing reads as met without evidence.
+    const ok = data.gates.every((g) => g.satisfied);
     body.innerHTML = html`${ownerBanner(["as"], "Account creation")}<section class="panel"><div class="ph"><h2>Account creation gates</h2>${me.role === "as" ? html`<button class="btn primary" id="mk" ${ok ? "" : raw('aria-disabled="true"')}>Create account and affiliate codes</button>` : ""}</div>
       <div class="pb">${gateList(data.gates)}<p class="tiny mt">The MA Code is generated here - never at lead creation. Validated franchise information is reused; each affiliate gets its own account code. The server re-checks every gate when you create the account.</p></div></section>`.s;
     body.querySelector("#mk")?.addEventListener("click", async (e) => {
@@ -326,8 +329,12 @@ function activation(ctx, acc) {
   const me = state.me;
   const act0 = (data.records.activation || [])[0];
   const st = data.summary.activationStatus;
-  const ready = data.readiness.length && data.readiness.every((g) => g.ok);
-  const status = st === "Pending" && ready ? "Ready" : st;
+  const ready = data.readiness.length && data.readiness.every((g) => g.satisfied);
+  // Only call it "Ready" when every item is truly met with evidence. If the
+  // only thing clearing a gate is a demo skip, we may still activate, but we do
+  // not falsely label the account "Ready to activate".
+  const fullyMet = data.readiness.length && data.readiness.every((g) => g.ok);
+  const status = st === "Pending" && fullyMet ? "Ready" : st;
   const eff = data.summary.effectivity;
   const ori = (data.records.orientation || [])[0];
   const steps = ["Pending", "Ready", "Scheduled", "Active", "Handover Complete"];

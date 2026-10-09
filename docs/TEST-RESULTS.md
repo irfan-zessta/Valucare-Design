@@ -1,16 +1,20 @@
 # Test results - Passed, Failed, Untested
 
-Run on 8 October 2026, macOS, Python 3.14, local server, fictional demo data. "Passed" means the
-behaviour worked in these runs; it is not production certification. Re-run the automated suite with
-`python3 -m unittest tests.test_api -v` (it also refreshes `docs/test-results.json`).
+Run on 8-9 October 2026, macOS, Python 3.14, local server, fictional demo data. "Passed" means the
+behaviour worked in these runs; it is not production certification. Two suites run in separate
+processes because the demo flag is a module constant:
+
+- `HMS_DEMO=0 python3 -m unittest tests.test_api -v` - full production enforcement (20 tests; also refreshes `docs/test-results.json`). The suite sets `HMS_DEMO=0` itself.
+- `python3 -m unittest tests.test_demo_integrity -v` - demo mode ON (`HMS_DEMO=1`), proving the audit fixes hold *while the bypass is enabled* (6 tests).
 
 ## Summary
 
 | Area | Passed | Failed (open) | Untested |
 |---|---|---|---|
-| Automated end-to-end API tests | 20 of 20 | 0 | - |
-| Browser checks (interactive) | 16 | 0 | see below |
-| Defects found during verification | 12 found, 12 fixed and retested | 0 | - |
+| Automated end-to-end API tests (real enforcement, `HMS_DEMO=0`) | 20 of 20 | 0 | - |
+| Demo-mode integrity tests (`HMS_DEMO=1`) | 6 of 6 | 0 | - |
+| Browser checks (interactive) | 16 + 1 (three-state gate list) | 0 | see below |
+| Defects found during verification | 12 + 3 audit defects, all fixed and retested | 0 | - |
 
 ## A. Automated API tests (`tests/test_api.py`) - all Passed
 
@@ -37,6 +41,31 @@ behaviour worked in these runs; it is not production certification. Re-run the a
 | T-19 | 10,052-row Member Data file uploaded, mapped and validated with errors found | Passed - 0.31 s |
 | T-20 | Company, provider, Plan Code search and queue load under 2 s | Passed - 1-35 ms |
 
+## A2. Workflow-integrity audit fixes - demo-mode invariant tests (`tests/test_demo_integrity.py`, `HMS_DEMO=1`) - all Passed
+
+The audit found three defects that only appeared with the demo bypass on: an empty rate request was
+accepted, account prerequisites looked complete without evidence, and account creation crashed when no
+contract existed. The demo model was reworked so a demo may skip DATA (mandatory fields, uploads) but
+still follows real approvals, dependencies and evidence (see `docs/DECISIONS.md` and the demo-flag note).
+These tests run with the bypass ON to prove the fixes hold in the mode the audit used.
+
+| # | Scenario (demo ON) | Result |
+|---|---|---|
+| D-01 | Empty rate request is refused with the specific missing fields (requestedPlans, paymentModes, …), even in demo - "empty rate request accepted" defect | Passed |
+| D-02 | `account.create` with no contract returns an actionable 409 (names the missing dependency), never a 500 crash | Passed |
+| D-03 | Account gates are evidence-derived: pricing / acceptance / contract are **not** satisfied and **not** demo-skippable on a fresh case - "complete without evidence" defect | Passed |
+| D-04 | Maker-checker still blocks self-approval in demo (`same_maker`); a different authorised user passes | Passed |
+| D-05 | Invalid state transitions still refused in demo (`invalid_state`) | Passed |
+| D-06 | A skipped mandatory document reads "Skipped for demo - not verified" (amber), never a false "Received" | Passed |
+
+Related audit defects fixed (beyond the 12 in section C):
+
+| # | Defect (demo mode) | Fix |
+|---|---|---|
+| 13 | Readiness/account gates marked every item complete when the bypass was on | Deleted the all-green `_demo_pass_gates` helper; gates always derive from saved evidence; demo only soft-passes DATA/upload items, shown amber "Skipped for demo" |
+| 14 | `account.create` raised an unhandled 500 when the franchise/contract was missing | Explicit dependency guards return actionable 409 with a link to the blocking record |
+| 15 | "Fill sample data" could put a tax-number-shaped value in a person's position or short name | `sampleValue` matches TIN precisely and fills person fields (position/short name/addressee/contact) with person-appropriate values first |
+
 ## B. Browser checks (built-in browser, 1366×860 and 375×812)
 
 | # | Check | Result |
@@ -57,6 +86,7 @@ behaviour worked in these runs; it is not production certification. Re-run the a
 | B-14 | Home, queue, case overview, proposal approval screens visually reviewed | Passed |
 | B-15 | Queue: view "All", sort by company, compact density, search "corp", scroll 300 px → leave and return → all five restored | Passed |
 | B-16 | Colour contrast measured for the palette (body 16.2:1, secondary 7.1:1, tertiary 5.3:1, pills 5.2-7.7:1, input borders 3.3:1) | Passed after fixes |
+| B-17 | Account-creation gates render three honest states on NB-2026-0006: genuine blockers red ●, demo-skipped docs amber ◐ "Skipped for demo - not verified" with the missing items named, never a false green; distinct glyphs so it does not rely on colour alone; console clean | Passed |
 
 ## C. Defects found during verification (all fixed and retested)
 
