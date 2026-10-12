@@ -29,6 +29,7 @@ const P = {
   filter: "M4 5h16l-6 8v6l-4-2v-4z",
   cols: "M4 4h16v16H4zM10 4v16M16 4v16",
   grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  help: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9a2.5 2.5 0 0 1 4.6 1.4c0 1.6-2.1 2-2.1 3.6M12 17h.01",
 };
 export const icon = (name, size = 18) => raw(`<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${P[name] || ""}"/></svg>`);
 

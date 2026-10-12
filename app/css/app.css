@@ -298,6 +298,8 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 .flow-item.na{cursor:not-allowed;color:var(--text-3);background:transparent;border-style:dashed;font-weight:500}
 .flow-item.na:hover{border-color:var(--border);background:transparent;color:var(--text-3)}
 .flow-item .tag{font-size:10px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--text-3);background:var(--gray-soft);border-radius:999px;padding:2px 7px}
+.flow-item.start{border-color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.flow-item.start .start-tag{color:var(--surface);background:var(--text)}
 .progress{height:8px;background:var(--gray-soft);border-radius:4px;overflow:hidden}.progress>i{display:block;height:100%;background:var(--blue)}
 
 /* ---------- Apple-style polish ---------- */
@@ -348,6 +350,13 @@ body{letter-spacing:-.003em}
 
 /* subtabs: subtle hover for the non-active pills */
 .subtabs a:not([aria-current="page"]):hover{background:var(--gray-soft);border-color:var(--blue-line);color:var(--text)}
+
+/* walkthrough guide: top-bar button + the "how to test" step list */
+.guide-btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.guide-btn .lbl-sm{font-weight:560}
+.guide-steps{margin:4px 0 0;padding-left:1.35em;display:flex;flex-direction:column;gap:10px}
+.guide-steps li{line-height:1.5;padding-left:4px}
+.guide-steps li::marker{color:var(--text-3);font-weight:700}
 
 /* ---------- responsive ---------- */
 @media (max-width:1100px){.fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.home-grid{grid-template-columns:1fr}.dl{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3{grid-template-columns:1fr 1fr}}

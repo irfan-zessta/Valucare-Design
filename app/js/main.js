@@ -21,7 +21,7 @@ async function boot() {
 const FLOWS = [
   { key: "corporate", label: "Corporate", depts: [
     { name: "Sales", items: [
-      { label: "New Business", user: "u-am1", href: "#/new-business" },
+      { label: "New Business", user: "u-am1", href: "#/new-business", start: true },
       { label: "Renewal Business" },
     ] },
     { name: "Actuarial", full: "ACCUSA", items: [
@@ -55,6 +55,7 @@ function renderLogin(reason) {
     <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3 · Corporate New Business<small>Choose a demo flow</small></span></div>
     <h1 style="font-size:20px;margin-top:8px">Choose a demo flow</h1>
     <p class="muted mt">Pick a department flow to sign in as that team's demo user and open their real work. Flows marked <b>Not in this build</b> are part of HMS3 but outside this Corporate New Business prototype. You can switch user any time from the top bar. Production sign-in would use SSO/MFA (NFR-01); there are no passwords here.</p>
+    <p class="note info mt">New here? Start with <b>Sales › New Business</b> below — then just follow the on-screen <b>Guide</b>, which walks you through the whole flow.</p>
     ${reason ? html`<div class="note warn mt">${reason}</div>` : ""}
     <div class="flowpick">${FLOWS.map((cat) => html`<section class="flow-cat" aria-label="${cat.label}">
       <h2>${cat.label}</h2>
@@ -62,7 +63,7 @@ function renderLogin(reason) {
       ${(cat.depts || []).map((d) => html`<div class="flow-dept">
         <div class="dept-h">${d.name}${d.full ? html`<small>${d.full}</small>` : ""}</div>
         <div class="dept-items">${d.items.map((it) => it.user
-          ? html`<button type="button" class="flow-item" data-flow data-user="${it.user}" data-href="${it.href}">${it.label}</button>`
+          ? html`<button type="button" class="flow-item ${it.start ? "start" : ""}" data-flow data-user="${it.user}" data-href="${it.href}">${it.label}${it.start ? html`<span class="tag start-tag">Start here</span>` : ""}</button>`
           : html`<span class="flow-item na" role="note" aria-label="${it.label}, not in this build" title="Not in this build">${it.label}<span class="tag">Not in this build</span></span>`)}</div>
       </div>`)}
     </section>`)}</div>
@@ -113,6 +114,7 @@ function renderShell() {
         <button type="button" class="btn ghost menu-btn" id="menuBtn" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">${icon("menu")}</button>
         <form class="qsearch" role="search" id="qsearch"><label class="sr-only" for="qs">Find a company or reference</label>${icon("search", 16)}
           <input id="qs" type="search" placeholder="Find company, case, franchise or account code…" autocomplete="off"></form>
+        <button type="button" class="btn ghost sm guide-btn" id="guideBtn" title="How to test this demo">${icon("help", 16)}<span class="lbl-sm">Guide</span></button>
         <span class="demo-tag" title="Fictional demo data; integrations are simulated">DEMO</span>
         <button type="button" class="whoami" id="whoBtn" aria-haspopup="dialog" aria-label="Signed in as ${me.name}, ${roleLabel(me.role)}. Switch demo user"><span class="avatar" aria-hidden="true">${me.name.split(" ").map((x) => x[0]).join("").slice(0, 2)}</span>
           <span class="w"><b>${me.name}</b><span>${roleLabel(me.role)}</span></span>${icon("chevd", 14)}</button>
@@ -129,8 +131,10 @@ function renderShell() {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && app.classList.contains("drawer-open")) { closeDrawer(); menuBtn.focus(); } });
   document.getElementById("qsearch").onsubmit = (e) => { e.preventDefault(); const q = document.getElementById("qs").value.trim(); go(`#/new-business?q=${encodeURIComponent(q)}&view=all`); };
   document.getElementById("whoBtn").onclick = (e) => userMenu(e.currentTarget);
+  document.getElementById("guideBtn").onclick = () => guideDialog();
   if (state.suggestedUser?.id && state.suggestedUser.id !== me.id) document.getElementById("whoBtn").classList.add("blink-switch");
   refreshCounts();
+  maybeShowGuide();
 }
 
 // Perform the real server-side session switch for the demo, then re-render.
@@ -162,6 +166,38 @@ async function userMenu(btn) {
   if (!r || (r.action !== "ok" && r.action !== "out")) return;
   if (r.action === "out") { if (!(await flushForms())) return; await api("logout", { method: "POST" }); state.me = null; return renderLogin(); }
   await switchUser(r.values.user);
+}
+
+// ---------------------------------------------------------------- walkthrough guide
+// A brand-new tester needs one thing: the mental model for how work moves. The
+// whole journey is driven by the "Next action" card on every case, so the guide
+// just teaches that loop. Shown once automatically on first sign-in (remembered
+// per browser) and reopenable any time from the top-bar "Guide" button.
+export async function guideDialog() {
+  const r = await dialog({
+    title: "How to test this demo",
+    wide: true,
+    body: html`<p class="muted">This is a mock of HMS3 Corporate <b>New Business</b> — one case travelling from first lead all the way to an active, handed-over account. One person can walk the whole journey by playing each role in turn. Here's the loop:</p>
+      <ol class="guide-steps mt">
+        <li><b>Open a case.</b> The <b>New Business</b> list (left) has every case, or hit <b>Create New Business</b> to start a fresh one from scratch.</li>
+        <li><b>Follow the “Next action” card.</b> At the top of each case it always says what happens next and who owns that step.</li>
+        <li><b>Switch to whoever owns it.</b> When the next step belongs to someone else, click <b>Switch to …</b> right on that card — you become that person and land straight on their task. (The user button, top-right, also blinks when a switch is due.)</li>
+        <li><b>Fill forms fast.</b> Every form has a <b>Fill sample data</b> button — use it, then Save or Submit to move the case forward.</li>
+        <li><b>Repeat to the end.</b> Keep following the card until the account is set up and handed over. That's the full flow, start to finish.</li>
+      </ol>
+      <p class="note info mt">You can change user any time from the top-right. Nothing here is real — all companies, people and numbers are fictional demo data, and approvals/mandatory fields are relaxed so you never get stuck.</p>`,
+    actions: [
+      { label: "Browse existing cases", value: "browse" },
+      { label: "Create a case", value: "create", kind: "primary" },
+    ],
+  });
+  if (r?.action === "create") go("#/new-business/create");
+  else if (r?.action === "browse") go("#/new-business");
+}
+function maybeShowGuide() {
+  if (prefs.get("guideSeen", false)) return;
+  prefs.set("guideSeen", true);
+  guideDialog();
 }
 
 export async function refreshCounts() {
