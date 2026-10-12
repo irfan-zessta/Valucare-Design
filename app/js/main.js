@@ -70,7 +70,7 @@ function renderLogin(reason) {
   root.querySelectorAll("[data-flow]").forEach((b) => (b.onclick = async () => {
     await api("login", { method: "POST", body: { userId: b.dataset.user } });
     state.me = (await api("me")).user;
-    location.hash = b.dataset.href || "#/home";
+    location.hash = b.dataset.href || "#/new-business";
     renderShell();
     route();
   }));
@@ -78,60 +78,24 @@ function renderLogin(reason) {
 }
 
 // ---------------------------------------------------------------- shell
-// Cross-cutting surfaces that are not tied to one business line.
+// This prototype is focused on a single end-to-end flow: Create New Business.
+// The sidebar therefore carries only the "Create New Business" action plus one
+// link back to the New Business case list (the flow's hub). Dashboard, Reports
+// and Shared Tools are intentionally omitted to keep the flow uncluttered.
 const NAV_PRIMARY = [
-  { key: "home", label: "Dashboard", icon: "grid", href: "#/home" },
-  { key: "reports", label: "Reports", icon: "chart", href: "#/reports" },
+  { key: "nb-list", label: "New Business", icon: "grid", href: "#/new-business" },
 ];
 const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 tasks">0</span>` : html`<span></span>`}</a>`;
 
-// The Sales accordion. Only New Business and Shared Tools are built in this
-// prototype, so every item points to a real, distinct destination. Renewal and
-// IFG are shown for familiarity but marked as handled outside this application
-// (no invented or duplicated pages) — matching how the app itself routes them.
-const SECTIONS = [
-  { key: "new-business", label: "New Business", items: [
-    { key: "nb-list", label: "Franchise List", href: "#/new-business" },
-    { key: "nb-enroll", label: "Franchise Enrollment", href: "#/new-business/create" },
-    { key: "nb-accounts", label: "Account Enrollment & Maintenance", href: "#/accounts" },
-  ] },
-  { key: "shared-tools", label: "Shared Tools", items: [
-    { key: "st-inter", label: "Agents and Brokers", href: "#/more/intermediaries" },
-    { key: "st-sob", label: "SOB template", href: "#/more/template" },
-    { key: "st-prov", label: "Provider directory", href: "#/more/providers" },
-    { key: "st-config", label: "Configuration", href: "#/more/config" },
-    { key: "st-testing", label: "Testing tools and demo data", href: "#/more/testing" },
-  ] },
-];
-
-// Which primary item / accordion section + item is active for the current route.
+// Which primary item is active for the current route.
 function activeInfo(parts) {
   const p = parts[0];
-  if (p === "home") return { top: "home" };
-  if (p === "tasks") return { top: "tasks" };
-  if (p === "reports") return { top: "reports" };
-  if (p === "new-business") return { section: "new-business", item: parts[1] === "create" ? "nb-enroll" : "nb-list" };
-  if (p === "case") return { section: "new-business", item: "nb-list" };
-  if (p === "accounts") return { section: "new-business", item: "nb-accounts" };
-  if (p === "more") {
-    const item = { intermediaries: "st-inter", template: "st-sob", providers: "st-prov", config: "st-config", testing: "st-testing" }[parts[1]];
-    if (item) return { section: "shared-tools", item };
-  }
+  if (p === "new-business" || p === "case") return { top: "nb-list" };
   return {};
 }
 
-const sectionHtml = (sec, open) => html`<div class="acc-sec">
-  <button type="button" class="navbtn acc-btn" data-acc="${sec.key}" aria-expanded="${open}" aria-controls="acc-${sec.key}"><span class="lbl">${sec.label}</span><span class="chev" aria-hidden="true">${icon(open ? "chevd" : "chev", 16)}</span></button>
-  <div class="sub acc-panel ${open ? "" : "hidden"}" id="acc-${sec.key}" role="region" aria-label="${sec.label}">
-    ${sec.items ? sec.items.map((it) => html`<a href="${it.href}" data-nav="${it.key}" class="acc-link">${it.label}</a>`) : html`<p class="acc-note">${sec.note}</p>`}
-  </div></div>`;
-
 function renderShell() {
   const collapsed = prefs.get("navCollapsed", false);
-  // Auto-expand the section holding the active page; otherwise restore the last
-  // section the user opened (default New Business on a first visit).
-  const info = activeInfo(parseHash().parts);
-  const openSection = info.section || prefs.get("openSection", "new-business");
   const me = state.me;
   root.innerHTML = html`<div class="app ${collapsed ? "collapsed" : ""}" id="app">
     <nav class="sidebar" aria-label="Main navigation" id="sidebar">
@@ -139,7 +103,6 @@ function renderShell() {
       ${["am", "sm"].includes(me.role) ? html`<a class="btn primary create-btn" href="#/new-business/create" title="Create New Business">${icon("plus")}<span class="lbl">Create New Business</span></a>` : ""}
       <div class="nav">
         ${NAV_PRIMARY.map(navLink)}
-        <div id="navAccordion">${SECTIONS.map((sec) => sectionHtml(sec, openSection === sec.key))}</div>
       </div>
       <div class="spacer"></div>
       <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse")}<span class="lbl">${collapsed ? "Expand" : "Collapse sidebar"}</span><span></span></button></div>
@@ -158,21 +121,6 @@ function renderShell() {
     </div></div>`.s;
   const app = document.getElementById("app");
   document.getElementById("collapseBtn").onclick = () => { prefs.set("navCollapsed", !app.classList.contains("collapsed")); renderShell(); route(true); };
-  // Accordion: open one section, collapse the rest. Clicking an open header
-  // closes it (all-closed is allowed). Navigation never happens here.
-  const setChev = (btn, open) => { btn.querySelector(".chev").innerHTML = icon(open ? "chevd" : "chev", 16).s; };
-  const openAccordion = (key) => {
-    root.querySelectorAll(".acc-panel").forEach((pnl) => pnl.classList.add("hidden"));
-    root.querySelectorAll("[data-acc]").forEach((b) => { const on = b.dataset.acc === key; b.setAttribute("aria-expanded", on); setChev(b, on); });
-    document.getElementById("acc-" + key)?.classList.remove("hidden");
-    prefs.set("openSection", key);
-  };
-  root.querySelectorAll("[data-acc]").forEach((btn) => btn.onclick = () => {
-    const key = btn.dataset.acc;
-    const isOpen = !document.getElementById("acc-" + key).classList.contains("hidden");
-    if (isOpen) { document.getElementById("acc-" + key).classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); setChev(btn, false); prefs.set("openSection", ""); }
-    else openAccordion(key);
-  });
   const menuBtn = document.getElementById("menuBtn");
   const closeDrawer = () => { app.classList.remove("drawer-open"); menuBtn.setAttribute("aria-expanded", "false"); };
   menuBtn.onclick = () => { app.classList.add("drawer-open"); menuBtn.setAttribute("aria-expanded", "true"); document.querySelector(".sidebar a").focus(); };
@@ -241,7 +189,7 @@ let renderSeq = 0;
 async function route(force = false) {
   if (!state.me) return;
   const { parts, query } = parseHash();
-  if (!parts.length) { location.replace("#/home"); return; }
+  if (!parts.length) { location.replace("#/new-business"); return; }
   let key = parts[0];
   if (key === "new-business" && parts[1] === "create") key = "create";
   const loader = VIEWS[key];
@@ -255,7 +203,7 @@ async function route(force = false) {
   });
   const seq = ++renderSeq;
   disposeForms();
-  if (!loader) { main.innerHTML = `<div class="empty"><b>Page not found</b><a href="#/home">Go to Home</a></div>`; return; }
+  if (!loader) { main.innerHTML = `<div class="empty"><b>Page not found</b><a href="#/new-business">Go to New Business</a></div>`; return; }
   try {
     const mod = await loader();
     if (seq !== renderSeq) return;
@@ -277,7 +225,7 @@ window.addEventListener("hashchange", async () => {
   const nextParts = target.split("?")[0].split("/").slice(0, 3).join("/");
   if (prevParts !== nextParts) {
     navigating = true;
-    history.replaceState(null, "", lastHash || "#/home");
+    history.replaceState(null, "", lastHash || "#/new-business");
     const ok = await flushForms();
     navigating = false;
     if (!ok) return;
