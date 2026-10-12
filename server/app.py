@@ -423,7 +423,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, tables.to_csv(cols, out), "text/csv", {"Content-Disposition": f"attachment; filename=\"plan-codes-{m.group(1)}.csv\""})
         m = re.fullmatch(r"samples/([\w-]+)\.csv", p)
         if m:
-            return self._send(200, self._sample(m.group(1)), "text/csv", {"Content-Disposition": f"attachment; filename=\"{m.group(1)}.csv\""})
+            return self._send(200, self._sample(m.group(1), q), "text/csv", {"Content-Disposition": f"attachment; filename=\"{m.group(1)}.csv\""})
         m = re.fullmatch(r"templates/([\w-]+)\.csv", p)
         if m:
             return self._send(200, self._template(m.group(1), q), "text/csv",
@@ -479,16 +479,26 @@ class Handler(BaseHTTPRequestHandler):
             counts[r.get("status")] = counts.get(r.get("status"), 0) + 1
         return {"total": len(rows), "items": rows[off:off + lim], "counts": counts}
 
-    def _sample(self, name):
+    def _sample(self, name, q=None):
         """Fictional sample files for upload/import testing."""
         import random as _r
         from . import seed as _seed
         st = store()
+        q = q or {}
+        # A case-specific clean Member Data sample, seeded with the plan codes
+        # actually approved on that account so every row validates in place (no
+        # "not an approved Plan Code" errors). Used by the "Use sample" button.
+        if name == "member-data-case":
+            case_id = q.get("caseId")
+            if case_id:
+                case_approved = [r["planCode"] for r in st.list("planCode", case_id) if r.get("status") == "Approved"]
+                if case_approved:
+                    return _seed.member_csv(120, case_approved, seed=7)
         jumbo = next((c for c in st.list("case") if (st.get(c["companyId"]) or {}).get("registeredName", "").startswith("Kalayaan")), None)
         approved = [r["planCode"] for r in st.list("planCode", jumbo["id"]) if r.get("status") == "Approved"] if jumbo else []
-        if name == "member-data-10000":
+        if name in ("member-data-10000",):
             return _seed.member_csv(5200, approved or ["PLAN-A"], errors=True, seed=99)
-        if name == "member-data-300":
+        if name in ("member-data-300", "member-data-case"):
             return _seed.member_csv(300, approved or ["PLAN-A"], seed=3)
         if name == "plan-codes-1000":
             accs = [a for a in st.list("account", jumbo["id"])] if jumbo else []

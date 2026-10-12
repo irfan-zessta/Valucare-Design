@@ -1,4 +1,4 @@
-import { html, raw, api, state, act, pickFile, showError, toast, dialog, fmtDateTime, roleLabel, int, upload, docUrl, esc, fileOrSample } from "../core.js";
+import { html, raw, api, state, act, pickFile, showError, toast, dialog, fmtDateTime, roleLabel, int, upload, docUrl, esc, fileOrSample, DEMO_BYPASS } from "../core.js";
 import { icon, pill, simNote } from "../components.js";
 
 export async function renderMemberData(ctx, box, purpose) {
@@ -18,13 +18,11 @@ export async function renderMemberData(ctx, box, purpose) {
   box.innerHTML = html`<section class="panel"><div class="ph"><div><h2>Member Data${purpose === "quotation" ? " for quotation (Master List)" : " (Master List) for enrollment"}</h2>
       <div class="tiny">${purpose === "quotation" ? "Validated before the rate request; Actuarial (ACCUSA) rates from it. Owner: AAT handler." : "Owner: AMT. Accepted data is submitted to MDA with approved Plan Codes."} Sensitive personal data (Data Privacy Act).</div></div>
       <div class="row"><a class="btn sm" href="/api/templates/member-data.csv" download>${icon("download", 14)} Template</a>
-        ${owns && !locked && !enrollmentBlocked ? html`<button class="btn sm ${batch ? "" : "primary"}" id="mUp">${icon("upload", 14)} ${batch ? "Re-upload (new version)" : "Upload file"}</button>` : ""}</div></div>
+        ${owns && !locked && !enrollmentBlocked ? html`<button class="btn sm ${batch ? "" : "primary"}" id="mUp">${icon("upload", 14)} ${batch ? "Re-upload (new version)" : "Upload file"}</button>` : ""}
+        ${DEMO_BYPASS && owns && !locked && !enrollmentBlocked ? html`<button class="btn sm ghost" id="mSample" title="Load a generated demo Member Data file (300 clean rows)">Use sample</button>` : ""}</div></div>
     <div class="pb" id="mBody">${enrollmentBlocked ? html`<div class="note">Enrollment Member Data is uploaded after the account is approved.</div>` :
       !batch ? html`<div class="empty"><b>No Member Data uploaded.</b>Upload a CSV or Excel (.xlsx) file using the template columns. Columns are mapped, every row is validated, and errors can be corrected here or by re-uploading.</div>` : ""}</div></section>`.s;
-  box.querySelector("#mUp")?.addEventListener("click", async (e) => {
-    const f = await pickFile(".csv,.xlsx");
-    if (!f) return;
-    const b = e.currentTarget;
+  const doImport = async (f, b) => {
     b.setAttribute("aria-busy", "true"); b.disabled = true;
     const body = box.querySelector("#mBody");
     body.insertAdjacentHTML("afterbegin", html`<div class="note" role="status" id="upNote">Uploading and validating ${f.name} (${Math.round(f.size / 1024)} KB)…</div>`.s);
@@ -34,6 +32,22 @@ export async function renderMemberData(ctx, box, purpose) {
       toast(`${f.name}: ${r.batch.counts.total} rows ${r.autoMapped ? `validated in ${((performance.now() - t0) / 1000).toFixed(1)} s` : "uploaded - confirm the column mapping"}.`, "ok");
       ctx.reload();
     } catch (err) { box.querySelector("#upNote")?.remove(); await showError(err); } finally { if (b.isConnected) { b.removeAttribute("aria-busy"); b.disabled = false; } }
+  };
+  box.querySelector("#mUp")?.addEventListener("click", async (e) => {
+    const f = await pickFile(".csv,.xlsx");
+    if (!f) return;
+    doImport(f, e.currentTarget);
+  });
+  box.querySelector("#mSample")?.addEventListener("click", async (e) => {
+    const b = e.currentTarget;
+    b.setAttribute("aria-busy", "true"); b.disabled = true;
+    let f;
+    try {
+      const res = await fetch(`/api/samples/member-data-case.csv?caseId=${encodeURIComponent(id)}`, { credentials: "same-origin" });
+      if (!res.ok) throw new Error("Could not load the sample Member Data file.");
+      f = new File([await res.text()], "member-data-sample.csv", { type: "text/csv" });
+    } catch (err) { if (b.isConnected) { b.removeAttribute("aria-busy"); b.disabled = false; } return showError(err); }
+    doImport(f, b);
   });
   if (!batch || enrollmentBlocked) return;
   const body = box.querySelector("#mBody");
