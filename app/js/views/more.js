@@ -16,14 +16,14 @@ async function intermediaries(main) {
   state.meta.intermediaries = items;
   const me = state.me;
   main.innerHTML = html`<div class="page-head"><div><h1>Agents and Brokers</h1><p>Only Active intermediaries with a verified agreement can be tagged to franchises (NB-AGT-05). One active AOR/BOR per account (BR-02).</p></div>
-    ${["am", "as", "compliance"].includes(me.role) ? html`<button class="btn primary" id="reg">${icon("plus")} Register intermediary</button>` : ""}</div>
+    ${["aat", "amt"].includes(me.role) ? html`<button class="btn primary" id="reg">${icon("plus")} Register intermediary</button>` : ""}</div>
     <div class="panel"><div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Intermediaries</caption><thead><tr><th>Name</th><th>Type</th><th>Code</th><th>Contact email</th><th>Status</th><th>Validity</th><th>Agreement</th><th>Accounts (AOR/BOR)</th><th>Action</th></tr></thead><tbody>
     ${items.map((i) => html`<tr><td><b>${i.name}</b><span class="sub">${i.contactPerson || ""} · ${i.mobile || ""}</span></td><td>${i.intermediaryType}</td><td class="mono">${i.code}</td><td>${i.email}</td><td>${pill(i.status)}</td>
       <td>${fmtDate(i.validFrom)} - ${fmtDate(i.validTo)}</td><td>${(i.documents || []).filter((d) => d.slot === "agreement").map((d) => html`<a href="${docUrl(d.id)}">${d.filename}</a>`)}
-        ${["am", "as", "compliance"].includes(me.role) ? html`<button class="btn sm" data-up="${i.id}">${icon("upload", 13)} Upload</button>` : ""}</td>
+        ${["aat", "amt"].includes(me.role) ? html`<button class="btn sm" data-up="${i.id}">${icon("upload", 13)} Upload</button>` : ""}</td>
       <td>${(i.aors || []).length ? i.aors.map((a) => html`<div class="tiny">${a.status} since ${fmtDate(a.effectiveFrom)}</div>`) : html`<span class="tiny">None</span>`}</td>
-      <td>${me.role === "compliance" && i.status === "Uploaded" ? html`<button class="btn sm" data-v="${i.id}">Verify agreement</button>` : ""}${me.role === "as" && i.status === "Verified" ? html`<button class="btn sm primary" data-v="${i.id}">Activate</button>` : ""}
-        ${me.role === "as" && i.status === "Active" ? html`<button class="btn sm" data-in="${i.id}">Deactivate</button>` : ""}</td></tr>`)}</tbody></table></div></div>`.s;
+      <td>${me.role === "amt" && i.status === "Uploaded" ? html`<button class="btn sm" data-v="${i.id}">Verify agreement</button>` : ""}${me.role === "amt" && i.status === "Verified" ? html`<button class="btn sm primary" data-v="${i.id}">Activate</button>` : ""}
+        ${me.role === "amt" && i.status === "Active" ? html`<button class="btn sm" data-in="${i.id}">Deactivate</button>` : ""}</td></tr>`)}</tbody></table></div></div>`.s;
   main.querySelector("#reg")?.addEventListener("click", async (e) => {
     const r = await dialog({ title: "Register agent or broker", wide: true, body: html`<div class="fgrid two">
       <div class="field"><label for="it">Type *</label><select id="it" name="intermediaryType" class="inp"><option>Agent</option><option>Broker</option></select></div>
@@ -33,7 +33,7 @@ async function intermediaries(main) {
       <div class="field"><label for="itn">TIN</label><input id="itn" name="tin" class="inp"></div><div class="field"><label for="icp">Contact person</label><input id="icp" name="contactPerson" class="inp"></div>
       <div class="field" style="grid-column:1/-1"><label for="iad">Address</label><input id="iad" name="address" class="inp"></div>
       <div class="field"><label for="ivf">Valid from</label><input id="ivf" name="validFrom" type="date" class="inp"></div><div class="field"><label for="ivt">Valid to</label><input id="ivt" name="validTo" type="date" class="inp"></div></div>
-      <p class="tiny mt">Status starts as Uploaded. Compliance verifies the signed agreement; Account Services activates.</p>`,
+      <p class="tiny mt">Status starts as Uploaded. AMT verifies the signed agreement and then activates the intermediary.</p>`,
       actions: [{ label: "Cancel" }, { label: "Register", kind: "primary", value: "ok", validate: (v) => (!v.name.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email) ? "Name and a valid email are required." : null) }] });
     if (r?.action === "ok" && (await act("intermediary.create", r.values, { button: e.currentTarget, success: "Intermediary registered." }))) intermediaries(main);
   });
@@ -50,7 +50,7 @@ async function intermediaries(main) {
 async function template(main) {
   document.title = "SOB template · HMS3";
   const t = (await api("records/SOB-TEMPLATE")).record;
-  const editable = state.me.role === "actuarial";
+  const editable = state.me.role === "accusa";
   main.innerHTML = html`<div class="page-head"><div><h1>SOB template</h1><p>Actuarial owns the standard SOB template (US-SOB-01). Sales starts every SOB draft from the approved template. Version ${t.v}.</p></div><span id="st"></span></div>
     ${editable ? "" : html`<div class="note mb">${icon("lock", 14)} Maintained by Actuarial. Read-only for ${roleLabel(state.me.role)}.</div>`}
     <section class="panel"><div class="ph"><h2>${t.name} ${pill(t.status)}</h2><div class="row">${editable ? html`<button class="btn sm" id="add">${icon("plus", 14)} Add benefit</button>${DEMO_BYPASS ? html`<button class="btn sm ghost" id="fillSampleTpl" type="button" title="Add a filled sample benefit line">Fill sample</button>` : ""}` : ""}</div></div><div class="pb flush" id="lines"></div></section>`.s;

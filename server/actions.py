@@ -52,14 +52,14 @@ def run(store, ctx, name, payload):
 def _case(s, ctx, case_id, need_open=True):
     c = s.store.must(case_id, "case")
     if not visible_case(ctx, c):
-        raise ApiError(403, "forbidden", "This case belongs to another Account Manager's portfolio.")
+        raise ApiError(403, "forbidden", "This case belongs to another AAT handler's book.")
     if need_open and c.get("status") != "Open":
         raise ApiError(409, "case_closed", f"Case is {c.get('status')}.")
     return c
 
 
 def _owner_or_sm(ctx, c):
-    if ctx.role == "am" and c.get("ownerId") != ctx.uid:
+    if ctx.role == "aat" and c.get("ownerId") != ctx.uid:
         raise ApiError(403, "forbidden", "Only the case owner can do this.")
 
 
@@ -138,13 +138,13 @@ def make_doc(s, ctx, case_id, linked, slot, doc_type, filename, data, mime="appl
 
 UPLOAD_ROLES = [
     # (slot prefix, roles allowed)
-    ("aor_bor", ("am", "sm")), ("signatory_id", ("am", "sm")), ("masterlist", ("am", "sm")), ("tor", ("am", "sm")),
-    ("utilization", ("am", "sm")), ("gis", ("am", "sm")), ("req:", ("am", "sm")), ("rr_attach", ("am", "sm")),
-    ("rs_pdf", ("actuarial",)), ("acceptance", ("am", "sm")), ("negotiation", ("am", "sm")),
-    ("kyc_form", ("am", "sm")), ("kyc_evidence", ("am", "sm", "compliance")), ("kyc_flag", ("compliance",)),
-    ("onb:", ("am", "sm", "as")), ("draft", ("legal",)), ("signed", ("as",)), ("notarized", ("as",)),
-    ("sob_signed", ("am", "sm", "as")), ("billing", ("bc",)), ("vat_doc", ("bc",)), ("member_exception", ("as",)),
-    ("agreement", ("am", "as", "compliance")), ("intermediary_id", ("am", "as", "compliance")), ("bor_letter", ("as",)),
+    ("aor_bor", ("aat",)), ("signatory_id", ("aat",)), ("masterlist", ("aat",)), ("tor", ("aat",)),
+    ("utilization", ("aat",)), ("gis", ("aat",)), ("req:", ("aat",)), ("rr_attach", ("aat",)),
+    ("rs_pdf", ("accusa",)), ("acceptance", ("aat",)), ("negotiation", ("aat",)),
+    ("kyc_form", ("aat",)), ("kyc_evidence", ("aat",)), ("kyc_flag", ("aat",)),
+    ("onb:", ("aat", "amt")), ("draft", ("legal",)), ("signed", ("amt",)), ("notarized", ("amt",)),
+    ("sob_signed", ("aat", "amt")), ("billing", ("bc",)), ("vat_doc", ("bc",)), ("member_exception", ("amt",)),
+    ("agreement", ("aat", "amt")), ("intermediary_id", ("aat", "amt")), ("bor_letter", ("amt",)),
 ]
 
 
@@ -260,7 +260,7 @@ LEAD_KEYS = ("leadSource", "estHeadcount", "estPremium", "probability", "targetE
              "contactEmail", "contactPhone", "pipelineStage", "vip", "jumbo", "notes")
 
 
-@action("case.create", ["am", "sm"])
+@action("case.create", ["aat"])
 def case_create(s, ctx, p):
     cfg = s.cfg
     lead = p.get("lead") or {}
@@ -273,15 +273,15 @@ def case_create(s, ctx, p):
     err = _intermediary_ok(s, lead.get("intermediaryId"), channel)
     if err and not DEMO_BYPASS:
         raise ApiError(422, "validation", err, {"fields": [{"field": "intermediaryId", "message": err}]})
-    if ctx.role == "am":
+    if ctx.role == "aat":
         owner = ctx.uid
     else:
         owner = lead.get("ownerId")
-        if not owner or USERS.get(owner, {}).get("role") != "am":
+        if not owner or USERS.get(owner, {}).get("role") != "aat":
             if DEMO_BYPASS:
-                owner = owner if USERS.get(owner, {}).get("role") == "am" else next((u["id"] for u in meta.USERS if u["role"] == "am"), ctx.uid)
+                owner = owner if USERS.get(owner, {}).get("role") == "aat" else next((u["id"] for u in meta.USERS if u["role"] == "aat"), ctx.uid)
             else:
-                raise ApiError(422, "validation", "Choose the Account Manager who will own this case.", {"fields": [{"field": "ownerId", "message": "Required."}]})
+                raise ApiError(422, "validation", "Choose the AAT handler who will own this case.", {"fields": [{"field": "ownerId", "message": "Required."}]})
     if not lead.get("leadSource") and not DEMO_BYPASS:
         raise ApiError(422, "validation", "Lead source is required.", {"fields": [{"field": "leadSource", "message": "Required."}]})
     override = None
@@ -334,8 +334,9 @@ def case_create(s, ctx, p):
             "duplicateOverride": override,
         }, None, ctx, action="company.create", rid=cid, reason=(override or {}).get("reason"))
     case_id = next_id(s.store, "NB")
-    owner_team = USERS[owner].get("team")
-    sm = next((u["id"] for u in meta.USERS if u["role"] == "sm" and u.get("team") == owner_team), None)
+    # The source process does not define an automatic secondary handler / approver
+    # assignment, so none is set here. The reviewing approver is pending confirmation.
+    sm = None
     rec = {
         "companyId": co["id"], "leadRef": next_id(s.store, "LD"), "ownerId": owner, "salesManagerId": sm,
         "channel": channel, "intermediaryId": lead.get("intermediaryId") if channel != "Direct" else None,
@@ -365,7 +366,7 @@ def below_min_message(cfg, hc):
             "this corporate lead with the reason recorded.")
 
 
-@action("case.closeLost", ["am", "sm"])
+@action("case.closeLost", ["aat"])
 def case_close_lost(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     _owner_or_sm(ctx, c)
@@ -375,7 +376,7 @@ def case_close_lost(s, ctx, p):
     return {}
 
 
-@action("case.routeIfg", ["am", "sm"])
+@action("case.routeIfg", ["aat"])
 def case_route_ifg(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     _owner_or_sm(ctx, c)
@@ -386,7 +387,7 @@ def case_route_ifg(s, ctx, p):
     return {}
 
 
-@action("case.reopen", ["sm"])
+@action("case.reopen", ["approver"])
 def case_reopen(s, ctx, p):
     c = _case(s, ctx, p["caseId"], need_open=False)
     if c.get("status") not in ("Closed Lost",):
@@ -395,18 +396,18 @@ def case_reopen(s, ctx, p):
     return {}
 
 
-@action("case.reassign", ["sm"])
+@action("case.reassign", ["approver"])
 def case_reassign(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     _need(p, "ownerId", "reason")
-    if USERS.get(p["ownerId"], {}).get("role") != "am":
-        raise ApiError(422, "validation", "Choose an Account Manager.")
+    if USERS.get(p["ownerId"], {}).get("role") != "aat":
+        raise ApiError(422, "validation", "Choose an AAT handler.")
     _set(s, ctx, c, {"ownerId": p["ownerId"]}, "lead.reassign", reason=p["reason"])
     notify(s.store, ctx, c["id"], "lead.assigned", [user_name(p["ownerId"])], f"Case {c['id']} reassigned to you")
     return {}
 
 
-@action("case.logActivity", ["am", "sm"])
+@action("case.logActivity", ["aat"])
 def case_log_activity(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     _need(p, "kind", "notes")
@@ -417,14 +418,14 @@ def case_log_activity(s, ctx, p):
     return {}
 
 
-@action("case.delete", None if DEMO_BYPASS else ["sm"])
+@action("case.delete", None if DEMO_BYPASS else ["approver"])
 def case_delete(s, ctx, p):
     """Demo housekeeping: permanently remove a case, all its linked records and
     documents, and its company when no other case references it. Not part of the
     real workflow - exposed only so the mock can be reset to a clean slate."""
     c = s.store.must(p["caseId"], "case")
     if not visible_case(ctx, c) and not DEMO_BYPASS:
-        raise ApiError(403, "forbidden", "This case belongs to another Account Manager's portfolio.")
+        raise ApiError(403, "forbidden", "This case belongs to another AAT handler's book.")
     reason = (p.get("reason") or "").strip() or "Demo: case and company removed."
     company_id = c.get("companyId")
     recs = s.store.list_case(c["id"]) + s.store.list("planCode", c["id"])
@@ -476,7 +477,7 @@ def franchise_prefill(s, ctx, c):
     }
 
 
-@action("franchise.start", ["am", "sm"])
+@action("franchise.start", ["aat"])
 def franchise_start(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     _owner_or_sm(ctx, c)
@@ -571,7 +572,7 @@ def active_aor(s, company_id):
     return None
 
 
-@action("franchise.submit", ["am", "sm"])
+@action("franchise.submit", ["aat"])
 def franchise_submit(s, ctx, p):
     fr = s.store.must(p["franchiseId"], "franchise")
     c = _case(s, ctx, fr["caseId"])
@@ -598,7 +599,7 @@ def franchise_submit(s, ctx, p):
             other = s.store.get(aor["intermediaryId"]) or {}
             raise ApiError(409, "aor_conflict",
                            f"{other.get('name', 'Another intermediary')} is the active AOR/BOR for this company. Only one may represent an account (BR-02). "
-                           "Account Services must record a BOR change with the supporting letter and signatory first.")
+                           "AMT must record a BOR change with the supporting letter and signatory first.")
     conflicts = franchise_conflicts(s, fr)
     blocking = [x for x in conflicts if x["blocking"]]
     if blocking and not DEMO_BYPASS:
@@ -612,12 +613,12 @@ def franchise_submit(s, ctx, p):
                       "highRisk": high, "returnReason": None}, "franchise.submit", base=p.get("baseVersion"))
     _set(s, ctx, c, {"channel": channel, "intermediaryId": oi.get("businessSourceName") if channel != "Direct" else None,
                      "estHeadcount": n}, "lead.syncFromFranchise")
-    notify(s.store, ctx, c["id"], "franchise.submitted", ["Account Services queue", user_name(c.get("salesManagerId"))],
+    notify(s.store, ctx, c["id"], "franchise.submitted", ["AMT queue", user_name(c.get("salesManagerId"))],
            f"Franchise {fr['code']} submitted for review")
     return {"conflicts": conflicts, "highRisk": high}
 
 
-@action("franchise.startReview", ["as"])
+@action("franchise.startReview", ["amt"])
 def franchise_start_review(s, ctx, p):
     fr = s.store.must(p["franchiseId"], "franchise")
     require_status(fr, "Submitted", what="Franchise")
@@ -635,7 +636,7 @@ def franchise_validity(s, ctx, fr):
     return today + dt.timedelta(days=364)
 
 
-@action("franchise.decide", ["as"])
+@action("franchise.decide", ["amt"])
 def franchise_decide(s, ctx, p):
     fr = s.store.must(p["franchiseId"], "franchise")
     require_status(fr, "Submitted", "Under Review", what="Franchise")
@@ -681,7 +682,7 @@ def franchise_decide(s, ctx, p):
     return {}
 
 
-@action("franchise.requestExtension", ["am", "sm"])
+@action("franchise.requestExtension", ["aat"])
 def franchise_req_ext(s, ctx, p):
     fr = s.store.must(p["franchiseId"], "franchise")
     c = _case(s, ctx, fr["caseId"])
@@ -697,11 +698,11 @@ def franchise_req_ext(s, ctx, p):
                                        "previousUntil": fr["validUntil"], "status": "Requested", "requestedBy": ctx.uid,
                                        "requestedByName": ctx.user["name"], "requestedAt": ctx.now_iso()}]
     _set(s, ctx, fr, {"extensions": ext}, "franchise.requestExtension", reason=p["reason"])
-    notify(s.store, ctx, c["id"], "franchise.extensionRequested", ["Account Services queue"], f"Extension requested for {fr['code']}")
+    notify(s.store, ctx, c["id"], "franchise.extensionRequested", ["AMT queue"], f"Extension requested for {fr['code']}")
     return {}
 
 
-@action("franchise.decideExtension", ["as"])
+@action("franchise.decideExtension", ["amt"])
 def franchise_dec_ext(s, ctx, p):
     fr = s.store.must(p["franchiseId"], "franchise")
     exts = copy.deepcopy(fr.get("extensions", []))
@@ -728,7 +729,7 @@ def franchise_dec_ext(s, ctx, p):
     return {}
 
 
-@action("franchise.setRequirement", ["am", "sm"])
+@action("franchise.setRequirement", ["aat"])
 def franchise_set_req(s, ctx, p):
     fr = s.store.must(p["franchiseId"], "franchise")
     _case(s, ctx, fr["caseId"])
@@ -747,7 +748,7 @@ def franchise_set_req(s, ctx, p):
 
 
 # ======================================================================== intermediaries / AOR
-@action("intermediary.create", ["am", "as", "compliance"])
+@action("intermediary.create", ["aat", "amt"])
 def intermediary_create(s, ctx, p):
     _need(p, "intermediaryType", "name", "email")
     if p["intermediaryType"] not in ("Agent", "Broker", "General Agent"):
@@ -763,7 +764,7 @@ def intermediary_create(s, ctx, p):
     return {"id": rid}
 
 
-@action("intermediary.verify", ["compliance", "as"])
+@action("intermediary.verify", ["amt"])
 def intermediary_verify(s, ctx, p):
     it = s.store.must(p["id"], "intermediary")
     nxt = {"Uploaded": "Verified", "Verified": "Active"}.get(it.get("status"))
@@ -773,14 +774,14 @@ def intermediary_verify(s, ctx, p):
         raise ApiError(409, "invalid_state", f"Intermediary is {it.get('status')}.")
     if nxt == "Verified" and not _docs(s, it["id"], "agreement"):
         raise ApiError(422, "validation", "Upload the signed agent/brokerage agreement before verifying (NB-AGT-05).")
-    if nxt == "Active" and ctx.role != "as":
-        raise ApiError(403, "forbidden", "Account Services activates verified intermediaries.")
+    if nxt == "Active" and ctx.role != "amt":
+        raise ApiError(403, "forbidden", "AMT activates verified intermediaries.")
     _set(s, ctx, it, {"status": nxt, "agreementVerified": nxt in ("Verified", "Active") or it.get("agreementVerified"),
                       f"{nxt.lower()}By": ctx.uid}, f"intermediary.{nxt.lower()}", reason=p.get("remarks"))
     return {}
 
 
-@action("aor.change", ["as"])
+@action("aor.change", ["amt"])
 def aor_change(s, ctx, p):
     _need(p, "caseId", "intermediaryId", "letterDocId", "signatory", "effectiveDate")
     c = s.store.must(p["caseId"], "case")
@@ -809,7 +810,7 @@ def _approved_franchise(s, b):
     return fr
 
 
-@action("rateRequest.create", ["am", "sm"])
+@action("rateRequest.create", ["aat"])
 def rr_create(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -826,7 +827,7 @@ def rr_create(s, ctx, p):
     return {"id": rec["id"]}
 
 
-@action("rateRequest.submit", ["am", "sm"])
+@action("rateRequest.submit", ["aat"])
 def rr_submit(s, ctx, p):
     rr = s.store.must(p["id"], "rateRequest")
     c = _case(s, ctx, rr["caseId"])
@@ -856,11 +857,11 @@ def rr_submit(s, ctx, p):
                        {"fields": [{"field": "requirements", "message": "Member Data (Master List) must be received before requesting rates."}]})
     _set(s, ctx, rr, {"status": "Submitted", "submittedBy": ctx.uid, "submittedAt": ctx.now_iso()}, "rateRequest.submit", base=p.get("baseVersion"))
     _set(s, ctx, c, {"pipelineStage": "For Rates Creation"}, "lead.stage")
-    notify(s.store, ctx, c["id"], "rateRequest.submitted", ["Actuarial queue"], f"Rate request {rr['code']} submitted")
+    notify(s.store, ctx, c["id"], "rateRequest.submitted", ["Actuarial (ACCUSA) queue"], f"Rate request {rr['code']} submitted")
     return {}
 
 
-@action("rateRequest.startReview", ["actuarial"])
+@action("rateRequest.startReview", ["accusa"])
 def rr_start(s, ctx, p):
     rr = s.store.must(p["id"], "rateRequest")
     require_status(rr, "Submitted", "Revised", what="Rate request")
@@ -869,7 +870,7 @@ def rr_start(s, ctx, p):
     return {}
 
 
-@action("rateRequest.returnForInfo", ["actuarial"])
+@action("rateRequest.returnForInfo", ["accusa"])
 def rr_return(s, ctx, p):
     rr = s.store.must(p["id"], "rateRequest")
     require_status(rr, "Submitted", "In Review", "Revised", what="Rate request")
@@ -882,7 +883,7 @@ def rr_return(s, ctx, p):
     return {}
 
 
-@action("rateRequest.respond", ["am", "sm"])
+@action("rateRequest.respond", ["aat"])
 def rr_respond(s, ctx, p):
     rr = s.store.must(p["id"], "rateRequest")
     _case(s, ctx, rr["caseId"])
@@ -895,7 +896,7 @@ def rr_respond(s, ctx, p):
     return {}
 
 
-@action("rateRequest.requestRevision", ["am", "sm"])
+@action("rateRequest.requestRevision", ["aat"])
 def rr_revision(s, ctx, p):
     rr = s.store.must(p["id"], "rateRequest")
     _case(s, ctx, rr["caseId"])
@@ -930,7 +931,7 @@ def validate_rate_rows(rows):
     return out, errs
 
 
-@action("rateSheet.issue", ["actuarial"])
+@action("rateSheet.issue", ["accusa"])
 def rs_issue(s, ctx, p):
     rr = s.store.must(p["rateRequestId"], "rateRequest")
     require_status(rr, "In Review", what="Rate request")
@@ -964,7 +965,7 @@ def rs_issue(s, ctx, p):
 
 
 # ======================================================================== TOR
-@action("tor.create", ["am", "sm"])
+@action("tor.create", ["aat"])
 def tor_create(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -1007,7 +1008,7 @@ def validate_line_rows(rows):
     return out, errs
 
 
-@action("tor.applyImport", ["am", "sm"])
+@action("tor.applyImport", ["aat"])
 def tor_apply(s, ctx, p):
     tor = s.store.must(p["torId"], "tor")
     _case(s, ctx, tor["caseId"])
@@ -1026,7 +1027,7 @@ def _template_lines(s):
     return copy.deepcopy((t or {}).get("lines", []))
 
 
-@action("sob.create", ["am", "sm"])
+@action("sob.create", ["aat"])
 def sob_create(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -1072,7 +1073,7 @@ def _sob_comparison(s, sob):
     return compare_benefits((tor or {}).get("lines", []), sob.get("lines", []))
 
 
-@action("sob.submitReview", ["am", "sm"])
+@action("sob.submitReview", ["aat"])
 def sob_submit(s, ctx, p):
     sob = _sob(s, ctx, p["id"])
     require_status(sob, "Draft", what="SOB")
@@ -1098,7 +1099,7 @@ def sob_submit(s, ctx, p):
     return {}
 
 
-@action("sob.salesReview", ["sm"])
+@action("sob.salesReview", ["approver"])
 def sob_sales_review(s, ctx, p):
     sob = s.store.must(p["id"], "sob")
     require_status(sob, "Sales Review", what="SOB")
@@ -1147,7 +1148,7 @@ def sob_validate(s, ctx, p):
     return {}
 
 
-@action("sob.recordSigned", ["am", "sm", "as"])
+@action("sob.recordSigned", ["aat", "amt"])
 def sob_signed(s, ctx, p):
     sob = _sob(s, ctx, p["id"])
     require_status(sob, "Approved", what="SOB")
@@ -1160,7 +1161,7 @@ def sob_signed(s, ctx, p):
     return {}
 
 
-@action("sob.codify", ["as"])
+@action("sob.codify", ["amt"])
 def sob_codify(s, ctx, p):
     sob = _sob(s, ctx, p["id"])
     require_status(sob, "Client Signed", what="SOB")
@@ -1173,7 +1174,7 @@ def sob_codify(s, ctx, p):
     return {}
 
 
-@action("sob.amend", ["am", "sm", "as"])
+@action("sob.amend", ["aat", "amt"])
 def sob_amend(s, ctx, p):
     sob = _sob(s, ctx, p["id"])
     if sob.get("status") == "Draft":
@@ -1193,7 +1194,7 @@ def sob_amend(s, ctx, p):
     return {}
 
 
-@action("sob.generatePdf", ["am", "sm", "as", "validator", "actuarial"])
+@action("sob.generatePdf", ["aat", "amt", "approver", "accusa"])
 def sob_pdf(s, ctx, p):
     sob = s.store.must(p["id"], "sob")
     b = s.bundle(sob["caseId"])
@@ -1240,7 +1241,7 @@ def _invalidate_proposal(s, ctx, prop, why):
          "proposal.invalidated", reason=why, content_version=prop["version"] + 1)
 
 
-@action("proposal.create", ["am", "sm"])
+@action("proposal.create", ["aat"])
 def prop_create(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -1271,7 +1272,7 @@ def _prop_checks(s, prop):
     return b, sob
 
 
-@action("proposal.reloadRates", ["am", "sm"])
+@action("proposal.reloadRates", ["aat"])
 def prop_reload(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     _case(s, ctx, prop["caseId"])
@@ -1286,7 +1287,7 @@ def prop_reload(s, ctx, p):
     return {}
 
 
-@action("proposal.submit", ["am", "sm"])
+@action("proposal.submit", ["aat"])
 def prop_submit(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     c = _case(s, ctx, prop["caseId"])
@@ -1322,7 +1323,7 @@ def prop_submit(s, ctx, p):
     return {}
 
 
-@action("proposal.smDecision", ["sm"])
+@action("proposal.smDecision", ["approver"])
 def prop_sm(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     _case(s, ctx, prop["caseId"])
@@ -1331,7 +1332,7 @@ def prop_sm(s, ctx, p):
     require_not_maker(ctx, prop.get("submittedBy"), "proposal")
     b, sob = _prop_checks(s, prop)
     if sob["version"] != prop.get("sobVersion") and not DEMO_SKIP_APPROVALS:
-        raise ApiError(409, "stale_sob", "The SOB changed after this proposal was submitted. The Account Manager must revise the proposal.")
+        raise ApiError(409, "stale_sob", "The SOB changed after this proposal was submitted. The AAT handler must revise the proposal.")
     d = p.get("decision")
     rec = {"stage": "sm", "decision": d, "by": ctx.uid, "byName": ctx.user["name"], "at": ctx.now_iso(), "remarks": p.get("remarks", ""),
            "version": prop["version"]}
@@ -1341,7 +1342,7 @@ def prop_sm(s, ctx, p):
                            {"fields": [{"field": "overrideAck", "message": "Required."}]})
         _set(s, ctx, prop, {"status": "Sales Manager Approved", "approvals": prop.get("approvals", []) + [rec]}, "proposal.smApprove",
              reason=p.get("remarks"), content_version=prop["version"])
-        notify(s.store, ctx, prop["caseId"], "proposal.approvalRequired", ["Senior Management"], f"Final pricing sign-off needed: {prop['code']} v{prop['version']}")
+        notify(s.store, ctx, prop["caseId"], "proposal.approvalRequired", ["Approver (second level - pending confirmation)"], f"Final pricing sign-off needed: {prop['code']} v{prop['version']}")
     elif d == "return":
         _need(p, "remarks")
         _set(s, ctx, prop, {"status": "Draft", "approvals": prop.get("approvals", []) + [rec], "returnReason": p["remarks"]},
@@ -1351,12 +1352,18 @@ def prop_sm(s, ctx, p):
     return {}
 
 
-@action("proposal.seniorDecision", ["senior"])
+@action("proposal.seniorDecision", ["approver"])
 def prop_senior(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     require_status(prop, "Sales Manager Approved", what="Proposal")
     _check_version(prop, p.get("reviewedVersion"))
     require_not_maker(ctx, prop.get("submittedBy"), "proposal")
+    # Two-level pricing control: the first and second level are both the pending-
+    # confirmation "approver" role, but the two approvals must be given by different
+    # people so the two-eyes principle survives the role consolidation.
+    first = next((a for a in reversed(prop.get("approvals", [])) if a.get("stage") == "sm" and a.get("decision") == "approve"), None)
+    if first and first.get("by") == ctx.uid and not DEMO_SKIP_APPROVALS:
+        raise ApiError(403, "segregation", "The second-level pricing approval must be given by a different approver than the first-level approval. Switch to another authorized approver to continue.")
     d = p.get("decision")
     rec = {"stage": "senior", "decision": d, "by": ctx.uid, "byName": ctx.user["name"], "at": ctx.now_iso(), "remarks": p.get("remarks", ""),
            "version": prop["version"]}
@@ -1380,7 +1387,7 @@ def _fmt(n):
     return "" if v is None else f"{v:,.2f}"
 
 
-@action("proposal.generate", ["am", "sm"])
+@action("proposal.generate", ["aat"])
 def prop_generate(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     _case(s, ctx, prop["caseId"])
@@ -1417,7 +1424,7 @@ def prop_generate(s, ctx, p):
     return {"docId": rec["id"]}
 
 
-@action("proposal.send", ["am", "sm"])
+@action("proposal.send", ["aat"])
 def prop_send(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     c = _case(s, ctx, prop["caseId"])
@@ -1439,7 +1446,7 @@ def prop_send(s, ctx, p):
     return {"recipients": recipients}
 
 
-@action("proposal.logRound", ["am", "sm"])
+@action("proposal.logRound", ["aat"])
 def prop_round(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     c = _case(s, ctx, prop["caseId"])
@@ -1462,7 +1469,7 @@ def prop_round(s, ctx, p):
     return {}
 
 
-@action("proposal.revise", ["am", "sm"])
+@action("proposal.revise", ["aat"])
 def prop_revise(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     _case(s, ctx, prop["caseId"])
@@ -1473,13 +1480,13 @@ def prop_revise(s, ctx, p):
     return {}
 
 
-@action("proposal.accept", ["am", "sm"])
+@action("proposal.accept", ["aat"])
 def prop_accept(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     c = _case(s, ctx, prop["caseId"])
     require_status(prop, "Sent", "Under Negotiation", what="Proposal")
     if not any(a["stage"] == "senior" and a["decision"] == "approve" and a["version"] == prop["version"] for a in prop.get("approvals", [])) and not DEMO_SKIP_APPROVALS:
-        raise ApiError(409, "not_approved", "This version has no Senior Management approval. It must be approved by Senior Management before the client can accept it.")
+        raise ApiError(409, "not_approved", "This version has no final (second-level) pricing approval. It must be approved by the second-level approver (pending confirmation) before the client can accept it.")
     if not DEMO_SKIP_DATA:
         _need(p, "docId", "date", msg="Attach the client's acceptance evidence and the acceptance date.")
         s.store.must(p["docId"], "document")
@@ -1492,7 +1499,7 @@ def prop_accept(s, ctx, p):
     return {}
 
 
-@action("proposal.decline", ["am", "sm"])
+@action("proposal.decline", ["aat"])
 def prop_decline(s, ctx, p):
     prop = s.store.must(p["id"], "proposal")
     _case(s, ctx, prop["caseId"])
@@ -1502,7 +1509,7 @@ def prop_decline(s, ctx, p):
     return {}
 
 
-@action("alignment.request", ["am", "sm"])
+@action("alignment.request", ["aat"])
 def align_request(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -1541,7 +1548,7 @@ def align_ack(s, ctx, p):
 
 
 # ======================================================================== contract / KYC / onboarding
-@action("contract.request", ["am", "sm"])
+@action("contract.request", ["aat"])
 def contract_request(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -1574,7 +1581,7 @@ def contract_request(s, ctx, p):
     return {}
 
 
-@action("contract.advance", ["legal", "as"])
+@action("contract.advance", ["legal", "amt"])
 def contract_advance(s, ctx, p):
     con = s.store.must(p["contractId"], "contract")
     _case(s, ctx, con["caseId"])
@@ -1605,11 +1612,11 @@ def contract_advance(s, ctx, p):
     if con["kind"] == "Contract" and nxt["key"] == "Completed":
         c = s.store.get(con["caseId"])
         _set(s, ctx, c, {"pipelineStage": "Closed Won"}, "lead.stage")
-    notify(s.store, ctx, con["caseId"], "contract.step", ["Account Manager", "Account Services"], f"{con['kind']}: {nxt['key']}")
+    notify(s.store, ctx, con["caseId"], "contract.step", ["AAT handler", "AMT"], f"{con['kind']}: {nxt['key']}")
     return {}
 
 
-@action("kyc.recordResult", ["compliance"])
+@action("kyc.recordResult", ["aat"])
 def kyc_result(s, ctx, p):
     k = s.store.must(p["id"], "kyc")
     _check_version(k, p.get("reviewedVersion"))
@@ -1631,7 +1638,7 @@ def kyc_result(s, ctx, p):
     return {}
 
 
-@action("kyc.resolveFlag", ["compliance"])
+@action("kyc.resolveFlag", ["aat"])
 def kyc_resolve(s, ctx, p):
     k = s.store.must(p["id"], "kyc")
     _need(p, "flagId", "resolution", "evidenceDocId", msg="Record the resolution and attach evidence.")
@@ -1663,7 +1670,7 @@ def onb_waive(s, ctx, p):
     return {}
 
 
-@action("onboarding.revokeWaiver", ["as"])
+@action("onboarding.revokeWaiver", ["amt"])
 def onb_revoke(s, ctx, p):
     o = s.store.must(p["id"], "onboarding")
     items = copy.deepcopy(o.get("items", {}))
@@ -1674,7 +1681,7 @@ def onb_revoke(s, ctx, p):
     return {}
 
 
-@action("document.review", ["as", "compliance", "actuarial", "legal", "mda", "bc"])
+@action("document.review", ["amt", "aat", "accusa", "legal", "mda", "bc"])
 def doc_review(s, ctx, p):
     d = s.store.must(p["id"], "document")
     dec = p.get("decision")
@@ -1701,7 +1708,7 @@ def _intermediary_contact(s, iid):
     return it or {}
 
 
-@action("account.create", ["as"])
+@action("account.create", ["amt"])
 def account_create(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -1798,7 +1805,7 @@ def validate_account(acc):
     return errs
 
 
-@action("account.submit", ["as"])
+@action("account.submit", ["amt"])
 def account_submit(s, ctx, p):
     acc = s.store.must(p["id"], "account")
     _case(s, ctx, acc["caseId"])
@@ -1815,7 +1822,7 @@ def account_submit(s, ctx, p):
     return {}
 
 
-@action("account.decide", ["as"])
+@action("account.decide", ["amt"])
 def account_decide(s, ctx, p):
     acc = s.store.must(p["id"], "account")
     require_status(acc, "For Approval", what="Account")
@@ -1838,7 +1845,7 @@ def account_decide(s, ctx, p):
     return {}
 
 
-@action("affiliate.add", ["as"])
+@action("affiliate.add", ["amt"])
 def affiliate_add(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -1855,7 +1862,7 @@ def affiliate_add(s, ctx, p):
     return {"id": rec["id"]}
 
 
-@action("affiliate.setSob", ["as", "am"])
+@action("affiliate.setSob", ["amt", "aat"])
 def affiliate_set_sob(s, ctx, p):
     acc = s.store.must(p["accountId"], "account")
     if not acc.get("parentId"):
@@ -1962,7 +1969,7 @@ def _pc_insert(s, ctx, acc, fields, action_name="planCode.create", reason=None):
     return s.store.insert("planCode", rec, acc["caseId"], ctx, action=action_name, reason=reason, rid=f"{code}#v1")
 
 
-@action("planCode.create", ["as"])
+@action("planCode.create", ["amt"])
 def pc_create(s, ctx, p):
     acc = _pc_account_ok(s, p.get("accountId"))
     rec = _pc_insert(s, ctx, acc, p.get("fields") or {})
@@ -1995,7 +2002,7 @@ def _proposal_combos(s, acc):
     return list(combos.values())
 
 
-@action("planCode.generate", ["as"])
+@action("planCode.generate", ["amt"])
 def pc_generate(s, ctx, p):
     acc = _pc_account_ok(s, p.get("accountId"))
     sob = _sob_of_account(s, acc)
@@ -2020,7 +2027,7 @@ def _pc(s, pid):
     return s.store.must(pid, "planCode")
 
 
-@action("planCode.clone", ["as"])
+@action("planCode.clone", ["amt"])
 def pc_clone(s, ctx, p):
     src = _pc(s, p["id"])
     acc = _pc_account_ok(s, p.get("targetAccountId") or src["accountId"])
@@ -2030,7 +2037,7 @@ def pc_clone(s, ctx, p):
     return {"id": rec["id"]}
 
 
-@action("planCode.amend", ["as"])
+@action("planCode.amend", ["amt"])
 def pc_amend(s, ctx, p):
     src = _pc(s, p["id"])
     require_status(src, "Approved", what="Plan Code")
@@ -2060,7 +2067,7 @@ def _bulk(s, ctx, ids, fn):
     return {"succeeded": ok, "failed": failed}
 
 
-@action("planCode.submit", ["as"])
+@action("planCode.submit", ["amt"])
 def pc_submit(s, ctx, p):
     def one(pid):
         pc = _pc(s, pid)
@@ -2078,7 +2085,7 @@ def pc_submit(s, ctx, p):
     return _bulk(s, ctx, p.get("ids") or [], one)
 
 
-@action("planCode.decide", ["as"])
+@action("planCode.decide", ["amt"])
 def pc_decide(s, ctx, p):
     d = p.get("decision")
     versions = p.get("reviewedVersions") or {}
@@ -2109,7 +2116,7 @@ def pc_decide(s, ctx, p):
     return res
 
 
-@action("planCode.bulkUpdate", ["as"])
+@action("planCode.bulkUpdate", ["amt"])
 def pc_bulk_update(s, ctx, p):
     field, value = p.get("field"), p.get("value")
     if field not in PC_KEYS or field in ("planCode", "accountId", "sobVersion"):
@@ -2125,7 +2132,7 @@ def pc_bulk_update(s, ctx, p):
     return _bulk(s, ctx, p.get("ids") or [], one)
 
 
-@action("planCode.duplicateToAffiliates", ["as"])
+@action("planCode.duplicateToAffiliates", ["amt"])
 def pc_dup(s, ctx, p):
     targets = p.get("affiliateIds") or []
     if not targets:
@@ -2145,7 +2152,7 @@ def pc_dup(s, ctx, p):
     return {"succeeded": ok, "failed": failed}
 
 
-@action("planCode.delete", ["as"])
+@action("planCode.delete", ["amt"])
 def pc_delete(s, ctx, p):
     pc = _pc(s, p["id"])
     require_status(pc, "Draft", what="Plan Code")
@@ -2188,7 +2195,7 @@ def validate_pc_import(s, rows, case_id):
     return out, errs
 
 
-@action("planCode.importCommit", ["as"])
+@action("planCode.importCommit", ["amt"])
 def pc_import_commit(s, ctx, p):
     imp = s.store.must(p["importId"], "import")
     if imp.get("kind") != "planCode":
@@ -2206,7 +2213,7 @@ def pc_import_commit(s, ctx, p):
     return {"created": len(created), "failed": failed}
 
 
-@action("planCode.sample", None if DEMO_BYPASS else ["as"])
+@action("planCode.sample", None if DEMO_BYPASS else ["amt"])
 def pc_sample(s, ctx, p):
     """Demo helper: create a couple of ready-made draft Plan Codes on the case's
     account so the flow can be walked without hand-entering every field."""
@@ -2231,7 +2238,7 @@ def pc_sample(s, ctx, p):
 
 
 # ======================================================================== COC / commission
-@action("coc.generate", ["as"])
+@action("coc.generate", ["amt"])
 def coc_generate(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -2263,7 +2270,7 @@ def coc_generate(s, ctx, p):
     doc.heading("Key benefits", 12)
     for l in sob.get("lines", [])[:30]:
         doc.text(f"- {l.get('subcategory')}: {l.get('benefitLimit')} {('/ ' + _fmt(l.get('innerLimit'))) if l.get('innerLimit') else ''}", size=9)
-    doc.signature_block(["Prepared by (Account Services)", "Approved by (Account Services checker)"])
+    doc.signature_block(["Prepared by (AMT)", "Approved by (AMT checker)"])
     rec = make_doc(s, ctx, c["id"], {"type": "coc", "id": coc["id"]}, "coc_pdf", "COC", f"COC_{acc['maCode']}.pdf", doc.render())
     data = {"status": "For Approval", "statusAt": ctx.now_iso(), "makerId": ctx.uid, "docId": rec["id"],
             "basis": {"accountVersion": acc["v"], "sobVersion": sob["version"], "planCodes": len(plans)}, "returnReason": None}
@@ -2271,7 +2278,7 @@ def coc_generate(s, ctx, p):
     return {"id": coc["id"]}
 
 
-@action("coc.decide", ["as"])
+@action("coc.decide", ["amt"])
 def coc_decide(s, ctx, p):
     coc = s.store.must(p["id"], "coc")
     require_status(coc, "For Approval", what="COC")
@@ -2285,16 +2292,16 @@ def coc_decide(s, ctx, p):
     return {}
 
 
-@action("coc.release", ["as"])
+@action("coc.release", ["amt"])
 def coc_release(s, ctx, p):
     coc = s.store.must(p["id"], "coc")
     require_status(coc, "Approved", what="COC")
     _set(s, ctx, coc, {"status": "Released", "releasedBy": ctx.uid, "releasedAt": ctx.now_iso()}, "coc.release")
-    notify(s.store, ctx, coc["caseId"], "coc.released", ["Account Manager", "Client (via AM)"], "COC released")
+    notify(s.store, ctx, coc["caseId"], "coc.released", ["AAT handler", "Client (via AAT)"], "COC released")
     return {}
 
 
-@action("commission.create", ["as"])
+@action("commission.create", ["amt"])
 def comm_create(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -2313,7 +2320,7 @@ def comm_create(s, ctx, p):
     return {}
 
 
-@action("commission.submit", ["as"])
+@action("commission.submit", ["amt"])
 def comm_submit(s, ctx, p):
     cm = s.store.must(p["id"], "commission")
     require_status(cm, "Draft", "Returned", what="Commission Rate Form")
@@ -2330,7 +2337,7 @@ def comm_submit(s, ctx, p):
     return {}
 
 
-@action("commission.decide", ["as", "sm"])
+@action("commission.decide", ["amt"])
 def comm_decide(s, ctx, p):
     cm = s.store.must(p["id"], "commission")
     require_status(cm, "For Approval", what="Commission Rate Form")
@@ -2365,7 +2372,7 @@ def revalidate_batch(s, ctx, batch, action_name="members.validate"):
                 reason=f"{counts['valid']} valid, {counts['errors']} error rows, {counts['exceptions']} exceptions, {counts['duplicates']} duplicates")
 
 
-@action("members.map", ["as", "am", "sm"])
+@action("members.map", ["amt", "aat"])
 def members_map(s, ctx, p):
     bt = s.store.must(p["batchId"], "memberBatch")
     _case(s, ctx, bt["caseId"])
@@ -2389,13 +2396,13 @@ def members_map(s, ctx, p):
 
 
 def _members_role(ctx, bt):
-    if bt.get("purpose") == "enrollment" and ctx.role not in ("as",):
-        raise ApiError(403, "forbidden", "Account Services manages enrollment Member Data.")
-    if bt.get("purpose") == "quotation" and ctx.role not in ("am", "sm"):
-        raise ApiError(403, "forbidden", "The Account Manager manages quotation Member Data.")
+    if bt.get("purpose") == "enrollment" and ctx.role not in ("amt",):
+        raise ApiError(403, "forbidden", "AMT manages enrollment Member Data.")
+    if bt.get("purpose") == "quotation" and ctx.role not in ("aat",):
+        raise ApiError(403, "forbidden", "The AAT handler manages quotation Member Data.")
 
 
-@action("members.updateRow", ["as", "am", "sm"])
+@action("members.updateRow", ["amt", "aat"])
 def members_update_row(s, ctx, p):
     bt = s.store.must(p["batchId"], "memberBatch")
     _members_role(ctx, bt)
@@ -2417,7 +2424,7 @@ def members_update_row(s, ctx, p):
     return {}
 
 
-@action("members.assignPlans", ["as"])
+@action("members.assignPlans", ["amt"])
 def members_assign(s, ctx, p):
     bt = s.store.must(p["batchId"], "memberBatch")
     _members_role(ctx, bt)
@@ -2441,7 +2448,7 @@ def members_assign(s, ctx, p):
     return {"assigned": n}
 
 
-@action("members.approveException", ["as"])
+@action("members.approveException", ["amt"])
 def members_exc(s, ctx, p):
     bt = s.store.must(p["batchId"], "memberBatch")
     _need(p, "rowNo", "reason", "docId", msg="Attach the supporting eligibility document and the reason.")
@@ -2452,7 +2459,7 @@ def members_exc(s, ctx, p):
     return {}
 
 
-@action("members.accept", ["as", "am", "sm"])
+@action("members.accept", ["amt", "aat"])
 def members_accept(s, ctx, p):
     bt = s.store.must(p["batchId"], "memberBatch")
     _members_role(ctx, bt)
@@ -2470,7 +2477,7 @@ def members_accept(s, ctx, p):
     return {}
 
 
-@action("members.submitMda", ["as"])
+@action("members.submitMda", ["amt"])
 def members_submit(s, ctx, p):
     bt = s.store.must(p["batchId"], "memberBatch")
     require_status(bt, "Accepted", what="Member Data")
@@ -2605,7 +2612,7 @@ def billing_payment(s, ctx, p):
     return {}
 
 
-@action("orientation.schedule", ["wellness"])
+@action("orientation.schedule", ["amt"])
 def orientation_schedule(s, ctx, p):
     c = s.store.must(p["caseId"], "case")
     _need(p, "date")
@@ -2619,7 +2626,7 @@ def orientation_schedule(s, ctx, p):
     return {}
 
 
-@action("orientation.complete", ["wellness"])
+@action("orientation.complete", ["amt"])
 def orientation_complete(s, ctx, p):
     o = s.store.must(p["id"], "orientation")
     require_status(o, "Scheduled", what="Orientation")
@@ -2628,7 +2635,7 @@ def orientation_complete(s, ctx, p):
 
 
 # ======================================================================== activation & handover
-@action("activation.activate", ["as"])
+@action("activation.activate", ["approver"])
 def activation_activate(s, ctx, p):
     c = _case(s, ctx, p["caseId"])
     b = s.bundle(c["id"])
@@ -2662,7 +2669,7 @@ def _on_active(s, ctx, case_id):
            "Account is active", "Members can avail services from the effective date. Renewal pipeline hand-off is outside this build.")
 
 
-@action("activation.ack", ["mda", "bc", "ccd", "wellness"])
+@action("activation.ack", ["mda", "bc", "ccd"])
 def activation_ack(s, ctx, p):
     act = s.store.must(p["id"], "activation")
     require_status(act, "Active", what="Activation")
@@ -2677,7 +2684,7 @@ def activation_ack(s, ctx, p):
     return {}
 
 
-@action("activation.completeHandover", ["as"])
+@action("activation.completeHandover", ["approver"])
 def activation_complete(s, ctx, p):
     act = s.store.must(p["id"], "activation")
     require_status(act, "Active", what="Activation")
@@ -2720,7 +2727,7 @@ def run_scheduler(store, ctx):
                     _set(s, ctx, act, {"status": "On Hold", "heldReason": "; ".join(f"{g['label']} - {g['detail']}" for g in failed)},
                          "activation.autoHold", reason="Readiness lapsed before scheduled activation")
                     c = store.get(act["caseId"])
-                    notify(store, ctx, act["caseId"], "account.activationHeld", [user_name(c.get("ownerId")), "Account Services"],
+                    notify(store, ctx, act["caseId"], "account.activationHeld", [user_name(c.get("ownerId")), "AMT"],
                            f"Scheduled activation for {sf} was held: prerequisites are no longer met",
                            note="; ".join(g["label"] for g in failed))
                     continue
@@ -2733,23 +2740,23 @@ def run_scheduler(store, ctx):
 
 # ======================================================================== generic save
 EDITABLE = {
-    "case": (("am", "sm"), None, LEAD_KEYS),
-    "franchise": (("am", "sm"), ("Draft", "Returned"), ("accountInfo", "otherInfo", "affiliates")),
-    "rateRequest": (("am", "sm"), ("Draft", "Returned for Info"), ("requestedPlans", "roomBoard", "mblOptions", "targetRates", "currentRates",
+    "case": (("aat",), None, LEAD_KEYS),
+    "franchise": (("aat",), ("Draft", "Returned"), ("accountInfo", "otherInfo", "affiliates")),
+    "rateRequest": (("aat",), ("Draft", "Returned for Info"), ("requestedPlans", "roomBoard", "mblOptions", "targetRates", "currentRates",
                                                                     "dependentCoverage", "paymentModes", "specialRequirements", "jumbo")),
-    "tor": (("am", "sm"), None, ("lines",)),
-    "sob": (("am", "sm"), ("Draft",), ("lines", "customExclusions", "specialInstructions", "addOns", "name", "reducedJustifications")),
-    "sobTemplate": (("actuarial",), None, ("lines", "status", "notes")),
-    "proposal": (("am", "sm"), ("Draft",), ("items", "commissionPct", "commissionNote", "justification", "recommendation", "reducedJustifications")),
-    "contract": (("legal", "as"), ("Requested", "Drafting", "Review", "Endorsed", "Client signed", "Notarized", "Sent to client"),
+    "tor": (("aat",), None, ("lines",)),
+    "sob": (("aat",), ("Draft",), ("lines", "customExclusions", "specialInstructions", "addOns", "name", "reducedJustifications")),
+    "sobTemplate": (("accusa",), None, ("lines", "status", "notes")),
+    "proposal": (("aat",), ("Draft",), ("items", "commissionPct", "commissionNote", "justification", "recommendation", "reducedJustifications")),
+    "contract": (("legal", "amt"), ("Requested", "Drafting", "Review", "Endorsed", "Client signed", "Notarized", "Sent to client"),
                  ("number", "parties", "signatories", "effectiveDate", "expiryDate", "product", "paymentMode", "paymentTerms", "notes")),
-    "kyc": (("am", "sm", "compliance"), None, ("notes",)),
-    "account": (("as",), ("Pending Setup", "Returned"), ("accountInfo", "contractInfo", "agentInfo", "otherInfo", "vcAppExclusions")),
-    "planCode": (("as",), ("Draft", "Returned"), tuple(k for k in PC_KEYS if k not in ("planCode", "accountId", "sobVersion"))),
-    "commission": (("as",), ("Draft", "Returned"), ("percentage", "basis", "effectiveFrom", "effectiveTo", "notes")),
+    "kyc": (("aat",), None, ("notes",)),
+    "account": (("amt",), ("Pending Setup", "Returned"), ("accountInfo", "contractInfo", "agentInfo", "otherInfo", "vcAppExclusions")),
+    "planCode": (("amt",), ("Draft", "Returned"), tuple(k for k in PC_KEYS if k not in ("planCode", "accountId", "sobVersion"))),
+    "commission": (("amt",), ("Draft", "Returned"), ("percentage", "basis", "effectiveFrom", "effectiveTo", "notes")),
     "billing": (("bc",), ("Draft", "Returned"), BILL_KEYS),
-    "alignment": (("am", "sm"), None, ("fields",)),
-    "intermediary": (("as", "compliance"), None, ("name", "email", "mobile", "tin", "contactPerson", "address", "validFrom", "validTo")),
+    "alignment": (("aat",), None, ("fields",)),
+    "intermediary": (("amt",), None, ("name", "email", "mobile", "tin", "contactPerson", "address", "validFrom", "validTo")),
 }
 
 
@@ -2770,12 +2777,12 @@ def record_save(s, ctx, p):
             raise ApiError(403, "forbidden", "You do not have access to this case.")
         if c and c.get("status") != "Open" and t != "case":
             raise ApiError(409, "case_closed", f"Case is {c.get('status')}.")
-    # Field-level rule: ACUSA remarks are written by Actuarial / Account Services only.
-    if t == "franchise" and ctx.role in ("actuarial", "as"):
+    # Field-level rule: ACUSA remarks are written by Actuarial (ACCUSA) / AMT only.
+    if t == "franchise" and ctx.role in ("accusa", "amt"):
         oi = dict(rec.get("otherInfo", {}))
         new_oi = changes.get("otherInfo") or {}
         if set(changes) - {"otherInfo"} or any(new_oi.get(k) != oi.get(k) for k in new_oi if k != "acusaRemarks"):
-            raise ApiError(403, "forbidden", "Actuarial / Account Services can only edit ACUSA Remarks on the franchise.")
+            raise ApiError(403, "forbidden", "Actuarial (ACCUSA) / AMT can only edit ACUSA Remarks on the franchise.")
         oi["acusaRemarks"] = new_oi.get("acusaRemarks", oi.get("acusaRemarks"))
         return {"record": s.store.update(rec, {"otherInfo": oi}, ctx, "franchise.acusaRemarks", base_version=p.get("baseVersion"))}
     if ctx.role not in roles:

@@ -590,10 +590,10 @@ class Handler(BaseHTTPRequestHandler):
         t0 = time.time()
         if kind == "members":
             purpose = q.get("purpose") or "enrollment"
-            if purpose == "enrollment" and ctx.role != "as":
-                raise ApiError(403, "forbidden", "Account Services uploads enrollment Member Data.")
-            if purpose == "quotation" and ctx.role not in ("am", "sm"):
-                raise ApiError(403, "forbidden", "The Account Manager uploads quotation Member Data.")
+            if purpose == "enrollment" and ctx.role != "amt":
+                raise ApiError(403, "forbidden", "AMT uploads enrollment Member Data.")
+            if purpose == "quotation" and ctx.role not in ("aat",):
+                raise ApiError(403, "forbidden", "The AAT handler uploads quotation Member Data.")
             with st.tx():
                 b = Bundle(st, case_id)
                 if purpose == "enrollment":
@@ -621,14 +621,14 @@ class Handler(BaseHTTPRequestHandler):
                     bt = actions.revalidate_batch(s, ctx, bt)
             return self._send(200, {"batch": st.get(bt["id"]), "autoMapped": complete, "elapsedMs": int((time.time() - t0) * 1000)})
         if kind == "rateSheet":
-            if ctx.role != "actuarial":
-                raise ApiError(403, "forbidden", "Actuarial imports rate sheets.")
+            if ctx.role != "accusa":
+                raise ApiError(403, "forbidden", "Actuarial (ACCUSA) imports rate sheets.")
             ok, errs = actions.validate_rate_rows(rows)
         elif kind == "tor":
             ok, errs = actions.validate_line_rows(rows)
         elif kind == "planCode":
-            if ctx.role != "as":
-                raise ApiError(403, "forbidden", "Account Services imports Plan Codes.")
+            if ctx.role != "amt":
+                raise ApiError(403, "forbidden", "AMT imports Plan Codes.")
             ok, errs = actions.validate_pc_import(s, rows, case_id)
         else:
             raise ApiError(404, "not_found", "Unknown import kind.")

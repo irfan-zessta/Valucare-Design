@@ -10,16 +10,16 @@ export async function render(ctx) {
   const me = state.me;
   const sobs = data.records.sob || [];
   const fr = (data.records.franchise || []).slice(-1)[0];
-  const am = me.role === "sm" || (me.role === "am" && data.case.ownerId === me.id);
+  const am = me.role === "aat" && data.case.ownerId === me.id;
   const sob = sobs.find((s) => s.id === ctx.query.sob) || sobs.find((s) => (s.scope || "parent") === "parent") || sobs[0];
   if (!sob) {
     const torLines = (data.records.tor || [])[0]?.lines?.length;
     const tpl = data.template;
     body.innerHTML = html`<section class="panel"><div class="pb"><h2 class="h">Summary of Benefits</h2>
-      <p class="muted mt">Sales prepares the SOB draft during proposal preparation, starting from the Actuarial-owned standard template (or from the structured TOR). A separate function validates it; Account Services codifies it after the client signs.</p>
+      <p class="muted mt">Sales prepares the SOB draft during proposal preparation, starting from the Actuarial-owned standard template (or from the structured TOR). A separate function validates it; AMT codifies it after the client signs.</p>
       ${!fr || !["Approved", "Converted to Account"].includes(fr.status) ? html`<p class="mt">Available after franchise approval.</p>` : am && data.case.status === "Open" ? html`<div class="row mt">
         <button class="btn primary" data-src="template" ${tpl?.status === "Approved" ? "" : "disabled"}>Start from approved template${tpl ? ` (template v${tpl.v})` : ""}</button>
-        <button class="btn" data-src="tor" ${torLines ? "" : "disabled"}>Start from structured TOR${torLines ? ` (${torLines} lines)` : " (no TOR lines)"}</button></div>` : html`<p class="tiny mt">Prepared by the Account Manager.</p>`}</div></section>`.s;
+        <button class="btn" data-src="tor" ${torLines ? "" : "disabled"}>Start from structured TOR${torLines ? ` (${torLines} lines)` : " (no TOR lines)"}</button></div>` : html`<p class="tiny mt">Prepared by the AAT handler.</p>`}</div></section>`.s;
     body.querySelectorAll("[data-src]").forEach((b) => (b.onclick = async () => { if (await act("sob.create", { caseId: id, source: b.dataset.src }, { button: b, success: "SOB draft created." })) ctx.reload(); }));
     return;
   }
@@ -34,7 +34,7 @@ export async function render(ctx) {
     <section class="panel"><div class="ph"><div><h2>${sob.name} · version ${sob.version} ${pill(sob.status)}</h2>
       <div class="tiny">Source: ${sob.source}${sob.templateVersion ? ` (Actuarial template v${sob.templateVersion})` : ""} · Prepared by ${userName(sob.preparedBy)}${sob.salesReviewBy ? ` · Sales review ${userName(sob.salesReviewBy)}` : ""}${sob.validatedBy ? ` · Validated by ${userName(sob.validatedBy)}` : ""}${sob.codifiedBy ? ` · Codified by ${userName(sob.codifiedBy)}` : ""}</div></div>
       <div class="row" id="sAct"></div></div>
-      <div class="pb"><ol class="steps-h" aria-label="SOB workflow">${FLOW.map((s, i) => html`<li class="${i < curStep ? "done" : i === curStep ? "cur" : ""}" ${i === curStep ? raw('aria-current="step"') : ""}>${s}<small>${{ "Draft": "Account Manager", "Sales Review": "Sales Manager", "Independent Validation": state.meta.config.sobValidatorRoles.map(roleLabel).join(" / "), "Approved": "", "Client Signed": "Client + AM", "Codified": "Account Services" }[s]}</small></li>`)}</ol>
+      <div class="pb"><ol class="steps-h" aria-label="SOB workflow">${FLOW.map((s, i) => html`<li class="${i < curStep ? "done" : i === curStep ? "cur" : ""}" ${i === curStep ? raw('aria-current="step"') : ""}>${s}<small>${{ "Draft": "AAT handler", "Sales Review": "Approver", "Independent Validation": state.meta.config.sobValidatorRoles.map(roleLabel).join(" / "), "Approved": "", "Client Signed": "Client + AAT", "Codified": "AMT" }[s]}</small></li>`)}</ol>
         ${sob.amendmentReason ? html`<div class="note mt">Amendment v${sob.version}: ${sob.amendmentReason}</div>` : ""}
         ${sob.returnReason && sob.status === "Draft" ? html`<div class="note warn mt"><b>Returned:</b> ${sob.returnReason}</div>` : ""}
         ${approvals.length ? html`<ul class="timeline mt">${approvals.map((a) => html`<li><span class="when">${fmtDateTime(a.at)}</span><div><b>${a.stage === "sales" ? "Sales review" : "Independent validation"}: ${a.decision}</b> by ${a.byName} (v${a.version})${a.remarks ? html`<div class="tiny">${a.remarks}</div>` : ""}</div></li>`)}</ul>` : ""}
@@ -49,7 +49,7 @@ export async function render(ctx) {
     ${(sob.scope || "parent") === "parent" ? html`<section class="panel"><div class="ph"><h2>TOR vs SOB comparison</h2><a class="tiny" href="#/case/${id}/quotation/tor">Edit TOR</a></div><div class="pb">${comparisonTable(cmp)}</div></section>` : ""}
     <section class="panel"><div class="ph"><h2>Documents and versions</h2></div><div class="pb">
       <div class="grid2">${docSlot({ label: "SOB signature-format PDF", slot: "sob_pdf", docs: data.documents, linkedType: "sob", linkedId: sob.id, caseId: id, canUpload: false })}
-        ${docSlot({ label: "Client-signed SOB", slot: "sob_signed", docs: data.documents, linkedType: "sob", linkedId: sob.id, caseId: id, canUpload: ["am", "sm", "as"].includes(me.role) && ["Approved"].includes(sob.status) })}</div>
+        ${docSlot({ label: "Client-signed SOB", slot: "sob_signed", docs: data.documents, linkedType: "sob", linkedId: sob.id, caseId: id, canUpload: ["aat", "amt"].includes(me.role) && ["Approved"].includes(sob.status) })}</div>
       ${(sob.history || []).length ? html`<div class="row mt"><label for="cmpV" class="tiny">Compare with version</label><select id="cmpV" class="inp" style="width:auto">${sob.history.map((h) => html`<option value="${h.version}">v${h.version} (${h.status})</option>`)}</select></div><div id="vdiff" class="mt"></div>` : html`<p class="tiny mt">No earlier versions.</p>`}</div></section>`.s;
   body.querySelector("#sobSel")?.addEventListener("change", (e) => go(`#/case/${id}/setup/sob?sob=${e.target.value}`));
   wireUploads(body, () => ctx.reload());
@@ -115,28 +115,28 @@ export async function render(ctx) {
   const bar = body.querySelector("#sAct");
   const btn = (label, cls, fn) => { const b = document.createElement("button"); b.className = `btn ${cls}`; b.textContent = label; b.onclick = () => fn(b); bar.appendChild(b); };
   btn("Generate signature PDF", "", async (b) => { const r = await act("sob.generatePdf", { id: sob.id }, { button: b, success: "SOB PDF generated." }); if (r) ctx.reload(); });
-  if (editable) btn("Send for Sales review", "primary", async (b) => { if (!(await form.save())) return; if (await act("sob.submitReview", { id: sob.id }, { button: b, success: "Sent for Sales Manager review." })) { form.dispose(); ctx.reload(); } });
+  if (editable) btn("Send for Sales review", "primary", async (b) => { if (!(await form.save())) return; if (await act("sob.submitReview", { id: sob.id }, { button: b, success: "Sent for Sales review." })) { form.dispose(); ctx.reload(); } });
   const decide = async (b, name, title, override) => {
     const r = await dialog({ title, body: html`<p>You are deciding on SOB <b>version ${sob.version}</b> (record v${sob.v}).</p>${override && sob.reducedCount ? html`<label class="check mt"><input type="checkbox" name="overrideAck"> I approve ${sob.reducedCount} documented benefit(s) below the TOR</label>` : ""}
       <div class="field mt"><label for="sr">Remarks (required to return)</label><textarea id="sr" name="remarks" class="inp"></textarea></div>`,
-      actions: [{ label: "Cancel" }, { label: "Return to Account Manager", value: "return", validate: (v) => (!v.remarks.trim() ? "Enter the reason." : null) }, { label: "Approve", kind: "primary", value: "approve", validate: (v) => (override && sob.reducedCount && !v.overrideAck ? "Confirm the coverage-reduction override." : null) }] });
+      actions: [{ label: "Cancel" }, { label: "Return to AAT handler", value: "return", validate: (v) => (!v.remarks.trim() ? "Enter the reason." : null) }, { label: "Approve", kind: "primary", value: "approve", validate: (v) => (override && sob.reducedCount && !v.overrideAck ? "Confirm the coverage-reduction override." : null) }] });
     if (r && ["approve", "return"].includes(r.action) && (await act(name, { id: sob.id, decision: r.action, reviewedVersion: sob.v, remarks: r.values.remarks, overrideAck: r.values.overrideAck }, { button: b, success: "Decision recorded." }))) ctx.reload();
   };
-  if (me.role === "sm" && sob.status === "Sales Review") sob.preparedBy === me.id ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared this SOB.</span>`) : btn("Sales review decision", "primary", (b) => decide(b, "sob.salesReview", "Sales Manager review of SOB", false));
+  if (me.role === "approver" && sob.status === "Sales Review") sob.preparedBy === me.id ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared this SOB.</span>`) : btn("Sales review decision", "primary", (b) => decide(b, "sob.salesReview", "Sales review of SOB", false));
   if (state.meta.config.sobValidatorRoles.includes(me.role) && sob.status === "Independent Validation") {
     if ([sob.preparedBy, sob.salesReviewBy].includes(me.id)) bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared or reviewed this SOB; an independent person must validate it.</span>`);
     else btn("Independent validation", "primary", (b) => decide(b, "sob.validate", "Independent SOB validation (against TOR and signed proposal)", true));
   }
-  if (["am", "sm", "as"].includes(me.role) && sob.status === "Approved") btn("Record client signature", "primary", async (b) => {
+  if (["aat", "amt"].includes(me.role) && sob.status === "Approved") btn("Record client signature", "primary", async (b) => {
     const signed = data.documents.filter((d) => d.slot === "sob_signed" && d.linked?.id === sob.id && !d.supersededBy);
     if (!signed.length) return showError({ message: "Upload the client-signed SOB in 'Client-signed SOB' first." });
     if (await act("sob.recordSigned", { id: sob.id, docId: signed[signed.length - 1].id }, { button: b, success: "Client signature recorded." })) ctx.reload();
   });
-  if (me.role === "as" && sob.status === "Client Signed") btn("Codify SOB", "primary", async (b) => {
+  if (me.role === "amt" && sob.status === "Client Signed") btn("Codify SOB", "primary", async (b) => {
     if (!(await confirmDialog("Codify SOB", `Codify SOB v${sob.version}? The structured benefits become the live SOB for CCD and the source for Plan Codes.`, { confirm: "Codify" }))) return;
     if (await act("sob.codify", { id: sob.id }, { button: b, success: "SOB codified." })) ctx.reload();
   });
-  if ((am || me.role === "as") && sob.status !== "Draft" && data.case.status === "Open") btn("Amend (new version)", "", async (b) => {
+  if ((am || me.role === "amt") && sob.status !== "Draft" && data.case.status === "Open") btn("Amend (new version)", "", async (b) => {
     const r = await dialog({ title: "Amend SOB", body: html`<p>Creates version ${sob.version + 1} as a draft. It must be reviewed, validated, signed and codified again. ${props && props.status !== "Accepted" ? "An unaccepted proposal will need re-approval." : ""}</p><div class="field mt"><label for="ar">Amendment reason *</label><textarea id="ar" name="reason" class="inp"></textarea></div>`,
       actions: [{ label: "Cancel" }, { label: "Create amendment", kind: "primary", value: "ok", validate: (v) => (!v.reason.trim() ? "Enter the reason." : null) }] });
     if (r?.action === "ok" && (await act("sob.amend", { id: sob.id, reason: r.values.reason }, { button: b, success: `SOB v${sob.version + 1} draft created.` }))) ctx.reload();

@@ -83,7 +83,7 @@ function caseDetails(data) {
     ["Registered name", s.company], ["Trade / short name", s.tradeName || "-"], ["TIN", fr?.accountInfo?.tin || co.tin || "-"],
     ["Industry", industryName(fr?.accountInfo?.natureOfBusiness || co.industry)], ["Address", `${co.address || ""}, ${co.city || ""}, ${co.province || ""}`],
     ["Business source", s.channel], ["Agent / broker (AOR/BOR)", s.intermediaryId ? interName(s.intermediaryId) : "Not applicable (Direct)"],
-    ["Account Manager", s.ownerName], ["Sales Manager", userName(s.salesManagerId)], ["Lead source", c.leadSource],
+    ["AAT handler", s.ownerName], ["Approver", userName(s.salesManagerId)], ["Lead source", c.leadSource],
     ["Target / contract effectivity", s.effectivity ? fmtDate(s.effectivity) : "-"], ["Franchise validity", fr?.validUntil ? `${fmtDate(fr.validFrom)} to ${fmtDate(fr.validUntil)}${fr.extended ? " (extended)" : ""}` : "-"],
     ["MA Code", acc?.maCode || "Not created"], ["Affiliate accounts", (data.records.account || []).filter((a) => a.parentId).map((a) => a.accountCode).join(", ") || "-"],
     ["Pipeline stage", c.pipelineStage], ["Est. headcount / premium", `${int(c.estHeadcount) || "-"} / ${money(c.estPremium) || "-"}`],
@@ -147,7 +147,7 @@ function overview(ctx) {
 
 function leadPanel(ctx, below) {
   const c = ctx.data.case;
-  const canEdit = c.status === "Open" && (state.me.role === "sm" || (state.me.role === "am" && c.ownerId === state.me.id));
+  const canEdit = c.status === "Open" && state.me.role === "aat" && c.ownerId === state.me.id;
   const stages = state.meta.config.pipelineStages.filter((x) => !x.startsWith("Closed"));
   return html`<section class="panel" data-form id="leadForm"><div class="ph"><h2>Lead and pipeline</h2>${canEdit ? html`<div class="row tight">${sampleBtn("fillSampleLeadC")}<span class="tiny" id="leadState"></span></div>` : html`<span class="tiny">${icon("lock", 12)} View only</span>`}</div>
     <div class="pb"><div class="fgrid two">
@@ -163,12 +163,12 @@ function leadPanel(ctx, below) {
       ${field({ key: "contactEmail", label: "Contact email", type: "email", src: "legacy", wide: true }, c.contactEmail, { editable: canEdit })}
     </div>
     ${below && c.status === "Open" ? html`<div class="note warn mt"><b>Below the corporate minimum.</b> ${c.estHeadcount} principal(s) is fewer than ${state.meta.config.corporateMinPrincipals}. The prospect must be routed to the IFG team (outside this application).</div>` : ""}
-    ${c.status === "Open" && (canEdit) ? html`<div class="row mt">
-      <button class="btn sm" id="logAct">Log activity</button>
-      ${below ? html`<button class="btn sm" id="ifg">Route to IFG</button>` : ""}
-      <button class="btn sm danger" id="lost">Close as lost</button>
-      ${state.me.role === "sm" ? html`<button class="btn sm" id="reassign">Reassign owner</button>` : ""}</div>` : ""}
-    ${c.status === "Closed Lost" && state.me.role === "sm" ? html`<button class="btn sm mt" id="reopen">Reopen case</button>` : ""}
+    ${c.status === "Open" && (canEdit || state.me.role === "approver") ? html`<div class="row mt">
+      ${canEdit ? html`<button class="btn sm" id="logAct">Log activity</button>` : ""}
+      ${canEdit && below ? html`<button class="btn sm" id="ifg">Route to IFG</button>` : ""}
+      ${canEdit ? html`<button class="btn sm danger" id="lost">Close as lost</button>` : ""}
+      ${state.me.role === "approver" ? html`<button class="btn sm" id="reassign">Reassign owner</button>` : ""}</div>` : ""}
+    ${c.status === "Closed Lost" && state.me.role === "approver" ? html`<button class="btn sm mt" id="reopen">Reopen case</button>` : ""}
     </div></section>`;
 }
 function activities(c) {
@@ -197,7 +197,7 @@ function wireLead(ctx) {
     if (r?.action === "ok" && (await act("case.logActivity", { caseId: c.id, ...r.values }, { success: "Activity logged." }))) ctx.reload();
   });
   box.querySelector("#lost")?.addEventListener("click", async (e) => {
-    const r = await dialog({ title: "Close as lost", body: html`<p>The case is closed and leaves active queues. A Sales Manager can reopen it.</p>
+    const r = await dialog({ title: "Close as lost", body: html`<p>The case is closed and leaves active queues. An authorized approver can reopen it.</p>
       <div class="field mt"><label for="lr">Reason <span class="req">*</span></label><select id="lr" name="reason" class="inp"><option value="">Select…</option>${state.meta.options.lostReason.map((o) => html`<option>${o.value}</option>`)}</select></div>
       <div class="field mt"><label for="ln">Note</label><textarea id="ln" name="note" class="inp"></textarea></div>`,
       actions: [{ label: "Cancel" }, { label: "Close as lost", kind: "primary", value: "ok", validate: (v) => (!v.reason ? "Choose a reason (NB-LEAD-04)." : null) }] });
@@ -209,13 +209,13 @@ function wireLead(ctx) {
     if (r?.action === "ok" && (await act("case.routeIfg", { caseId: c.id, note: r.values.note }, { success: "Routed to IFG." }))) ctx.reload();
   });
   box.querySelector("#reassign")?.addEventListener("click", async () => {
-    const r = await dialog({ title: "Reassign owner", body: html`<div class="field"><label for="ro">New Account Manager</label><select id="ro" name="ownerId" class="inp">${state.meta.users.filter((u) => u.role === "am").map((u) => html`<option value="${u.id}" ${u.id === c.ownerId ? "selected" : ""}>${u.name} (${u.team})</option>`)}</select></div>
+    const r = await dialog({ title: "Reassign owner", body: html`<div class="field"><label for="ro">New AAT handler</label><select id="ro" name="ownerId" class="inp">${state.meta.users.filter((u) => u.role === "aat").map((u) => html`<option value="${u.id}" ${u.id === c.ownerId ? "selected" : ""}>${u.name} (${u.team})</option>`)}</select></div>
       <div class="field mt"><label for="rr">Reason <span class="req">*</span></label><textarea id="rr" name="reason" class="inp"></textarea></div>`,
       actions: [{ label: "Cancel" }, { label: "Reassign", kind: "primary", value: "ok", validate: (v) => (!v.reason.trim() ? "Reason is required." : null) }] });
     if (r?.action === "ok" && (await act("case.reassign", { caseId: c.id, ...r.values }, { success: "Owner reassigned." }))) ctx.reload();
   });
   box.querySelector("#reopen")?.addEventListener("click", async () => {
-    if (await act("case.reopen", { caseId: c.id, reason: "Reopened by Sales Manager" }, { success: "Case reopened." })) ctx.reload();
+    if (await act("case.reopen", { caseId: c.id, reason: "Reopened by authorized approver" }, { success: "Case reopened." })) ctx.reload();
   });
 }
 
@@ -233,11 +233,11 @@ const ACTION_TEXT = {
   "rateRequest.startReview": "Actuarial started the review", "rateRequest.returnForInfo": "Actuarial asked for information", "rateRequest.respond": "Answered Actuarial",
   "rateRequest.revise": "Requested revised rates", "rateRequest.issued": "Rate request marked issued", "rateSheet.issue": "Issued a rate sheet", "rateSheet.supersede": "Superseded the previous rate sheet",
   "tor.create": "Started the structured TOR", "tor.save": "Edited the TOR", "tor.import": "Imported TOR lines",
-  "sob.create": "Created the SOB draft", "sob.save": "Edited the SOB draft", "sob.submitReview": "Sent the SOB for Sales review", "sob.salesApprove": "Sales Manager approved the SOB",
-  "sob.salesReturn": "Sales Manager returned the SOB", "sob.validate": "Independently validated the SOB", "sob.validationReturn": "Validator returned the SOB",
+  "sob.create": "Created the SOB draft", "sob.save": "Edited the SOB draft", "sob.submitReview": "Sent the SOB for Sales review", "sob.salesApprove": "Approver approved the SOB",
+  "sob.salesReturn": "Approver returned the SOB", "sob.validate": "Independently validated the SOB", "sob.validationReturn": "Validator returned the SOB",
   "sob.clientSigned": "Recorded the client-signed SOB", "sob.codify": "Codified the SOB", "sob.amend": "Created an SOB amendment", "sob.linkAccount": "Linked the SOB to the account",
-  "proposal.create": "Created the proposal", "proposal.save": "Edited the proposal", "proposal.submit": "Submitted the proposal for internal review", "proposal.smApprove": "Sales Manager approved pricing",
-  "proposal.smReturn": "Sales Manager returned the proposal", "proposal.seniorApprove": "Senior Management approved final pricing", "proposal.seniorReject": "Senior Management returned the pricing",
+  "proposal.create": "Created the proposal", "proposal.save": "Edited the proposal", "proposal.submit": "Submitted the proposal for internal review", "proposal.smApprove": "First-level pricing approval",
+  "proposal.smReturn": "Returned the proposal (first-level pricing)", "proposal.seniorApprove": "Second-level pricing approval", "proposal.seniorReject": "Returned the pricing (second-level)",
   "proposal.generate": "Generated the proposal document", "proposal.send": "Sent the proposal (simulated email)", "proposal.invalidated": "Created a new proposal version (earlier approvals no longer apply)",
   "proposal.accept": "Recorded client acceptance", "proposal.decline": "Recorded the client's decline", "proposal.reloadRates": "Reloaded rates from the latest rate sheet", "proposal.autoExpire": "Proposal validity lapsed",
   "negotiation.round": "Logged a negotiation round", "alignment.request": "Started internal alignment", "alignment.confirm": "Confirmed internal alignment", "alignment.flag": "Flagged an alignment issue",

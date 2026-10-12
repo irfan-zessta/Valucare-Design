@@ -161,18 +161,11 @@ def user_name(uid):
 
 def visible_case(ctx, case):
     r = ctx.role
-    if r == "am":
-        return case.get("ownerId") == ctx.uid
-    if r == "sm":
-        owner = USERS.get(case.get("ownerId"))
-        if case.get("ownerId") == ctx.uid or (owner and owner.get("team") == ctx.user.get("team")) or case.get("salesManagerId") == ctx.uid:
-            return True
-        # A proposal awaiting internal pricing review can be reviewed by any Sales
-        # Manager (so segregation of duties never dead-ends when the submitter is the
-        # only same-team SM). Make such a case visible to every SM while it is in that
-        # state, regardless of team/portfolio.
-        return any(p.get("status") == "For Internal Review"
-                   for p in ctx.store.list("proposal", case["id"]))
+    # AAT handlers see the cases they own or co-handle. Every other role (AMT,
+    # ACCUSA, Legal, the pending-confirmation approver, and the internal-alignment
+    # participants) sees the full book so cross-department handoffs never dead-end.
+    if r == "aat":
+        return case.get("ownerId") == ctx.uid or case.get("salesManagerId") == ctx.uid
     return True
 
 
@@ -426,15 +419,15 @@ def account_gates(b, cfg):
     missing = [i["label"] for i in onb if i["mandatory"] and i["status"] not in ("Received", "Waived")]
     L = lambda tab: f"#/case/{case_id}/{tab}"
     gates = [
-        gate("pricing", "Final pricing approved by Senior Management", approved_pricing, "senior", L("quotation/proposal"),
-             "" if approved_pricing else "Senior Management has not approved the current proposal version."),
-        gate("accepted", "Client accepted the proposal", accepted, "am", L("quotation/negotiation"),
+        gate("pricing", "Final pricing approved (approver pending confirmation)", approved_pricing, "approver", L("quotation/proposal"),
+             "" if approved_pricing else "Final pricing approval has not been recorded for the current proposal version."),
+        gate("accepted", "Client accepted the proposal", accepted, "aat", L("quotation/negotiation"),
              "" if accepted else "Record client acceptance with evidence.", evidence=(prop or {}).get("acceptance", {}).get("docId")),
-        gate("contract", f"Contract at '{need}' or later", c_ok, "legal" if not c or c.get("status") in ("Requested", "Drafting", "Review") else "as",
+        gate("contract", f"Contract at '{need}' or later", c_ok, "legal" if not c or c.get("status") in ("Requested", "Drafting", "Review") else "amt",
              L("contract"), f"Contract is '{(c or {}).get('status', 'not requested')}'."),
         gate("kyc", "KYC cleared" + ("" if cfg["kycRequiredForAccount"] else " (not required by configuration)"), kyc_ok,
-             "compliance", L("contract#kyc"), f"KYC is '{(kyc or {}).get('status', 'not started')}'."),
-        gate("docs", "Mandatory onboarding documents received or waived", not missing, "am", L("contract#onboarding"),
+             "aat", L("contract#kyc"), f"KYC is '{(kyc or {}).get('status', 'not started')}'."),
+        gate("docs", "Mandatory onboarding documents received or waived", not missing, "aat", L("contract#onboarding"),
              ("Not uploaded - Skipped for demo (not verified). Missing: " + ", ".join(missing)) if (missing and DEMO_SKIP_DATA)
              else (("Missing: " + ", ".join(missing)) if missing else ""),
              demo=bool(missing) and DEMO_SKIP_DATA),
@@ -467,25 +460,25 @@ def readiness(b, cfg):
     mda = (mb or {}).get("mda", {})
     bill = b.one("billing")
     items = [
-        gate("account", "Parent and affiliate accounts approved", acc_ok, "as", L("setup/account"),
+        gate("account", "Parent and affiliate accounts approved", acc_ok, "amt", L("setup/account"),
              "" if acc_ok else "Account or an affiliate is not yet approved.", evidence=(acc or {}).get("maCode")),
-        gate("contract", "Contract completed", bool(c and c.get("status") == "Completed"), "as", L("contract"),
+        gate("contract", "Contract completed", bool(c and c.get("status") == "Completed"), "amt", L("contract"),
              f"Contract is '{(c or {}).get('status', 'not requested')}'."),
-        gate("kyc", "KYC cleared", bool(kyc and kyc.get("status") == "Cleared"), "compliance", L("contract#kyc"),
+        gate("kyc", "KYC cleared", bool(kyc and kyc.get("status") == "Cleared"), "aat", L("contract#kyc"),
              f"KYC is '{(kyc or {}).get('status', 'not started')}'.", evidence=(kyc or {}).get("externalRef")),
-        gate("docs", "Mandatory documents received or waived", not missing, "am", L("contract#onboarding"),
+        gate("docs", "Mandatory documents received or waived", not missing, "aat", L("contract#onboarding"),
              ("Not uploaded - Skipped for demo (not verified). Missing: " + ", ".join(missing)) if (missing and DEMO_SKIP_DATA)
              else (("Missing: " + ", ".join(missing)) if missing else ""),
              demo=bool(missing) and DEMO_SKIP_DATA),
-        gate("sob", "SOB client-signed and codified", sob_ok, "as", L("setup/sob"),
+        gate("sob", "SOB client-signed and codified", sob_ok, "amt", L("setup/sob"),
              f"SOB is '{(sob or {}).get('status', 'not started')}'."),
-        gate("plans", "Plan Codes approved", approved > 0 and pending == 0, "as", L("setup/plans"),
+        gate("plans", "Plan Codes approved", approved > 0 and pending == 0, "amt", L("setup/plans"),
              f"{approved} approved, {pending} not yet approved."),
-        gate("coc", "COC approved and released", bool(coc and coc.get("status") == "Released"), "as", L("setup/coc"),
+        gate("coc", "COC approved and released", bool(coc and coc.get("status") == "Released"), "amt", L("setup/coc"),
              f"COC is '{(coc or {}).get('status', 'not generated')}'.", evidence=(coc or {}).get("docId")),
     ]
     if intermediary:
-        items.append(gate("commission", "Commission Rate Form approved", bool(comm and comm.get("status") == "Approved"), "as",
+        items.append(gate("commission", "Commission Rate Form approved", bool(comm and comm.get("status") == "Approved"), "amt",
                           L("setup/coc"), f"Commission form is '{(comm or {}).get('status', 'not created')}'."))
     items += [
         gate("members", "Member Data enrolled by MDA", mda.get("status") in ("Completed", "Completed with exceptions"), "mda",
@@ -505,7 +498,7 @@ def _task(b, key, title, role, since, tat_key, cfg, link, waiting=None, kind="ac
     tat = cfg["tatDays"].get(tat_key, 1) if tat_key else None
     sd = parse_date(since)
     due = add_workdays(sd, tat) if (sd and tat is not None) else None
-    if role == "am" and not assignee:
+    if role == "aat" and not assignee:
         assignee = b.case.get("ownerId")
     return {"key": key, "title": title, "role": role, "roleLabel": ROLE_LABEL.get(role, role), "assigneeId": assignee,
             "assigneeName": user_name(assignee) if assignee else None, "since": since, "due": iso(due),
@@ -527,28 +520,28 @@ def derive(b, cfg, today):
     if not closed:
         # ---- Lead / Franchise
         if not fr:
-            T.append(_task(b, "franchise_start", "Start the franchise form", "am", c.get("createdAt"), "franchise_submit", cfg,
+            T.append(_task(b, "franchise_start", "Start the franchise form", "aat", c.get("createdAt"), "franchise_submit", cfg,
                            "franchise", stage=1))
         else:
             s = st(fr)
             stage = 2
             if s == "Draft":
-                T.append(_task(b, "franchise_submit", "Complete and submit the franchise form", "am", at(fr), "franchise_submit", cfg, "franchise", stage=2))
+                T.append(_task(b, "franchise_submit", "Complete and submit the franchise form", "aat", at(fr), "franchise_submit", cfg, "franchise", stage=2))
             elif s == "Returned":
-                T.append(_task(b, "franchise_fix", "Correct the returned franchise and resubmit", "am", at(fr), "franchise_submit", cfg,
+                T.append(_task(b, "franchise_fix", "Correct the returned franchise and resubmit", "aat", at(fr), "franchise_submit", cfg,
                                "franchise", kind="returned", blocker=f"Returned: {fr.get('returnReason', '')}", stage=2))
             elif s in ("Submitted", "Under Review"):
-                T.append(_task(b, "franchise_review", "Review franchise request" if s == "Submitted" else "Decide on franchise", "as",
+                T.append(_task(b, "franchise_review", "Review and upload the franchise" if s == "Submitted" else "Decide on franchise", "amt",
                                at(fr), "franchise_review", cfg, "franchise", kind="approval", stage=2, exclude=fr.get("submittedBy")))
             elif s == "Rejected":
-                T.append(_task(b, "franchise_rejected", "Franchise rejected - close the lead or start a corrected request", "am",
+                T.append(_task(b, "franchise_rejected", "Franchise rejected - close the lead or start a corrected request", "aat",
                                at(fr), "franchise_submit", cfg, "franchise", kind="returned", blocker=f"Rejected: {fr.get('rejectReason', '')}", stage=2))
             elif s == "Expired":
-                T.append(_task(b, "franchise_expired", "Franchise expired - request a new franchise or close the lead", "am",
+                T.append(_task(b, "franchise_expired", "Franchise expired - request a new franchise or close the lead", "aat",
                                at(fr), "franchise_submit", cfg, "franchise", kind="returned", blocker="Franchise expired and was auto-cancelled", stage=2))
             ext = [e for e in fr.get("extensions", []) if e.get("status") == "Requested"]
             if ext:
-                T.append(_task(b, "franchise_ext", "Decide on franchise extension request", "as", ext[-1].get("requestedAt"),
+                T.append(_task(b, "franchise_ext", "Decide on franchise extension request", "amt", ext[-1].get("requestedAt"),
                                "franchise_review", cfg, "franchise", kind="approval", stage=2, exclude=ext[-1].get("requestedBy")))
             if s in ("Approved", "Converted to Account"):
                 milestones["franchise"] = True
@@ -556,7 +549,7 @@ def derive(b, cfg, today):
             if s == "Approved":
                 vu = parse_date(fr.get("validUntil"))
                 if vu and (vu - today).days <= cfg["franchiseExpiryReminderDays"] and not milestones.get("contract_done"):
-                    T.append(_task(b, "franchise_expiring", f"Franchise expires {vu.isoformat()} - request an extension if needed", "am",
+                    T.append(_task(b, "franchise_expiring", f"Franchise expires {vu.isoformat()} - request an extension if needed", "aat",
                                    iso(vu - dt.timedelta(days=cfg["franchiseExpiryReminderDays"])), None, cfg, "franchise",
                                    blocker=f"Franchise expires in {(vu - today).days} day(s)", stage=2))
 
@@ -568,26 +561,26 @@ def derive(b, cfg, today):
             rs = b.current_rate_sheet()
             if not rs:
                 if outstanding and (not rr or st(rr) in ("Draft",)):
-                    T.append(_task(b, "requirements", "Collect outstanding requirements from client", "am", fr.get("approvedAt"),
+                    T.append(_task(b, "requirements", "Collect outstanding requirements from client", "aat", fr.get("approvedAt"),
                                    "requirements", cfg, "quotation/requirements", waiting="client",
                                    blocker="Outstanding: " + ", ".join(outstanding), stage=3))
                 if not rr or st(rr) == "Draft":
-                    T.append(_task(b, "rate_request", "Submit the rate request to Actuarial", "am", at(rr) if rr else fr.get("approvedAt"),
+                    T.append(_task(b, "rate_request", "Submit the rate request to ACCUSA (Actuarial)", "aat", at(rr) if rr else fr.get("approvedAt"),
                                    "rate_request", cfg, "quotation/rates", stage=3))
                 elif st(rr) in ("Submitted", "In Review", "Revised"):
-                    T.append(_task(b, "rate_sheet", "Prepare and issue the rate sheet", "actuarial", at(rr), "rate_sheet", cfg,
+                    T.append(_task(b, "rate_sheet", "Prepare and issue the rate sheet", "accusa", at(rr), "rate_sheet", cfg,
                                    "quotation/rates", stage=3))
                 elif st(rr) == "Returned for Info":
                     q = (rr.get("clarifications") or [{}])[-1].get("question", "")
-                    T.append(_task(b, "rate_clarify", "Answer Actuarial's clarification", "am", at(rr), "rate_request", cfg,
-                                   "quotation/rates", kind="returned", blocker=f"Actuarial asked: {q}", stage=3))
+                    T.append(_task(b, "rate_clarify", "Answer ACCUSA's clarification", "aat", at(rr), "rate_request", cfg,
+                                   "quotation/rates", kind="returned", blocker=f"ACCUSA asked: {q}", stage=3))
             else:
                 milestones["rates"] = True
                 stage = 4
                 if rr and st(rr) in ("Revised",):
-                    T.append(_task(b, "rate_sheet", "Issue the revised rate sheet", "actuarial", at(rr), "rate_sheet", cfg, "quotation/rates", stage=4))
+                    T.append(_task(b, "rate_sheet", "Issue the revised rate sheet", "accusa", at(rr), "rate_sheet", cfg, "quotation/rates", stage=4))
                 elif rr and st(rr) == "Returned for Info":
-                    T.append(_task(b, "rate_clarify", "Answer Actuarial's clarification", "am", at(rr), "rate_request", cfg,
+                    T.append(_task(b, "rate_clarify", "Answer ACCUSA's clarification", "aat", at(rr), "rate_request", cfg,
                                    "quotation/rates", kind="returned", stage=4))
 
         # ---- SOB draft (Sales prepares during proposal; validation by independent function)
@@ -598,17 +591,17 @@ def derive(b, cfg, today):
                 label = "SOB" if s_.get("scope", "parent") == "parent" else f"SOB for {s_.get('name')}"
                 link = f"setup/sob?sob={s_['id']}"
                 if ss == "Draft" and milestones.get("rates"):
-                    T.append(_task(b, f"sob_draft_{s_['id']}", f"Complete the {label} draft and send for Sales review", "am", at(s_), "sob", cfg, link,
+                    T.append(_task(b, f"sob_draft_{s_['id']}", f"Complete the {label} draft and send for review", "aat", at(s_), "sob", cfg, link,
                                    kind="returned" if s_.get("returnReason") else "action",
                                    blocker=(f"Returned: {s_.get('returnReason')}" if s_.get("returnReason") else None), stage=4))
                 elif ss == "Sales Review":
-                    T.append(_task(b, f"sob_review_{s_['id']}", f"Review {label} (Sales Manager)", "sm", at(s_), "sob_review", cfg, link,
-                                   kind="approval", assignee=c.get("salesManagerId"), stage=4))
+                    T.append(_task(b, f"sob_review_{s_['id']}", f"Review {label} (approver - pending confirmation)", "approver", at(s_), "sob_review", cfg, link,
+                                   kind="approval", stage=4, exclude=s_.get("preparedBy")))
                 elif ss == "Independent Validation":
-                    T.append(_task(b, f"sob_validate_{s_['id']}", f"Independently validate {label}", "validator", at(s_), "sob_validate", cfg, link,
+                    T.append(_task(b, f"sob_validate_{s_['id']}", f"Independently validate {label}", "approver", at(s_), "sob_validate", cfg, link,
                                    kind="approval", stage=4, exclude=s_.get("preparedBy")))
             if milestones.get("rates") and not sob:
-                T.append(_task(b, "sob_create", "Create the SOB draft from the approved template", "am", b.current_rate_sheet().get("issuedAt"),
+                T.append(_task(b, "sob_create", "Create the SOB draft from the approved template", "aat", b.current_rate_sheet().get("issuedAt"),
                                "sob", cfg, "setup/sob", stage=4))
 
         # ---- Proposal and negotiation
@@ -616,30 +609,30 @@ def derive(b, cfg, today):
         if milestones.get("rates"):
             ps_ = st(prop)
             if not prop:
-                T.append(_task(b, "proposal", "Prepare the proposal and rate recommendation", "am", b.current_rate_sheet().get("issuedAt"),
+                T.append(_task(b, "proposal", "Prepare the proposal and rate recommendation", "aat", b.current_rate_sheet().get("issuedAt"),
                                "proposal", cfg, "quotation/proposal", stage=4))
             elif ps_ == "Draft":
-                T.append(_task(b, "proposal", "Complete the proposal and submit for internal review", "am", at(prop), "proposal", cfg,
+                T.append(_task(b, "proposal", "Complete the proposal and submit for internal review", "aat", at(prop), "proposal", cfg,
                                "quotation/proposal", kind="returned" if prop.get("returnReason") else "action",
                                blocker=(f"Returned: {prop.get('returnReason')}" if prop.get("returnReason") else None), stage=4))
             elif ps_ == "For Internal Review":
-                T.append(_task(b, "pricing_sm", "Review pricing (Sales Manager)", "sm", at(prop), "pricing_review", cfg, "quotation/proposal",
-                               kind="approval", assignee=c.get("salesManagerId"), stage=4))
+                T.append(_task(b, "pricing_sm", "Review pricing (first level - approver pending confirmation)", "approver", at(prop), "pricing_review", cfg, "quotation/proposal",
+                               kind="approval", stage=4, exclude=prop.get("submittedBy")))
             elif ps_ == "Sales Manager Approved":
-                T.append(_task(b, "pricing_senior", "Final pricing approval", "senior", at(prop), "senior_approval", cfg, "quotation/proposal",
+                T.append(_task(b, "pricing_senior", "Final pricing approval (second level - approver pending confirmation)", "approver", at(prop), "senior_approval", cfg, "quotation/proposal",
                                kind="approval", stage=4))
             elif ps_ == "Approved":
-                T.append(_task(b, "proposal_send", "Generate and send the approved proposal", "am", at(prop), "proposal", cfg,
+                T.append(_task(b, "proposal_send", "Generate and send the approved proposal", "aat", at(prop), "proposal", cfg,
                                "quotation/proposal", stage=4))
             elif ps_ in ("Sent", "Under Negotiation"):
                 via = "agent/broker" if b.channel in ("Agent", "Broker") else "client"
                 T.append(_task(b, "client_decision", f"Waiting for the client's decision (via {via}) - log negotiation or record acceptance",
-                               "am", at(prop), "client_decision", cfg, "quotation/negotiation", waiting="client", stage=4))
+                               "aat", at(prop), "client_decision", cfg, "quotation/negotiation", waiting="client", stage=4))
             elif ps_ == "Rejected":
-                T.append(_task(b, "proposal_declined", "Client declined - revise the offer or close the lead as lost", "am", at(prop),
+                T.append(_task(b, "proposal_declined", "Client declined - revise the offer or close the lead as lost", "aat", at(prop),
                                "proposal", cfg, "quotation/negotiation", kind="returned", blocker=f"Declined: {prop.get('declineReason', '')}", stage=4))
             elif ps_ == "Expired":
-                T.append(_task(b, "proposal_expired", "Proposal validity lapsed - revise and re-send", "am", at(prop), "proposal", cfg,
+                T.append(_task(b, "proposal_expired", "Proposal validity lapsed - revise and re-send", "aat", at(prop), "proposal", cfg,
                                "quotation/negotiation", kind="returned", blocker="Proposal expired", stage=4))
             if ps_ == "Accepted":
                 milestones["accepted"] = True
@@ -649,7 +642,7 @@ def derive(b, cfg, today):
         if milestones.get("accepted"):
             con = b.contract()
             if not con:
-                T.append(_task(b, "contract_request", "Request the contract draft from Legal", "am", prop.get("acceptance", {}).get("recordedAt"),
+                T.append(_task(b, "contract_request", "Request the contract draft from Legal", "aat", prop.get("acceptance", {}).get("recordedAt"),
                                "contract_legal", cfg, "contract", stage=5))
             else:
                 for kind in ("Contract", "DSA"):
@@ -671,21 +664,21 @@ def derive(b, cfg, today):
             kyc = b.one("kyc")
             if con:
                 if not kyc or (st(kyc) == "Pending" and not kyc.get("formDocId")):
-                    T.append(_task(b, "kyc_form", "Upload the client's KYC form and evidence", "am", at(kyc) if kyc else at(con), "kyc", cfg,
+                    T.append(_task(b, "kyc_form", "Upload the client's KYC form and evidence", "aat", at(kyc) if kyc else at(con), "kyc", cfg,
                                    "contract#kyc", waiting="client", stage=5))
                 elif st(kyc) == "Pending":
-                    T.append(_task(b, "kyc_check", "Run the KYC check and record the result", "compliance", at(kyc), "kyc", cfg, "contract#kyc", stage=5))
+                    T.append(_task(b, "kyc_check", "Review KYC and check SOLYTICS, then record the result", "aat", at(kyc), "kyc", cfg, "contract#kyc", stage=5))
                 elif st(kyc) == "Flagged":
-                    T.append(_task(b, "kyc_flag", "Resolve KYC flags", "compliance", at(kyc), "kyc", cfg, "contract#kyc",
+                    T.append(_task(b, "kyc_flag", "Resolve KYC flags", "aat", at(kyc), "kyc", cfg, "contract#kyc",
                                    blocker="KYC flagged: " + "; ".join(f["description"] for f in kyc.get("flags", []) if f.get("status") == "Open"), stage=5))
                 onb = onboarding_status(b, cfg)
                 missing = [i["label"] for i in onb if i["mandatory"] and i["status"] not in ("Received", "Waived")]
                 if missing:
-                    T.append(_task(b, "onboarding_docs", "Collect mandatory onboarding documents", "am", at(con), "kyc", cfg,
+                    T.append(_task(b, "onboarding_docs", "Collect mandatory onboarding documents", "aat", at(con), "kyc", cfg,
                                    "contract#onboarding", waiting="client", blocker="Missing: " + ", ".join(missing), stage=5))
             al = b.one("alignment")
             if not al:
-                T.append(_task(b, "alignment", "Start internal alignment with B&C and MDA", "am", prop.get("acceptance", {}).get("recordedAt"),
+                T.append(_task(b, "alignment", "Start internal alignment with B&C and MDA", "aat", prop.get("acceptance", {}).get("recordedAt"),
                                "alignment", cfg, "quotation/alignment", stage=5))
             else:
                 for team in ("bc", "mda"):
@@ -701,18 +694,18 @@ def derive(b, cfg, today):
         acc = b.parent_account
         if milestones.get("contract_done"):
             if not acc:
-                T.append(_task(b, "account_create", "Create the account and affiliate account numbers", "as", c.get("gatesMetAt") or iso(today),
+                T.append(_task(b, "account_create", "Create the account and affiliate account numbers", "amt", c.get("gatesMetAt") or iso(today),
                                "account_create", cfg, "setup/account", stage=6))
             for a in ([acc] if acc else []) + b.affiliates:
                 s = st(a)
                 nm = "parent account" if not a.get("parentId") else f"affiliate {a.get('accountInfo', {}).get('accountName', '')}"
                 if s in ("Pending Setup", "Returned"):
-                    T.append(_task(b, f"account_setup_{a['id']}", f"Complete and submit the {nm}", "as", at(a), "account_create", cfg,
+                    T.append(_task(b, f"account_setup_{a['id']}", f"Complete and submit the {nm}", "amt", at(a), "account_create", cfg,
                                    "setup/account" if not a.get("parentId") else "setup/affiliates",
                                    kind="returned" if s == "Returned" else "action",
                                    blocker=(f"Returned: {a.get('returnReason')}" if s == "Returned" else None), stage=6))
                 elif s == "For Approval":
-                    T.append(_task(b, f"account_approve_{a['id']}", f"Approve the {nm}", "as", at(a), "account_approve", cfg,
+                    T.append(_task(b, f"account_approve_{a['id']}", f"Approve the {nm}", "amt", at(a), "account_approve", cfg,
                                    "setup/account" if not a.get("parentId") else "setup/affiliates", kind="approval",
                                    exclude=a.get("makerId"), stage=6))
             if acc and st(acc) in ("Approved", "Scheduled", "Active"):
@@ -725,38 +718,38 @@ def derive(b, cfg, today):
                 ss = st(s_)
                 link = f"setup/sob?sob={s_['id']}"
                 if ss == "Approved":
-                    T.append(_task(b, f"sob_sign_{s_['id']}", "Obtain and upload the client-signed SOB", "am", at(s_), "sob", cfg, link,
+                    T.append(_task(b, f"sob_sign_{s_['id']}", "Obtain and upload the client-signed SOB", "aat", at(s_), "sob", cfg, link,
                                    waiting="client", stage=7))
                 elif ss == "Client Signed":
-                    T.append(_task(b, f"sob_codify_{s_['id']}", "Codify the signed SOB", "as", at(s_), "codify", cfg, link, stage=7))
+                    T.append(_task(b, f"sob_codify_{s_['id']}", "Codify the signed SOB", "amt", at(s_), "codify", cfg, link, stage=7))
             ps = b.plan_stats
             if not sum(ps.values()):
-                T.append(_task(b, "plans_create", "Create Plan Codes from the approved SOB", "as", acc.get("approvedAt"), "plan_codes", cfg,
+                T.append(_task(b, "plans_create", "Create Plan Codes from the approved SOB", "amt", acc.get("approvedAt"), "plan_codes", cfg,
                                "setup/plans", stage=7))
             if ps.get("Draft"):
-                T.append(_task(b, "plans_draft", f"Submit {ps['Draft']} draft Plan Code(s) for approval", "as", acc.get("approvedAt"), "plan_codes",
+                T.append(_task(b, "plans_draft", f"Submit {ps['Draft']} draft Plan Code(s) for approval", "amt", acc.get("approvedAt"), "plan_codes",
                                cfg, "setup/plans", stage=7))
             if ps.get("Returned"):
-                T.append(_task(b, "plans_returned", f"Correct {ps['Returned']} returned Plan Code(s)", "as", acc.get("approvedAt"), "plan_codes",
+                T.append(_task(b, "plans_returned", f"Correct {ps['Returned']} returned Plan Code(s)", "amt", acc.get("approvedAt"), "plan_codes",
                                cfg, "setup/plans", kind="returned", stage=7))
             if ps.get("For Approval"):
-                T.append(_task(b, "plans_approve", f"Check and approve {ps['For Approval']} Plan Code(s)", "as", acc.get("approvedAt"),
+                T.append(_task(b, "plans_approve", f"Check and approve {ps['For Approval']} Plan Code(s)", "amt", acc.get("approvedAt"),
                                "plan_approve", cfg, "setup/plans", kind="approval", stage=7))
             coc = b.one("coc")
             if ps.get("Approved") and (not coc or st(coc) in ("Returned", "Draft")):
-                T.append(_task(b, "coc", "Generate the COC", "as", acc.get("approvedAt"), "coc", cfg, "setup/coc", stage=7))
+                T.append(_task(b, "coc", "Generate the COC", "amt", acc.get("approvedAt"), "coc", cfg, "setup/coc", stage=7))
             elif coc and st(coc) == "For Approval":
-                T.append(_task(b, "coc_approve", "Approve the COC", "as", at(coc), "coc", cfg, "setup/coc", kind="approval",
+                T.append(_task(b, "coc_approve", "Approve the COC", "amt", at(coc), "coc", cfg, "setup/coc", kind="approval",
                                exclude=coc.get("makerId"), stage=7))
             elif coc and st(coc) == "Approved":
-                T.append(_task(b, "coc_release", "Release the approved COC", "as", at(coc), "coc", cfg, "setup/coc", stage=7))
+                T.append(_task(b, "coc_release", "Release the approved COC", "amt", at(coc), "coc", cfg, "setup/coc", stage=7))
             if b.channel in ("Agent", "Broker"):
                 cm = b.one("commission")
                 if not cm or st(cm) in ("Draft", "Returned"):
-                    T.append(_task(b, "commission", "Prepare and submit the Commission Rate Form", "as", acc.get("approvedAt"), "commission",
+                    T.append(_task(b, "commission", "Prepare and submit the Commission Rate Form", "amt", acc.get("approvedAt"), "commission",
                                    cfg, "setup/coc", stage=7))
                 elif st(cm) == "For Approval":
-                    T.append(_task(b, "commission_approve", "Approve the Commission Rate Form", "as", at(cm), "commission", cfg,
+                    T.append(_task(b, "commission_approve", "Approve the Commission Rate Form", "amt", at(cm), "commission", cfg,
                                    "setup/coc", kind="approval", exclude=cm.get("makerId"), stage=7))
             sob_all = b.many("sob")
             if sob_all and all(st(s_) == "Codified" for s_ in sob_all) and ps.get("Approved") and not ps.get("For Approval") \
@@ -769,15 +762,15 @@ def derive(b, cfg, today):
             mb = b.member_batch("enrollment")
             ms = st(mb)
             if not mb:
-                T.append(_task(b, "members_upload", "Upload and validate Member Data", "as", acc.get("approvedAt"), "member_data", cfg,
+                T.append(_task(b, "members_upload", "Upload and validate Member Data", "amt", acc.get("approvedAt"), "member_data", cfg,
                                "setup/members", stage=8))
             elif ms in ("Mapping", "Has errors", "Validated", "Returned by MDA"):
                 T.append(_task(b, "members_fix", "Resolve Member Data rows and accept the file" if ms != "Validated" else "Accept the validated Member Data",
-                               "as", at(mb), "member_data", cfg, "setup/members", kind="returned" if ms in ("Has errors", "Returned by MDA") else "action",
+                               "amt", at(mb), "member_data", cfg, "setup/members", kind="returned" if ms in ("Has errors", "Returned by MDA") else "action",
                                blocker=(f"{mb.get('counts', {}).get('errors', 0)} row(s) need correction" if ms == "Has errors" else
                                         (f"MDA returned: {mb.get('mda', {}).get('notes', '')}" if ms == "Returned by MDA" else None)), stage=8))
             elif ms == "Accepted":
-                T.append(_task(b, "members_submit", "Submit accepted Member Data to MDA", "as", at(mb), "member_data", cfg, "setup/members", stage=8))
+                T.append(_task(b, "members_submit", "Submit accepted Member Data to MDA", "amt", at(mb), "member_data", cfg, "setup/members", stage=8))
             elif ms == "Submitted to MDA":
                 T.append(_task(b, "mda_enroll", "Enroll members and record the MDA result", "mda", at(mb), "mda", cfg, "setup/members", stage=8))
             bill = b.one("billing")
@@ -793,7 +786,7 @@ def derive(b, cfg, today):
                 T.append(_task(b, "billing_complete", "Complete billing setup", "bc", at(bill), "billing", cfg, "setup/billing", stage=8))
             ori = b.one("orientation")
             if not ori or st(ori) == "Not scheduled":
-                T.append(_task(b, "orientation", "Schedule the health benefit orientation", "wellness", acc.get("approvedAt"), "orientation", cfg,
+                T.append(_task(b, "orientation", "Schedule the health benefit orientation", "amt", acc.get("approvedAt"), "orientation", cfg,
                                "setup/activation#orientation", stage=8))
             if milestones.get("plans") and (mb or {}).get("mda", {}).get("status") in ("Completed", "Completed with exceptions") \
                     and bs == "Completed":
@@ -807,10 +800,10 @@ def derive(b, cfg, today):
             ready = all(g["satisfied"] for g in readiness(b, cfg))
             if acts in ("Pending", "Ready") and ready:
                 stage = 9
-                T.append(_task(b, "activate", "Activate the account", "as", iso(today), "activation", cfg, "setup/activation", stage=9))
+                T.append(_task(b, "activate", "Activate the account (owner pending confirmation)", "approver", iso(today), "activation", cfg, "setup/activation", stage=9))
             elif acts == "Scheduled":
                 stage = 9
-                T.append(_task(b, "scheduled", f"Activation scheduled for {act.get('scheduledFor')} (future effectivity)", "as",
+                T.append(_task(b, "scheduled", f"Activation scheduled for {act.get('scheduledFor')} (future effectivity)", "approver",
                                act.get("statusAt"), None, cfg, "setup/activation", waiting="date", stage=9))
             elif acts == "Active":
                 stage = 9
@@ -819,7 +812,7 @@ def derive(b, cfg, today):
                         T.append(_task(b, f"ack_{team['key']}", "Acknowledge the account handover", team["role"], act.get("statusAt"),
                                        "handover", cfg, "setup/activation", stage=9))
                 if all(act.get("acks", {}).get(t["key"], {}).get("status") == "Acknowledged" for t in meta.HANDOVER_TEAMS):
-                    T.append(_task(b, "handover", "Complete the handover", "as", act.get("statusAt"), "handover", cfg, "setup/activation", stage=9))
+                    T.append(_task(b, "handover", "Complete the handover (owner pending confirmation)", "approver", act.get("statusAt"), "handover", cfg, "setup/activation", stage=9))
             elif acts == "Handover Complete":
                 stage = 9
 
@@ -844,7 +837,7 @@ def derive(b, cfg, today):
             status, tone = "Returned for correction", "warn"
         elif main["waiting"] == "client":
             status, tone = "Waiting on client", "warn"
-        elif main["role"] == "am":
+        elif main["role"] == "aat":
             status, tone = ("Draft" if stage <= 2 and st(fr) in (None, "Draft") else "In progress"), "info"
         elif main["kind"] == "approval":
             status, tone = f"Awaiting {ROLE_LABEL.get(main['role'])}", "info"
@@ -890,17 +883,17 @@ def task_matches_user(t, user):
         return False
     if t["role"] != user["role"]:
         return False
-    if t["role"] in ("am",) and t.get("assigneeId") and t["assigneeId"] != user["id"]:
+    # AAT tasks pinned to a specific handler stay with that handler.
+    if t["role"] == "aat" and t.get("assigneeId") and t["assigneeId"] != user["id"]:
         return False
-    if t["role"] == "sm" and t.get("assigneeId") and t["assigneeId"] != user["id"]:
-        return False
-    if t["role"] == "validator":
-        return True
     return True
 
 
 def matches_validator(t, user, cfg):
-    return t["role"] == "validator" and user["role"] in cfg["sobValidatorRoles"] and t.get("excludeUserId") != user["id"]
+    # Independent SOB validation can be routed to any configured role, not only the
+    # task's own role. The owning title is unconfirmed (see sobValidatorRoles).
+    return t.get("key", "").startswith("sob_validate") and user["role"] in cfg["sobValidatorRoles"] \
+        and t.get("excludeUserId") != user["id"]
 
 
 def user_tasks(summary, user, cfg):

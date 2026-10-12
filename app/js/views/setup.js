@@ -36,7 +36,7 @@ export async function render(ctx) {
 // ---------------------------------------------------------------- account
 export function accountForm(ctx, a, box, { isAffiliate = false } = {}) {
   const me = state.me;
-  const editable = me.role === "as" && ["Pending Setup", "Returned"].includes(a.status) && ctx.data.case.status === "Open";
+  const editable = me.role === "amt" && ["Pending Setup", "Returned"].includes(a.status) && ctx.data.case.status === "Open";
   const schema = state.meta.accountSchema;
   const errs = ctx.accountErrors?.[a.id] || [];
   const em = Object.fromEntries(errs.map((e) => [e.field, e.message]));
@@ -54,7 +54,7 @@ export function accountForm(ctx, a, box, { isAffiliate = false } = {}) {
     </div></div></section>
     <section class="panel form-sec" id="acc-${a.id}-docs"><div class="ph"><h2>Supporting documents</h2></div><div class="pb">
       <p class="tiny">Onboarding documents (KYC, GIS, registrations, VAT evidence) are on the <a href="#/case/${ctx.id}/contract#onboarding">Contract tab</a>; franchise documents on the <a href="#/case/${ctx.id}/franchise#sec-documents">Franchise tab</a>.</p>
-      ${docSlot({ label: "Other account documents", slot: "onb:account_misc", docs: ctx.data.documents, linkedType: "account", linkedId: a.id, caseId: ctx.id, canUpload: me.role === "as" && ctx.data.case.status === "Open" })}</div></section>
+      ${docSlot({ label: "Other account documents", slot: "onb:account_misc", docs: ctx.data.documents, linkedType: "account", linkedId: a.id, caseId: ctx.id, canUpload: me.role === "amt" && ctx.data.case.status === "Open" })}</div></section>
     </div>
     ${editable ? html`<div class="savebar"><span data-st></span><div class="row">${sampleBtn("fillSampleAcc")}<button class="btn primary" data-submit>Submit for approval (maker)</button></div></div>` : ""}`.s;
   wireErrorLinks(box);
@@ -88,7 +88,7 @@ export function accountForm(ctx, a, box, { isAffiliate = false } = {}) {
     b.setAttribute("aria-busy", "true"); b.disabled = true;
     try {
       await api("action/account.submit", { method: "POST", body: { id: a.id, baseVersion: form.base.v } });
-      toast("Submitted for approval. A different Account Services user must approve it.", "ok");
+      toast("Submitted for approval. A different AMT user must approve it.", "ok");
       (ctx.accountErrors ||= {})[a.id] = [];
       form.dispose();
       ctx.reload();
@@ -106,8 +106,8 @@ export function accountForm(ctx, a, box, { isAffiliate = false } = {}) {
 }
 function decisionButtons(ctx, a, bar, label) {
   const me = state.me;
-  if (me.role !== "as" || a.status !== "For Approval") return;
-  if (a.makerId === me.id) { bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared this ${label}; another Account Services user approves it.</span>`); return; }
+  if (me.role !== "amt" || a.status !== "For Approval") return;
+  if (a.makerId === me.id) { bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared this ${label}; another AMT user approves it.</span>`); return; }
   const b = document.createElement("button");
   b.className = "btn primary";
   b.textContent = `Check and approve ${label}`;
@@ -126,7 +126,7 @@ function account(ctx, acc) {
     // server re-checks. The gate list still shows each demo skip in amber, so
     // nothing reads as met without evidence.
     const ok = data.gates.every((g) => g.satisfied);
-    body.innerHTML = html`${ownerBanner(["as"], "Account creation")}<section class="panel"><div class="ph"><h2>Account creation gates</h2>${me.role === "as" ? html`<button class="btn primary" id="mk" ${ok ? "" : raw('aria-disabled="true"')}>Create account and affiliate codes</button>` : ""}</div>
+    body.innerHTML = html`${ownerBanner(["amt"], "Account creation")}<section class="panel"><div class="ph"><h2>Account creation gates</h2>${me.role === "amt" ? html`<button class="btn primary" id="mk" ${ok ? "" : raw('aria-disabled="true"')}>Create account and affiliate codes</button>` : ""}</div>
       <div class="pb">${gateList(data.gates)}<p class="tiny mt">The MA Code is generated here - never at lead creation. Validated franchise information is reused; each affiliate gets its own account code. The server re-checks every gate when you create the account.</p></div></section>`.s;
     body.querySelector("#mk")?.addEventListener("click", async (e) => {
       if (!ok) return showError({ code: "gate", message: "Account creation is blocked", details: { gates: data.gates } });
@@ -147,11 +147,11 @@ function affiliates(ctx, acc, affs) {
   const sel = ctx.query.aff || affs[0]?.id;
   const a = affs.find((x) => x.id === sel);
   const sobs = (data.records.sob || []);
-  body.innerHTML = html`<section class="panel"><div class="ph"><h2>Affiliates of ${acc.accountInfo.accountName} (${affs.length})</h2>${me.role === "as" && data.case.status === "Open" ? html`<button class="btn sm" id="addAff">${icon("plus", 14)} Add affiliate</button>` : ""}</div>
+  body.innerHTML = html`<section class="panel"><div class="ph"><h2>Affiliates of ${acc.accountInfo.accountName} (${affs.length})</h2>${me.role === "amt" && data.case.status === "Open" ? html`<button class="btn sm" id="addAff">${icon("plus", 14)} Add affiliate</button>` : ""}</div>
     <div class="pb flush"><div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Affiliates</caption><thead><tr><th>Affiliate</th><th>Account code</th><th>Status</th><th>SOB</th><th>Financial assistance</th><th></th></tr></thead><tbody>
     ${affs.length ? affs.map((x) => { const s = sobs.find((y) => y.id === x.sobId); return html`<tr class="${x.id === sel ? "sel" : ""}"><td class="co"><a href="#/case/${ctx.id}/setup/affiliates?aff=${x.id}">${x.accountInfo.accountName}</a></td><td class="mono">${x.accountCode}</td><td>${pill(x.status)}</td>
       <td>${x.sobMode === "separate" ? html`Separate: <a href="#/case/${ctx.id}/setup/sob?sob=${x.sobId}">${s?.name || x.sobId}</a> ${s ? pill(s.status) : ""}` : "Shares main SOB"}
-        ${["as", "am"].includes(me.role) && data.case.status === "Open" ? html`<button class="btn ghost sm" data-sob="${x.id}" data-mode="${x.sobMode === "separate" ? "shared" : "separate"}">${x.sobMode === "separate" ? "Use main SOB" : "Create separate SOB"}</button>` : ""}</td>
+        ${["amt", "aat"].includes(me.role) && data.case.status === "Open" ? html`<button class="btn ghost sm" data-sob="${x.id}" data-mode="${x.sobMode === "separate" ? "shared" : "separate"}">${x.sobMode === "separate" ? "Use main SOB" : "Create separate SOB"}</button>` : ""}</td>
       <td>${x.otherInfo?.financialAssistance || "-"}${x.otherInfo?.financialAssistanceName ? html`<span class="sub">${x.otherInfo.financialAssistanceName}</span>` : ""}</td>
       <td><a class="btn sm" href="#/case/${ctx.id}/setup/affiliates?aff=${x.id}">Open</a></td></tr>`; }) : html`<tr><td colspan="6"><div class="empty">No affiliates.</div></td></tr>`}</tbody></table></div></div></section>
     ${a ? html`<section class="panel mt"><div class="ph"><h2>${a.accountInfo.accountName} · ${a.accountCode} ${pill(a.status)}</h2><div class="row" id="affAct"></div></div></section><div id="affForm" class="mt"></div>` : ""}`.s;
@@ -180,7 +180,7 @@ function cocCommission(ctx, acc) {
   const coc = (data.records.coc || [])[0];
   const cm = (data.records.commission || [])[0];
   const inter = data.summary.channel !== "Direct";
-  body.innerHTML = html`${ownerBanner(["as"], "COC and the Commission Rate Form")}
+  body.innerHTML = html`${ownerBanner(["amt"], "COC and the Commission Rate Form")}
     <section class="panel"><div class="ph"><div><h2>Certificate of Coverage ${pill(coc?.status || "Not generated")}</h2><div class="tiny">Generated from the account, codified SOB and approved Plan Codes. A separate approver releases it.</div></div><div class="row" id="cocAct"></div></div>
       <div class="pb">${coc?.basis ? html`<p class="tiny">Generated from account version ${coc.basis.accountVersion}, SOB v${coc.basis.sobVersion}, ${coc.basis.planCodes} approved Plan Code(s). Maker ${userName(coc.makerId)}${coc.checkerId ? `, checker ${userName(coc.checkerId)}` : ""}${coc.releasedAt ? `, released ${fmtDateTime(coc.releasedAt)}` : ""}.</p>` : ""}
         ${coc?.returnReason && coc.status === "Returned" ? html`<div class="note warn">Returned: ${coc.returnReason}</div>` : ""}
@@ -189,7 +189,7 @@ function cocCommission(ctx, acc) {
       <div class="pb" id="cmBody">${!inter ? "" : !cm ? html`<p class="muted">Not created. Pre-filled from the negotiated commission on the accepted proposal.</p>` : ""}</div></section>`.s;
   const cbar = body.querySelector("#cocAct");
   const btn = (bar, label, cls, fn) => { const b = document.createElement("button"); b.className = `btn ${cls}`; b.textContent = label; b.onclick = () => fn(b); bar.appendChild(b); };
-  if (me.role === "as" && data.case.status === "Open") {
+  if (me.role === "amt" && data.case.status === "Open") {
     if (!coc || ["Returned", "Draft"].includes(coc.status)) btn(cbar, coc?.status === "Returned" ? "Regenerate COC" : "Generate COC", "primary", async (b) => { if (await act("coc.generate", { caseId: id }, { button: b, success: "COC generated and sent for approval." })) ctx.reload(); });
     if (coc?.status === "For Approval") coc.makerId === me.id ? cbar.insertAdjacentHTML("beforeend", `<span class="tiny">You generated it; another person approves.</span>`) : btn(cbar, "Check and approve COC", "primary", async (b) => {
       const r = await dialog({ title: "Approve COC", body: html`<p>Open the COC document and check it against the account, SOB and Plan Codes.</p><div class="field mt"><label for="cr">Remarks (required to return)</label><textarea id="cr" name="remarks" class="inp"></textarea></div>`,
@@ -200,9 +200,9 @@ function cocCommission(ctx, acc) {
   }
   if (!inter) return;
   const mbar = body.querySelector("#cmAct");
-  if (me.role === "as" && !cm && data.case.status === "Open") btn(mbar, "Create Commission Rate Form", "primary", async (b) => { if (await act("commission.create", { caseId: id }, { button: b, success: "Commission Rate Form created." })) ctx.reload(); });
+  if (me.role === "amt" && !cm && data.case.status === "Open") btn(mbar, "Create Commission Rate Form", "primary", async (b) => { if (await act("commission.create", { caseId: id }, { button: b, success: "Commission Rate Form created." })) ctx.reload(); });
   if (!cm) return;
-  const editable = me.role === "as" && ["Draft", "Returned"].includes(cm.status);
+  const editable = me.role === "amt" && ["Draft", "Returned"].includes(cm.status);
   const cbody = body.querySelector("#cmBody");
   cbody.innerHTML = html`${cm.returnReason && cm.status === "Returned" ? html`<div class="note warn mb">Returned: ${cm.returnReason}</div>` : ""}<div class="fgrid" data-form>
     <div class="field"><span class="lbl">Intermediary</span><div class="ro">${interName(cm.intermediaryId)}</div></div>
@@ -221,7 +221,7 @@ function cocCommission(ctx, acc) {
     if (DEMO_BYPASS) btn(mbar, "Fill sample", "ghost", () => fillSampleData(cbody.querySelector("[data-form]")));
     btn(mbar, "Submit for approval", "primary", async (b) => { if (!(await form.save())) return; if (await act("commission.submit", { id: cm.id, baseVersion: form.base.v }, { button: b, success: "Commission Rate Form submitted." })) ctx.reload(); });
   }
-  if (["as", "sm"].includes(me.role) && cm.status === "For Approval") cm.makerId === me.id ? mbar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared it; another person approves.</span>`) : btn(mbar, "Approve Commission Rate Form", "primary", async (b) => {
+  if (me.role === "amt" && cm.status === "For Approval") cm.makerId === me.id ? mbar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared it; another AMT user approves.</span>`) : btn(mbar, "Approve Commission Rate Form", "primary", async (b) => {
     const r = await dialog({ title: "Approve Commission Rate Form", body: html`<p>${cm.percentage}% on ${cm.basis} for ${interName(cm.intermediaryId)}, ${fmtDate(cm.effectiveFrom)} to ${fmtDate(cm.effectiveTo)}.</p><div class="field mt"><label for="mr">Remarks (required to return)</label><textarea id="mr" name="remarks" class="inp"></textarea></div>`,
       actions: [{ label: "Cancel" }, { label: "Return", value: "return", validate: (v) => (!v.remarks.trim() ? "Enter the reason." : null) }, { label: "Approve", kind: "primary", value: "approve" }] });
     if (r && ["approve", "return"].includes(r.action) && (await act("commission.decide", { id: cm.id, decision: r.action, reviewedVersion: cm.v, remarks: r.values.remarks }, { button: b, success: "Decision recorded." }))) ctx.reload();
@@ -262,7 +262,7 @@ function billing(ctx, acc) {
         ${x.resolution ? html`<div class="tiny">Resolved by ${x.resolvedByName} ${fmtDateTime(x.resolvedAt)}: ${x.resolution} · <a href="${docUrl(x.evidenceDocId)}">evidence</a></div>` : me.role === "bc" ? html`<button class="btn sm mt" data-resx="${x.id}">Resolve with evidence</button>` : ""}</div></li>`)}</ul>` : html`<p class="tiny">No exceptions.</p>`}</div></section>
     <section class="panel"><div class="ph"><h2>First payment</h2>${me.role === "bc" && !bl.firstPaymentPosted ? html`<button class="btn sm" id="pay">Record first payment</button>` : ""}</div><div class="pb">
       ${bl.firstPaymentPosted ? html`<p>Posted ${fmtDate(bl.firstPayment.date)} · reference ${bl.firstPayment.reference}</p>${simNote(bl.firstPayment.note)}` : html`<p class="muted">Not posted. Until it is, a signed contract shows as "Signed - unpaid".</p>`}</div></section>
-    <section class="panel" id="orientation"><div class="ph"><h2>Health benefit orientation ${pill(ori?.status || "Not scheduled")}</h2><div class="row" id="oAct"></div></div><div class="pb"><p class="tiny">Owned by Wellness. Scheduling is tracked separately from billing completion.</p>
+    <section class="panel" id="orientation"><div class="ph"><h2>Health benefit orientation ${pill(ori?.status || "Not scheduled")}</h2><div class="row" id="oAct"></div></div><div class="pb"><p class="tiny">Owned by AMT. Scheduling is tracked separately from billing completion.</p>
       ${ori ? html`<p class="mt">${ori.date ? `Scheduled ${fmtDate(ori.date)}` : ""}${ori.venue ? ` at ${ori.venue}` : ""}${ori.completedAt ? ` · completed ${fmtDateTime(ori.completedAt)}` : ""}</p>` : ""}</div></section>`.s;
   wireUploads(body, () => ctx.reload());
   const bar = body.querySelector("#bAct");
@@ -307,7 +307,7 @@ function billing(ctx, acc) {
   orientationButtons(ctx, ori, body.querySelector("#oAct"));
 }
 function orientationButtons(ctx, ori, bar) {
-  if (!bar || state.me.role !== "wellness") return;
+  if (!bar || state.me.role !== "amt") return;
   const b = document.createElement("button");
   b.className = "btn sm";
   b.textContent = ori ? "Reschedule" : "Schedule orientation";
@@ -341,7 +341,7 @@ function activation(ctx, acc) {
   const eff = data.summary.effectivity;
   const ori = (data.records.orientation || [])[0];
   const steps = ["Pending", "Ready", "Scheduled", "Active", "Handover Complete"];
-  body.innerHTML = html`${ownerBanner(["as"], "Activation")}
+  body.innerHTML = html`${ownerBanner(["approver"], "Activation")}
     <section class="panel"><div class="ph"><div><h2>Activation ${pill(status)}</h2><div class="tiny">Effective date ${fmtDate(eff) || "-"}${eff ? (daysUntil(eff) > 0 ? ` (in ${daysUntil(eff)} days - activation will be Scheduled, not Active)` : " (today or past)") : ""}</div></div><div class="row" id="aAct"></div></div>
       <div class="pb"><ol class="steps-h">${steps.map((s, i) => html`<li class="${i < steps.indexOf(status) ? "done" : i === steps.indexOf(status) ? "cur" : ""}">${s}</li>`)}</ol>
       ${act0?.status === "Scheduled" ? html`<div class="note mt">Scheduled to become Active on <b>${fmtDate(act0.scheduledFor)}</b>. The scheduler activates it on that date; it is not reported as active before then.</div>` : ""}</div></section>
@@ -354,7 +354,7 @@ function activation(ctx, acc) {
     <section class="panel"><div class="ph"><h2>Notifications and integrations</h2></div><div class="pb">${simNote("Announcements, MDA policy issuance, e-ID publishing, CCD live SOB access and renewal pipeline hand-off are recorded as simulated - nothing is delivered to external systems from this application. See History for each notification and its result.")}</div></section>`.s;
   orientationButtons(ctx, ori, body.querySelector("#oAct"));
   const bar = body.querySelector("#aAct");
-  if (me.role === "as" && ["Pending", "Ready"].includes(st) && acc && data.case.status === "Open") {
+  if (me.role === "approver" && ["Pending", "Ready"].includes(st) && acc && data.case.status === "Open") {
     const b = document.createElement("button");
     b.className = "btn primary";
     b.textContent = daysUntil(eff) > 0 ? "Schedule activation" : "Activate account";
@@ -381,7 +381,7 @@ function activation(ctx, acc) {
       };
       hbar.appendChild(b);
     }
-    if (me.role === "as") {
+    if (me.role === "approver") {
       const b = document.createElement("button");
       b.className = "btn";
       b.textContent = "Complete handover";

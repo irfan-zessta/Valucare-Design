@@ -10,7 +10,7 @@ const COLS = [
   { key: "owner", label: "Owner (next step)", sort: (c) => ownerText(c.next) },
   { key: "due", label: "Task due", sort: (c) => c.nextDue || "9999" },
   { key: "effectivity", label: "Effectivity", sort: (c) => c.effectivity || "9999", def: false },
-  { key: "am", label: "Account Manager", sort: (c) => c.ownerName, def: false },
+  { key: "am", label: "AAT handler", sort: (c) => c.ownerName, def: false },
   { key: "intermediary", label: "Intermediary", sort: (c) => (c.intermediaryId ? interName(c.intermediaryId) : "Direct"), def: false },
   { key: "updated", label: "Updated", sort: (c) => c.updatedAt || "", def: false },
 ];
@@ -34,7 +34,7 @@ export async function render(main, { query }) {
   if (query.view) st.view = query.view;
   save(st);
   main.innerHTML = html`<div class="page-head"><div><h1>New Business</h1><p>Every Corporate New Business case you are permitted to see, from lead to handover.</p></div>
-    ${["am", "sm"].includes(state.me.role) ? html`<a class="btn primary" href="#/new-business/create">${icon("plus")} Create New Business</a>` : ""}</div>
+    ${state.me.role === "aat" ? html`<a class="btn primary" href="#/new-business/create">${icon("plus")} Create New Business</a>` : ""}</div>
     <div class="panel" id="q"><div class="state-box" aria-busy="true"><div class="skeleton"></div><div class="skeleton mt"></div><div class="skeleton mt"></div><p class="tiny mt">Loading cases…</p></div></div>`.s;
   const box = main.querySelector("#q");
   let items, recent;
@@ -55,7 +55,7 @@ export async function render(main, { query }) {
     const me = state.me;
     if (st.view === "mine") return c.ownerId === me.id || c.salesManagerId === me.id || involved.has(c.id) || c.myTasks.length > 0;
     if (st.view === "action") return c.myTasks.length > 0;
-    if (st.view === "waiting") return !c.closed && !c.myTasks.length && c.next && (["am", "sm"].includes(me.role) ? (c.ownerId === me.id || c.salesManagerId === me.id) : involved.has(c.id));
+    if (st.view === "waiting") return !c.closed && !c.myTasks.length && c.next && (me.role === "aat" ? (c.ownerId === me.id || c.salesManagerId === me.id) : involved.has(c.id));
     return true;
   }
   function filtered() {
@@ -167,9 +167,9 @@ export async function render(main, { query }) {
   function filtersPopover(anchor) {
     const f = st.filters || {};
     const statuses = [...new Set(items.map((c) => c.status))].sort();
-    const ams = state.meta.users.filter((u) => u.role === "am");
+    const ams = state.meta.users.filter((u) => u.role === "aat");
     popover(anchor, html`<div class="stack sm"><h2 class="h">Filters</h2>
-      <div class="field"><label for="f-o">Account Manager</label><select id="f-o" class="inp" name="owner"><option value="">Any</option>${ams.map((u) => html`<option value="${u.id}" ${f.owner === u.id ? "selected" : ""}>${u.name}</option>`)}</select></div>
+      <div class="field"><label for="f-o">AAT handler</label><select id="f-o" class="inp" name="owner"><option value="">Any</option>${ams.map((u) => html`<option value="${u.id}" ${f.owner === u.id ? "selected" : ""}>${u.name}</option>`)}</select></div>
       <div class="field"><label for="f-s">Status</label><select id="f-s" class="inp" name="status"><option value="">Any</option>${statuses.map((s) => html`<option ${f.status === s ? "selected" : ""}>${s}</option>`)}</select></div>
       <div class="field"><label for="f-g">Stage</label><select id="f-g" class="inp" name="stage"><option value="">Any</option>${state.meta.stages.map((s) => html`<option value="${s.n}" ${String(f.stage) === String(s.n) ? "selected" : ""}>${s.n}. ${s.label}</option>`)}</select></div>
       <div class="field"><label for="f-i">Intermediary</label><select id="f-i" class="inp" name="intermediary"><option value="">Any</option><option value="Direct" ${f.intermediary === "Direct" ? "selected" : ""}>Direct (no intermediary)</option>

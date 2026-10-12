@@ -297,7 +297,7 @@ export function docSlot({ label, slot, docs, linkedType, linkedId, caseId, canUp
         <button type="button" class="btn sm" data-upload="${slot}" data-linked-type="${linkedType}" data-linked-id="${linkedId}" data-case="${caseId || ""}" data-label="${label}">${icon("upload", 14)} ${mine.length ? "Upload new version" : "Upload"}</button>
         ${DEMO_BYPASS ? html`<button type="button" class="btn sm ghost" data-sample="${slot}" data-linked-type="${linkedType}" data-linked-id="${linkedId}" data-case="${caseId || ""}" data-label="${label}" title="Attach a generated demo file">Use sample</button>` : ""}
       </div>` : ""}</div>
-    ${mine.length ? html`<ul class="doclist">${mine.map((d) => docRow(d, { canReview: !["am", "sm"].includes(state.me.role) }))}</ul>` : html`<div class="tiny mt">No file uploaded.</div>`}
+    ${mine.length ? html`<ul class="doclist">${mine.map((d) => docRow(d, { canReview: ["amt", "aat", "accusa", "legal", "mda", "bc"].includes(state.me.role) }))}</ul>` : html`<div class="tiny mt">No file uploaded.</div>`}
     ${hist.length ? html`<details class="tiny"><summary>${hist.length} earlier version(s)</summary><ul class="doclist">${hist.map((d) => docRow(d))}</ul></details>` : ""}
   </div>`;
 }

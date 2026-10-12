@@ -7,44 +7,68 @@ Provenance tags used throughout (shown in the UI and the parity checklist):
   "demo"     - fictional/placeholder master data for this build; replace from HMS3 masters
 """
 
+# ROLES — aligned to the two source-of-truth documents:
+#   * SALES NEW BUSINESS CORP. PROCESS FLOWCHART 2026 (AAT / AMT / ACCUSA / LEGAL)
+#   * Actuarial Process Flow (ACCUSA quotation routing)
+# The exact labels AAT and AMT are preserved; their full names are NOT confirmed
+# by the source, so they are never expanded. Only the roles the documents assign
+# are treated as confirmed. Everything the source leaves silent (pricing/SOB
+# approver titles, billing/member-enrolment/activation owners, downstream
+# acknowledgers) is kept as an explicitly "pending confirmation" participant so
+# the step stays visible and the owner stays unresolved — not invented.
 ROLES = {
-    "am": "Account Manager",
-    "sm": "Sales Manager",
-    "senior": "Senior Management",
-    "as": "Account Services",
-    "actuarial": "Actuarial (ACCUSA)",
-    "legal": "Legal",
-    "compliance": "Compliance",
-    "validator": "SOB Validator",
-    "mda": "Members Data Administration",
-    "bc": "Billing and Collection",
-    "wellness": "Wellness",
-    "ccd": "Customer Care (CCD)",
-    "admin": "System Administrator",
+    # ---- Source-confirmed Corporate New Business participants ----
+    "aat": "AAT",
+    "amt": "AMT",
+    "accusa": "Actuarial (ACCUSA)",
+    "legal": "Legal Department",
+    # ---- Ownership not established by the source (kept visible + configurable) ----
+    "approver": "Approver (pending confirmation)",
+    "mda": "MDA (internal alignment)",
+    "bc": "B&C (internal alignment)",
+    "ccd": "CCD (downstream)",
+    # ---- Technical account, not a business-process participant ----
+    "admin": "System Administrator (technical)",
 }
 
-# Fictional demo users. Two users exist for every maker-checker role so
-# separation of duties can be exercised.
+# Fictional demo users. IDs are UNCHANGED from the pre-migration build so every
+# existing record, approval and audit entry (which reference the user id, not the
+# role) stays intact; only each account's role and display name were remapped to
+# the source-aligned model. See docs/ROLE-MIGRATION.md for the full mapping.
+# Multiple accounts share a role on purpose so maker-checker separation can be
+# exercised (two AMT users, several approvers for first/second-level sign-off).
 USERS = [
-    {"id": "u-am1", "name": "Ana Reyes", "role": "am", "team": "Team North"},
-    {"id": "u-am2", "name": "Ben Cruz", "role": "am", "team": "Team North"},
-    {"id": "u-am3", "name": "Cora Lim", "role": "am", "team": "Team South"},
-    {"id": "u-sm1", "name": "Carla Mendoza", "role": "sm", "team": "Team North"},
-    {"id": "u-sm2", "name": "Rafael Soriano", "role": "sm", "team": "Team South"},
-    {"id": "u-sr1", "name": "Dante Lim", "role": "senior", "team": None},
-    {"id": "u-as1", "name": "Ella Santos", "role": "as", "team": None},
-    {"id": "u-as2", "name": "Felix Tan", "role": "as", "team": None},
-    {"id": "u-ac1", "name": "Gina Ramos", "role": "actuarial", "team": None},
-    {"id": "u-lg1", "name": "Hugo Villanueva", "role": "legal", "team": None},
-    {"id": "u-co1", "name": "Iris Navarro", "role": "compliance", "team": None},
-    {"id": "u-va1", "name": "Jonas Uy", "role": "validator", "team": None},
-    {"id": "u-md1", "name": "Karen Dizon", "role": "mda", "team": None},
-    {"id": "u-bc1", "name": "Leo Bautista", "role": "bc", "team": None},
-    {"id": "u-bc2", "name": "Lara Ocampo", "role": "bc", "team": None},
-    {"id": "u-we1", "name": "Mia Flores", "role": "wellness", "team": None},
-    {"id": "u-cc1", "name": "Paolo Garcia", "role": "ccd", "team": None},
-    {"id": "u-ad1", "name": "Noel Garcia", "role": "admin", "team": None},
+    # AAT — all Sales New Business handler work (was Account Manager / Compliance-KYC)
+    {"id": "u-am1", "name": "AAT Demo User", "role": "aat", "team": None},
+    {"id": "u-am2", "name": "AAT Demo User 2", "role": "aat", "team": None},
+    {"id": "u-am3", "name": "AAT Demo User 3", "role": "aat", "team": None},
+    {"id": "u-co1", "name": "AAT Demo User 4 (KYC desk)", "role": "aat", "team": None},
+    # AMT — franchise upload/approval, contract endorsement, account/plan/COC setup
+    {"id": "u-as1", "name": "AMT Demo User", "role": "amt", "team": None},
+    {"id": "u-as2", "name": "AMT Demo User 2", "role": "amt", "team": None},
+    {"id": "u-we1", "name": "AMT Demo User 3 (orientation)", "role": "amt", "team": None},
+    # ACCUSA — rate sheet / quotation routing
+    {"id": "u-ac1", "name": "ACCUSA Demo User", "role": "accusa", "team": None},
+    # Legal — draft contract preparation and review
+    {"id": "u-lg1", "name": "Legal Demo User", "role": "legal", "team": None},
+    # Approver — first/second-level approvals the source does not title (pending)
+    {"id": "u-sm1", "name": "Approver Demo User (pending confirmation)", "role": "approver", "team": None},
+    {"id": "u-sm2", "name": "Approver Demo User 2 (pending confirmation)", "role": "approver", "team": None},
+    {"id": "u-sr1", "name": "Approver Demo User 3 (pending confirmation)", "role": "approver", "team": None},
+    {"id": "u-va1", "name": "Approver Demo User 4 (pending confirmation)", "role": "approver", "team": None},
+    # Internal-alignment / downstream participants named only collectively (pending)
+    {"id": "u-md1", "name": "MDA Demo User (internal alignment)", "role": "mda", "team": None},
+    {"id": "u-bc1", "name": "B&C Demo User (internal alignment)", "role": "bc", "team": None},
+    {"id": "u-bc2", "name": "B&C Demo User 2 (internal alignment)", "role": "bc", "team": None},
+    {"id": "u-cc1", "name": "CCD Demo User (downstream)", "role": "ccd", "team": None},
+    # Technical account only — not a documented business participant
+    {"id": "u-ad1", "name": "System Admin (technical)", "role": "admin", "team": None},
 ]
+
+# Roles that own a workflow step the source documents do NOT assign an owner to.
+# Used to label those steps "assignment pending confirmation" and to keep any
+# demo action on them flagged as a simulation, never an assumed production right.
+PENDING_ROLES = {"approver", "mda", "bc", "ccd"}
 
 STAGES = [
     {"n": 1, "key": "lead", "label": "Lead"},
@@ -289,22 +313,28 @@ REQUIREMENTS = [
     {"key": "gis", "label": "GIS"},
 ]
 
+# Contract lifecycle. Source: AAT requests the contract; LEGAL prepares and
+# reviews the draft; AMT endorses the Contract/DSA to the client, retrieves and
+# notarizes it, and sends the notarized copy.
 CONTRACT_STEPS = [
-    {"key": "Requested", "role": "am"},
+    {"key": "Requested", "role": "aat"},
     {"key": "Drafting", "role": "legal"},
     {"key": "Review", "role": "legal"},
-    {"key": "Endorsed", "role": "as"},
-    {"key": "Client signed", "role": "as", "doc": "signed"},
-    {"key": "Notarized", "role": "as", "doc": "notarized"},
-    {"key": "Sent to client", "role": "as"},
-    {"key": "Completed", "role": "as"},
+    {"key": "Endorsed", "role": "amt"},
+    {"key": "Client signed", "role": "amt", "doc": "signed"},
+    {"key": "Notarized", "role": "amt", "doc": "notarized"},
+    {"key": "Sent to client", "role": "amt"},
+    {"key": "Completed", "role": "amt"},
 ]
 
+# Downstream teams that acknowledge an account handover. Named only collectively
+# in the source ("internal alignment with VC departments"), so ownership is left
+# unconfirmed. Wellness has no login in this prototype's scope; AMT retains the
+# documented health-benefit-orientation participation elsewhere.
 HANDOVER_TEAMS = [
-    {"key": "mda", "label": "Members Data Administration", "role": "mda"},
-    {"key": "bc", "label": "Billing and Collection", "role": "bc"},
-    {"key": "ccd", "label": "Customer Care (CCD)", "role": "ccd"},
-    {"key": "wellness", "label": "Wellness", "role": "wellness"},
+    {"key": "mda", "label": "MDA (internal alignment)", "role": "mda"},
+    {"key": "bc", "label": "B&C (internal alignment)", "role": "bc"},
+    {"key": "ccd", "label": "CCD (downstream)", "role": "ccd"},
 ]
 
 # ---------------------------------------------------------------- configuration
@@ -317,19 +347,28 @@ DEFAULT_CONFIG = {
     "franchiseExpiryReminderDays": {"value": 7, "src": "proposed", "note": "NB-FRN-09"},
     "proposalValidityDays": {"value": 60, "src": "proposed", "note": "BR-08"},
     "highRiskIndustries": {"value": ["IND-03", "IND-05", "IND-11"], "src": "proposed", "note": "BR-07"},
-    "duplicateOverrideRoles": {"value": ["sm", "as"], "src": "pending", "note": "Who may create a separate company despite a possible duplicate"},
-    "waiverRoles": {"value": ["as"], "src": "pending", "note": "OQ-02: who may approve onboarding document waivers"},
+    "duplicateOverrideRoles": {"value": ["aat", "amt"], "src": "pending", "note": "Who may create a separate company despite a possible duplicate (handlers; source does not name an override owner)"},
+    "waiverRoles": {"value": ["amt"], "src": "pending", "note": "OQ-02: who may approve onboarding document waivers (source silent; AMT placeholder, configurable)"},
     "allowMandatoryWaiver": {"value": False, "src": "pending", "note": "OQ-02: may mandatory onboarding documents be waived"},
     "kycRequiredForAccount": {"value": True, "src": "proposed", "note": "To-be step 12: KYC completed before account number"},
     "accountGateContractStep": {"value": "Completed", "src": "pending", "note": "NB-ONB-03 says Completed/Signed; BR-12 says signed and closed",
                                 "options": ["Client signed", "Notarized", "Completed"]},
-    "sobValidatorRoles": {"value": ["validator", "actuarial", "as"], "src": "pending", "note": "US-SOB-04: independent second function; named role not confirmed"},
+    "sobValidatorRoles": {"value": ["approver"], "src": "pending", "note": "US-SOB-04: independent second function; source does not name the role, so routed to the pending-confirmation approver"},
     "vatModel": {"value": "manual", "src": "pending", "note": "OQ-03 / audit: Before VAT / VAT Inclusive / VAT amount meaning unverified. 'manual' = no formula",
                  "options": ["manual", "check_12pct"]},
     "decouplePaymentMode": {"value": False, "src": "pending", "note": "OQ-05 / NB-PLN-07: payment mode outside Plan Code identity"},
     "partnerCompat": {"value": "map", "src": "pending", "note": "Legacy 'If Grepa' field retained and mapped, never overwritten; Full Life mapping unconfirmed",
                       "options": ["map"]},
-    "seniorApprovalAlways": {"value": True, "src": "proposed", "note": "BR-09: every account needs Senior Management sign-off"},
+    "seniorApprovalAlways": {"value": True, "src": "proposed", "note": "BR-09: every account needs a sign-off; the approving title is not named in the source (see activationOwnerRoles / pricingApprovalRoles)"},
+    # ---- Owners the two source documents do NOT name. Each step stays visible but
+    # its owner is routed to a pending-confirmation participant and is configurable
+    # here. Any demo action on these is a simulation, never an assumed production right.
+    "pricingApprovalRoles": {"value": ["approver"], "src": "pending", "note": "Actuarial 1st/2nd-level quotation approval; source shows the steps but not the approving titles"},
+    "activationOwnerRoles": {"value": ["approver"], "src": "pending", "note": "Final account activation / go-live owner is not named in either source"},
+    "memberEnrollmentRoles": {"value": ["mda"], "src": "pending", "note": "Member Data loading/enrolment; named only collectively as internal alignment"},
+    "billingOwnerRoles": {"value": ["bc"], "src": "pending", "note": "Billing setup owner; B&C named only collectively as internal alignment"},
+    "orientationRoles": {"value": ["amt"], "src": "proposed", "note": "AMT participates in health-benefit orientation (source-confirmed); Wellness has no login in this build"},
+    "handoverAckRoles": {"value": ["mda", "bc", "ccd"], "src": "pending", "note": "Downstream handover acknowledgers; named only collectively"},
     "sessionMinutes": {"value": 480, "src": "demo", "note": "Session expiry (set low to test session-expiry recovery)"},
     "tatDays": {"value": {
         "franchise_submit": 1, "franchise_review": 1, "requirements": 1, "rate_request": 1, "rate_sheet": 3,
@@ -395,14 +434,15 @@ def franchise_schema():
             S("businessSourceName", "Name of Business Source", "intermediary", src="legacy", requiredWhen="intermediary",
               help="Only active, verified agents/brokers of the selected type can be chosen."),
             S("createdBy", "Created By", "readonly", src="legacy"),
-            S("accountManager", "Account Manager", "user:am", required=True, src="legacy"),
-            S("salesManager", "Sales/Team Manager", "user:sm", required=True, src="legacy"),
+            S("accountManager", "Account handler (AAT)", "user:aat", required=True, src="legacy"),
+            S("salesManager", "Secondary handler (AAT)", "user:aat", required=True, src="legacy",
+              help="Second AAT handler for this account. (Source does not confirm a separate Sales/Team Manager role.)"),
             S("currentHmoProvider", "Current HMO provider", src="proposed"),
             S("currentContractExpiry", "Current contract expiry", "date", src="proposed"),
             S("targetEffectiveDate", "Target effective date", "date", src="proposed"),
             S("salesRemarks", "Sales Remarks", "textarea", src="legacy", wide=True),
-            S("acusaRemarks", "ACUSA Remarks", "textarea", src="legacy", wide=True, editRoles=["actuarial", "as"],
-              help="Entered by Actuarial / Account Services."),
+            S("acusaRemarks", "ACCUSA Remarks", "textarea", src="legacy", wide=True, editRoles=["accusa", "amt"],
+              help="Entered by ACCUSA (Actuarial) or AMT."),
         ]},
     ]
 
@@ -480,7 +520,7 @@ def account_schema():
             S("naturalDeathAmount", "Natural Death Amount", "money", src="legacy"),
             S("accidentalDeathAmount", "Accidental Death Amount", "money", src="legacy"),
             S("dismembermentAmount", "Dismemberment Amount", "money", src="legacy"),
-            S("accountManager", "Account Manager", "user:am", required=True, src="proposed"),
+            S("accountManager", "Account handler (AAT)", "user:aat", required=True, src="proposed"),
             S("vip", "VIP account", "checkbox", src="proposed"),
             S("vipReason", "VIP reason", src="proposed"),
             S("jumbo", "Jumbo account", "checkbox", src="proposed"),

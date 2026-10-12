@@ -101,7 +101,7 @@ function renderShell() {
   root.innerHTML = html`<div class="app ${collapsed ? "collapsed" : ""}" id="app">
     <nav class="sidebar" aria-label="Main navigation" id="sidebar">
       <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3 New Business<small>Corporate · Commercial</small></span></div>
-      ${["am", "sm"].includes(me.role) ? html`<a class="btn primary create-btn" href="#/new-business/create" title="Create New Business">${icon("plus")}<span class="lbl">Create New Business</span></a>` : ""}
+      ${me.role === "aat" ? html`<a class="btn primary create-btn" href="#/new-business/create" title="Create New Business">${icon("plus")}<span class="lbl">Create New Business</span></a>` : ""}
       <div class="nav">
         ${NAV_PRIMARY.map(navLink)}
       </div>

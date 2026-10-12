@@ -3,8 +3,8 @@ import { icon, field, mountCombos, pill, sampleBtn, fillSampleData } from "../co
 
 export async function render(main) {
   document.title = "Create New Business · HMS3";
-  if (!["am", "sm"].includes(state.me.role)) {
-    main.innerHTML = html`<div class="page-head"><div><h1>Create New Business</h1></div></div><div class="note">New Business cases are created by Account Managers and Sales Managers. You are signed in as ${roleLabel(state.me.role)}.</div>`.s;
+  if (state.me.role !== "aat") {
+    main.innerHTML = html`<div class="page-head"><div><h1>Create New Business</h1></div></div><div class="note">New Business cases are created by the AAT (lead generation) team. You are signed in as ${roleLabel(state.me.role)}.</div>`.s;
     return;
   }
   const s = { step: "find", q: "", results: null, company: null, newCompany: null, dups: null, override: null };
@@ -126,7 +126,7 @@ export async function render(main) {
         ${allowed ? html`<p class="tiny">Authorized override (${state.meta.config.duplicateOverrideRoles.map(roleLabel).join(" or ")}). The reason is recorded in History against your name and role.</p>
           <div class="field mt"><label for="ovr">Reason it is a separate legal entity <span class="req">*</span></label><textarea id="ovr" class="inp" placeholder="e.g. Different SEC registration and TIN; sister company with separate HR."></textarea></div>
           <button type="button" class="btn mt" id="ovrBtn">Record override and continue</button>`
-        : html`<p class="muted">Only ${state.meta.config.duplicateOverrideRoles.map(roleLabel).join(" or ")} can create a separate company when a possible duplicate exists. Use the existing company, or ask your Sales Manager to create it.</p>`}</div></div>`.s;
+        : html`<p class="muted">Only ${state.meta.config.duplicateOverrideRoles.map(roleLabel).join(" or ")} can create a separate company when a possible duplicate exists. Use the existing company, or ask an authorized approver to create it.</p>`}</div></div>`.s;
     box.querySelectorAll("[data-useco]").forEach((b) => (b.onclick = () => { s.company = s.dups[+b.dataset.useco].company; s.newCompany = null; s.step = "lead"; draw(); }));
     box.querySelector("#ovrBtn")?.addEventListener("click", () => {
       const r = box.querySelector("#ovr").value.trim();
@@ -139,16 +139,15 @@ export async function render(main) {
   // ---- step 3: lead
   function drawLead(body) {
     const co = s.company || s.newCompany;
-    const L = (s.lead ||= { channel: "", intermediaryId: "", leadSource: "", estHeadcount: "", estPremium: "", probability: "", targetEffectiveDate: "", contactName: "", contactEmail: "", contactPhone: "", ownerId: state.me.role === "am" ? state.me.id : "", jumbo: false });
+    const L = (s.lead ||= { channel: "", intermediaryId: "", leadSource: "", estHeadcount: "", estPremium: "", probability: "", targetEffectiveDate: "", contactName: "", contactEmail: "", contactPhone: "", ownerId: state.me.id, jumbo: false });
     body.innerHTML = html`<form class="panel" data-form id="lf" novalidate><div class="ph"><h2>Lead details</h2><button type="button" class="btn ghost sm" id="back">‹ Back</button></div><div class="pb">
       <div class="note"><b>${co.registeredName}</b> · ${s.company ? html`Existing company record ${s.company.id} - the case will be linked to it.` : html`New company${s.override ? " (separate-company override recorded)" : ""}. A company record will be created with the case.`}
-        <div class="tiny">No account number is generated at lead creation; it is issued by Account Services after the contract and pricing gates.</div></div>
+        <div class="tiny">No account number is generated at lead creation; it is issued by AMT after the contract and pricing gates.</div></div>
       <fieldset class="mt" style="border:0;padding:0"><legend class="lbl" style="font-weight:600;font-size:12.5px;color:var(--text-2)">Business source <span class="req">*</span> <span class="tag legacy">HMS3</span></legend>
         <div class="row">${["Direct", "Agent", "Broker"].map((c) => html`<label class="check"><input type="radio" name="channel" value="${c}" ${L.channel === c ? "checked" : ""}> ${c}</label>`)}</div></fieldset>
       <div class="fgrid mt">
         <div id="interBox" class="${L.channel && L.channel !== "Direct" ? "" : "hidden"}">${field({ key: "intermediaryId", label: "Agent / broker (AOR/BOR)", type: "intermediary", required: true, src: "legacy", help: "Only Active intermediaries with a verified agreement." }, L.intermediaryId, { values: { businessSource: L.channel } })}</div>
         ${field({ key: "leadSource", label: "Lead source", type: "select", options: "leadSource", required: true, src: "proposed" }, L.leadSource)}
-        ${state.me.role === "sm" ? field({ key: "ownerId", label: "Account Manager (owner)", type: "user:am", required: true, src: "proposed" }, L.ownerId) : ""}
         ${field({ key: "estHeadcount", label: "Estimated principals", type: "int", src: "proposed", help: `Corporate minimum: ${min} principals (BR-01).` }, L.estHeadcount)}
         ${field({ key: "estPremium", label: "Estimated annual premium (PHP)", type: "money", src: "proposed" }, L.estPremium)}
         ${field({ key: "probability", label: "Probability (%)", type: "int", src: "proposed" }, L.probability)}
@@ -190,7 +189,6 @@ export async function render(main) {
       if (!L.channel) errs.push({ field: "channel", message: "Choose Direct, Agent or Broker." });
       if (L.channel && L.channel !== "Direct" && !L.intermediaryId) errs.push({ field: "intermediaryId", message: "Choose the agent or broker." });
       if (!L.leadSource) errs.push({ field: "leadSource", message: "Lead source is required." });
-      if (state.me.role === "sm" && !L.ownerId) errs.push({ field: "ownerId", message: "Choose the Account Manager." });
       if (L.contactPhone && !/^\+?[0-9 ()./-]{3,}/.test(L.contactPhone)) errs.push({ field: "contactPhone", message: "Use digits, spaces, + ( ) -." });
     }
     paintFieldErrors(errs, main);

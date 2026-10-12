@@ -3,7 +3,7 @@ import { icon, pill } from "../components.js";
 
 const REPORTS = [
   { key: "pipeline", label: "New Business pipeline", desc: "Cases, headcount and estimated premium by stage." },
-  { key: "franchise", label: "Franchise register", desc: "Active, expiring, extended and expired franchises by Account Manager and intermediary." },
+  { key: "franchise", label: "Franchise register", desc: "Active, expiring, extended and expired franchises by AAT handler and intermediary." },
   { key: "effectivity", label: "Approaching effectivity", desc: "Cases within 45 days of effectivity that are not yet active." },
   { key: "onboarding", label: "Onboarding status", desc: "Cases from contract onward, with the next step and its owner." },
   { key: "tat", label: "TAT compliance", desc: "Elapsed days per step, measured from the audit trail." },
@@ -11,7 +11,7 @@ const REPORTS = [
   { key: "dataquality", label: "Data quality", desc: "Possible duplicate companies and missing intermediary tags." },
 ];
 const LABELS = { stage: "Stage", cases: "Cases", headcount: "Est. headcount", premium: "Est. premium (PHP)", franchiseCode: "Franchise code", company: "Company", status: "Status",
-  validUntil: "Valid until", accountManager: "Account Manager", intermediary: "Intermediary", effectivity: "Effectivity", daysLeft: "Days left", owner: "Owner", openTasks: "Open tasks",
+  validUntil: "Valid until", accountManager: "AAT handler", intermediary: "Intermediary", effectivity: "Effectivity", daysLeft: "Days left", owner: "Owner", openTasks: "Open tasks",
   next: "Next step", due: "Due", franchiseReviewDays: "Franchise review", rateSheetDays: "Rate sheet", pricingApprovalDays: "Pricing approval", contractDays: "Contract",
   onboardingDays: "Account to handover", result: "Result", reason: "Reason", issue: "Issue", detail: "Detail", reference: "Reference", override: "Override recorded" };
 

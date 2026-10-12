@@ -9,16 +9,16 @@ export async function render(ctx) {
   const accs = (data.records.account || []);
   const parent = accs.find((a) => !a.parentId);
   if (!parent || !["Approved", "Scheduled", "Active"].includes(parent.status)) {
-    body.innerHTML = html`<div class="note">Plan Codes are created by Account Services after the account is approved (BR-12). Account is <b>${parent?.status || "not created"}</b>.</div>`.s;
+    body.innerHTML = html`<div class="note">Plan Codes are created by AMT after the account is approved (BR-12). Account is <b>${parent?.status || "not created"}</b>.</div>`.s;
     return;
   }
-  const isAS = me.role === "as" && data.case.status === "Open";
+  const isAS = me.role === "amt" && data.case.status === "Open";
   const accountOpts = accs.map((a) => ({ value: a.id, label: `${a.accountCode} · ${a.accountInfo.accountName}`, sub: a.parentId ? "Affiliate" : "Parent account" }));
   const st = prefs.get(`plans:${id}`, { account: "", status: "", q: "", page: 0, size: 50, sort: "planCode", dir: "asc" });
   let selected = new Set();
   let current = { items: [], total: 0, counts: {} };
-  body.innerHTML = html`${ownerBanner(["as"], "Plan Codes")}
-    <section class="panel"><div class="ph"><div><h2>Plan Codes</h2><div class="tiny">Account Services is the maker; a different Account Services user is the checker. Approved versions are kept for date-of-service adjudication.
+  body.innerHTML = html`${ownerBanner(["amt"], "Plan Codes")}
+    <section class="panel"><div class="ph"><div><h2>Plan Codes</h2><div class="tiny">AMT is the maker; a different AMT user is the checker. Approved versions are kept for date-of-service adjudication.
       Payment-mode decoupling: <b>${state.meta.config.decouplePaymentMode ? "on" : "off"}</b> <span class="tag pending">configurable (OQ-05)</span> · VAT model: <b>${state.meta.config.vatModel}</b> <span class="tag pending">no formula applied</span></div></div>
       ${isAS ? html`<div class="row"><button class="btn primary" id="add">${icon("plus", 14)} Add Plan Code</button><button class="btn" id="gen">Generate from approved SOB</button>
         <button class="btn" id="imp">${icon("upload", 14)} Bulk import</button><a class="btn" href="/api/templates/plan-codes.csv" download>Template</a>${DEMO_BYPASS ? html`<button class="btn ghost" id="impSample" title="Import a few generated demo plan codes">Add sample plan codes</button>` : ""}</div>` : ""}</div>

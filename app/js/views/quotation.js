@@ -26,7 +26,7 @@ export async function render(ctx) {
   const body = el.querySelector("#qbody");
   ctx.body = body;
   if (!fr || !["Approved", "Converted to Account"].includes(fr.status)) {
-    body.innerHTML = html`<div class="note">Quotation starts after Account Services approves the franchise (status "For Rates Creation"). Franchise is currently <b>${fr?.status || "not started"}</b>. <a href="#/case/${ctx.id}/franchise">Open Franchise</a></div>`.s;
+    body.innerHTML = html`<div class="note">Quotation starts after AMT approves the franchise (status "For Rates Creation"). Franchise is currently <b>${fr?.status || "not started"}</b>. <a href="#/case/${ctx.id}/franchise">Open Franchise</a></div>`.s;
     return;
   }
   const map = { requirements, tor, members: (c) => renderMemberData(c, c.body, "quotation"), rates, proposal, negotiation, alignment };
@@ -39,14 +39,14 @@ const reqStatus = (fr) => {
   return out ? `${out} outstanding` : "complete";
 };
 const alignStatus = (al) => ["bc", "mda"].every((t) => al.acks?.[t]?.status === "Confirmed") ? "confirmed" : "pending";
-const isAM = (ctx) => state.me.role === "sm" || (state.me.role === "am" && ctx.data.case.ownerId === state.me.id);
+const isAM = (ctx) => state.me.role === "aat" && ctx.data.case.ownerId === state.me.id;
 
 // ---------------------------------------------------------------- requirements
 function requirements(ctx) {
   const { data, body, id } = ctx;
   const fr = data.records.franchise.slice(-1)[0];
   const can = isAM(ctx) && data.case.status === "Open";
-  body.innerHTML = html`<section class="panel"><div class="ph"><h2>Requirements checklist</h2><span class="tiny">Owner: Account Manager · request from ${data.summary.channel !== "Direct" ? "the agent/broker (BR-03)" : "the client"}</span></div>
+  body.innerHTML = html`<section class="panel"><div class="ph"><h2>Requirements checklist</h2><span class="tiny">Owner: AAT handler · request from ${data.summary.channel !== "Direct" ? "the agent/broker (BR-03)" : "the client"}</span></div>
     <div class="pb"><div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Requirements</caption><thead><tr><th scope="col">Requirement</th><th scope="col">Status</th><th scope="col">Files and notes</th>${can ? html`<th scope="col">Update</th>` : ""}</tr></thead><tbody>
     ${state.meta.requirements.map((r) => {
       const st = fr.requirements?.[r.key] || { status: "Requested" };
@@ -75,7 +75,7 @@ function tor(ctx) {
   const can = isAM(ctx) && data.case.status === "Open" && prop?.status !== "Accepted";
   if (!t) {
     body.innerHTML = html`<section class="panel"><div class="pb"><h2 class="h">Structured TOR</h2><p class="muted mt">Digitise the client's Terms of Reference (current benefits) using the same benefit library as the SOB. It becomes the baseline for the TOR vs SOB comparison. The original TOR file stays attached.</p>
-      ${can ? html`<button class="btn primary mt" id="mk">Start structured TOR</button>` : html`<p class="tiny mt">Prepared by the Account Manager.</p>`}</div></section>`.s;
+      ${can ? html`<button class="btn primary mt" id="mk">Start structured TOR</button>` : html`<p class="tiny mt">Prepared by the AAT handler.</p>`}</div></section>`.s;
     body.querySelector("#mk")?.addEventListener("click", async (e) => { if (await act("tor.create", { caseId: id }, { button: e.currentTarget, success: "TOR started." })) ctx.reload(); });
     return;
   }
@@ -130,13 +130,13 @@ function rates(ctx) {
   const am = isAM(ctx) && data.case.status === "Open";
   if (!rr) {
     body.innerHTML = html`<section class="panel"><div class="pb"><h2 class="h">Rate request</h2><p class="muted mt">Replaces the Actuarial Google form. The franchise reference, jumbo indicator and dependent coverage are pre-filled. Actuarial computes rates outside HMS and imports a structured rate sheet here.</p>
-      ${am ? html`<button class="btn primary mt" id="mk">Create rate request</button>` : html`<p class="tiny mt">Created by the Account Manager.</p>`}</div></section>`.s;
+      ${am ? html`<button class="btn primary mt" id="mk">Create rate request</button>` : html`<p class="tiny mt">Created by the AAT handler.</p>`}</div></section>`.s;
     body.querySelector("#mk")?.addEventListener("click", async (e) => { if (await act("rateRequest.create", { caseId: id }, { button: e.currentTarget, success: "Rate request created." })) ctx.reload(); });
     return;
   }
   const editable = am && ["Draft"].includes(rr.status);
   const F = (k, label, type = "text", extra = {}) => field({ key: k, label, type, src: "proposed", ...extra }, rr[k], { editable });
-  body.innerHTML = html`${ownerBanner(["am", "sm", "actuarial"], "The rate request")}
+  body.innerHTML = html`${ownerBanner(["aat", "accusa"], "The rate request")}
     <section class="panel"><div class="ph"><div><h2>Rate request ${rr.code} ${pill(rr.status)}</h2><div class="tiny">Franchise ${rr.franchiseCode} · ${rr.submittedAt ? `submitted ${fmtDateTime(rr.submittedAt)} by ${userName(rr.submittedBy)}` : "not submitted"}${rr.reviewerId ? ` · Actuarial: ${userName(rr.reviewerId)}` : ""}</div></div>
       <div class="row" id="rrAct"></div></div>
     <div class="pb" data-form id="rrForm"><div class="fgrid">
@@ -152,7 +152,7 @@ function rates(ctx) {
     <div class="mt">${docSlot({ label: "Attachments", slot: "rr_attach", docs: data.documents, linkedType: "rateRequest", linkedId: rr.id, caseId: id, canUpload: am && !["Rate Sheet Issued"].includes(rr.status), hint: "Member Data, utilization and TOR files are already on the franchise checklist." })}</div></div>
     ${editable ? html`<div class="savebar"><span id="st"></span><div class="row">${sampleBtn("fillSampleRr")}<button class="btn primary" id="sub">Submit to Actuarial</button></div></div>` : ""}</section>
     <section class="panel"><div class="ph"><h2>Clarifications</h2></div><div class="pb">${(rr.clarifications || []).length ? html`<ul class="timeline">${rr.clarifications.map((c) => html`<li><span class="when">${fmtDateTime(c.askedAt)}</span><div><b>${c.askedByName} (Actuarial) asked:</b> ${c.question}
-      ${c.answer ? html`<div class="mt"><b>${c.answeredByName} answered:</b> ${c.answer} <span class="tiny">${fmtDateTime(c.answeredAt)}</span></div>` : html`<div class="tiny mt">Awaiting the Account Manager's answer.</div>`}</div></li>`)}</ul>` : html`<p class="tiny">No clarifications.</p>`}</div></section>
+      ${c.answer ? html`<div class="mt"><b>${c.answeredByName} answered:</b> ${c.answer} <span class="tiny">${fmtDateTime(c.answeredAt)}</span></div>` : html`<div class="tiny mt">Awaiting the AAT handler's answer.</div>`}</div></li>`)}</ul>` : html`<p class="tiny">No clarifications.</p>`}</div></section>
     <section class="panel"><div class="ph"><h2>Rate sheet versions (${sheets.length})</h2><span class="tiny">Actuarial calculation is external; HMS stores imported results and versions.</span></div><div class="pb">
       ${sheets.length ? sheets.map((s) => html`<details ${s.status === "Issued" ? "open" : ""} class="mb"><summary><b>${s.code}</b> ${pill(s.status)} <span class="tiny">issued ${fmtDateTime(s.issuedAt)} by ${s.issuedByName} · ${s.rows.length} rate rows</span></summary>
         <div class="row mt">${Object.entries(s.assumptions || {}).map(([k, v]) => html`<span class="pill neutral plain">${k}: ${v}%</span>`)}</div>
@@ -163,12 +163,12 @@ function rates(ctx) {
   wireUploads(body, () => ctx.reload());
   const bar = body.querySelector("#rrAct");
   const btn = (label, cls, fn) => { const b = document.createElement("button"); b.className = `btn ${cls}`; b.textContent = label; b.onclick = () => fn(b); bar.appendChild(b); };
-  if (me.role === "actuarial") {
+  if (me.role === "accusa") {
     if (["Submitted", "Revised"].includes(rr.status)) btn("Start review", "", async (b) => { if (await act("rateRequest.startReview", { id: rr.id }, { button: b, success: "Review started." })) ctx.reload(); });
     if (["Submitted", "In Review", "Revised"].includes(rr.status)) btn("Return for information", "", async (b) => {
-      const r = await dialog({ title: "Ask the Account Manager", body: html`<div class="field"><label for="q">Question / missing information *</label><textarea id="q" name="question" class="inp"></textarea></div>`,
+      const r = await dialog({ title: "Ask the AAT handler", body: html`<div class="field"><label for="q">Question / missing information *</label><textarea id="q" name="question" class="inp"></textarea></div>`,
         actions: [{ label: "Cancel" }, { label: "Return for information", kind: "primary", value: "ok", validate: (v) => (!v.question.trim() ? "Enter the question." : null) }] });
-      if (r?.action === "ok" && (await act("rateRequest.returnForInfo", { id: rr.id, question: r.values.question }, { button: b, success: "Returned to the Account Manager." }))) ctx.reload();
+      if (r?.action === "ok" && (await act("rateRequest.returnForInfo", { id: rr.id, question: r.values.question }, { button: b, success: "Returned to the AAT handler." }))) ctx.reload();
     });
     if (rr.status === "In Review") btn("Import rate sheet", "primary", () => importFlow(ctx, "rateSheet", (imp) => issueSheet(ctx, rr, imp)));
     bar.insertAdjacentHTML("beforeend", `<a class="btn sm ghost" href="/api/templates/rate-sheet.csv" download>Rate sheet template</a>`);
@@ -220,7 +220,7 @@ async function issueSheet(ctx, rr, imp) {
   if (r.values.pdf?.length) { try { pdfId = (await upload(r.values.pdf[0], { caseId: ctx.id, linkedType: "rateRequest", linkedId: rr.id, slot: "rs_pdf" })).document.id; } catch (e) { return showError(e); } }
   const assumptions = {};
   A.forEach(([k]) => (assumptions[k] = r.values[k] === "" ? 0 : Number(r.values[k])));
-  if (await act("rateSheet.issue", { rateRequestId: rr.id, importId: imp.id, assumptions, pdfDocId: pdfId, notes: r.values.notes }, { success: "Rate sheet issued; the Account Manager is notified (simulated)." })) ctx.reload();
+  if (await act("rateSheet.issue", { rateRequestId: rr.id, importId: imp.id, assumptions, pdfDocId: pdfId, notes: r.values.notes }, { success: "Rate sheet issued; the AAT handler is notified (simulated)." })) ctx.reload();
 }
 
 // ---------------------------------------------------------------- proposal
@@ -255,7 +255,7 @@ function proposal(ctx) {
       ${staleRates ? html`<div class="note warn mb">Rate sheet v${rs.version} was issued after this proposal used v${prop.rateSheetVersion}. ${editable ? html`<button class="btn sm" id="reload">Load rates from v${rs.version}</button>` : "Revise the proposal to use it."}</div>` : ""}
       ${staleSob ? html`<div class="note danger mb">The SOB changed (now v${sob.version}) after this proposal was submitted with v${prop.sobVersion}. Approvals are no longer valid for the current benefits - revise the proposal.</div>` : ""}
       <div class="stack sm">${["sm", "senior"].map((st) => { const a = approvalsThis.filter((x) => x.stage === st).slice(-1)[0];
-        return html`<div class="row"><b style="min-width:220px">${st === "sm" ? "1. Sales Manager review" : "2. Senior Management final pricing"}</b>${a ? html`${pill(a.decision === "approve" ? "Approved" : "Returned")} <span class="tiny">${a.byName} · ${fmtDateTime(a.at)} · reviewed v${a.version}${a.remarks ? " · " + a.remarks : ""}</span>` : html`<span class="pill neutral">Not yet decided</span>`}</div>`; })}
+        return html`<div class="row"><b style="min-width:220px">${st === "sm" ? "1. First-level pricing review" : "2. Second-level pricing approval"}</b>${a ? html`${pill(a.decision === "approve" ? "Approved" : "Returned")} <span class="tiny">${a.byName} · ${fmtDateTime(a.at)} · reviewed v${a.version}${a.remarks ? " · " + a.remarks : ""}</span>` : html`<span class="pill neutral">Not yet decided</span>`}</div>`; })}
         <p class="tiny">Approvals are bound to the reviewed version. A material change to rates, commission or benefits creates a new version and these approvals no longer apply (NB-NEG-02).</p></div>
     </div></section>
     <section class="panel" data-form id="pForm"><div class="ph"><h2>Rates and recommendation</h2><span id="st"></span></div><div class="pb">
@@ -269,7 +269,7 @@ function proposal(ctx) {
       </div></div>
       ${editable ? html`<div class="savebar"><span class="tiny">Submitting binds the current rate-sheet and SOB versions for review.</span><div class="row">${sampleBtn("fillSampleProp")}<button class="btn primary" id="submit">Submit for internal review</button></div></div>` : ""}</section>
     <section class="panel"><div class="ph"><div><h2>TOR vs SOB comparison</h2><div class="tiny">${sob ? html`SOB v${sob.version} (${sob.status}) · <a href="#/case/${id}/setup/sob">Edit SOB draft</a>` : html`<a href="#/case/${id}/setup/sob">Create the SOB draft</a>`} · <a href="#/case/${id}/quotation/tor">Edit TOR</a></div></div></div>
-      <div class="pb">${reduced.length ? html`<div class="note warn mb"><b>${reduced.length} benefit(s) are missing or lower than the TOR.</b> Each needs a documented justification (on the SOB line or below) and the Sales Manager must confirm the override (BR-10).</div>
+      <div class="pb">${reduced.length ? html`<div class="note warn mb"><b>${reduced.length} benefit(s) are missing or lower than the TOR.</b> Each needs a documented justification (on the SOB line or below) and the first-level pricing approver must confirm the override (BR-10).</div>
         <div class="fgrid two mb" id="justBox">${reduced.map((r) => html`<div class="field"><label for="rj-${r.code}">Justification - ${r.benefit} (${r.flags.join(", ")})</label>
           ${editable ? html`<textarea id="rj-${r.code}" class="inp" data-just="${r.code}">${prop.reducedJustifications?.[r.code] || r.sob?.justification || ""}</textarea>` : html`<div class="ro">${prop.reducedJustifications?.[r.code] || r.sob?.justification || "Not provided"}</div>`}</div>`)}</div>` : ""}
         ${comparisonTable(cmp)}</div></section>
@@ -312,24 +312,30 @@ function proposal(ctx) {
       if (touched) { form.set("items", its); drawItems(); }
       body.querySelectorAll("[data-just]").forEach((t) => { if (!t.value.trim()) { t.value = "Demo: reduction accepted for the walkthrough."; t.dispatchEvent(new Event("input", { bubbles: true })); } });
     });
-    body.querySelector("#submit").onclick = async (e) => { if (!(await form.save())) return; if (await act("proposal.submit", { id: prop.id, baseVersion: form.base.v }, { button: e.currentTarget, success: "Submitted to the Sales Manager." })) { form.dispose(); ctx.reload(); } };
+    body.querySelector("#submit").onclick = async (e) => { if (!(await form.save())) return; if (await act("proposal.submit", { id: prop.id, baseVersion: form.base.v }, { button: e.currentTarget, success: "Submitted for first-level pricing review." })) { form.dispose(); ctx.reload(); } };
   }
   const bar = body.querySelector("#pAct");
   const btn = (label, cls, fn) => { const b = document.createElement("button"); b.className = `btn ${cls}`; b.textContent = label; b.onclick = () => fn(b); bar.appendChild(b); };
   const decide = async (b, stage) => {
-    const r = await dialog({ title: stage === "sm" ? "Sales Manager pricing review" : "Final pricing approval (Senior Management)", wide: true,
+    const r = await dialog({ title: stage === "sm" ? "First-level pricing review" : "Second-level pricing approval", wide: true,
       body: html`<p>You are deciding on <b>proposal version ${prop.version}</b> (rate sheet v${prop.rateSheetVersion}, SOB v${prop.sobVersion}). Max discount vs actuarial: <b>${prop.maxDiscountPct}%</b>. Commission: <b>${prop.commissionPct ?? "n/a"}%</b>.</p>
         <p class="mt"><b>Justification:</b> ${prop.justification}</p>
         ${stage === "sm" && prop.reducedCodes?.length ? html`<label class="check mt"><input type="checkbox" name="overrideAck"> I approve the ${prop.reducedCodes.length} documented coverage reduction(s) below the TOR (${prop.reducedCodes.join(", ")})</label>` : ""}
         <div class="field mt"><label for="dr">Remarks (required to return)</label><textarea id="dr" name="remarks" class="inp"></textarea></div>`,
-      actions: [{ label: "Cancel" }, { label: stage === "sm" ? "Return to Account Manager" : "Reject - return", value: "return", validate: (v) => (!v.remarks.trim() ? "Enter the reason." : null) },
+      actions: [{ label: "Cancel" }, { label: stage === "sm" ? "Return to AAT handler" : "Reject - return", value: "return", validate: (v) => (!v.remarks.trim() ? "Enter the reason." : null) },
         { label: "Approve", kind: "primary", value: "approve", validate: (v) => (stage === "sm" && prop.reducedCodes?.length && !v.overrideAck ? "Confirm the coverage-reduction override." : null) }] });
     if (!r || !["approve", "return"].includes(r.action)) return;
     const name = stage === "sm" ? "proposal.smDecision" : "proposal.seniorDecision";
-    if (await act(name, { id: prop.id, decision: r.action === "return" && stage === "senior" ? "reject" : r.action, reviewedVersion: prop.v, overrideAck: r.values.overrideAck, remarks: r.values.remarks }, { button: b, success: r.action === "approve" ? "Approved." : "Returned to the Account Manager." })) ctx.reload();
+    if (await act(name, { id: prop.id, decision: r.action === "return" && stage === "senior" ? "reject" : r.action, reviewedVersion: prop.v, overrideAck: r.values.overrideAck, remarks: r.values.remarks }, { button: b, success: r.action === "approve" ? "Approved." : "Returned to the AAT handler." })) ctx.reload();
   };
-  if (me.role === "sm" && prop.status === "For Internal Review") prop.submittedBy === me.id ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You submitted this version; another approver must review it.</span>`) : btn("Review pricing", "primary", (b) => decide(b, "sm"));
-  if (me.role === "senior" && prop.status === "Sales Manager Approved") btn("Final pricing decision", "primary", (b) => decide(b, "senior"));
+  if (me.role === "approver" && prop.status === "For Internal Review") prop.submittedBy === me.id ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You submitted this version; another approver must review it.</span>`) : btn("Review pricing", "primary", (b) => decide(b, "sm"));
+  if (me.role === "approver" && prop.status === "Sales Manager Approved") {
+    // Two-level segregation: the approver who gave the first-level decision cannot give the second (mirrors proposal.seniorDecision on the server).
+    const firstBy = [...(prop.approvals || [])].reverse().find((a) => a.stage === "sm" && a.version === prop.version)?.by;
+    firstBy === me.id
+      ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You gave the first-level pricing approval; a different approver must give the second-level approval.</span>`)
+      : btn("Final pricing decision", "primary", (b) => decide(b, "senior"));
+  }
   if (am && ["Approved", "Sent", "Under Negotiation"].includes(prop.status)) btn(prop.docVersion === prop.version ? "Regenerate proposal PDF" : "Generate proposal PDF", prop.docVersion === prop.version ? "" : "primary", async (b) => { const r = await act("proposal.generate", { id: prop.id }, { button: b, success: "Proposal generated." }); if (r) ctx.reload(); });
   if (am && prop.status === "Approved") btn(inter ? `Send via ${interName(data.summary.intermediaryId)}` : "Send to client", prop.docVersion === prop.version ? "primary" : "", async (b) => {
     const ok = await confirmDialog("Send proposal", inter ? `For this intermediary account the proposal goes only to ${interName(data.summary.intermediaryId)} (BR-03). No email service is connected, so sending is recorded as simulated.` : "The proposal goes to the proposal addressee. No email service is connected, so sending is recorded as simulated.", { confirm: "Send" });
@@ -393,7 +399,7 @@ function negotiation(ctx) {
       if (r?.action === "ok" && (await act("proposal.decline", { id: prop.id, reason: r.values.reason }, { button: b, success: "Decline recorded." }))) ctx.reload();
     });
     btn("Record acceptance", "primary", async (b) => {
-      const r = await dialog({ title: `Record client acceptance - version ${prop.version}`, body: html`<p>Only the Senior-Management-approved version ${prop.version} can be accepted.</p>
+      const r = await dialog({ title: `Record client acceptance - version ${prop.version}`, body: html`<p>Only the fully approved version ${prop.version} (second-level pricing approval) can be accepted.</p>
         <div class="field mt"><label for="af">Acceptance evidence (signed conforme, email) *</label><input id="af" type="file" name="file"></div>
         <div class="field mt"><label for="ad">Acceptance date *</label><input id="ad" type="date" name="date" class="inp" value="${new Date().toISOString().slice(0, 10)}"></div>
         <div class="field mt"><label for="an">Notes</label><textarea id="an" name="notes" class="inp"></textarea></div>`,

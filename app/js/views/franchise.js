@@ -9,22 +9,22 @@ export async function render(ctx) {
   const frs = data.records.franchise || [];
   const fr = frs[frs.length - 1];
   const me = state.me;
-  const isOwner = me.role === "sm" || (me.role === "am" && c.ownerId === me.id);
+  const isOwner = me.role === "aat" && c.ownerId === me.id;
   if (!fr || (["Rejected", "Expired"].includes(fr.status) && ctx.query.new)) {
     el.innerHTML = html`<div class="panel"><div class="pb"><h2 class="h">Franchise not started</h2>
-      <p class="muted mt">The franchise registers this prospect to the Account Manager${c.channel !== "Direct" ? " and the agent/broker" : ""} for a validity period.
+      <p class="muted mt">The franchise registers this prospect to the AAT handler${c.channel !== "Direct" ? " and the agent/broker" : ""} for a validity period.
       The form opens pre-filled from the lead and company record; nothing is chosen for you where the lead has no value.</p>
-      ${c.status !== "Open" ? html`<p class="mt">The case is ${c.status}.</p>` : isOwner ? html`<button class="btn primary mt" id="start">Start franchise form</button>` : html`<p class="tiny mt">${icon("lock", 12)} Started by the Account Manager (${userName(c.ownerId)}).</p>`}</div></div>`.s;
+      ${c.status !== "Open" ? html`<p class="mt">The case is ${c.status}.</p>` : isOwner ? html`<button class="btn primary mt" id="start">Start franchise form</button>` : html`<p class="tiny mt">${icon("lock", 12)} Started by the AAT handler (${userName(c.ownerId)}).</p>`}</div></div>`.s;
     el.querySelector("#start")?.addEventListener("click", async (e) => { if (await act("franchise.start", { caseId: id }, { button: e.currentTarget, success: "Franchise form started." })) ctx.reload(); });
     return;
   }
   const editable = isOwner && ["Draft", "Returned"].includes(fr.status) && c.status === "Open";
-  const acusaEditable = ["actuarial", "as"].includes(me.role) && c.status === "Open";
+  const acusaEditable = ["accusa", "amt"].includes(me.role) && c.status === "Open";
   const docs = data.documents;
   const inter = ["Agent", "Broker"].includes(fr.otherInfo?.businessSource);
   const vu = fr.validUntil ? daysUntil(fr.validUntil) : null;
   const pendingExt = (fr.extensions || []).find((x) => x.status === "Requested");
-  const canReview = me.role === "as" && ["Submitted", "Under Review"].includes(fr.status) && fr.submittedBy !== me.id;
+  const canReview = me.role === "amt" && ["Submitted", "Under Review"].includes(fr.status) && fr.submittedBy !== me.id;
   const schema = state.meta.franchiseSchema;
   let errors = ctx.franchiseErrors || [];
 
@@ -34,10 +34,10 @@ export async function render(ctx) {
         ${fr.submittedBy ? `Submitted by ${userName(fr.submittedBy)}` : `Created by ${fr.otherInfo?.createdBy || ""}`}${fr.approvedBy ? ` · Approved by ${userName(fr.approvedBy)}` : ""}
         · Validity rule: ${inter ? `${state.meta.config.franchiseValidityIntermediaryDays} days (intermediary)` : `direct = ${state.meta.config.franchiseValidityDirectRule === "calendar_year" ? "calendar year" : "12 months"}`} <span class="tag pending">configurable</span></div></div>
       <div class="row" id="frActions"></div></div>
-      ${fr.status === "Returned" ? html`<div class="pb"><div class="note warn"><b>Returned by Account Services:</b> ${fr.returnReason}</div></div>` : ""}
+      ${fr.status === "Returned" ? html`<div class="pb"><div class="note warn"><b>Returned by AMT:</b> ${fr.returnReason}</div></div>` : ""}
       ${fr.status === "Rejected" ? html`<div class="pb"><div class="note danger"><b>Rejected:</b> ${fr.rejectReason}</div>${isOwner ? html`<a class="btn mt" href="#/case/${id}/franchise?new=1" id="newReq">Start a corrected franchise request</a>` : ""}</div>` : ""}
       ${fr.status === "Expired" ? html`<div class="pb"><div class="note danger"><b>Expired and auto-cancelled</b> on ${fmtDate(fr.validUntil)} (BR-06). The account is available to others.</div>${isOwner ? html`<a class="btn mt" href="#/case/${id}/franchise?new=1">Request a new franchise</a>` : ""}</div>` : ""}
-      ${pendingExt ? html`<div class="pb"><div class="note"><b>Extension requested</b> by ${pendingExt.requestedByName} to ${fmtDate(pendingExt.requestedUntil)}: ${pendingExt.reason}. Waiting for Account Services.</div></div>` : ""}
+      ${pendingExt ? html`<div class="pb"><div class="note"><b>Extension requested</b> by ${pendingExt.requestedByName} to ${fmtDate(pendingExt.requestedUntil)}: ${pendingExt.reason}. Waiting for AMT.</div></div>` : ""}
       ${(canReview || (fr.status !== "Draft" && (fr.conflicts?.length || fr.highRisk))) ? reviewPanel(fr, data) : ""}
     </section>
     <div id="errs">${raw(errorSummaryHtml(errors).s || "")}</div>
@@ -54,10 +54,10 @@ export async function render(ctx) {
           return field(def, v, { name: `${sec.key}.${f.key}`, editable: ed, values: fr.otherInfo || {}, errors: Object.fromEntries(errors.map((e) => [e.field, e.message])) });
         })}</div>
         ${sec.key === "otherInfo" ? html`<div class="note mt tiny">Product (Account Type), Business Source, Current Coverage, Manner of Payment (contribution) and payment frequency are kept as <b>separate fields</b> with their original HMS3 values and codes.</div>` : ""}
-        ${sec.key === "otherInfo" && acusaEditable ? html`<div class="mt" data-acusa><div class="field"><label for="acusa">ACUSA Remarks (Actuarial / Account Services) <span class="tag legacy">HMS3</span></label>
+        ${sec.key === "otherInfo" && acusaEditable ? html`<div class="mt" data-acusa><div class="field"><label for="acusa">ACUSA Remarks (Actuarial (ACCUSA) / AMT) <span class="tag legacy">HMS3</span></label>
           <textarea id="acusa" class="inp">${fr.otherInfo?.acusaRemarks || ""}</textarea></div><button class="btn sm mt" id="saveAcusa">Save ACUSA remarks</button></div>` : ""}
         </div></section>`)}
-      <section class="panel form-sec" id="sec-documents"><div class="ph"><h2>Documents</h2><span class="tiny">Each slot keeps versions; Account Services can mark a file as needing correction.</span></div><div class="pb">
+      <section class="panel form-sec" id="sec-documents"><div class="ph"><h2>Documents</h2><span class="tiny">Each slot keeps versions; AMT can mark a file as needing correction.</span></div><div class="pb">
         ${state.meta.franchiseDocs.map((d) => docSlot({ label: d.label, slot: d.key, docs, linkedType: "franchise", linkedId: fr.id, caseId: id, canUpload: isOwner && c.status === "Open" && !["Converted to Account", "Rejected", "Expired"].includes(fr.status),
           required: d.requiredWhen === "intermediary" && inter, src: d.src, hint: d.key === "masterlist" ? "Sensitive personal data (Data Privacy Act)." : d.key === "aor_bor" ? "Required for Agent/Broker accounts: one active AOR/BOR per account." : "" }))}
       </div></section>
@@ -65,7 +65,7 @@ export async function render(ctx) {
         <div class="pb flush" id="affBox"></div></section>
       <section class="panel form-sec" id="sec-decisions"><div class="ph"><h2>Decisions and extensions</h2></div><div class="pb">${decisions(fr)}</div></section>
     </div>
-    ${editable ? html`<div class="savebar"><span id="saveState"></span><div class="row">${DEMO_BYPASS ? html`<button class="btn ghost" id="fillSample" type="button" title="Fill empty fields with demo data">Fill sample data</button>` : ""}<button class="btn" id="saveBtn">Save draft</button><button class="btn primary" id="submitBtn">Submit to Account Services</button></div></div>` : ""}`.s;
+    ${editable ? html`<div class="savebar"><span id="saveState"></span><div class="row">${DEMO_BYPASS ? html`<button class="btn ghost" id="fillSample" type="button" title="Fill empty fields with demo data">Fill sample data</button>` : ""}<button class="btn" id="saveBtn">Save draft</button><button class="btn primary" id="submitBtn">Submit to AMT</button></div></div>` : ""}`.s;
 
   wireErrorLinks(el);
   el.querySelectorAll("[data-jump]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); const t = document.getElementById(a.dataset.jump); t.scrollIntoView({ block: "start" }); t.querySelector("h2")?.setAttribute("tabindex", "-1"); t.querySelector("h2")?.focus({ preventScroll: true }); }));
@@ -184,7 +184,7 @@ export async function render(ctx) {
     b.setAttribute("aria-busy", "true"); b.disabled = true;
     try {
       const r = await api("action/franchise.submit", { method: "POST", body: { franchiseId: fr.id, baseVersion: form.base.v } });
-      toast(r.conflicts?.length ? `Submitted. ${r.conflicts.length} possible conflict(s) will be shown to Account Services.` : "Submitted to Account Services.", "ok");
+      toast(r.conflicts?.length ? `Submitted. ${r.conflicts.length} possible conflict(s) will be shown to AMT.` : "Submitted to AMT.", "ok");
       ctx.franchiseErrors = [];
       form.dispose();
       ctx.reload();
@@ -210,7 +210,7 @@ function reviewPanel(fr, data) {
   const aor = (data.aor || []).find((a) => a.status === "Active");
   const n = Number(fr.otherInfo?.employeeCount) || 0;
   const min = state.meta.config.corporateMinPrincipals;
-  return html`<div class="pb" style="border-top:1px solid var(--border-2)"><h3 class="h">Account Services checks</h3>
+  return html`<div class="pb" style="border-top:1px solid var(--border-2)"><h3 class="h">AMT checks</h3>
     <ul class="gate-list mt">
       <li><span class="${n >= min ? "ok" : "no"}">${n >= min ? "✓" : "●"}</span><div><b>Corporate principal minimum</b><div class="tiny">${n} principals (minimum ${min})</div></div><span></span></li>
       <li><span class="${fr.conflicts?.length ? "no" : "ok"}">${fr.conflicts?.length ? "●" : "✓"}</span><div><b>Duplicate / conflicting franchise</b>
@@ -239,12 +239,12 @@ function actionsBar(ctx, fr, { isOwner, canReview, pendingExt }) {
   const bar = ctx.el.querySelector("#frActions");
   const me = state.me;
   const btns = [];
-  if (me.role === "as" && fr.status === "Submitted" && fr.submittedBy !== me.id) btns.push(["Start review", "start", ""]);
+  if (me.role === "amt" && fr.status === "Submitted" && fr.submittedBy !== me.id) btns.push(["Start review", "start", ""]);
   if (canReview) { btns.push(["Return for correction", "return", ""]); btns.push(["Reject", "reject", "danger"]); btns.push(["Approve franchise", "approve", "primary"]); }
-  if (me.role === "as" && ["Submitted", "Under Review"].includes(fr.status) && fr.submittedBy === me.id) bar.insertAdjacentHTML("beforeend", `<span class="tiny">You submitted this franchise; another Account Services user must review it.</span>`);
+  if (me.role === "amt" && ["Submitted", "Under Review"].includes(fr.status) && fr.submittedBy === me.id) bar.insertAdjacentHTML("beforeend", `<span class="tiny">You submitted this franchise; another AMT user must review it.</span>`);
   if (isOwner && fr.status === "Approved" && !pendingExt && ctx.data.case.status === "Open") btns.push(["Request extension", "ext", ""]);
-  if (me.role === "as" && pendingExt && pendingExt.requestedBy !== me.id) btns.push(["Decide extension", "decideExt", "primary"]);
-  if (!btns.length && !["am", "sm", "as"].includes(me.role)) bar.insertAdjacentHTML("beforeend", `<span class="tiny">Franchise decisions belong to Account Services.</span>`);
+  if (me.role === "amt" && pendingExt && pendingExt.requestedBy !== me.id) btns.push(["Decide extension", "decideExt", "primary"]);
+  if (!btns.length && !["aat", "amt"].includes(me.role)) bar.insertAdjacentHTML("beforeend", `<span class="tiny">Franchise decisions belong to AMT.</span>`);
   btns.forEach(([l, k, cls]) => {
     const b = document.createElement("button");
     b.className = `btn ${cls}`;
@@ -256,10 +256,10 @@ function actionsBar(ctx, fr, { isOwner, canReview, pendingExt }) {
     if (k === "start") { if (await act("franchise.startReview", { franchiseId: fr.id }, { button: b, success: "Review started." })) ctx.reload(); return; }
     if (["approve", "return", "reject"].includes(k)) {
       const r = await dialog({ title: k === "approve" ? "Approve franchise" : k === "return" ? "Return for correction" : "Reject franchise",
-        body: html`<p>You are deciding on <b>version ${fr.v}</b> of ${fr.code}. If the Account Manager changes it before you finish, you will be asked to review again.</p>
+        body: html`<p>You are deciding on <b>version ${fr.v}</b> of ${fr.code}. If the AAT handler changes it before you finish, you will be asked to review again.</p>
           ${k === "approve" && fr.conflicts?.length ? html`<label class="check mt"><input type="checkbox" name="conflictAck"> I reviewed the ${fr.conflicts.length} possible conflicting franchise(s)</label>` : ""}
           ${k === "approve" && fr.highRisk ? html`<div class="field mt"><label for="hr">High-risk industry remark <span class="req">*</span></label><textarea id="hr" name="highRiskRemark" class="inp"></textarea></div>` : ""}
-          ${k === "approve" ? html`<p class="tiny mt">On approval: validity starts today, status becomes "For Rates Creation", and the Account Manager${["Agent", "Broker"].includes(fr.otherInfo?.businessSource) ? " and agent/broker are" : " is"} notified (simulated email).</p>` : ""}
+          ${k === "approve" ? html`<p class="tiny mt">On approval: validity starts today, status becomes "For Rates Creation", and the AAT handler${["Agent", "Broker"].includes(fr.otherInfo?.businessSource) ? " and agent/broker are" : " is"} notified (simulated email).</p>` : ""}
           <div class="field mt"><label for="rm">${k === "approve" ? "Remarks (optional)" : "Reason (required)"}</label><textarea id="rm" name="remarks" class="inp"></textarea></div>`,
         actions: [{ label: "Cancel" }, { label: k === "approve" ? "Approve" : k === "return" ? "Return" : "Reject", kind: k === "reject" ? "danger" : "primary", value: "ok",
           validate: (v) => (k !== "approve" && (v.remarks || "").trim().length < 5 ? "Enter the reason (at least 5 characters)." : k === "approve" && fr.conflicts?.length && !v.conflictAck ? "Confirm the conflict review." : k === "approve" && fr.highRisk && (v.highRiskRemark || "").trim().length < 5 ? "Enter the high-risk remark." : null) }] });
@@ -267,7 +267,7 @@ function actionsBar(ctx, fr, { isOwner, canReview, pendingExt }) {
       if (await act("franchise.decide", { franchiseId: fr.id, decision: k, reviewedVersion: fr.v, ...r.values }, { button: b, success: `Franchise ${k === "approve" ? "approved" : k === "return" ? "returned" : "rejected"}.` })) ctx.reload();
     }
     if (k === "ext") {
-      const r = await dialog({ title: "Request franchise extension", body: html`<p>Current expiry: <b>${fmtDate(fr.validUntil)}</b>. Account Services approves extensions.</p>
+      const r = await dialog({ title: "Request franchise extension", body: html`<p>Current expiry: <b>${fmtDate(fr.validUntil)}</b>. AMT approves extensions.</p>
         <div class="field mt"><label for="eu">Requested new expiry <span class="req">*</span></label><input id="eu" type="date" name="requestedUntil" class="inp" min="${fr.validUntil}"></div>
         <div class="field mt"><label for="er">Reason <span class="req">*</span></label><textarea id="er" name="reason" class="inp"></textarea></div>`,
         actions: [{ label: "Cancel" }, { label: "Request extension", kind: "primary", value: "ok", validate: (v) => (!v.requestedUntil || !v.reason.trim() ? "Date and reason are required." : v.requestedUntil <= fr.validUntil ? "Choose a date after the current expiry." : null) }] });
