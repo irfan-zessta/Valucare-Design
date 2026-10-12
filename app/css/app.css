@@ -237,6 +237,47 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 .next-card{border:1px solid var(--blue-line);background:linear-gradient(0deg,var(--surface),var(--surface)),var(--blue-soft);border-left:4px solid var(--blue);border-radius:var(--r);padding:14px 16px}
 .next-card h2{font-size:17px;font-weight:650;margin:4px 0 8px}
 .kv{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--text-2)} .kv b{color:var(--text);font-weight:600}
+
+/* ---------- five-step record shell ---------- */
+.rec-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.rec-title h1{font-size:22px;font-weight:650;letter-spacing:-.01em;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rec-title .refs{color:var(--text-2);font-size:13px;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap}
+/* Next-action strip — the single "what happens next" surface at the top of a record */
+.rec-next{border:1px solid var(--blue-line);background:var(--surface);border-left:4px solid var(--blue);border-radius:var(--r);padding:12px 16px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
+.rec-next.done{border-left-color:var(--border-2);color:var(--text-2)}
+.rec-next .rn-main{display:flex;flex-direction:column;gap:2px}
+.rec-next .rn-main b{font-size:16px;font-weight:650;color:var(--text)}
+.rec-next .rn-meta{font-size:13px;color:var(--text-2);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rec-next .rn-act{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rec-next .rn-block{margin:0}
+.rec-next .rn-par{font-size:13px}
+.rec-next .rn-par summary{cursor:pointer;color:var(--blue);font-weight:600;padding:2px 0}
+.rec-next .rn-par-list{margin:6px 0 0;padding-left:18px;color:var(--text-2);display:flex;flex-direction:column;gap:4px}
+/* When the strip and the full header sit together, align head above the strip */
+.rec-head + .rec-next{margin-top:0}
+/* Step nav doubles as the compact progress indicator */
+.steps-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.step-tab{flex:1;min-width:150px;display:grid;grid-template-columns:28px 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;padding:10px 12px;text-decoration:none;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text-2)}
+.step-tab:hover{border-color:var(--blue-line);color:var(--text)}
+.step-tab[aria-current="page"]{border-color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue)}
+.step-tab .st-n{grid-row:1 / span 2;width:28px;height:28px;border-radius:999px;background:var(--gray-soft);color:var(--text-2);font-weight:700;font-size:13px;display:grid;place-items:center}
+.step-tab[aria-current="page"] .st-n{background:var(--blue);color:#fff}
+.step-tab .st-l{font-weight:650;font-size:13.5px;color:var(--text);display:inline-flex;gap:6px;align-items:center}
+.step-tab .st-l .mark{width:8px;height:8px;border-radius:50%;background:var(--amber)}
+/* Status line — text is the signal; the dot is a subtle, paired accent only */
+.step-tab .st-s{font-size:12px;font-weight:600;color:var(--text-3);display:flex;align-items:center;gap:5px}
+.step-tab .st-s::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.step-tab.done .st-s{color:var(--text-2)}
+.step-tab.act .st-s{color:var(--blue-ink)}
+.step-tab.wait .st-s{color:var(--text-3)}
+.step-tab.todo .st-s{color:var(--text-3)}
+.step-tab.muted .st-s{color:var(--text-3)}
+.step-tab.done .st-n{background:#C9C9CF;color:#fff}
+/* Stacked sections within a step */
+.step-secs{display:flex;flex-direction:column;gap:22px}
+.step-sec{scroll-margin-top:calc(var(--top-h) + 56px)}
+.step-sec:empty{display:none}
+.step-jump{margin-bottom:14px}
 .stages{display:flex;gap:4px;list-style:none;margin:0;padding:0;flex-wrap:wrap}
 .stages li{flex:1;min-width:92px;font-size:12px;color:var(--text-3);display:flex;flex-direction:column;gap:5px}
 .stages li .bar{height:6px;border-radius:3px;background:var(--gray-soft)}

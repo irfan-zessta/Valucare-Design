@@ -453,3 +453,8 @@ function alignment(ctx) {
     });
   }
 }
+
+// Section renderers exposed to the 5-step record shell (case.js). Each renders
+// into ctx.body; the shell composes them into the "Prepare Quotation" and
+// "Finalize Offer" work areas.
+export { requirements, tor, rates, proposal, negotiation, alignment };

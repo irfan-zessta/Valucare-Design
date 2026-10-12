@@ -79,12 +79,14 @@ function renderLogin(reason) {
 }
 
 // ---------------------------------------------------------------- shell
-// This prototype is focused on a single end-to-end flow: Create New Business.
-// The sidebar therefore carries only the "Create New Business" action plus one
-// link back to the New Business case list (the flow's hub). Dashboard, Reports
-// and Shared Tools are intentionally omitted to keep the flow uncluttered.
+// A small, honest sidebar: the three places work actually lives. "New Business"
+// is the hub (every case), "My Tasks" is the current user's queue (the count badge
+// shows how many need action), and "Tools & Reports" collects reporting and the
+// shared utilities. The prominent "Create New Business" action sits above them.
 const NAV_PRIMARY = [
   { key: "nb-list", label: "New Business", icon: "grid", href: "#/new-business" },
+  { key: "tasks", label: "My Tasks", icon: "check", href: "#/tasks", count: true },
+  { key: "tools", label: "Tools & Reports", icon: "chart", href: "#/reports" },
 ];
 const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 tasks">0</span>` : html`<span></span>`}</a>`;
 
@@ -92,6 +94,8 @@ const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.l
 function activeInfo(parts) {
   const p = parts[0];
   if (p === "new-business" || p === "case") return { top: "nb-list" };
+  if (p === "tasks") return { top: "tasks" };
+  if (p === "reports" || p === "more" || p === "accounts") return { top: "tools" };
   return {};
 }
 

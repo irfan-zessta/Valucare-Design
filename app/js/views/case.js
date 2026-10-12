@@ -3,58 +3,111 @@ import { html, raw, api, state, act, roleLabel, userName, industryName, interNam
 import { icon, pill, stageBar, ownerText, docRow, wireUploads, field, mountCombos, controlValue, sampleBtn, fillSampleData } from "../components.js";
 import { switchUser } from "../main.js";
 
-export const TABS = [
-  { key: "overview", label: "Overview" },
-  { key: "franchise", label: "Franchise" },
-  { key: "quotation", label: "Quotation and Proposal" },
-  { key: "contract", label: "Contract" },
-  { key: "setup", label: "Account Setup" },
+// The record is organised as five user-facing work areas (steps). Each step is a
+// single scrolling work area built from stacked sections — no competing rows of
+// sub-tabs. The step nav doubles as the compact progress indicator. The existing
+// section modules are reused unchanged and composed here; nothing was rebuilt.
+export const STEPS = [
+  { key: "franchise", n: 1, label: "Create Franchise", stages: [1, 2] },
+  { key: "quotation", n: 2, label: "Prepare Quotation", stages: [3] },
+  { key: "offer", n: 3, label: "Finalize Offer", stages: [4] },
+  { key: "account", n: 4, label: "Set Up Account", stages: [5, 6, 7] },
+  { key: "activation", n: 5, label: "Activate & Handover", stages: [8, 9] },
 ];
-const TAB_MODS = {
-  franchise: () => import("./franchise.js"),
-  quotation: () => import("./quotation.js"),
-  contract: () => import("./contract.js"),
-  setup: () => import("./setup.js"),
+const STEP_KEYS = STEPS.map((s) => s.key);
+// Backward-compatible map: old tab/sub links (tasks, saved deep links, in-page
+// cross references) resolve to the new step + in-page section anchor, so no link
+// dead-ends. `_` is the fallback when there is no sub.
+const LEGACY = {
+  overview: { _: null },
+  franchise: { _: { step: "franchise" } },
+  quotation: {
+    requirements: { step: "quotation", anchor: "sec-requirements" }, tor: { step: "quotation", anchor: "sec-tor" },
+    members: { step: "quotation", anchor: "sec-members-quotation" }, rates: { step: "quotation", anchor: "sec-rates" },
+    proposal: { step: "offer", anchor: "sec-proposal" }, negotiation: { step: "offer", anchor: "sec-negotiation" },
+    alignment: { step: "offer", anchor: "sec-alignment" }, _: { step: "quotation" },
+  },
+  contract: { _: { step: "account", anchor: "sec-contract" } },
+  setup: {
+    account: { step: "account", anchor: "sec-account" }, affiliates: { step: "account", anchor: "sec-affiliates" },
+    sob: { step: "offer", anchor: "sec-sob" }, plans: { step: "account", anchor: "sec-plans" }, coc: { step: "account", anchor: "sec-coc" },
+    members: { step: "activation", anchor: "sec-members-enrollment" }, billing: { step: "activation", anchor: "sec-billing" },
+    activation: { step: "activation", anchor: "sec-activation" }, _: { step: "account" },
+  },
 };
+// The live step, derived from the server's stage (1-9).
+function currentStepKey(data) {
+  const st = data.summary.stage || 1;
+  return (STEPS.find((s) => st <= Math.max(...s.stages)) || STEPS[0]).key;
+}
+// Resolve a URL (new step key, legacy tab/sub, or nothing) to {step, anchor}.
+// A legacy sub takes priority because some old subs (proposal, sob) moved to a
+// different step than their old tab — e.g. quotation/proposal now lives in "offer".
+function resolveStep(parts, data) {
+  const seg = parts[2], sub = parts[3];
+  if (seg && LEGACY[seg] && sub && LEGACY[seg][sub]) return LEGACY[seg][sub];
+  if (STEP_KEYS.includes(seg)) return { step: seg, anchor: sub ? "sec-" + sub : null };
+  if (seg && LEGACY[seg] && LEGACY[seg]._) return LEGACY[seg]._;
+  return { step: currentStepKey(data), anchor: null };
+}
+// Which step does a task/deep link belong to (for the "task for you" marks)?
+function linkStep(link) {
+  const seg = (link || "").split("#/case/")[1]?.split("?")[0].split("#")[0].split("/");
+  const tab = seg?.[1], sub = seg?.[2]; if (!tab) return null;
+  if (LEGACY[tab] && sub && LEGACY[tab][sub]) return LEGACY[tab][sub].step;
+  if (STEP_KEYS.includes(tab)) return tab;
+  const m = LEGACY[tab] && LEGACY[tab]._;
+  return m ? m.step : null;
+}
 
 export async function render(main, { parts, query, force }) {
   const id = parts[1];
-  const tab = parts[2] || "overview";
-  const sub = parts[3];
-  if (!force) main.innerHTML = html`<div class="state-box" aria-busy="true"><div class="skeleton"></div><div class="skeleton mt"></div><p class="tiny mt">Loading case…</p></div>`.s;
+  if (!force) main.innerHTML = html`<div class="state-box" aria-busy="true"><div class="skeleton"></div><div class="skeleton mt"></div><p class="tiny mt">Loading record…</p></div>`.s;
   let data;
   try { data = await api(`cases/${id}`); } catch (e) {
-    main.innerHTML = html`<div class="panel"><div class="state-box" role="alert"><b>${e.status === 404 ? "Case not found" : e.status === 403 ? "No access to this case" : "This case could not load"}</b>
+    main.innerHTML = html`<div class="panel"><div class="state-box" role="alert"><b>${e.status === 404 ? "Record not found" : e.status === 403 ? "No access to this record" : "This record could not load"}</b>
       <p class="mt">${e.message}</p><div class="row mt" style="justify-content:center"><button class="btn" id="r">Retry</button><a class="btn" href="#/new-business">Back to New Business</a></div></div></div>`.s;
     main.querySelector("#r").onclick = () => render(main, { parts, query });
     return;
   }
-  const s = data.summary;
-  document.title = `${s.company} · ${TABS.find((t) => t.key === tab)?.label || ""} · HMS3`;
+  const s = data.summary, c = data.case;
+  const { step: stepKey, anchor } = resolveStep(parts, data);
+  const stepDef = STEPS.find((x) => x.key === stepKey) || STEPS[0];
+  document.title = `${s.company} · ${stepDef.label} · HMS3`;
   const ctx = {
-    id, data, tab, sub, query, main,
+    id, data, step: stepKey, tab: stepKey, sub: parts[3], query, main,
     reload: async () => { const y = window.scrollY; if (!(await flushForms())) return; disposeForms(); await render(main, { parts: location.hash.replace(/^#\/?/, "").split("?")[0].split("/"), query: Object.fromEntries(new URLSearchParams(location.hash.split("?")[1] || "")), force: true }); window.scrollTo(0, y); window.dispatchEvent(new Event("hms:changed")); },
   };
-  const tabHasTask = (k) => s.myTasks.some((t) => t.link.split("#/case/")[1]?.split("/")[1]?.split("?")[0]?.split("#")[0] === k);
+  const n = s.next;
+  const mine = n && s.myTasks.some((t) => t.key === n.key);
+  // Suggest who should take the next step so the demo driver knows which user to switch to.
+  const suggested = (() => {
+    if (!DEMO_BYPASS || !n || mine || n.waiting === "client") return null;
+    const uid = n.assigneeId || state.meta.users.find((u) => u.role === n.role)?.id;
+    if (!uid || uid === state.me.id) return null;
+    const u = state.meta.users.find((x) => x.id === uid);
+    return u ? { id: u.id, name: u.name, role: u.role } : null;
+  })();
+  state.suggestedUser = suggested;
+
   main.innerHTML = html`
     <nav class="tiny mb" aria-label="Breadcrumb"><a href="#/new-business">New Business</a> › ${s.company}</nav>
-    <div class="case-head">
-      <div><h1>${s.company} ${pill(s.status, s.statusTone)} ${s.vip ? html`<span class="badge-vip">VIP</span>` : ""}${s.jumbo ? html`<span class="badge-jumbo">JUMBO</span>` : ""}
-          ${s.signedUnpaid ? html`<span class="pill warn plain" title="Contract signed; first payment not yet posted (BR-21)">Signed - unpaid</span>` : ""}</h1>
-        <div class="refs"><span>Case <b>${s.id}</b></span><span>Lead ${s.leadRef}</span>${s.franchiseCode ? html`<span>Franchise ${s.franchiseCode}</span>` : ""}${s.maCode ? html`<span>MA Code ${s.maCode}</span>` : ""}
-          <span>Stage ${s.stage}. ${s.stageLabel}</span></div></div>
+    <div class="rec-head">
+      <div class="rec-title"><h1>${s.company} ${pill(s.status, s.statusTone)}${s.vip ? html` <span class="badge-vip">VIP</span>` : ""}${s.jumbo ? html` <span class="badge-jumbo">JUMBO</span>` : ""}${s.signedUnpaid ? html` <span class="pill warn plain" title="Contract signed; first payment not yet posted (BR-21)">Signed - unpaid</span>` : ""}</h1>
+        <div class="refs"><span>Case <b>${s.id}</b></span>${s.franchiseCode ? html`<span>Franchise ${s.franchiseCode}</span>` : ""}${s.maCode ? html`<span>MA Code ${s.maCode}</span>` : ""}<span>Responsible: <b>${n ? (n.waiting === "client" ? "Client" : ownerText(n)) : s.ownerName}</b></span></div></div>
       <div class="row"><button class="btn" id="docsBtn">${icon("file", 16)} Documents <span class="pill neutral plain">${data.documents.filter((d) => !d.supersededBy).length}</span></button>
         <button class="btn" id="histBtn">${icon("history", 16)} History</button>
-        ${DEMO_BYPASS ? html`<button class="btn ghost danger" id="delCaseBtn" title="Permanently delete this case and its company (demo only)">Delete case</button>` : ""}</div>
+        ${DEMO_BYPASS ? html`<button class="btn ghost danger" id="delCaseBtn" title="Permanently delete this record and its company (demo only)">Delete</button>` : ""}</div>
     </div>
-    <details class="case-details" ${raw(localStorage.getItem("hms-pref:caseDetailsOpen") === "true" ? "open" : "")}><summary>View case details</summary>${caseDetails(data)}</details>
-    <nav class="tabs" aria-label="Case sections">${TABS.map((t) => html`<a href="#/case/${id}/${t.key}" ${t.key === tab ? raw('aria-current="page"') : ""}>${t.label}${tabHasTask(t.key) ? html`<span class="mark" title="Has a task for you"></span><span class="sr-only">(has a task for you)</span>` : ""}</a>`)}</nav>
-    <div id="tab"></div>`.s;
+    ${nextStrip(ctx, { n, mine, suggested })}
+    <nav class="steps-nav" aria-label="Work areas and progress">${STEPS.map((step) => stepTab(ctx, step, stepKey))}</nav>
+    <details class="case-details" ${raw(localStorage.getItem("hms-pref:caseDetailsOpen") === "true" ? "open" : "")}><summary>Record details and provenance (reference)</summary>${caseDetails(data)}</details>
+    <div id="step"></div>`.s;
   main.querySelector(".case-details").addEventListener("toggle", (e) => localStorage.setItem("hms-pref:caseDetailsOpen", e.target.open));
   main.querySelector("#docsBtn").onclick = () => documentsDrawer(ctx);
   main.querySelector("#histBtn").onclick = () => historyDrawer(ctx);
   main.querySelector("#delCaseBtn")?.addEventListener("click", async (e) => {
-    const ok = await confirmDialog("Delete this case?",
+    const ok = await confirmDialog("Delete this record?",
       html`This permanently removes <b>${s.company}</b> — the case, every linked record (franchise, proposals, contract, account, plan codes) and all uploaded documents. The company record is removed too if no other case uses it.<br><br>This cannot be undone and is intended for resetting the demo.`,
       { confirm: "Delete permanently", kind: "danger" });
     if (!ok) return;
@@ -63,16 +116,116 @@ export async function render(main, { parts, query, force }) {
     if (r) { if (!(await flushForms())) return; disposeForms(); go("#/new-business"); }
     else { b.removeAttribute("aria-busy"); b.disabled = false; }
   });
-  const el = main.querySelector("#tab");
-  ctx.el = el;
-  if (tab === "overview") return overview(ctx);
-  if (!TAB_MODS[tab]) { el.innerHTML = `<div class="empty">Unknown section.</div>`; return; }
-  const mod = await TAB_MODS[tab]();
-  await mod.render(ctx);
-  if (location.hash.includes("#", 1)) {
-    const anchor = location.hash.split("#").pop();
-    const target = document.getElementById(anchor);
-    if (target && !force) target.scrollIntoView({ block: "start" });
+  main.querySelector("#switchNext")?.addEventListener("click", async (e) => {
+    const b = e.currentTarget; b.setAttribute("aria-busy", "true"); b.disabled = true;
+    const ok = await switchUser(suggested.id);
+    if (ok) go(n.link); else { b.removeAttribute("aria-busy"); b.disabled = false; }
+  });
+
+  ctx.el = main.querySelector("#step");
+  await renderStep(ctx, stepKey);
+  if (anchor && !force) { const t = document.getElementById(anchor); if (t) t.scrollIntoView({ block: "start" }); }
+}
+
+// ---------------------------------------------------------------- record header: next action
+function nextStrip(ctx, { n, mine, suggested }) {
+  const s = ctx.data.summary, c = ctx.data.case;
+  const others = s.tasks.filter((t) => t !== n && t.key !== n?.key);
+  if (s.closed && !n) {
+    return html`<div class="rec-next done"><div><span class="eyebrow">Record status</span><b>${s.status}</b> — ${c.status === "Closed Lost" ? `Lost: ${c.lostReason}${c.lostNote ? " - " + c.lostNote : ""}` : c.status === "Routed to IFG" ? "Below the corporate minimum; routed to the IFG team (outside this application)." : "All New Business steps are complete. The account is active and handed over."}</div></div>`;
+  }
+  if (!n) return html`<div class="rec-next"><b>No open work.</b></div>`;
+  return html`<div class="rec-next">
+    <div class="rn-main"><span class="eyebrow">Next action</span><b>${n.title}</b>
+      <span class="rn-meta">Owner: ${n.waiting === "client" ? `Client${s.channel !== "Direct" ? " via " + interName(s.intermediaryId) : ""}` : ownerText(n)} · Due ${dueHtml(n.due)}${mine ? html` · <span class="pill info plain">Your task</span>` : ""}</span></div>
+    <div class="rn-act"><a class="btn ${mine ? "primary" : ""}" href="${n.link}">${mine ? "Go to task" : "Open"} ›</a>
+      ${suggested ? html`<button type="button" class="btn primary blink-switch" id="switchNext">Switch to ${suggested.name} (${roleLabel(suggested.role)})</button>` : ""}</div>
+    ${s.blocker ? html`<div class="note warn rn-block">${icon("alert", 14)} <b>Blocker:</b> ${s.blocker}</div>` : ""}
+    ${others.length ? html`<details class="rn-par"><summary>${others.length} other task(s) can proceed in parallel</summary><ul class="rn-par-list">${others.map((t) => html`<li><a href="${t.link}">${t.title}</a> — ${t.waiting === "client" ? "Client" : ownerText(t)}${s.myTasks.some((m) => m.key === t.key) ? html` <span class="pill info plain">You</span>` : ""} · ${dueHtml(t.due)}</li>`)}</ul></details>` : ""}
+  </div>`;
+}
+
+// ---------------------------------------------------------------- step nav = progress indicator
+function stepStatus(ctx, step) {
+  const s = ctx.data.summary, c = ctx.data.case;
+  const stopped = ["Closed Lost", "Routed to IFG"].includes(c.status);
+  const done = s.closed && !stopped;
+  const stage = done ? 99 : (s.stage || 1);
+  const min = Math.min(...step.stages), max = Math.max(...step.stages);
+  if (stage > max) return { label: "Completed", cls: "done" };
+  if (stopped) return { label: stage < min ? "Not Started" : "Stopped", cls: "muted" };
+  if (stage < min) return { label: "Not Started", cls: "todo" };
+  const mineHere = s.myTasks?.some((t) => linkStep(t.link) === step.key);
+  if (mineHere) return { label: "Needs Action", cls: "act" };
+  if (s.next && s.next.waiting) return { label: "Waiting", cls: "wait" };
+  return { label: "Needs Action", cls: "act" };
+}
+function stepTab(ctx, step, activeKey) {
+  const st = stepStatus(ctx, step);
+  const hasTask = ctx.data.summary.myTasks?.some((t) => linkStep(t.link) === step.key);
+  return html`<a href="#/case/${ctx.id}/${step.key}" class="step-tab ${st.cls}" ${step.key === activeKey ? raw('aria-current="page"') : ""}>
+    <span class="st-n">${step.n}</span><span class="st-l">${step.label}${hasTask ? html`<span class="mark" title="Has a task for you"></span><span class="sr-only"> (has a task for you)</span>` : ""}</span>
+    <span class="st-s">${st.label}</span></a>`;
+}
+
+// ---------------------------------------------------------------- step composition
+const secId = (sid) => "sec-" + sid;
+function stepGuard(stepKey, data) {
+  const fr = (data.records.franchise || []).slice(-1)[0];
+  if (["quotation", "offer"].includes(stepKey) && !(fr && ["Approved", "Converted to Account"].includes(fr.status)))
+    return html`<div class="note">This work area opens after AMT approves the franchise (status "For Rates Creation"). The franchise is currently <b>${fr?.status || "not started"}</b>. <a href="#/case/${data.summary.id}/franchise">Go to Create Franchise</a>.</div>`;
+  return null;
+}
+function stepSections(stepKey, data) {
+  const Q = () => import("./quotation.js"), SU = () => import("./setup.js"), MB = () => import("./members.js");
+  const acc = (data.records.account || []).find((a) => !a.parentId);
+  const affs = (data.records.account || []).filter((a) => a.parentId);
+  switch (stepKey) {
+    case "franchise": return [
+      { id: "lead", label: "Lead and pipeline", load: (cc) => { const k = cc.data.case; const below = k.estHeadcount != null && k.estHeadcount < state.meta.config.corporateMinPrincipals; cc.el.innerHTML = html`<div class="stack">${leadPanel(cc, below)}${activities(k)}</div>`.s; wireLead(cc); } },
+      { id: "franchise", label: "Franchise registration", load: async (cc) => (await import("./franchise.js")).render(cc) },
+    ];
+    case "quotation": return [
+      { id: "requirements", label: "Requirements", load: async (cc) => (await Q()).requirements(cc) },
+      { id: "tor", label: "TOR", load: async (cc) => (await Q()).tor(cc) },
+      { id: "members-quotation", label: "Member Data check", load: async (cc) => (await MB()).renderMemberData(cc, cc.body, "quotation") },
+      { id: "rates", label: "Rate request and sheets", load: async (cc) => (await Q()).rates(cc) },
+    ];
+    case "offer": return [
+      { id: "sob", label: "SOB and benefits", load: async (cc) => (await import("./sob.js")).render(cc) },
+      { id: "proposal", label: "Proposal and approvals", load: async (cc) => (await Q()).proposal(cc) },
+      { id: "negotiation", label: "Negotiation and acceptance", load: async (cc) => (await Q()).negotiation(cc) },
+      { id: "alignment", label: "Internal alignment", load: async (cc) => (await Q()).alignment(cc) },
+    ];
+    case "account": return [
+      { id: "contract", label: "Contract and KYC", load: async (cc) => (await import("./contract.js")).render(cc) },
+      { id: "account", label: "Account details", load: async (cc) => (await SU()).account(cc, acc) },
+      { id: "affiliates", label: "Affiliates", load: async (cc) => (await SU()).affiliates(cc, acc, affs) },
+      { id: "plans", label: "Plan Codes", load: async (cc) => (await import("./plans.js")).render(cc) },
+      { id: "coc", label: "COC and commission", load: async (cc) => (await SU()).cocCommission(cc, acc) },
+    ];
+    case "activation": return [
+      { id: "members-enrollment", label: "Member Data (enrollment)", load: async (cc) => (await MB()).renderMemberData(cc, cc.body, "enrollment") },
+      { id: "billing", label: "Billing", load: async (cc) => (await SU()).billing(cc, acc, { hideOrientation: true }) },
+      { id: "activation", label: "Activation and handover", load: async (cc) => (await SU()).activation(cc, acc) },
+    ];
+  }
+  return [];
+}
+async function renderStep(ctx, stepKey) {
+  const el = ctx.el;
+  const guard = stepGuard(stepKey, ctx.data);
+  const secs = stepSections(stepKey, ctx.data);
+  el.innerHTML = html`
+    ${!guard && secs.length > 1 ? html`<nav class="secnav step-jump" aria-label="Sections in this work area">${secs.map((x) => html`<a href="#${secId(x.id)}" data-jump="${secId(x.id)}">${x.label}</a>`)}</nav>` : ""}
+    ${guard ? guard : html`<div class="step-secs">${secs.map((x) => html`<div class="step-sec" id="${secId(x.id)}"></div>`)}</div>`}`.s;
+  if (guard) return;
+  el.querySelectorAll("[data-jump]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); document.getElementById(a.dataset.jump)?.scrollIntoView({ block: "start" }); }));
+  for (const x of secs) {
+    const cont = el.querySelector("#" + CSS.escape(secId(x.id)));
+    if (!cont) continue;
+    const cc = { ...ctx, el: cont, body: cont };
+    try { await x.load(cc); } catch (err) { console.error("Section", x.id, err); cont.innerHTML = html`<div class="note danger">The "${x.label}" section could not load: ${err.message || err}</div>`.s; }
   }
 }
 
@@ -89,60 +242,6 @@ function caseDetails(data) {
     ["Pipeline stage", c.pipelineStage], ["Est. headcount / premium", `${int(c.estHeadcount) || "-"} / ${money(c.estPremium) || "-"}`],
   ];
   return html`<dl class="dl">${items.map(([k, v]) => html`<div><dt>${k}</dt><dd>${v || "-"}</dd></div>`)}</dl>`;
-}
-
-// ---------------------------------------------------------------- overview
-function overview(ctx) {
-  const { data, el, id } = ctx;
-  const s = data.summary;
-  const c = data.case;
-  const n = s.next;
-  const others = s.tasks.filter((t) => t !== n && t.key !== n?.key);
-  const mine = n && s.myTasks.some((t) => t.key === n.key);
-  // Who should take the next step? Suggest the assignee, else the first demo user
-  // in that role — so the person driving the demo knows which user to switch to.
-  const suggested = (() => {
-    if (!DEMO_BYPASS || !n || mine || n.waiting === "client") return null;
-    const uid = n.assigneeId || state.meta.users.find((u) => u.role === n.role)?.id;
-    if (!uid || uid === state.me.id) return null;
-    const u = state.meta.users.find((x) => x.id === uid);
-    return u ? { id: u.id, name: u.name, role: u.role } : null;
-  })();
-  state.suggestedUser = suggested;
-  const min = state.meta.config.corporateMinPrincipals;
-  const below = c.estHeadcount != null && c.estHeadcount < min;
-  el.innerHTML = html`<div class="home-grid">
-    <div class="stack">
-      ${s.closed && !n ? html`<div class="next-card"><div class="eyebrow">Case status</div><h2>${s.status}</h2>
-          <p class="muted">${c.status === "Closed Lost" ? `Lost reason: ${c.lostReason}${c.lostNote ? " - " + c.lostNote : ""}` : c.status === "Routed to IFG" ? "This prospect is below the corporate minimum and was routed to the IFG team (outside this application)." : "All New Business steps are complete. The account is active and handed over."}</p></div>`
-      : n ? html`<section class="next-card" aria-labelledby="nx"><div class="eyebrow">Next action</div><h2 id="nx">${n.title}</h2>
-          <div class="kv"><span>Owner: <b>${n.waiting === "client" ? `Client${s.channel !== "Direct" ? " via " + interName(s.intermediaryId) : ""} (followed up by ${n.assigneeName || n.roleLabel})` : ownerText(n)}</b></span>
-            <span>Due: <b>${dueHtml(n.due)}</b></span>${mine ? html`<span class="pill info plain">Your task</span>` : ""}</div>
-          ${s.blocker ? html`<div class="note warn mt">${icon("alert", 14)} <b>Blocker:</b> ${s.blocker}</div>` : ""}
-          <div class="row mt"><a class="btn ${mine ? "primary" : ""}" href="${n.link}">${mine ? "Go to task" : "Open"} ›</a>
-            ${suggested ? html`<button type="button" class="btn primary blink-switch" id="switchNext">Switch to ${suggested.name} (${roleLabel(suggested.role)})</button>` : ""}
-            ${!mine ? html`<span class="tiny">${suggested ? html`To continue, switch to <b>${suggested.name}</b> and open the task.` : n.waiting ? "Waiting - no action from you is needed now." : `This step belongs to ${ownerText(n)}. You can view it; editing is limited to that role.`}</span>` : ""}</div></section>`
-      : html`<div class="next-card"><h2>No open work</h2></div>`}
-      ${others.length ? html`<section class="panel"><div class="ph"><h2>Other open work in parallel (${others.length})</h2></div><div class="pb flush"><div class="tbl-wrap"><table class="tbl compact">
-        <caption class="sr-only">Parallel tasks</caption><thead><tr><th scope="col">Task</th><th scope="col">Owner</th><th scope="col">Due</th></tr></thead><tbody>
-        ${others.map((t) => html`<tr><td><a href="${t.link}">${t.title}</a>${t.blocker ? html`<span class="sub">${t.blocker}</span>` : ""}</td><td>${t.waiting === "client" ? "Client" : ownerText(t)}${s.myTasks.some((m) => m.key === t.key) ? html` <span class="pill info plain">You</span>` : ""}</td><td class="nowrap">${dueHtml(t.due)}</td></tr>`)}
-        </tbody></table></div></div></section>` : ""}
-      <section class="panel"><div class="ph"><h2>Stage progress</h2><span class="tiny">Stage ${s.stage} of 9</span></div><div class="pb">${stageBar(s.stage, s.closed)}</div></section>
-      <section class="panel"><div class="ph"><h2>Recent activity</h2><button class="btn ghost sm" id="allHist">Full history</button></div><div class="pb" id="recent"><div class="skeleton"></div></div></section>
-    </div>
-    <div class="stack">${leadPanel(ctx, below)}${activities(c)}</div></div>`.s;
-  if (suggested) document.getElementById("whoBtn")?.classList.add("blink-switch");
-  el.querySelector("#switchNext")?.addEventListener("click", async (e) => {
-    const b = e.currentTarget; b.setAttribute("aria-busy", "true"); b.disabled = true;
-    const ok = await switchUser(suggested.id);
-    if (ok) go(n.link); else { b.removeAttribute("aria-busy"); b.disabled = false; }
-  });
-  el.querySelector("#allHist").onclick = () => historyDrawer(ctx);
-  api(`cases/${id}/history?limit=8`).then((h) => {
-    const box = el.querySelector("#recent");
-    if (box) box.innerHTML = historyList(h.items.slice(0, 8), true).s;
-  }).catch(() => { const box = el.querySelector("#recent"); if (box) box.textContent = "Activity could not load."; });
-  wireLead(ctx);
 }
 
 function leadPanel(ctx, below) {
@@ -319,8 +418,12 @@ export function documentsDrawer(ctx) {
 }
 
 // ---------------------------------------------------------------- shared helpers for tab modules
+// Retained for backward compatibility. The five-step shell stacks sections and no
+// longer renders sub-tab rows, so this is unused in the new flow; kept so any older
+// caller still resolves. Label falls back to the step name.
 export function subnav(ctx, items, current) {
-  return html`<nav class="subtabs" aria-label="${TABS.find((t) => t.key === ctx.tab).label} sections">${items.map((i) => html`<a href="#/case/${ctx.id}/${ctx.tab}/${i.key}" ${i.key === current ? raw('aria-current="page"') : ""}>${i.label}${i.status ? html` <span class="st">· ${i.status}</span>` : ""}</a>`)}</nav>`;
+  const label = (STEPS.find((t) => t.key === ctx.tab)?.label) || "Record";
+  return html`<nav class="subtabs" aria-label="${label} sections">${items.map((i) => html`<a href="#/case/${ctx.id}/${ctx.tab}/${i.key}" ${i.key === current ? raw('aria-current="page"') : ""}>${i.label}${i.status ? html` <span class="st">· ${i.status}</span>` : ""}</a>`)}</nav>`;
 }
 export function ownerBanner(roleKeys, what) {
   if (roleKeys.includes(state.me.role)) return "";

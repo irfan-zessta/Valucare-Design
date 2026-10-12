@@ -229,7 +229,7 @@ function cocCommission(ctx, acc) {
 }
 
 // ---------------------------------------------------------------- billing
-function billing(ctx, acc) {
+function billing(ctx, acc, { hideOrientation = false } = {}) {
   const { data, body, id } = ctx;
   const me = state.me;
   const bl = (data.records.billing || [])[0];
@@ -262,8 +262,8 @@ function billing(ctx, acc) {
         ${x.resolution ? html`<div class="tiny">Resolved by ${x.resolvedByName} ${fmtDateTime(x.resolvedAt)}: ${x.resolution} · <a href="${docUrl(x.evidenceDocId)}">evidence</a></div>` : me.role === "bc" ? html`<button class="btn sm mt" data-resx="${x.id}">Resolve with evidence</button>` : ""}</div></li>`)}</ul>` : html`<p class="tiny">No exceptions.</p>`}</div></section>
     <section class="panel"><div class="ph"><h2>First payment</h2>${me.role === "bc" && !bl.firstPaymentPosted ? html`<button class="btn sm" id="pay">Record first payment</button>` : ""}</div><div class="pb">
       ${bl.firstPaymentPosted ? html`<p>Posted ${fmtDate(bl.firstPayment.date)} · reference ${bl.firstPayment.reference}</p>${simNote(bl.firstPayment.note)}` : html`<p class="muted">Not posted. Until it is, a signed contract shows as "Signed - unpaid".</p>`}</div></section>
-    <section class="panel" id="orientation"><div class="ph"><h2>Health benefit orientation ${pill(ori?.status || "Not scheduled")}</h2><div class="row" id="oAct"></div></div><div class="pb"><p class="tiny">Owned by AMT. Scheduling is tracked separately from billing completion.</p>
-      ${ori ? html`<p class="mt">${ori.date ? `Scheduled ${fmtDate(ori.date)}` : ""}${ori.venue ? ` at ${ori.venue}` : ""}${ori.completedAt ? ` · completed ${fmtDateTime(ori.completedAt)}` : ""}</p>` : ""}</div></section>`.s;
+    ${hideOrientation ? "" : html`<section class="panel" id="orientation"><div class="ph"><h2>Health benefit orientation ${pill(ori?.status || "Not scheduled")}</h2><div class="row" id="oAct"></div></div><div class="pb"><p class="tiny">Owned by AMT. Scheduling is tracked separately from billing completion.</p>
+      ${ori ? html`<p class="mt">${ori.date ? `Scheduled ${fmtDate(ori.date)}` : ""}${ori.venue ? ` at ${ori.venue}` : ""}${ori.completedAt ? ` · completed ${fmtDateTime(ori.completedAt)}` : ""}</p>` : ""}</div></section>`}`.s;
   wireUploads(body, () => ctx.reload());
   const bar = body.querySelector("#bAct");
   const btn = (b0, label, cls, fn) => { const b = document.createElement("button"); b.className = `btn ${cls}`; b.textContent = label; b.onclick = () => fn(b); b0.appendChild(b); };
@@ -304,7 +304,7 @@ function billing(ctx, acc) {
       actions: [{ label: "Cancel" }, { label: "Record", kind: "primary", value: "ok", validate: (v) => (!v.date || !v.reference ? "Date and reference are required." : null) }] });
     if (r?.action === "ok" && (await act("billing.recordFirstPayment", { id: bl.id, ...r.values }, { button: e.currentTarget, success: "First payment recorded." }))) ctx.reload();
   });
-  orientationButtons(ctx, ori, body.querySelector("#oAct"));
+  if (!hideOrientation) orientationButtons(ctx, ori, body.querySelector("#oAct"));
 }
 function orientationButtons(ctx, ori, bar) {
   if (!bar || state.me.role !== "amt") return;
@@ -390,3 +390,8 @@ function activation(ctx, acc) {
     }
   }
 }
+
+// Section renderers exposed to the 5-step record shell (case.js). Each renders
+// into ctx.body; the shell composes them into the "Set Up Account" and
+// "Activate & Handover" work areas.
+export { account, affiliates, cocCommission, billing, activation };
