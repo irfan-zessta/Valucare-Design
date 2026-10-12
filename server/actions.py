@@ -2096,7 +2096,11 @@ def pc_decide(s, ctx, p):
 
     def one(pid):
         pc = _pc(s, pid)
-        require_status(pc, "For Approval", what=f"Plan Code {pc['planCode']}")
+        # Demo: a Plan Code can be approved (or returned) straight from Draft or
+        # Returned, without first routing through submit. Production still requires
+        # the maker to submit it "For Approval" first.
+        allowed = ("Draft", "Returned", "For Approval") if DEMO_BYPASS else ("For Approval",)
+        require_status(pc, *allowed, what=f"Plan Code {pc['planCode']}")
         require_not_maker(ctx, pc.get("makerId"), f"Plan Code {pc['planCode']}")
         if pid in versions:
             _check_version(pc, versions[pid])
