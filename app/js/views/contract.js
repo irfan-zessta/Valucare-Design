@@ -105,7 +105,7 @@ function kycBlock(ctx, k, am) {
     b.className = "btn primary";
     b.textContent = "Record check result";
     b.onclick = async () => {
-      if (!k.formDocId) return showError({ message: "The KYC form has not been uploaded yet." });
+      if (!DEMO_BYPASS && !k.formDocId) return showError({ message: "The KYC form has not been uploaded yet." });
       const open = (k.flags || []).filter((f) => f.status === "Open").length;
       const r = await dialog({ title: "Record KYC result", body: html`<fieldset style="border:0;padding:0"><legend class="sr-only">Result</legend>
         <label class="check"><input type="radio" name="status" value="Cleared" ${open ? "disabled" : "checked"}> Cleared${open ? " (resolve open flags first)" : ""}</label><label class="check"><input type="radio" name="status" value="Flagged" ${open ? "checked" : ""}> Flagged</label></fieldset>

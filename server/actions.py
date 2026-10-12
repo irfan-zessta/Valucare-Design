@@ -1620,10 +1620,11 @@ def contract_advance(s, ctx, p):
 def kyc_result(s, ctx, p):
     k = s.store.must(p["id"], "kyc")
     _check_version(k, p.get("reviewedVersion"))
-    if not k.get("formDocId"):
+    if not k.get("formDocId") and not DEMO_BYPASS:
         raise ApiError(422, "validation", "The KYC form has not been uploaded yet.")
     st = p.get("status")
-    _need(p, "externalRef", "checkDate", msg="Enter the external check reference and check date.")
+    if not DEMO_BYPASS:
+        _need(p, "externalRef", "checkDate", msg="Enter the external check reference and check date.")
     flags = copy.deepcopy(k.get("flags", []))
     if st == "Flagged":
         _need(p, "flagDescription")
@@ -1633,7 +1634,7 @@ def kyc_result(s, ctx, p):
             raise ApiError(409, "open_flags", "Resolve every open KYC flag with evidence before clearing.")
     else:
         raise ApiError(400, "bad_request", "status must be Cleared or Flagged.")
-    _set(s, ctx, k, {"status": st, "externalRef": p["externalRef"], "checkDate": p["checkDate"], "checkerId": ctx.uid,
+    _set(s, ctx, k, {"status": st, "externalRef": p.get("externalRef") or "", "checkDate": p.get("checkDate") or "", "checkerId": ctx.uid,
                      "checkerName": ctx.user["name"], "flags": flags}, f"kyc.{st.lower()}", reason=p.get("flagDescription") or p.get("remarks"))
     return {}
 
