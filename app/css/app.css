@@ -300,6 +300,55 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 .flow-item .tag{font-size:10px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--text-3);background:var(--gray-soft);border-radius:999px;padding:2px 7px}
 .progress{height:8px;background:var(--gray-soft);border-radius:4px;overflow:hidden}.progress>i{display:block;height:100%;background:var(--blue)}
 
+/* ---------- Apple-style polish ---------- */
+html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+body{letter-spacing:-.003em}
+::selection{background:rgba(60,60,67,.16)}
+/* thin, macOS-style overlay scrollbars */
+*{scrollbar-width:thin;scrollbar-color:rgba(60,60,67,.28) transparent}
+*::-webkit-scrollbar{width:11px;height:11px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:rgba(60,60,67,.26);border-radius:999px;border:3px solid transparent;background-clip:content-box}
+*::-webkit-scrollbar-thumb:hover{background:rgba(60,60,67,.42);background-clip:content-box}
+
+/* smooth, lightly springy interactions */
+.btn,.linkbtn,.nav a,.nav button.navbtn,.subtabs a,.views button,.tabs a,.secnav a,.whoami,.userpick button,.flow-item,.chip button,.combo li{
+  transition:background-color .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .08s ease}
+.field input,.field select,.field textarea,.inp,.topbar .qsearch input,.toolbar .search input{
+  transition:border-color .16s ease,box-shadow .16s ease,background-color .16s ease}
+
+/* buttons: refined radius, weight + press feedback */
+.btn{border-radius:8px;font-weight:590;letter-spacing:-.01em}
+.btn:active{transform:scale(.97)}
+.btn.primary{box-shadow:0 1px 1.5px rgba(0,0,0,.14),0 1px 1px rgba(0,0,0,.04)}
+.btn.primary:hover{background:#000;border-color:#000}
+.create-btn{border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.16)}
+
+/* inputs: softer borders, calmer halo focus */
+.field input,.field select,.field textarea,.inp,.topbar .qsearch input,.toolbar .search input{border-radius:8px;border-color:#D6D6DB}
+.field input:hover,.field select:hover,.field textarea:hover,.inp:hover,.topbar .qsearch input:hover{border-color:#BDBDC2}
+.field input:focus,.field select:focus,.field textarea:focus,.inp:focus,.topbar .qsearch input:focus,.toolbar .search input:focus{border-color:#A6A6AD;box-shadow:0 0 0 3.5px rgba(60,60,67,.14)}
+
+/* panels & overlays: rounder, layered soft shadows */
+.panel{border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.05)}
+.dialog{border-radius:18px;box-shadow:0 12px 44px rgba(0,0,0,.20),0 2px 8px rgba(0,0,0,.08)}
+.menu,.popover,.combo ul,.drawer{border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,.14)}
+.drawer{border-radius:18px 0 0 18px}
+.login .card{border-radius:18px;box-shadow:0 12px 44px rgba(0,0,0,.10)}
+
+/* sidebar selection: clean filled rounded rect, no inset bar */
+.nav a[aria-current="page"]{background:#E8E8ED;color:var(--text);box-shadow:none;font-weight:620}
+
+/* iOS-style segmented control for the table view switcher */
+.views{display:flex;width:max-content;max-width:100%;gap:2px;background:var(--gray-soft);border:0;border-bottom:0;border-radius:10px;padding:3px;margin:8px 8px 0}
+.views button{border:0;border-bottom:0;border-radius:7px;padding:6px 14px;color:var(--text-2);font-weight:560}
+.views button:hover{color:var(--text)}
+.views button[aria-selected="true"]{background:var(--surface);color:var(--text);border-bottom:0;box-shadow:0 1px 2px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.04);font-weight:620}
+.views .cnt{color:var(--text-3)}
+
+/* subtabs: subtle hover for the non-active pills */
+.subtabs a:not([aria-current="page"]):hover{background:var(--gray-soft);border-color:var(--blue-line);color:var(--text)}
+
 /* ---------- responsive ---------- */
 @media (max-width:1100px){.fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.home-grid{grid-template-columns:1fr}.dl{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3{grid-template-columns:1fr 1fr}}
 @media (max-width:860px){
