@@ -1891,9 +1891,11 @@ PC_KEYS = [f[0] for f in meta.PLAN_CODE_FIELDS]
 
 
 def _pc_validate(s, pc):
-    # Demo may skip EMPTY required fields, but mismatched/invalid values (unknown
-    # option, unknown provider code, wrong type, VAT off 12%) are ALWAYS detected
-    # so a malformed plan code never passes silently.
+    # Detects both empty required fields (unless DEMO_SKIP_DATA) and mismatched/
+    # invalid values (unknown option, unknown provider code, wrong type, VAT off
+    # 12%). Callers decide how strict to be: the submit gate blocks on these in
+    # production but lets them through under DEMO_BYPASS so a plan code can be
+    # approved at any format for the demo.
     errs = []
     prov = providers.by_code()
     decouple = s.cfg["decouplePaymentMode"]
@@ -2076,7 +2078,7 @@ def pc_submit(s, ctx, p):
             if pc["v"] <= (pc.get("returnedV") or 0):
                 raise ApiError(409, "not_corrected", f"{pc['planCode']} was returned and has not been edited since.")
         errs = [e for e in _pc_validate(s, pc) if not e.get("warning")]
-        if errs:
+        if errs and not DEMO_BYPASS:
             raise ApiError(422, "validation", f"{pc['planCode']}: " + "; ".join(e["message"] for e in errs[:4]), {"fields": errs})
         sob = s.store.get(pc["sobId"])
         if not sob or sob.get("status") != "Codified":
