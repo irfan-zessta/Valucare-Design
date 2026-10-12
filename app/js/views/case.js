@@ -123,8 +123,7 @@ export async function render(main, { parts, query, force }) {
   });
 
   ctx.el = main.querySelector("#step");
-  await renderStep(ctx, stepKey);
-  if (anchor && !force) { const t = document.getElementById(anchor); if (t) t.scrollIntoView({ block: "start" }); }
+  await renderStep(ctx, stepKey, anchor);
 }
 
 // ---------------------------------------------------------------- record header: next action
@@ -212,15 +211,26 @@ function stepSections(stepKey, data) {
   }
   return [];
 }
-async function renderStep(ctx, stepKey) {
+async function renderStep(ctx, stepKey, anchor) {
   const el = ctx.el;
   const guard = stepGuard(stepKey, ctx.data);
+  if (guard) { el.innerHTML = html`${guard}`.s; return; }
   const secs = stepSections(stepKey, ctx.data);
+  // Each section is a tab within the work area: one is shown at a time, rather than
+  // every section stacked into one long form. A legacy deep link to a section opens
+  // its tab directly; otherwise the first section is shown.
+  const active = (anchor && secs.some((x) => secId(x.id) === anchor)) ? anchor : (secs[0] ? secId(secs[0].id) : null);
   el.innerHTML = html`
-    ${!guard && secs.length > 1 ? html`<nav class="secnav step-jump" aria-label="Sections in this work area">${secs.map((x) => html`<a href="#${secId(x.id)}" data-jump="${secId(x.id)}">${x.label}</a>`)}</nav>` : ""}
-    ${guard ? guard : html`<div class="step-secs">${secs.map((x) => html`<div class="step-sec" id="${secId(x.id)}"></div>`)}</div>`}`.s;
-  if (guard) return;
-  el.querySelectorAll("[data-jump]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); document.getElementById(a.dataset.jump)?.scrollIntoView({ block: "start" }); }));
+    ${secs.length > 1 ? html`<nav class="secnav step-tabs" role="tablist" aria-label="Sections in this work area">${secs.map((x) => html`<a href="#${secId(x.id)}" role="tab" data-tab="${secId(x.id)}" aria-selected="${secId(x.id) === active ? "true" : "false"}">${x.label}</a>`)}</nav>` : ""}
+    <div class="step-secs">${secs.map((x) => html`<div class="step-sec" id="${secId(x.id)}" role="tabpanel" ${secId(x.id) === active ? "" : raw("hidden")}></div>`)}</div>`.s;
+  const tabs = [...el.querySelectorAll("[data-tab]")];
+  const show = (id) => {
+    secs.forEach((x) => { const p = el.querySelector("#" + CSS.escape(secId(x.id))); if (p) p.hidden = secId(x.id) !== id; });
+    tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === id)));
+  };
+  tabs.forEach((t) => (t.onclick = (e) => { e.preventDefault(); show(t.dataset.tab); el.scrollIntoView({ block: "start" }); }));
+  // Render every section once (keeps forms and their save-state mounted when you
+  // switch tabs); only the active one is visible.
   for (const x of secs) {
     const cont = el.querySelector("#" + CSS.escape(secId(x.id)));
     if (!cont) continue;
