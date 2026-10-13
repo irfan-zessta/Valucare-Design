@@ -1,14 +1,20 @@
-import { html, raw, esc, state, optLabel, industryName, interName, userName, fmtDate, fmtDateTime, money, int, getPath, upload, pickFile,
+import { html, raw, esc, state, optLabel, industryName, interName, userName, fmtDate, fmtDateTime, money, int, daysUntil, getPath, upload, pickFile,
   docUrl, toast, showError, api, act, dialog, DEMO_BYPASS, sampleFile } from "./core.js";
 
 // ---------------------------------------------------------------- icons
+// Lucide-style line icons: 16px default, 1.5px stroke, round caps/joins.
 const P = {
   home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
   briefcase: "M9 6V4h6v2m-11 2h16v11H4zM4 12h16",
   check: "M4 12l5 5L20 6",
   tasks: "M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2",
+  inbox: "M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z",
+  folder: "M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z",
   building: "M4 21V4h10v17M14 9h6v12M7 8h4M7 12h4M7 16h4M17 13h1M17 17h1",
   chart: "M4 20V10m6 10V4m6 16v-7m4 7H2",
+  users: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+  user: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  settings: "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6",
   more: "M5 12h.01M12 12h.01M19 12h.01",
   plus: "M12 5v14M5 12h14",
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zm9 3-4.3-4.3",
@@ -16,6 +22,7 @@ const P = {
   x: "M6 6l12 12M18 6 6 18",
   chev: "M9 6l6 6-6 6",
   chevd: "M6 9l6 6 6-6",
+  arrowr: "M5 12h14M12 5l7 7-7 7",
   file: "M14 3H6v18h12V7zM14 3v4h4",
   clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zm0-13v5l3 2",
   alert: "M12 3 2 20h20zM12 10v4m0 3h.01",
@@ -29,9 +36,80 @@ const P = {
   filter: "M4 5h16l-6 8v6l-4-2v-4z",
   cols: "M4 4h16v16H4zM10 4v16M16 4v16",
   grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  bell: "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0",
+  trash: "M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6",
   help: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9a2.5 2.5 0 0 1 4.6 1.4c0 1.6-2.1 2-2.1 3.6M12 17h.01",
 };
-export const icon = (name, size = 18) => raw(`<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${P[name] || ""}"/></svg>`);
+export const icon = (name, size = 16) => raw(`<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${P[name] || ""}"/></svg>`);
+
+// ---------------------------------------------------------------- display helpers
+// Pluralize a count without the "(s)" shortcut the copy rules forbid.
+export const plural = (n, one, many) => `${n} ${n === 1 ? one : many || one + "s"}`;
+
+// Internal qualifiers that must not leak into the UI as if they were real titles.
+// "(pending confirmation)" marks a role the source documents don't name; we show
+// the plain role once and let callers add a single small "TBC" tag with a tooltip.
+const QUAL = /\s*\((?:pending confirmation|internal alignment|downstream|technical|KYC desk|orientation)\)/gi;
+export const cleanLabel = (s) => String(s ?? "").replace(QUAL, "").trim();
+export const isTbc = (s) => /pending confirmation/i.test(s || "");
+
+// Initials avatar. Unknown person shows an en dash.
+export function avatar(name, cls = "") {
+  const ini = cleanLabel(name).split(/\s+/).map((w) => w[0]).filter(Boolean).join("").slice(0, 2).toUpperCase() || "–";
+  return html`<span class="avatar ${cls}" aria-hidden="true">${ini}</span>`;
+}
+
+// 9-stage engine → 5 user-facing work areas (same map as the case workspace).
+const AREAS = [
+  { n: 1, label: "Create Franchise", stages: [1, 2] },
+  { n: 2, label: "Prepare Quotation", stages: [3] },
+  { n: 3, label: "Finalize Offer", stages: [4] },
+  { n: 4, label: "Set Up Account", stages: [5, 6, 7] },
+  { n: 5, label: "Activate & Handover", stages: [8, 9] },
+];
+export const AREA_TOTAL = AREAS.length;
+export const area = (stage) => AREAS.find((a) => a.stages.includes(stage)) || AREAS[0];
+
+// The six honest case statuses. The owner lives in its own column, never inside
+// the status. "Your turn" / "Returned" are relative to the viewer (derived from
+// their own open tasks on this case); the rest describe the case itself.
+export function caseStatus(c) {
+  if (c.caseStatus === "Closed Lost" || c.caseStatus === "Routed to IFG") return { label: "Closed", tone: "closed" };
+  if (c.activationStatus === "Handover Complete") return { label: "Done", tone: "success" };
+  const mine = c.myTasks || [];
+  if (mine.some((t) => t.kind === "returned")) return { label: "Returned", tone: "danger" };
+  if (c.status === "Draft") return { label: "Draft", tone: "neutral" };
+  if (mine.length) return { label: "Your turn", tone: "info" };
+  return { label: "Waiting", tone: "warning" };
+}
+export function statusPill(c) { const s = caseStatus(c); return html`<span class="pill ${s.tone}">${s.label}</span>`; }
+
+// Small outline flags beside a company name — never a status pill.
+export const flags = (c) => html`${c.vip ? html`<span class="badge">VIP</span>` : ""}${c.jumbo ? html`<span class="badge">Jumbo</span>` : ""}${c.signedUnpaid ? html`<span class="badge warn">Signed · Unpaid</span>` : ""}`;
+
+// Owner of the next step: avatar + one line. Client-waiting reads "Client".
+export function ownerCell(c) {
+  const t = c.next;
+  if (!t) return html`<span class="tiny">—</span>`;
+  if (t.waiting === "client") return html`<span class="row tight">${avatar("Client", "sm")}<span>Client</span></span>`;
+  const name = cleanLabel(t.assigneeName || t.roleLabel);
+  return html`<span class="row tight">${avatar(name, "sm")}<span class="truncate">${name}</span></span>`;
+}
+
+// Relative due: words in lists; danger TEXT only when overdue (never a red fill).
+export function relDue(d) {
+  if (!d) return html`<span class="tiny">No date</span>`;
+  const n = daysUntil(d);
+  if (n < 0) return html`<span class="due overdue" title="${fmtDate(d)}">${plural(-n, "day")} overdue</span>`;
+  if (n === 0) return html`<span class="due soon">Today</span>`;
+  if (n === 1) return html`<span class="due soon">Tomorrow</span>`;
+  if (n <= 7) return html`<span class="due">In ${plural(n, "day")}</span>`;
+  return html`<span class="due" title="${fmtDate(d)}">${fmtDate(d)}</span>`;
+}
+
+// One empty state, used everywhere.
+export const emptyState = ({ icon: ic = "inbox", title, body, action } = {}) =>
+  html`<div class="empty">${icon(ic, 28)}<b>${title}</b>${body ? html`<p>${body}</p>` : ""}${action || ""}</div>`;
 
 // ---------------------------------------------------------------- status pills
 const TONES = [
@@ -284,21 +362,21 @@ export function mountProviders(root) {
 export function docRow(d, { canReview = false } = {}) {
   return html`<li><div><a href="${docUrl(d.id)}" download>${icon("file", 14)} ${d.filename}</a>
       <span class="tiny"> · v${d.version} · ${d.uploaderName} · ${fmtDateTime(d.uploadedAt)}${d.expiry ? ` · expires ${fmtDate(d.expiry)}` : ""}${d.sensitive ? " · Sensitive (Data Privacy Act)" : ""}</span>
-      ${d.correctionReason ? html`<div class="tiny" style="color:var(--red)">Correction needed: ${d.correctionReason}</div>` : ""}</div>
+      ${d.correctionReason ? html`<div class="tiny" style="color:var(--danger)">Correction needed: ${d.correctionReason}</div>` : ""}</div>
     <div class="row tight">${pill(d.validation)}${canReview && !d.generated && d.validation === "Pending review" ? html`<button class="btn sm" data-review="${d.id}">Review</button>` : ""}</div></li>`;
 }
 export function docSlot({ label, slot, docs, linkedType, linkedId, caseId, canUpload, required, src, hint }) {
   const mine = docs.filter((d) => d.slot === slot && d.linked?.id === linkedId && !d.supersededBy);
   const hist = docs.filter((d) => d.slot === slot && d.linked?.id === linkedId && d.supersededBy);
   return html`<div class="slot" data-field="docs.${slot}">
-    <div class="row between"><div><b>${label}</b> ${required ? html`<span class="req" style="color:var(--red)">* required</span>` : ""} ${srcTag(src)}
+    <div class="row between"><div><b>${label}</b> ${required ? html`<span class="req" aria-label="required">*</span>` : ""} ${srcTag(src)}
       ${hint ? html`<div class="tiny">${hint}</div>` : ""}</div>
       ${canUpload ? html`<div class="row tight">
         <button type="button" class="btn sm" data-upload="${slot}" data-linked-type="${linkedType}" data-linked-id="${linkedId}" data-case="${caseId || ""}" data-label="${label}">${icon("upload", 14)} ${mine.length ? "Upload new version" : "Upload"}</button>
         ${DEMO_BYPASS ? html`<button type="button" class="btn sm ghost" data-sample="${slot}" data-linked-type="${linkedType}" data-linked-id="${linkedId}" data-case="${caseId || ""}" data-label="${label}" title="Attach a generated demo file">Use sample</button>` : ""}
       </div>` : ""}</div>
     ${mine.length ? html`<ul class="doclist">${mine.map((d) => docRow(d, { canReview: ["amt", "aat", "accusa", "legal", "mda", "bc"].includes(state.me.role) }))}</ul>` : html`<div class="tiny mt">No file uploaded.</div>`}
-    ${hist.length ? html`<details class="tiny"><summary>${hist.length} earlier version(s)</summary><ul class="doclist">${hist.map((d) => docRow(d))}</ul></details>` : ""}
+    ${hist.length ? html`<details class="tiny"><summary>${plural(hist.length, "earlier version")}</summary><ul class="doclist">${hist.map((d) => docRow(d))}</ul></details>` : ""}
   </div>`;
 }
 export function wireUploads(root, onDone) {
@@ -435,7 +513,8 @@ export function stageBar(stage, closed) {
 
 export function ownerText(t) {
   if (!t) return "";
-  return t.assigneeName ? `${t.assigneeName} (${t.roleLabel})` : `${t.roleLabel} team`;
+  const role = cleanLabel(t.roleLabel);
+  return t.assigneeName ? `${cleanLabel(t.assigneeName)} (${role})` : `${role} team`;
 }
 
 export function gateList(items) {

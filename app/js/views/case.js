@@ -418,7 +418,7 @@ export function documentsDrawer(ctx) {
       <label class="check tiny"><input type="checkbox" id="old" ${showOld ? "checked" : ""}> Show superseded versions</label></div>
     <div class="tbl-wrap"><table class="tbl compact"><caption class="sr-only">Case documents</caption><thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Linked record</th><th scope="col">Ver.</th><th scope="col">Uploaded</th><th scope="col">Status</th></tr></thead><tbody>
     ${docs.filter((d) => (!f || d.docType === f) && (showOld || !d.supersededBy)).sort((a, b) => (a.uploadedAt < b.uploadedAt ? 1 : -1)).map((d) => html`<tr>
-      <td><a href="/api/documents/${d.id}/download">${d.filename}</a>${d.supersededBy ? html`<span class="sub">Superseded by ${d.supersededBy}</span>` : ""}${d.correctionReason ? html`<span class="sub" style="color:var(--red)">${d.correctionReason}</span>` : ""}${d.expiry ? html`<span class="sub">Expires ${fmtDate(d.expiry)}</span>` : ""}</td>
+      <td><a href="/api/documents/${d.id}/download">${d.filename}</a>${d.supersededBy ? html`<span class="sub">Superseded by ${d.supersededBy}</span>` : ""}${d.correctionReason ? html`<span class="sub" style="color:var(--danger)">${d.correctionReason}</span>` : ""}${d.expiry ? html`<span class="sub">Expires ${fmtDate(d.expiry)}</span>` : ""}</td>
       <td>${d.docType}</td><td class="mono">${d.linked?.type} ${d.linked?.id}</td><td>${d.version}</td><td>${d.uploaderName}<span class="sub">${fmtDateTime(d.uploadedAt)}</span></td><td>${pill(d.validation)}</td></tr>`)}
     </tbody></table></div>`;
   drawer("Documents", render("", false), (d) => {

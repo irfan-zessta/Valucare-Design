@@ -82,7 +82,7 @@ function tor(ctx) {
   body.innerHTML = html`<section class="panel"><div class="ph"><div><h2>Structured TOR (${(t.lines || []).length} benefit lines)</h2><div class="tiny">OCR import of TOR PDFs is optional (C priority) and not built; use structured entry or the CSV/Excel template.</div></div>
       <div class="row">${can ? html`<a class="btn sm" href="/api/templates/tor.csv" download>${icon("download", 14)} Template</a><button class="btn sm" id="imp">${icon("upload", 14)} Import CSV/Excel</button><button class="btn sm" id="add">${icon("plus", 14)} Add line</button>${DEMO_BYPASS ? html`<button class="btn sm ghost" id="fillSampleTor" type="button" title="Add a filled sample benefit line">Fill sample</button>` : ""}` : ""}<span id="st"></span></div></div>
     <div class="pb flush" id="lines"></div>
-    <div class="pb" style="border-top:1px solid var(--border-2)">${docSlot({ label: "Original TOR document", slot: "tor_original", docs: data.documents, linkedType: "tor", linkedId: t.id, caseId: id, canUpload: can })}</div></section>`.s;
+    <div class="pb" style="border-top:1px solid var(--border)">${docSlot({ label: "Original TOR document", slot: "tor_original", docs: data.documents, linkedType: "tor", linkedId: t.id, caseId: id, canUpload: can })}</div></section>`.s;
   wireUploads(body, () => ctx.reload());
   let form = null;
   if (can) {

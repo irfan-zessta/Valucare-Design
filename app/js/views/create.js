@@ -143,7 +143,7 @@ export async function render(main) {
     body.innerHTML = html`<form class="panel" data-form id="lf" novalidate><div class="ph"><h2>Lead details</h2><button type="button" class="btn ghost sm" id="back">‹ Back</button></div><div class="pb">
       <div class="note"><b>${co.registeredName}</b> · ${s.company ? html`Existing company record ${s.company.id} - the case will be linked to it.` : html`New company${s.override ? " (separate-company override recorded)" : ""}. A company record will be created with the case.`}
         <div class="tiny">No account number is generated at lead creation; it is issued by AMT after the contract and pricing gates.</div></div>
-      <fieldset class="mt" style="border:0;padding:0"><legend class="lbl" style="font-weight:600;font-size:12.5px;color:var(--text-2)">Business source <span class="req">*</span> <span class="tag legacy">HMS3</span></legend>
+      <fieldset class="mt" style="border:0;padding:0"><legend class="lbl" style="font-weight:600;font-size:12.5px;color:var(--text-muted)">Business source <span class="req">*</span> <span class="tag legacy">HMS3</span></legend>
         <div class="row">${["Direct", "Agent", "Broker"].map((c) => html`<label class="check"><input type="radio" name="channel" value="${c}" ${L.channel === c ? "checked" : ""}> ${c}</label>`)}</div></fieldset>
       <div class="fgrid mt">
         <div id="interBox" class="${L.channel && L.channel !== "Direct" ? "" : "hidden"}">${field({ key: "intermediaryId", label: "Agent / broker (AOR/BOR)", type: "intermediary", required: true, src: "legacy", help: "Only Active intermediaries with a verified agreement." }, L.intermediaryId, { values: { businessSource: L.channel } })}</div>

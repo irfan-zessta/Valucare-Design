@@ -1,5 +1,5 @@
-import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, toast, announce } from "./core.js";
-import { icon } from "./components.js";
+import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, confirmDialog, toast, announce, DEMO_BYPASS } from "./core.js";
+import { icon, avatar, cleanLabel, fillSampleData } from "./components.js";
 
 const root = document.getElementById("root");
 let lastHash = location.hash;
@@ -13,126 +13,84 @@ async function boot() {
   route();
 }
 
-// ---------------------------------------------------------------- sign-in
-// Demo flows, grouped by business (Corporate / IFG) and department. A flow with
-// a `user` signs in as that team's demo user and lands on their real work;
-// flows without one are part of HMS3 but not built in this prototype, so they
-// are shown for context but are not clickable (honest, no dead ends).
-const FLOWS = [
-  { key: "corporate", label: "Corporate", depts: [
-    { name: "Sales", items: [
-      { label: "New Business", user: "u-am1", href: "#/new-business", start: true },
-      { label: "Renewal Business" },
-    ] },
-    { name: "Actuarial", full: "ACCUSA", items: [
-      { label: "New Business", user: "u-ac1", href: "#/actuarial" },
-      { label: "Renewal Business" },
-    ] },
-    { name: "MDA", full: "Members Data Administration", items: [
-      { label: "New Closed Account" },
-      { label: "Additional or New Member" },
-      { label: "Renewal Member" },
-      { label: "Amendment Request" },
-      { label: "Lost Card Request" },
-      { label: "Cancellation Request" },
-      { label: "Reactivation and Reapplication" },
-    ] },
-    { name: "Billing", full: "Billing and Collection", items: [
-      { label: "Billing queue", user: "u-bc1", href: "#/tasks" },
-    ] },
-    { name: "Claims", items: [{ label: "Claims" }] },
-    { name: "CCD", full: "Customer Care", items: [
-      { label: "Customer Care queue", user: "u-cc1", href: "#/tasks" },
-    ] },
-    { name: "Accounting", items: [{ label: "Accounting" }] },
-  ] },
-  { key: "ifg", label: "IFG", note: "Individual / Family Group business runs in a separate application and is outside this build. Corporate leads below the minimum are routed to IFG from within a New Business case." },
+// ---------------------------------------------------------------- sign in
+// A quiet centered card. Each row signs in as that team's demo user and opens
+// their work. No passwords, no dead-end tiles, no production disclaimers — the
+// Demo panel makes clear this is a mock.
+const SIGNIN = [
+  { user: "u-am1", role: "Sales", desc: "Create and move New Business cases" },
+  { user: "u-ac1", role: "Actuarial", desc: "Price quotations and release rates" },
+  { user: "u-bc1", role: "Billing", desc: "Billing and collection" },
+  { user: "u-cc1", role: "Customer Care", desc: "Downstream account care" },
 ];
 
 function renderLogin(reason) {
-  document.title = "Choose a demo flow · HMS3 Corporate New Business";
-  root.innerHTML = html`<div class="login"><div class="card wide" role="main" id="main">
-    <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3 · Corporate New Business<small>Choose a demo flow</small></span></div>
-    <h1 style="font-size:20px;margin-top:8px">Choose a demo flow</h1>
-    <p class="muted mt">Pick a department flow to sign in as that team's demo user and open their real work. Flows marked <b>Not in this build</b> are part of HMS3 but outside this Corporate New Business prototype. You can switch user any time from the top bar. Production sign-in would use SSO/MFA (NFR-01); there are no passwords here.</p>
-    <p class="note info mt">New here? Start with <b>Sales › New Business</b> below — then just follow the on-screen <b>Guide</b>, which walks you through the whole flow.</p>
+  document.title = "Sign in · HMS3 Corporate New Business";
+  root.innerHTML = html`<div class="login"><div class="card" role="main" id="main">
+    <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Corporate New Business</small></span></div>
+    <h1>Sign in to HMS3</h1>
+    <p class="muted">Choose a role to start.</p>
     ${reason ? html`<div class="note warn mt">${reason}</div>` : ""}
-    <div class="flowpick">${FLOWS.map((cat) => html`<section class="flow-cat" aria-label="${cat.label}">
-      <h2>${cat.label}</h2>
-      ${cat.note ? html`<p class="flow-note">${icon("lock", 13)} ${cat.note}</p>` : ""}
-      ${(cat.depts || []).map((d) => html`<div class="flow-dept">
-        <div class="dept-h">${d.name}${d.full ? html`<small>${d.full}</small>` : ""}</div>
-        <div class="dept-items">${d.items.map((it) => it.user
-          ? html`<button type="button" class="flow-item ${it.start ? "start" : ""}" data-flow data-user="${it.user}" data-href="${it.href}">${it.label}${it.start ? html`<span class="tag start-tag">Start here</span>` : ""}</button>`
-          : html`<span class="flow-item na" role="note" aria-label="${it.label}, not in this build" title="Not in this build">${it.label}<span class="tag">Not in this build</span></span>`)}</div>
-      </div>`)}
-    </section>`)}</div>
+    <div class="rolelist">${SIGNIN.map((r) => html`<button type="button" data-user="${r.user}">
+      <span class="avatar" aria-hidden="true">${r.role.split(" ").map((w) => w[0]).join("").slice(0, 2)}</span>
+      <span class="grow"><b>${r.role}</b><span>${r.desc}</span></span>${icon("arrowr")}</button>`)}</div>
   </div></div>`.s;
-  root.querySelectorAll("[data-flow]").forEach((b) => (b.onclick = async () => {
+  root.querySelectorAll("[data-user]").forEach((b) => (b.onclick = async () => {
     await api("login", { method: "POST", body: { userId: b.dataset.user } });
     state.me = (await api("me")).user;
-    location.hash = b.dataset.href || "#/new-business";
+    if (!location.hash || location.hash === "#/") location.hash = "#/new-business";
     renderShell();
     route();
   }));
-  root.querySelector("[data-flow]")?.focus();
+  root.querySelector("[data-user]")?.focus();
 }
 
 // ---------------------------------------------------------------- shell
-// A small, honest sidebar: the three places work actually lives. "New Business"
-// is the hub (every case), "My Tasks" is the current user's queue (the count badge
-// shows how many need action), and "Tools & Reports" collects reporting and the
-// shared utilities. The prominent "Create New Business" action sits above them.
-const NAV_PRIMARY = [
-  { key: "nb-list", label: "New Business", icon: "grid", href: "#/new-business" },
-  { key: "tasks", label: "My Tasks", icon: "check", href: "#/tasks", count: true },
-  { key: "tools", label: "Tools & Reports", icon: "chart", href: "#/reports" },
+// Five places work lives. Inbox is the current user's queue (a badge appears only
+// when something needs action); Cases is every case; then Reports, Directory and
+// Settings. Creating a case is a quiet full-width action above the list.
+const NAV = [
+  { key: "inbox", label: "Inbox", icon: "inbox", href: "#/tasks", count: true },
+  { key: "cases", label: "Cases", icon: "folder", href: "#/new-business" },
+  { key: "reports", label: "Reports", icon: "chart", href: "#/reports" },
+  { key: "directory", label: "Directory", icon: "users", href: "#/more" },
 ];
-const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 tasks">0</span>` : html`<span></span>`}</a>`;
-
-// Primary nav for the current user. The Actuarial quotation journey is a dedicated
-// surface for the pricing roles, so it leads their nav; everyone else gets the
-// standard three. Visibility only — the server still enforces every action.
-function navFor(me) {
-  const items = [...NAV_PRIMARY];
-  if (me.role === "accusa" || me.role === "approver")
-    items.unshift({ key: "actuarial", label: "Actuarial Quotation", icon: "briefcase", href: "#/actuarial" });
-  return items;
-}
+const NAV_SETTINGS = { key: "settings", label: "Settings", icon: "settings", href: "#/settings" };
+const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon, 18)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 items">0</span>` : html`<span></span>`}</a>`;
 
 // Which primary item is active for the current route.
 function activeInfo(parts) {
   const p = parts[0];
-  if (p === "actuarial") return { top: "actuarial" };
-  if (p === "new-business" || p === "case") return { top: "nb-list" };
-  if (p === "tasks") return { top: "tasks" };
-  if (p === "reports" || p === "more" || p === "accounts") return { top: "tools" };
+  if (p === "tasks") return { top: "inbox" };
+  if (p === "new-business" || p === "case" || p === "actuarial") return { top: "cases" };
+  if (p === "reports") return { top: "reports" };
+  if (p === "more" || p === "accounts") return { top: "directory" };
+  if (p === "settings") return { top: "settings" };
   return {};
 }
 
 function renderShell() {
   const collapsed = prefs.get("navCollapsed", false);
   const me = state.me;
+  const initials = cleanLabel(me.name).split(" ").map((x) => x[0]).join("").slice(0, 2);
   root.innerHTML = html`<div class="app ${collapsed ? "collapsed" : ""}" id="app">
     <nav class="sidebar" aria-label="Main navigation" id="sidebar">
-      <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3 New Business<small>Corporate · Commercial</small></span></div>
-      ${me.role === "aat" ? html`<a class="btn primary create-btn" href="#/new-business/create" title="Create New Business">${icon("plus")}<span class="lbl">Create New Business</span></a>` : ""}
-      <div class="nav">
-        ${navFor(me).map(navLink)}
-      </div>
+      <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Corporate New Business</small></span></div>
+      ${me.role === "aat" ? html`<a class="btn create-btn" href="#/new-business/create" title="New case">${icon("plus")}<span class="lbl">New case</span></a>` : ""}
+      <div class="nav">${NAV.map(navLink)}</div>
       <div class="spacer"></div>
-      <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse")}<span class="lbl">${collapsed ? "Expand" : "Collapse sidebar"}</span><span></span></button></div>
+      <div class="nav">${navLink(NAV_SETTINGS)}</div>
+      <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse", 18)}<span class="lbl">Collapse</span><span></span></button></div>
     </nav>
     <div class="scrim" id="scrim"></div>
     <div class="content">
       <header class="topbar">
         <button type="button" class="btn ghost menu-btn" id="menuBtn" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">${icon("menu")}</button>
-        <form class="qsearch" role="search" id="qsearch"><label class="sr-only" for="qs">Find a company or reference</label>${icon("search", 16)}
-          <input id="qs" type="search" placeholder="Find company, case, franchise or account code…" autocomplete="off"></form>
-        <button type="button" class="btn ghost sm guide-btn" id="guideBtn" title="How to test this demo">${icon("help", 16)}<span class="lbl-sm">Guide</span></button>
-        <span class="demo-tag" title="Fictional demo data; integrations are simulated">DEMO</span>
-        <button type="button" class="whoami" id="whoBtn" aria-haspopup="dialog" aria-label="Signed in as ${me.name}, ${roleLabel(me.role)}. Switch demo user"><span class="avatar" aria-hidden="true">${me.name.split(" ").map((x) => x[0]).join("").slice(0, 2)}</span>
-          <span class="w"><b>${me.name}</b><span>${roleLabel(me.role)}</span></span>${icon("chevd", 14)}</button>
+        <form class="qsearch" role="search" id="qsearch"><label class="sr-only" for="qs">Search</label>${icon("search", 16)}
+          <input id="qs" type="search" placeholder="Search companies and cases" autocomplete="off"><kbd>⌘K</kbd></form>
+        <button type="button" class="iconbtn" id="bellBtn" title="Notifications" aria-label="Notifications"><span class="dot" id="bellDot" hidden></span>${icon("bell", 18)}</button>
+        <button type="button" class="whoami" id="whoBtn" aria-haspopup="dialog" aria-label="Signed in as ${cleanLabel(me.name)}, ${cleanLabel(roleLabel(me.role))}. Open account menu"><span class="avatar" aria-hidden="true">${initials}</span>
+          <span class="w"><b>${cleanLabel(me.name)}</b><span>${cleanLabel(roleLabel(me.role))}</span></span>${icon("chevd", 14)}</button>
       </header>
       <main id="main" tabindex="-1"></main>
     </div></div>`.s;
@@ -146,10 +104,53 @@ function renderShell() {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && app.classList.contains("drawer-open")) { closeDrawer(); menuBtn.focus(); } });
   document.getElementById("qsearch").onsubmit = (e) => { e.preventDefault(); const q = document.getElementById("qs").value.trim(); go(`#/new-business?q=${encodeURIComponent(q)}&view=all`); };
   document.getElementById("whoBtn").onclick = (e) => userMenu(e.currentTarget);
-  document.getElementById("guideBtn").onclick = () => guideDialog();
-  if (state.suggestedUser?.id && state.suggestedUser.id !== me.id) document.getElementById("whoBtn").classList.add("blink-switch");
+  document.getElementById("bellBtn").onclick = () => go("#/tasks");
+  renderDemoPanel();
   refreshCounts();
-  maybeShowGuide();
+}
+
+// ---------------------------------------------------------------- demo panel
+// All demo-only controls live here, out of the product chrome: who you are acting
+// as, a quick switch, fill the current form, the walkthrough, and reset. Hidden
+// entirely when the demo bypass is off.
+function renderDemoPanel() {
+  document.getElementById("demoPanel")?.remove();
+  if (!DEMO_BYPASS) return;
+  const me = state.me;
+  const collapsed = prefs.get("demoCollapsed", false);
+  const el = document.createElement("div");
+  el.id = "demoPanel";
+  el.className = `demo-panel ${collapsed ? "collapsed" : ""}`;
+  el.innerHTML = html`
+    <div class="dp-head" id="dpHead" role="button" tabindex="0" aria-expanded="${!collapsed}">
+      <b>Demo</b><span class="row tight"><span class="tiny">${cleanLabel(me.name)}</span>${icon(collapsed ? "expand" : "collapse", 14)}</span></div>
+    <div class="dp-body">
+      <div class="dp-who">${avatar(me.name)}<div class="tiny">Acting as <b>${cleanLabel(me.name)}</b><br>${cleanLabel(roleLabel(me.role))}</div></div>
+      <div class="dp-actions">
+        <button class="btn sm" data-dp="act">${icon("user", 15)} Act as…</button>
+        <button class="btn sm" data-dp="fill">${icon("check", 15)} Fill this form</button>
+        <button class="btn sm" data-dp="guide">${icon("help", 15)} Show guide</button>
+        <button class="btn sm danger-ghost" data-dp="reset">${icon("history", 15)} Reset demo data</button>
+      </div>
+    </div>`.s;
+  document.body.appendChild(el);
+  const toggle = () => { prefs.set("demoCollapsed", !el.classList.contains("collapsed")); renderDemoPanel(); };
+  const head = el.querySelector("#dpHead");
+  head.onclick = toggle;
+  head.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } };
+  el.querySelector('[data-dp="act"]').onclick = () => userMenu(document.getElementById("whoBtn"));
+  el.querySelector('[data-dp="fill"]').onclick = () => {
+    const form = document.querySelector("#main [data-form], #main form");
+    if (form) fillSampleData(form); else toast("No form to fill on this page.", "info");
+  };
+  el.querySelector('[data-dp="guide"]').onclick = () => guideDialog();
+  el.querySelector('[data-dp="reset"]').onclick = async () => {
+    if (!(await confirmDialog("Reset demo data?", "This restores the sample companies and cases to their starting state.", { confirm: "Reset", kind: "danger" }))) return;
+    await api("demo/reset", { method: "POST" });
+    toast("Demo data reset.", "ok");
+    go("#/new-business");
+    route(true);
+  };
 }
 
 // Perform the real server-side session switch for the demo, then re-render.
@@ -168,15 +169,16 @@ export async function switchUser(userId) {
 
 async function userMenu(btn) {
   const sug = state.suggestedUser;
+  const me = state.me;
   const r = await dialog({
-    title: "Switch demo user",
-    body: html`<p class="muted">You are <b>${state.me.name}</b> (${roleLabel(state.me.role)}). Switching user keeps your place; unsaved changes are saved first.</p>
-      ${sug && sug.id && sug.id !== state.me.id ? html`<p class="note info mt">Next step needs <b>${sug.name}</b> (${roleLabel(sug.role)}). It's pre-selected below.</p>` : ""}
-      <div class="field mt"><label for="sw">Sign in as</label><select id="sw" name="user" class="inp">${state.meta.users.map((u) => {
-        const pick = sug && sug.id ? u.id === sug.id : u.id === state.me.id;
-        return html`<option value="${u.id}" ${pick ? "selected" : ""}>${sug && u.id === sug.id ? "➜ " : ""}${u.name} - ${roleLabel(u.role)}${u.team ? " (" + u.team + ")" : ""}${sug && u.id === sug.id ? " — suggested next" : ""}</option>`;
+    title: "Account",
+    body: html`<p class="muted">Signed in as <b>${cleanLabel(me.name)}</b> (${cleanLabel(roleLabel(me.role))}). Switching keeps your place; unsaved changes are saved first.</p>
+      ${sug && sug.id && sug.id !== me.id ? html`<p class="note info mt">The next step needs <b>${cleanLabel(sug.name)}</b>. They are selected below.</p>` : ""}
+      <div class="field mt"><label for="sw">Act as</label><select id="sw" name="user" class="inp">${state.meta.users.map((u) => {
+        const pick = sug && sug.id ? u.id === sug.id : u.id === me.id;
+        return html`<option value="${u.id}" ${pick ? "selected" : ""}>${cleanLabel(u.name)} · ${cleanLabel(roleLabel(u.role))}</option>`;
       })}</select></div>`,
-    actions: [{ label: "Sign out", value: "out" }, { label: "Cancel" }, { label: "Switch user", kind: "primary", value: "ok" }],
+    actions: [{ label: "Sign out", value: "out" }, { label: "Cancel" }, { label: "Switch", kind: "primary", value: "ok" }],
   });
   if (!r || (r.action !== "ok" && r.action !== "out")) return;
   if (r.action === "out") { if (!(await flushForms())) return; await api("logout", { method: "POST" }); state.me = null; return renderLogin(); }
@@ -190,36 +192,34 @@ async function userMenu(btn) {
 // per browser) and reopenable any time from the top-bar "Guide" button.
 export async function guideDialog() {
   const r = await dialog({
-    title: "How to test this demo",
+    title: "How this demo works",
     wide: true,
-    body: html`<p class="muted">This is a mock of HMS3 Corporate <b>New Business</b> — one case travelling from first lead all the way to an active, handed-over account. One person can walk the whole journey by playing each role in turn. Here's the loop:</p>
+    body: html`<p class="muted">One Corporate New Business case travels from first lead to an active, handed-over account. Walk the whole journey by acting as each team in turn.</p>
       <ol class="guide-steps mt">
-        <li><b>Open a case.</b> The <b>New Business</b> list (left) has every case, or hit <b>Create New Business</b> to start a fresh one from scratch.</li>
-        <li><b>Follow the “Next action” card.</b> At the top of each case it always says what happens next and who owns that step.</li>
-        <li><b>Switch to whoever owns it.</b> When the next step belongs to someone else, click <b>Switch to …</b> right on that card — you become that person and land straight on their task. (The user button, top-right, also blinks when a switch is due.)</li>
-        <li><b>Fill forms fast.</b> Every form has a <b>Fill sample data</b> button — use it, then Save or Submit to move the case forward.</li>
-        <li><b>Repeat to the end.</b> Keep following the card until the account is set up and handed over. That's the full flow, start to finish.</li>
+        <li><b>Open a case</b> from Cases, or start a fresh one with New case.</li>
+        <li><b>Follow the next action.</b> Each case shows what happens next and who owns it.</li>
+        <li><b>Act as the owner.</b> When the next step belongs to another team, use Act as in the Demo panel to become that person.</li>
+        <li><b>Fill forms fast</b> with Fill this form, then save or submit to move the case on.</li>
+        <li><b>Repeat</b> until the account is set up and handed over.</li>
       </ol>
-      <p class="note info mt">You can change user any time from the top-right. Nothing here is real — all companies, people and numbers are fictional demo data, and approvals/mandatory fields are relaxed so you never get stuck.</p>`,
+      <p class="note info mt">${icon("help", 16)} Everything here is fictional demo data. Approvals and mandatory fields are relaxed so you never get stuck.</p>`,
     actions: [
-      { label: "Browse existing cases", value: "browse" },
+      { label: "Browse cases", value: "browse" },
       { label: "Create a case", value: "create", kind: "primary" },
     ],
   });
   if (r?.action === "create") go("#/new-business/create");
   else if (r?.action === "browse") go("#/new-business");
 }
-function maybeShowGuide() {
-  if (prefs.get("guideSeen", false)) return;
-  prefs.set("guideSeen", true);
-  guideDialog();
-}
 
 export async function refreshCounts() {
   try {
     const t = await api("tasks");
+    const n = t.items.length;
     const el = document.getElementById("taskCount");
-    if (el) { el.textContent = t.items.length; el.classList.toggle("zero", !t.items.length); el.setAttribute("aria-label", `${t.items.length} tasks need your action`); }
+    if (el) { el.textContent = n; el.classList.toggle("zero", !n); el.setAttribute("aria-label", `${n} items need your action`); }
+    const dot = document.getElementById("bellDot");
+    if (dot) dot.hidden = !n;
   } catch (e) { /* counts are non-critical */ }
 }
 window.addEventListener("hms:changed", refreshCounts);
@@ -235,7 +235,16 @@ const VIEWS = {
   more: () => import("./views/more.js"),
   case: () => import("./views/case.js"),
   actuarial: () => import("./views/actuarial.js"),
+  settings: () => import("./views/settings.js"),
 };
+
+// ⌘K / Ctrl-K focuses the global search from anywhere.
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+    const qs = document.getElementById("qs");
+    if (qs) { e.preventDefault(); qs.focus(); qs.select(); }
+  }
+});
 
 let renderSeq = 0;
 async function route(force = false) {

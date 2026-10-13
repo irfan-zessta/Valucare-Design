@@ -49,7 +49,7 @@ export async function render(main, { parts }) {
     const rowHtml = (r) => html`<tr>${cols.map((c, i) => html`<td class="${["cases", "headcount", "premium", "daysLeft", "openTasks"].includes(c) ? "num" : ""}">${i === 0 && r.caseId ? html`<a href="#/case/${r.caseId}/overview">${fmt(c, r[c])}</a>` : fmt(c, r[c])}</td>`)}</tr>`;
     if (group) {
       const keys = [...new Set(d.rows.map((r) => r[group]))].sort();
-      body = keys.map((k) => html`<tr><th colspan="${cols.length}" scope="rowgroup" style="background:var(--surface-2)">${LABELS[group]}: ${k} (${d.rows.filter((r) => r[group] === k).length})</th></tr>${d.rows.filter((r) => r[group] === k).map(rowHtml)}`);
+      body = keys.map((k) => html`<tr><th colspan="${cols.length}" scope="rowgroup" style="background:var(--surface-muted)">${LABELS[group]}: ${k} (${d.rows.filter((r) => r[group] === k).length})</th></tr>${d.rows.filter((r) => r[group] === k).map(rowHtml)}`);
     } else body = d.rows.map(rowHtml);
     main.innerHTML = html`<div class="page-head"><div><a href="#/reports" class="tiny">‹ All reports</a><h1>${d.title}</h1><p>${meta?.desc || ""} Generated ${new Date().toLocaleString("en-PH")}.</p></div>
       <div class="row">${d.groupBy ? html`<label for="grp" class="tiny">Group by</label><select id="grp" class="inp" style="width:auto"><option value="">No grouping</option>${d.groupBy.map((g) => html`<option value="${g}" ${group === g ? "selected" : ""}>${LABELS[g]}</option>`)}</select>` : ""}

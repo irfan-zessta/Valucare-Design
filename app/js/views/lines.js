@@ -27,7 +27,7 @@ export function linesTable({ lines, editable, kind = "sob", comparison = null, p
       ${comparison ? html`<td>${flags.map((f) => html`<span class="cmp-flag ${f.split(" ")[0]}">${f}</span> `)}</td>` : ""}
       <td><button type="button" class="btn ghost sm" data-toggle="${det}" aria-expanded="false" aria-controls="${det}">Details</button></td>
       ${editable ? html`<td><button type="button" class="btn ghost sm" data-rm="${i}" aria-label="Remove line ${i + 1}">${icon("x", 14)}</button></td>` : ""}</tr>
-      <tr id="${det}" hidden><td colspan="${comparison ? 9 : 8}" style="background:var(--surface-2)"><div class="fgrid">
+      <tr id="${det}" hidden><td colspan="${comparison ? 9 : 8}" style="background:var(--surface-muted)"><div class="fgrid">
         ${txt(l, i, "limitDescription", "Benefit limit description", editable)}
         ${txt(l, i, "waitingPeriod", "Waiting period", editable)}
         ${txt(l, i, "preExisting", "Pre-existing terms", editable)}

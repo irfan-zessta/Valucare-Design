@@ -210,7 +210,7 @@ function reviewPanel(fr, data) {
   const aor = (data.aor || []).find((a) => a.status === "Active");
   const n = Number(fr.otherInfo?.employeeCount) || 0;
   const min = state.meta.config.corporateMinPrincipals;
-  return html`<div class="pb" style="border-top:1px solid var(--border-2)"><h3 class="h">AMT checks</h3>
+  return html`<div class="pb" style="border-top:1px solid var(--border)"><h3 class="h">AMT checks</h3>
     <ul class="gate-list mt">
       <li><span class="${n >= min ? "ok" : "no"}">${n >= min ? "✓" : "●"}</span><div><b>Corporate principal minimum</b><div class="tiny">${n} principals (minimum ${min})</div></div><span></span></li>
       <li><span class="${fr.conflicts?.length ? "no" : "ok"}">${fr.conflicts?.length ? "●" : "✓"}</span><div><b>Duplicate / conflicting franchise</b>
