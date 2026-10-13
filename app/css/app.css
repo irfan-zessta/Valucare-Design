@@ -1,18 +1,20 @@
 /* HMS3 Corporate New Business - calm, dense, accessible. */
 :root{
   /* Enterprise palette: a light neutral canvas, white work surfaces, ONE restrained
-     deep-blue accent for primary / interactive / active states, and semantic green /
-     amber / red reserved for status only. Demo and simulated items use a muted slate so
-     they never read as a status colour. Neutrals stay the calm Apple-gray canvas. */
+     deep-red (crimson) accent for primary / interactive / active states, and semantic
+     green / amber / red reserved for status only. The accent crimson (#B21E3A) is kept
+     distinct from the semantic danger brick-red (#C0392B) so a primary action never
+     reads as an error. Demo and simulated items use a muted slate so they never read as
+     a status colour. Neutrals stay the calm Apple-gray canvas. */
   --bg:#F5F5F7; --surface:#FFFFFF; --surface-2:#FBFBFD; --border:#E4E4E9; --border-2:#EEEEF1;
   --text:#1D1D1F; --text-2:#6E6E73; --text-3:#8E8E93;
-  --blue:#2B4FC8; --blue-ink:#1E3A8A; --blue-soft:#EEF2FC; --blue-line:#CBD9F5;
+  --blue:#B21E3A; --blue-ink:#8A1530; --blue-soft:#FBEDF0; --blue-line:#F0CAD2;
   --green:#1E7A4D; --green-soft:#E7F4EC; --amber:#8A5A00; --amber-soft:#FBF0D9; --red:#C0392B; --red-soft:#FBEBE9;
   --violet:#5E6478; --violet-soft:#EDEEF3; --gray-soft:#ECECEF;
   /* interactive surfaces: form borders, keyboard focus, table hover */
-  --border-input:#D6D6DB; --border-input-hover:#BDBDC2; --border-input-focus:#9DB4E8;
-  --ring:0 0 0 3.5px rgba(43,79,200,.16); --focus-outline:rgba(43,79,200,.9);
-  --row-hover:#F7F9FD;
+  --border-input:#D6D6DB; --border-input-hover:#BDBDC2; --border-input-focus:#D98B9C;
+  --ring:0 0 0 3.5px rgba(178,30,58,.16); --focus-outline:rgba(178,30,58,.9);
+  --row-hover:#FDF7F8;
   /* spacing scale (4px base) — one rhythm for gaps, stacks and padding */
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-7:32px;
   /* radius scale */
@@ -362,7 +364,7 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 /* ---------- Apple-style polish ---------- */
 html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 body{letter-spacing:-.003em}
-::selection{background:rgba(43,79,200,.16)}
+::selection{background:rgba(178,30,58,.16)}
 /* thin, macOS-style overlay scrollbars */
 *{scrollbar-width:thin;scrollbar-color:rgba(60,60,67,.28) transparent}
 *::-webkit-scrollbar{width:11px;height:11px}
