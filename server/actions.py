@@ -954,7 +954,12 @@ def rs_issue(s, ctx, p):
     rs = s.store.insert("rateSheet", {"requestId": rr["id"], "code": f"{rr['code']}-v{v}", "version": v, "status": "Issued",
                                       "rows": imp["rows"], "assumptions": a, "sourceDocId": imp.get("docId"),
                                       "pdfDocId": p.get("pdfDocId"), "issuedBy": ctx.uid, "issuedByName": ctx.user["name"],
-                                      "issuedAt": ctx.now_iso(), "notes": p.get("notes", "")}, rr["caseId"], ctx, action="rateSheet.issue")
+                                      "issuedAt": ctx.now_iso(), "notes": p.get("notes", ""),
+                                      # Actuarial quotation lifecycle (additive, see quote.* actions). A freshly
+                                      # imported sheet is "Prepared"; it still needs 1st- and 2nd-level approval
+                                      # and an explicit release before it reaches Sales.
+                                      "quoteStatus": "Prepared", "approvals": [], "approvalLog": []},
+                     rr["caseId"], ctx, action="rateSheet.issue")
     _set(s, ctx, rr, {"status": "Rate Sheet Issued", "latestVersion": v}, "rateRequest.issued")
     c = s.store.get(rr["caseId"])
     notify(s.store, ctx, c["id"], "rateRequest.issued", [user_name(c["ownerId"])], f"Rate sheet v{v} issued for {rr['code']}")
@@ -962,6 +967,132 @@ def rs_issue(s, ctx, p):
     if prop and prop.get("status") not in ("Accepted", "Draft") and prop.get("rateSheetVersion") != v:
         _invalidate_proposal(s, ctx, prop, f"Rate sheet v{v} issued")
     return {"id": rs["id"], "version": v}
+
+
+# =========================================================== quotation approval & release
+# The documented Actuarial / ACCUSA sequence (source: Actuarial New Business process)
+# is: prepare quotation -> first-level approval -> second-level approval -> release the
+# quotation and marked SOB to Sales. The two approval FUNCTIONS are documented, but the
+# approving JOB TITLES are not confirmed by the business, so both levels route to the
+# pending-confirmation 'approver' role (see meta.pricingApprovalRoles) and every decision
+# is recorded as a demo simulation, never an assumed production right.
+#
+# These are additive: the existing rateSheet.issue behaviour (used by the AAT proposal
+# flow) is unchanged; it simply now stamps quoteStatus="Prepared" on the sheet. Legacy
+# sheets with no quoteStatus are treated as already "Released" everywhere.
+_QUOTE_PREPARE = ("Prepared", "Returned for Correction")
+
+
+def _quote_sheet(s, ctx, p):
+    rs = s.store.must(p["rateSheetId"], "rateSheet")
+    c = _case(s, ctx, rs["caseId"])
+    return rs, c
+
+
+def _check_quote_version(rs, reviewed):
+    # An approval must stay attached to the version that was actually reviewed. A
+    # re-import creates a brand-new rateSheet record, so within one sheet the version
+    # is stable; this guards against deciding on a stale copy of the open sheet.
+    if DEMO_SKIP_APPROVALS or reviewed is None:
+        return
+    if int(reviewed) != int(rs.get("version", 0)):
+        raise ApiError(409, "stale_review",
+                       f"The rate sheet changed since you opened it (you reviewed v{reviewed}, current is "
+                       f"v{rs.get('version')}). Reload and review the current version before deciding.", {"current": rs})
+
+
+@action("quote.submitReview", ["accusa"])
+def quote_submit(s, ctx, p):
+    rs, c = _quote_sheet(s, ctx, p)
+    qs = rs.get("quoteStatus", "Released")
+    if qs not in _QUOTE_PREPARE:
+        raise ApiError(409, "bad_state", f"This quotation is '{qs}' and cannot be submitted for review.")
+    # A fresh submission starts a new approval cycle; prior cycle decisions stay in the log.
+    _set(s, ctx, rs, {"quoteStatus": "Submitted for Review", "submittedReviewBy": ctx.uid,
+                      "submittedReviewByName": ctx.user["name"], "submittedReviewAt": ctx.now_iso(),
+                      "approvals": [], "returnNote": "", "returnedLevel": None},
+         "quote.submitReview", reason=p.get("note") or None)
+    notify(s.store, ctx, c["id"], "quote.submitted", ["First-level pricing approver (pending confirmation)"],
+           f"Quotation {rs['code']} submitted for first-level approval")
+    return {}
+
+
+@action("quote.decide", ["approver"])
+def quote_decide(s, ctx, p):
+    rs, c = _quote_sheet(s, ctx, p)
+    level = int(p.get("level") or 0)
+    if level not in (1, 2):
+        raise ApiError(400, "bad_request", "Approval level must be 1 or 2.")
+    qs = rs.get("quoteStatus", "Released")
+    need = "Submitted for Review" if level == 1 else "L1 Approved"
+    if qs != need:
+        raise ApiError(409, "bad_state", f"Level {level} review needs status '{need}', but the quotation is '{qs}'.")
+    _check_quote_version(rs, p.get("reviewedVersion"))
+    # Separation of duty: the 2nd-level approver must be a different person than the 1st.
+    if level == 2 and not DEMO_SKIP_APPROVALS:
+        l1 = next((a for a in rs.get("approvals", []) if a.get("level") == 1 and a.get("decision") == "approve"), None)
+        if l1 and l1.get("by") == ctx.uid:
+            raise ApiError(409, "maker_checker",
+                           "Second-level approval must be given by a different approver than the first level.")
+    decision = p.get("decision")
+    if decision not in ("approve", "return"):
+        raise ApiError(400, "bad_request", "Decision must be 'approve' or 'return'.")
+    entry = {"level": level, "decision": decision, "by": ctx.uid, "byName": ctx.user["name"],
+             "at": ctx.now_iso(), "comments": (p.get("comments") or "").strip(), "reviewedVersion": rs.get("version")}
+    log = rs.get("approvalLog", []) + [entry]
+    if decision == "approve":
+        new_qs = "L1 Approved" if level == 1 else "L2 Approved"
+        _set(s, ctx, rs, {"quoteStatus": new_qs, "approvals": rs.get("approvals", []) + [entry], "approvalLog": log},
+             "quote.approve", reason=entry["comments"] or None)
+        who = "second-level" if level == 2 else "first-level"
+        nxt = "ready to release to Sales" if level == 2 else "awaiting second-level approval"
+        notify(s.store, ctx, c["id"], "quote.approved", ["Actuarial (ACCUSA) queue"],
+               f"Quotation {rs['code']} {who}-approved — {nxt}")
+    else:
+        if not entry["comments"] and not DEMO_BYPASS:
+            raise ApiError(422, "validation", "Enter the reason for returning the quotation for correction.",
+                           {"fields": [{"field": "comments", "message": "Required."}]})
+        _set(s, ctx, rs, {"quoteStatus": "Returned for Correction", "approvals": [], "approvalLog": log,
+                          "returnNote": entry["comments"], "returnedLevel": level}, "quote.return", reason=entry["comments"] or None)
+        # Reopen the request so Actuarial can correct and re-submit (carrying the work forward).
+        rr = s.store.get(rs["requestId"])
+        if rr and rr.get("status") != "In Review":
+            _set(s, ctx, rr, {"status": "In Review"}, "rateRequest.reopen")
+        notify(s.store, ctx, c["id"], "quote.returned", ["Actuarial (ACCUSA) queue"],
+               f"Quotation {rs['code']} returned for correction by level-{level} review")
+    return {}
+
+
+@action("quote.release", ["accusa"])
+def quote_release(s, ctx, p):
+    rs, c = _quote_sheet(s, ctx, p)
+    qs = rs.get("quoteStatus", "Released")
+    if qs != "L2 Approved":
+        raise ApiError(409, "bad_state",
+                       f"The quotation can be released only after second-level approval (currently '{qs}').")
+    _set(s, ctx, rs, {"quoteStatus": "Released", "releasedBy": ctx.uid, "releasedByName": ctx.user["name"],
+                      "releasedAt": ctx.now_iso(), "releaseNote": (p.get("note") or "").strip(),
+                      "salesRecipient": c.get("ownerId")}, "quote.release", reason=p.get("note") or None)
+    # Simulated notification only — no real email leaves the demo, and nothing is
+    # activated or enrolled here: this is purely the quotation + marked SOB handoff.
+    notify(s.store, ctx, c["id"], "quote.released", [user_name(c["ownerId"])],
+           f"Quotation {rs['code']} and marked SOB released to Sales (simulated email)")
+    return {}
+
+
+@action("quote.setAssumptions", ["accusa"])
+def quote_assumptions(s, ctx, p):
+    rs, c = _quote_sheet(s, ctx, p)
+    qs = rs.get("quoteStatus", "Released")
+    if qs not in _QUOTE_PREPARE:
+        raise ApiError(409, "bad_state", "Pricing assumptions can be edited only before the quotation is submitted for review.")
+    incoming = p.get("assumptions") or {}
+    merged = dict(rs.get("assumptions", {}))
+    for k, v in incoming.items():
+        n = num(v)
+        merged[k] = n if n is not None else v
+    _set(s, ctx, rs, {"assumptions": merged, "notes": p.get("notes", rs.get("notes", ""))}, "quote.setAssumptions")
+    return {}
 
 
 # ======================================================================== TOR

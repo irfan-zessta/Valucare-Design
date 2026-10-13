@@ -25,7 +25,7 @@ const FLOWS = [
       { label: "Renewal Business" },
     ] },
     { name: "Actuarial", full: "ACCUSA", items: [
-      { label: "New Business", user: "u-ac1", href: "#/tasks" },
+      { label: "New Business", user: "u-ac1", href: "#/actuarial" },
       { label: "Renewal Business" },
     ] },
     { name: "MDA", full: "Members Data Administration", items: [
@@ -90,9 +90,20 @@ const NAV_PRIMARY = [
 ];
 const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 tasks">0</span>` : html`<span></span>`}</a>`;
 
+// Primary nav for the current user. The Actuarial quotation journey is a dedicated
+// surface for the pricing roles, so it leads their nav; everyone else gets the
+// standard three. Visibility only — the server still enforces every action.
+function navFor(me) {
+  const items = [...NAV_PRIMARY];
+  if (me.role === "accusa" || me.role === "approver")
+    items.unshift({ key: "actuarial", label: "Actuarial Quotation", icon: "briefcase", href: "#/actuarial" });
+  return items;
+}
+
 // Which primary item is active for the current route.
 function activeInfo(parts) {
   const p = parts[0];
+  if (p === "actuarial") return { top: "actuarial" };
   if (p === "new-business" || p === "case") return { top: "nb-list" };
   if (p === "tasks") return { top: "tasks" };
   if (p === "reports" || p === "more" || p === "accounts") return { top: "tools" };
@@ -107,7 +118,7 @@ function renderShell() {
       <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3 New Business<small>Corporate · Commercial</small></span></div>
       ${me.role === "aat" ? html`<a class="btn primary create-btn" href="#/new-business/create" title="Create New Business">${icon("plus")}<span class="lbl">Create New Business</span></a>` : ""}
       <div class="nav">
-        ${NAV_PRIMARY.map(navLink)}
+        ${navFor(me).map(navLink)}
       </div>
       <div class="spacer"></div>
       <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse")}<span class="lbl">${collapsed ? "Expand" : "Collapse sidebar"}</span><span></span></button></div>
@@ -223,6 +234,7 @@ const VIEWS = {
   reports: () => import("./views/reports.js"),
   more: () => import("./views/more.js"),
   case: () => import("./views/case.js"),
+  actuarial: () => import("./views/actuarial.js"),
 };
 
 let renderSeq = 0;

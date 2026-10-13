@@ -15,8 +15,9 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import actions, meta, members, providers, tables
-from .domain import (Bundle, Ctx, SYSTEM_USER, USERS, account_gates, compare_benefits, config, config_payload, derive,
-                     next_id, onboarding_status, parse_date, readiness, user_tasks, visible_case, matches_validator)
+from .domain import (Bundle, Ctx, SYSTEM_USER, USERS, account_gates, add_workdays, compare_benefits, config, config_payload,
+                     derive, iso, next_id, onboarding_status, parse_date, readiness, user_tasks, user_name, visible_case,
+                     matches_validator)
 from .store import ApiError, Store
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -367,6 +368,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"items": actions.search_companies(actions.S(st), q.get("q"))})
         if p == "accounts":
             return self._send(200, {"items": self._accounts(ctx)})
+        if p == "quotations":
+            return self._send(200, {"items": self._quotations(ctx)})
         if p == "intermediaries":
             items = st.list("intermediary")
             for it in items:
@@ -452,6 +455,93 @@ class Handler(BaseHTTPRequestHandler):
                         "businessSource": a.get("agentInfo", {}).get("businessSource"), "product": a.get("contractInfo", {}).get("product"),
                         "accountManager": USERS.get(a.get("otherInfo", {}).get("accountManager"), {}).get("name"), "caseId": a["caseId"],
                         "vip": a.get("otherInfo", {}).get("vip"), "jumbo": a.get("otherInfo", {}).get("jumbo")})
+        return out
+
+    def _quotations(self, ctx):
+        # One row per case that has a rate request, for the Actuarial / ACCUSA journey.
+        # Visibility follows the normal rule (ACCUSA/approvers see the whole book; a
+        # Sales AAT user sees only their own portfolio). The pending step, its owning
+        # demo persona and a single due date are computed here so the client stays thin.
+        st = store()
+        cfg = config(st)
+        today = ctx.today()
+        tat = cfg.get("tatDays", {})
+
+        def due_from(base, key):
+            d = parse_date(base)
+            return iso(add_workdays(d, tat.get(key, 1))) if d else None
+
+        out = []
+        for c in st.list("case"):
+            if not visible_case(ctx, c):
+                continue
+            b = Bundle(st, c["id"])
+            rr = b.one("rateRequest")
+            if not rr:
+                continue
+            summ = derive(b, cfg, today)
+            sheets = b.rate_sheets()
+            latest = sheets[-1] if sheets else None
+            # Legacy sheets issued before the approval lifecycle have no quoteStatus;
+            # treat them as already handed to Sales so they never look "stuck".
+            qs = (latest.get("quoteStatus", "Released") if latest else None)
+            apprs = (latest.get("approvals", []) if latest else [])
+
+            pending_role = pending_area = due = None
+            if latest and qs != "Released":
+                if qs == "L2 Approved":
+                    l2 = next((a for a in apprs if a.get("level") == 2), None)
+                    pending_role, pending_area = "accusa", "release"
+                    due = due_from((l2 or {}).get("at") or latest.get("issuedAt"), "senior_approval")
+                elif qs == "L1 Approved":
+                    l1 = next((a for a in apprs if a.get("level") == 1), None)
+                    pending_role, pending_area = "l2", "approve"
+                    due = due_from((l1 or {}).get("at") or latest.get("submittedReviewAt"), "senior_approval")
+                elif qs == "Submitted for Review":
+                    pending_role, pending_area = "l1", "approve"
+                    due = due_from(latest.get("submittedReviewAt"), "pricing_review")
+                elif qs in ("Prepared", "Returned for Correction"):
+                    pending_role, pending_area = "accusa", "prepare"
+                    due = due_from(latest.get("issuedAt"), "rate_sheet")
+            elif not latest or qs == "Released":
+                rs_status = rr.get("status")
+                if rs_status in ("Submitted", "Revised"):
+                    pending_role, pending_area = "accusa", "review"
+                    due = due_from(rr.get("submittedAt") or rr.get("statusAt"), "rate_request")
+                elif rs_status == "In Review":
+                    pending_role, pending_area = "accusa", "prepare"
+                    due = due_from(rr.get("statusAt"), "rate_sheet")
+                elif rs_status == "Returned for Info":
+                    pending_role, pending_area = "aat", "clarify"
+                    due = due_from(rr.get("statusAt"), "rate_request")
+                elif rs_status == "Draft":
+                    pending_role, pending_area = "aat", "review"
+                    due = due_from(rr.get("statusAt"), "rate_request")
+
+            clars = rr.get("clarifications", []) or []
+            open_clar = clars[-1] if (clars and not clars[-1].get("answer")) else None
+
+            sheet_payload = None
+            if latest:
+                sheet_payload = {
+                    "id": latest["id"], "version": latest.get("version"), "code": latest.get("code"),
+                    "quoteStatus": qs, "issuedAt": latest.get("issuedAt"), "issuedByName": latest.get("issuedByName"),
+                    "submittedReviewAt": latest.get("submittedReviewAt"), "approvals": apprs,
+                    "returnNote": latest.get("returnNote"), "returnedLevel": latest.get("returnedLevel"),
+                    "releasedAt": latest.get("releasedAt"), "releasedByName": latest.get("releasedByName"),
+                }
+            out.append({
+                "caseId": c["id"], "company": summ["company"], "vip": summ.get("vip"), "jumbo": summ.get("jumbo"),
+                "rrId": rr["id"], "rrCode": rr.get("code"), "rrStatus": rr.get("status"),
+                "isRevision": bool(rr.get("wasRevision") or rr.get("status") == "Revised" or (latest and (latest.get("version") or 1) > 1)),
+                "ownerId": c.get("ownerId"), "ownerName": summ.get("ownerName"),
+                "reviewerId": rr.get("reviewerId"), "reviewerName": user_name(rr["reviewerId"]) if rr.get("reviewerId") else None,
+                "submittedAt": rr.get("submittedAt"), "effectivity": summ.get("effectivity"),
+                "sheet": sheet_payload, "sheetCount": len(sheets),
+                "pendingRole": pending_role, "pendingArea": pending_area, "due": due,
+                "openClarification": (open_clar or {}).get("question"), "closed": summ.get("closed"),
+            })
+        out.sort(key=lambda r: (r.get("due") or "9999"))
         return out
 
     def _plancodes(self, ctx, case_id, q):
