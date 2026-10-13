@@ -1,16 +1,18 @@
 /* HMS3 Corporate New Business - calm, dense, accessible. */
 :root{
-  /* Wireframe palette: soft, Apple-inspired neutral grays. Accent token names are
-     kept so every rule keeps working, but each resolves to a shade of gray. */
+  /* Enterprise palette: a light neutral canvas, white work surfaces, ONE restrained
+     deep-blue accent for primary / interactive / active states, and semantic green /
+     amber / red reserved for status only. Demo and simulated items use a muted slate so
+     they never read as a status colour. Neutrals stay the calm Apple-gray canvas. */
   --bg:#F5F5F7; --surface:#FFFFFF; --surface-2:#FBFBFD; --border:#E4E4E9; --border-2:#EEEEF1;
   --text:#1D1D1F; --text-2:#6E6E73; --text-3:#8E8E93;
-  --blue:#3A3A3C; --blue-ink:#1D1D1F; --blue-soft:#ECECEF; --blue-line:#DADADF;
-  --green:#5B5B60; --green-soft:#EFEFF2; --amber:#5B5B60; --amber-soft:#EFEFF2; --red:#5B5B60; --red-soft:#EFEFF2;
-  --violet:#5B5B60; --violet-soft:#EFEFF2; --gray-soft:#ECECEF;
+  --blue:#2B4FC8; --blue-ink:#1E3A8A; --blue-soft:#EEF2FC; --blue-line:#CBD9F5;
+  --green:#1E7A4D; --green-soft:#E7F4EC; --amber:#8A5A00; --amber-soft:#FBF0D9; --red:#C0392B; --red-soft:#FBEBE9;
+  --violet:#5E6478; --violet-soft:#EDEEF3; --gray-soft:#ECECEF;
   /* interactive surfaces: form borders, keyboard focus, table hover */
-  --border-input:#D6D6DB; --border-input-hover:#BDBDC2; --border-input-focus:#A6A6AD;
-  --ring:0 0 0 3.5px rgba(60,60,67,.14); --focus-outline:rgba(60,60,67,.9);
-  --row-hover:#FAFAFB;
+  --border-input:#D6D6DB; --border-input-hover:#BDBDC2; --border-input-focus:#9DB4E8;
+  --ring:0 0 0 3.5px rgba(43,79,200,.16); --focus-outline:rgba(43,79,200,.9);
+  --row-hover:#F7F9FD;
   /* spacing scale (4px base) — one rhythm for gaps, stacks and padding */
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-7:32px;
   /* radius scale */
@@ -154,7 +156,7 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 .tbl td.co,.tbl td:first-child .co{min-width:220px}
 .tbl .co a{font-weight:600;text-decoration:none;color:var(--text)} .tbl .co a:hover{color:var(--blue);text-decoration:underline}
 .tbl .sub{display:block;font-size:12px;color:var(--text-3)}
-.tbl tr.err td{background:#F1F0F2} .tbl tr.exc td{background:#F5F5F3} .tbl tr.sel td{background:var(--blue-soft)}
+.tbl tr.err td{background:var(--red-soft)} .tbl tr.exc td{background:var(--amber-soft)} .tbl tr.sel td{background:var(--blue-soft)}
 .tbl .frozen{position:sticky;left:0;min-width:36px;background:var(--surface);z-index:1;box-shadow:1px 0 0 var(--border-2)}
 .tbl thead .frozen{z-index:3;background:var(--surface-2)}
 .tbl .frozen2{position:sticky;left:var(--f1w,120px);background:var(--surface);z-index:1;box-shadow:1px 0 0 var(--border-2)}
@@ -186,7 +188,7 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 .field input:focus,.field select:focus,.field textarea:focus,.inp:focus{outline:none;border-color:var(--blue);box-shadow:var(--ring)}
 .field .help{font-size:12px;color:var(--text-3)}
 .field .err{font-size:12.5px;color:var(--red);font-weight:550}
-.field [aria-invalid="true"]{border-color:var(--red)!important;background:#F6F5F6}
+.field [aria-invalid="true"]{border-color:var(--red)!important;background:var(--red-soft)}
 .field .ro{min-height:36px;display:flex;align-items:center;padding:0 2px;color:var(--text);word-break:break-word}
 .field .ro.empty{color:var(--text-3)}
 .check{display:flex;align-items:center;gap:8px;min-height:36px;cursor:pointer}
@@ -360,7 +362,7 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 /* ---------- Apple-style polish ---------- */
 html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 body{letter-spacing:-.003em}
-::selection{background:rgba(60,60,67,.16)}
+::selection{background:rgba(43,79,200,.16)}
 /* thin, macOS-style overlay scrollbars */
 *{scrollbar-width:thin;scrollbar-color:rgba(60,60,67,.28) transparent}
 *::-webkit-scrollbar{width:11px;height:11px}
@@ -392,8 +394,9 @@ body{letter-spacing:-.003em}
 .drawer{border-radius:var(--r-xl) 0 0 var(--r-xl)}
 .login .card{border-radius:var(--r-xl);box-shadow:0 12px 44px rgba(0,0,0,.10)}
 
-/* sidebar selection: clean filled rounded rect, no inset bar */
-.nav a[aria-current="page"]{background:#E8E8ED;color:var(--text);box-shadow:none;font-weight:620}
+/* sidebar selection: soft accent-tinted rounded rect with a quiet accent spine */
+.nav a[aria-current="page"]{background:var(--blue-soft);color:var(--blue-ink);box-shadow:inset 3px 0 0 var(--blue);font-weight:620}
+.nav a[aria-current="page"] .ico{color:var(--blue)}
 
 /* iOS-style segmented control for the table view switcher */
 .views{display:flex;width:max-content;max-width:100%;gap:2px;background:var(--gray-soft);border:0;border-bottom:0;border-radius:10px;padding:3px;margin:8px 8px 0}
@@ -440,20 +443,20 @@ body{letter-spacing:-.003em}
 .persona-switch{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .pbtn{flex:1 1 180px;min-width:160px;text-align:left;border:1px solid var(--border);background:var(--surface);border-radius:var(--r);padding:8px 12px;cursor:pointer;transition:border-color .12s,background .12s}
 .pbtn:hover{border-color:var(--border-input-hover)}
-.pbtn.on{border-color:var(--text);background:var(--blue-soft);box-shadow:inset 0 0 0 1px var(--text)}
+.pbtn.on{border-color:var(--blue);background:var(--blue-soft);box-shadow:inset 0 0 0 1px var(--blue)}
 .pbtn b{display:block;font-size:13px;font-weight:650;color:var(--text)}
 .pbtn small{display:block;font-size:11.5px;color:var(--text-2);margin-top:1px}
 .areatabs{display:flex;flex-wrap:wrap;gap:2px;margin-top:14px;border-bottom:1px solid var(--border)}
 .areatabs a{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;font-size:13px;font-weight:600;color:var(--text-2);border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:6px 6px 0 0}
 .areatabs a:hover{color:var(--text);background:var(--surface-2)}
-.areatabs a.on{color:var(--text);border-bottom-color:var(--text)}
+.areatabs a.on{color:var(--blue-ink);border-bottom-color:var(--blue)}
 .areatabs.sub{margin-top:16px}
 .areatabs .n{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--gray-soft);color:var(--text-2);font-size:11px;font-weight:700}
-.areatabs a.on .n{background:var(--text);color:var(--surface)}
-.taskdot{color:var(--text);font-size:9px;line-height:1}
+.areatabs a.on .n{background:var(--blue);color:var(--surface)}
+.taskdot{color:var(--amber);font-size:9px;line-height:1}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .abucket{margin-bottom:14px}
-.count{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:var(--text);color:var(--surface);font-size:11.5px;font-weight:700;vertical-align:middle}
+.count{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:var(--surface);font-size:11.5px;font-weight:700;vertical-align:middle}
 .count.zero{background:var(--gray-soft);color:var(--text-3)}
 .empty-bucket{padding:14px 16px;color:var(--text-3)}
 .qtable tbody tr{cursor:pointer}
