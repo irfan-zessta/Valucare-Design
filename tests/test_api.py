@@ -175,7 +175,7 @@ class E2E(unittest.TestCase):
                   email="hr@harbor.example", telephone="+63 (032) 8123-4567 loc. 12", facsimile="0322345678", contactPerson="Liza Tan", contactPosition="HR Head",
                   contactNumber="09171234567", proposalAddressee="Mr. Ruiz", addresseePosition="CFO", addresseeContactNumber="+639181112222")
         oi = dict(fr["otherInfo"], dependentCount=90, vatStatus="VAT-able", currentCoverage="AT", mannerOfEnrollment="Compulsory", mannerOfPayment="Subsidized",
-                  salesRemarks="Test remarks")
+                  salesManager="u-am2", salesRemarks="Test remarks")  # secondary handler (AAT) is chosen by the maker, not auto-assigned
         affs = [{"name": "Harbor Foods Logistics Inc.", "address": "Pier 2", "email": "a@h.example", "contactPerson": "A", "contactNumber": "0917 111 2222", "financialAssistance": "", "financialAssistanceName": ""},
                 {"name": "Harbor Foods Retail Inc.", "address": "Pier 3", "email": "b@h.example", "contactPerson": "B", "contactNumber": "+63 917 333 4444", "financialAssistance": "Yes", "financialAssistanceName": "Rice subsidy"}]
         st, r = self.am.save(fr["id"], {"accountInfo": ai, "otherInfo": oi, "affiliates": affs})
@@ -210,7 +210,7 @@ class E2E(unittest.TestCase):
         fid = self.am2.ok("franchise.start", caseId=cid)["franchiseId"]
         fr = self.am2.rec(fid)
         ai = dict(fr["accountInfo"], accountType="TPA/ASO", billingAddress="1 Loop St", billingProvince="Laguna", billingCity="Calamba", email="x@loop.example", contactPerson="X", contactNumber="0917")
-        oi = dict(fr["otherInfo"], vatStatus="Non Vat", currentCoverage="AA", mannerOfEnrollment="Voluntary", mannerOfPayment="Contributory")
+        oi = dict(fr["otherInfo"], vatStatus="Non Vat", currentCoverage="AA", mannerOfEnrollment="Voluntary", mannerOfPayment="Contributory", salesManager="u-am1")
         self.assertEqual(self.am2.save(fid, {"accountInfo": ai, "otherInfo": oi})[0], 200)
         self.am2.ok("franchise.submit", franchiseId=fid)
         fr = self.as2.rec(fid)

@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-10-09T14:56:05",
+  "runAt": "2026-10-14T09:08:28",
   "results": [
     {
       "test": "test_01_zero_result_search_then_new_company",
@@ -9,7 +9,7 @@
     {
       "test": "test_02_duplicate_resolution_and_override",
       "doc": "Duplicate detection by name/TIN; override needs authorized role and reason; existing company stores its id.",
-      "result": "Passed"
+      "result": "Failed"
     },
     {
       "test": "test_03_full_franchise_entry_and_persistence",
@@ -44,12 +44,12 @@
     {
       "test": "test_09_contract_kyc_and_account_gates",
       "doc": "Contract steps need documents; KYC by Compliance; account creation gated; mandatory waiver refused; maker-checker on account.",
-      "result": "Passed"
+      "result": "Failed"
     },
     {
       "test": "test_10_plan_codes_lifecycle",
       "doc": "Generate from SOB, customise, maker-checker with partial results, return requires edit, clone, amend keeps history.",
-      "result": "Passed"
+      "result": "Failed"
     },
     {
       "test": "test_11_bulk_import_1000_plan_codes_partial",
@@ -59,22 +59,22 @@
     {
       "test": "test_12_member_data_errors_and_corrections",
       "doc": "Upload with errors, row correction, exception with evidence, accept, MDA hand-off (simulated).",
-      "result": "Passed"
+      "result": "Failed"
     },
     {
       "test": "test_13_billing_exception_resolution",
       "doc": "Open exception blocks billing; resolution needs evidence; approver differs from maker.",
-      "result": "Passed"
+      "result": "Failed"
     },
     {
       "test": "test_14_future_effective_scheduling_and_handover",
       "doc": "Future effectivity -> Scheduled (not Active); scheduler activates on the date; handover needs every acknowledgement.",
-      "result": "Passed"
+      "result": "Failed"
     },
     {
       "test": "test_15_concurrent_edits_idempotency_failed_save_session",
       "doc": "Concurrent edit detection with changed fields; idempotent submit; failed save recovery; session expiry.",
-      "result": "Passed"
+      "result": "Failed"
     },
     {
       "test": "test_16_intermediary_rules",
@@ -103,13 +103,13 @@
     }
   ],
   "performance": {
-    "planCodeImport1000Seconds": 2.41,
+    "planCodeImport1000Seconds": 2.37,
     "memberData10kRows": 10052,
-    "memberData10kSeconds": 0.32,
-    "memberProblemRowsQueryMs": 36,
-    "companySearchMs": 3,
+    "memberData10kSeconds": 0.31,
+    "memberProblemRowsQueryMs": 34,
+    "companySearchMs": 4,
     "providerSearchMs": 1,
-    "planCodeSearchMs": 22,
-    "queueLoadMs": 36
+    "planCodeSearchMs": 21,
+    "queueLoadMs": 33
   }
 }

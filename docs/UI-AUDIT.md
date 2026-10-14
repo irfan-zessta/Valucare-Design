@@ -112,14 +112,14 @@ The queue currently shows: Returned for correction, Awaiting AMT, With AMT, With
 
 Reduce to 6 statuses, and show the owner in its own column:
 
-| Status | Color | Meaning |
+| Status | Black-and-white style | Meaning |
 |---|---|---|
-| Draft | neutral | Not submitted yet |
-| Your turn | accent | You or your team owns the next step |
-| Waiting | amber | With another team or the client |
-| Returned | red | Sent back for fixes |
-| Done | green | Stage or case complete |
-| Closed | neutral, strikethrough icon | Lost or routed out |
+| Draft | dashed border, ○ | Not submitted yet |
+| Your turn | black fill, white text, ● | You or your team owns the next step |
+| Waiting | gray border, ◐ | With another team or the client |
+| Returned | thick black border, ↩ | Sent back for fixes |
+| Done | light gray fill, ✓ | Stage or case complete |
+| Closed | gray text, ✕ | Lost or routed out |
 
 ## 6. Minor
 
@@ -133,6 +133,6 @@ Reduce to 6 statuses, and show the owner in its own column:
 
 1. Fix counts, next-action landing, the role placeholder leak, and the seed data (P0 1-9). That's about a day of work and it fixes most of the "slop" feeling.
 2. Pull demo scaffolding into one Demo panel.
-3. Apply the new token set and component styles (see `REDESIGN-PROMPT.md`).
+3. Apply the black-and-white token set and component styles, and add the flow map (see `REDESIGN-PROMPT.md`).
 4. Copy pass: dashes, requirement IDs, "(s)", explanatory subtitles.
 5. Mobile card layout for queues.

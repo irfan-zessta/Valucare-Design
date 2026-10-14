@@ -154,7 +154,7 @@ def _seed(store, sd, now):
         inter.setdefault(typ, []).append(iid)
         if status in ("Verified", "Active", "Inactive"):
             sd.doc(AS1, None, {"type": "intermediary", "id": iid}, "agreement", f"Agreement_{iid}.pdf", "Signed intermediary agreement")
-            actions.run(store, sd.ctx(COMP), "intermediary.verify", {"id": iid})
+            actions.run(store, sd.ctx(AS1), "intermediary.verify", {"id": iid})
         if status in ("Active", "Inactive"):
             actions.run(store, sd.ctx(AS1), "intermediary.verify", {"id": iid})
         if status == "Inactive":
@@ -259,6 +259,7 @@ def run_case(store, sd, i, comp, target, am, active, now):
     oi.update(dependentCount=deps, vatStatus=R.choice(["VAT-able", "Fully VAT-able", "VAT exempt" if i == 4 else "VAT-able"]),
               currentCoverage=R.choice(["AT", "AT", "CP", "AA"]), mannerOfEnrollment=R.choice(["Compulsory", "Voluntary"]),
               mannerOfPayment=R.choice(["Subsidized", "Contributory", "Salary Deduction"]), currentHmoProvider=R.choice(["Incumbent HMO A", "Incumbent HMO B", ""]),
+              salesManager={"u-am1": "u-am2", "u-am2": "u-am3", "u-am3": "u-am1"}[am],
               commissionType="Percentage of premium" if iid else "None", salesRemarks="Client prioritises outpatient coverage and APE.")
     affiliates = []
     if i in (0, 2, 9, 12):
@@ -522,17 +523,17 @@ def run_case(store, sd, i, comp, target, am, active, now):
     sd.act(WEL, "orientation.schedule", {"caseId": cid, "date": (eff + dt.timedelta(days=7)).isoformat(), "venue": "Client main office"})
     if level == "billing_done":
         if target == "activated_future":
-            sd.act(AS1, "activation.activate", {"caseId": cid})
+            sd.act(sm, "activation.activate", {"caseId": cid})
         return
     after_eff = dt.datetime.combine(eff, dt.time(9, 0)) + dt.timedelta(days=1)
     if sd.t < after_eff:
         sd.t = after_eff
         sd.at(sd.t)
-    sd.act(AS1, "activation.activate", {"caseId": cid})
+    sd.act(sm, "activation.activate", {"caseId": cid})
     act = actions.S(store).bundle(cid).one("activation")
-    for uid in (MDA, BC1, CCD, WEL):
+    for uid in (MDA, BC1, CCD):
         sd.act(uid, "activation.ack", {"id": act["id"], "decision": "acknowledge"})
-    sd.act(AS1, "activation.completeHandover", {"id": act["id"]})
+    sd.act(sm, "activation.completeHandover", {"id": act["id"]})
 
 
 FIRST = ["Maria", "Jose", "Ana", "Juan", "Liza", "Paolo", "Grace", "Ramon", "Carmela", "Andres", "Bea", "Diego", "Elena", "Felipe", "Gina",

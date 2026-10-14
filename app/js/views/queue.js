@@ -1,7 +1,9 @@
 import { html, api, state, prefs, fmtDate, daysUntil, go } from "../core.js";
 import { icon, statusPill, caseStatus, ownerCell, relDue, flags, area, AREA_TOTAL, cleanLabel, emptyState, plural } from "../components.js";
 
-const KEY = "queue:nb";
+// Bumped from "queue:nb": the redesigned table uses new column keys (step, handler)
+// so any pref saved by the old table would hide the Step column and stale filters.
+const KEY = "queue:nb2";
 // Curated columns. The first four tell the whole story at a glance; the rest are
 // opt-in through the View menu for power users who want more context.
 const COLS = [

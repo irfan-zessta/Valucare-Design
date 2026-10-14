@@ -6,7 +6,9 @@ Paste everything below the line into Claude Code, started in the `Valucare` repo
 
 ## 1. Role
 
-You are a senior product designer and front-end engineer. You are redesigning an internal operations app so it looks and feels like a modern, calm B2B SaaS product (in the spirit of Linear, Attio, Stripe Dashboard, Vercel). Make it look like the real product, not a prototype.
+You are a senior product designer and front-end engineer. You are turning an internal operations app into a **clean black-and-white clickable mockup**: a high-fidelity wireframe that shows the layout, hierarchy and flow of a modern B2B SaaS product (think Linear or Attio layouts, drawn in grayscale).
+
+It must **not** look like a finished, branded product. No brand color, no shadows, no gradients, no illustrations. The goal is that stakeholders review the **flow and structure**, not the visual polish. Clean and calm, not sketchy: straight lines, real text, real data.
 
 ## 2. Context
 
@@ -27,37 +29,36 @@ You are a senior product designer and front-end engineer. You are redesigning an
 
 1. **One thing to do.** Every screen has one obvious primary action. Everything else is secondary or in a menu.
 2. **Content first.** Header chrome takes at most 160px on a case page before content starts.
-3. **Color means something.** Neutral by default. Accent only for the primary action and current selection. Red only for errors, destructive actions and overdue dates.
+3. **Black and white only.** Grayscale for everything. Hierarchy comes from weight, size, spacing and borders. Meaning comes from text and icons, never color.
 4. **Say less.** Labels of 1-3 words, helper text only when a field would otherwise be misread, no sentences that explain how the system works.
 5. **Same pattern everywhere.** One tab style, one table style, one status pill, one empty state.
 
 ## 5. Visual system
 
-Define these as CSS custom properties on `:root` in `app/css/app.css`. Replace every hard-coded hex value with a token. Rename misleading tokens (`--blue` is crimson today, `--violet` is grey).
+Define these as CSS custom properties on `:root` in `app/css/app.css`. Replace every hard-coded hex value with a token. **Delete every colored token** (`--blue`, which is crimson today, `--green`, `--amber`, `--red`, `--violet` and their `-soft` versions) and every `rgba()` with a hue.
 
-### Color (light)
+### Palette: grayscale only
 
 | Token | Value | Use |
 |---|---|---|
-| `--bg` | `#FAFAFA` | App background |
-| `--surface` | `#FFFFFF` | Cards, tables, panels |
-| `--surface-muted` | `#F4F4F5` | Table header, hover, segmented control track |
-| `--border` | `#E4E4E7` | Default borders, dividers |
-| `--border-strong` | `#D4D4D8` | Inputs |
-| `--text` | `#18181B` | Primary text |
-| `--text-muted` | `#52525B` | Secondary text |
-| `--text-subtle` | `#71717A` | Meta, placeholders, IDs |
-| `--accent` | `#B21E3A` | Brand: primary button, active nav marker, focus ring, links on hover |
-| `--accent-soft` | `#FBEEF1` | Active nav background, selected row |
-| `--success` / `--success-soft` | `#15803D` / `#F0FDF4` | Done |
-| `--warning` / `--warning-soft` | `#B45309` / `#FFFBEB` | Waiting, due soon |
-| `--danger` / `--danger-soft` | `#DC2626` / `#FEF2F2` | Errors, returned, overdue, delete |
-| `--info` / `--info-soft` | `#2563EB` / `#EFF6FF` | Tips, "Your turn" |
-| `--neutral` / `--neutral-soft` | `#52525B` / `#F4F4F5` | Draft, closed, locked |
+| `--white` | `#FFFFFF` | Page background, cards, inputs |
+| `--gray-50` | `#F7F7F7` | Table header, hover row, sidebar, locked areas |
+| `--gray-100` | `#EFEFEF` | Selected row, active nav item, segmented control track |
+| `--gray-200` | `#E2E2E2` | Dividers, card borders |
+| `--gray-300` | `#CFCFCF` | Input borders, disabled borders |
+| `--gray-500` | `#8A8A8A` | Placeholders, meta, IDs, disabled text |
+| `--gray-700` | `#4D4D4D` | Secondary text, icons |
+| `--black` | `#111111` | Primary text, primary button fill, active marker, focus ring |
 
-Add a dark theme under `@media (prefers-color-scheme: dark)` with the same token names.
+Light mode only. No dark theme for the mockup.
 
-**Rules:** links in tables are `--text` with no underline and underline only on hover. Informational notes use `--info-soft` or `--neutral-soft`, **never** the accent or danger color. Overdue dates use `--danger` text only, no background.
+**Rules**
+- **Primary button:** `--black` fill, white text. **Secondary:** white fill, 1px `--gray-300` border, black text. **Ghost:** text only. **Destructive:** white fill, 1px black border, black text, trash icon. It is never red.
+- **Links:** black, no underline, underline on hover. Never colored.
+- **Selection:** `--gray-100` background plus a 2px black left bar (nav) or bottom bar (tabs).
+- **Emphasis** comes from weight (600) and size, not color.
+- **Placeholders for images, logos, charts and avatars:** `--gray-100` boxes with a 1px `--gray-300` border and a centered 12px gray label (e.g. "Chart", "Logo"). Avatars are gray circles with initials.
+- **Charts** in Reports are grayscale: bars in `--gray-700`, `--gray-500`, `--gray-300`, labelled directly. Use patterns (solid, hatched) if two series need to be told apart.
 
 ### Type
 
@@ -70,13 +71,14 @@ Add a dark theme under `@media (prefers-color-scheme: dark)` with the same token
 
 - 4px grid: 4 · 8 · 12 · 16 · 20 · 24 · 32 · 48.
 - Radius: 6 (inputs, buttons, pills) · 10 (cards, menus) · 14 (modals).
-- Borders over shadows. Cards: 1px `--border`, no shadow. Menus and modals: `0 8px 24px rgba(0,0,0,.08)`.
+- **No shadows anywhere.** Cards: 1px `--gray-200`. Menus, popovers, modals and drawers: 1px `--black` border. Modal backdrop: `rgba(255,255,255,.8)`.
+- No gradients, no blur, no tinted backgrounds.
 - Controls: 32px height (compact) and 36px (default). Table rows 44px, compact 36px.
 - Motion: 120ms ease-out for hover and focus, 180ms for panels and modals. Respect `prefers-reduced-motion`.
 
 ### Components to restyle (one version each)
 
-Button (primary, secondary, ghost, destructive; sm and md) · Icon button · Input, select, combobox, textarea · Field (label, optional hint, error) · Segmented tabs · Status pill · Badge/count · Table (sticky header, row hover, row click opens) · Card · Stepper · Banner (info, warning, danger) · Empty state · Skeleton loader · Toast · Modal · Drawer (right side, 480px) · Overflow menu · Avatar · Tooltip.
+Button (primary, secondary, ghost, destructive; sm and md) · Icon button · Input, select, combobox, textarea · Field (label, optional hint, error) · Segmented tabs · Status pill · Badge/count · Table (sticky header, row hover, row click opens) · Card · Stepper · Banner (one style: white, 1px black left bar 3px, icon + text) · Empty state · Skeleton loader · Toast · Modal · Drawer (right side, 480px) · Overflow menu · Avatar · Tooltip.
 
 Use one icon set throughout (Lucide, inline SVG, 16px, 1.5px stroke).
 
@@ -90,13 +92,26 @@ Use one icon set throughout (Lucide, inline SVG, 16px, 1.5px stroke).
   - **Reports**
   - **Directory** (Agents and brokers, Providers)
   - **Settings** (SOB template, configuration), at the bottom
-  - **New case** as a full-width secondary button above the items. Not a crimson block.
+  - **New case** as a full-width black primary button above the items.
 - **Top bar** (56px): global search with `⌘K` hint, notifications, user menu. Nothing else.
 - Page header: title (24px), optional one-line description (max 8 words), primary action on the right.
 
 ### Demo panel (new)
 
 Move every demo-only control out of the product screens into one floating, collapsible panel (bottom-right, 320px). It contains: current role and user, "Act as…" switcher with the suggested next owner first, "Fill this form", "Show guide", "Reset demo data". Remove the `DEMO` badge, the "Switch to…" button on the Next action card, "Fill sample" buttons in form footers and "Use sample" on upload slots. Hide the panel behind a flag so the product can be screenshotted without it.
+
+The Demo panel uses the same black-and-white style: white card, 1px black border, black primary button.
+
+### Mockup flow (new)
+
+The mockup is reviewed as a **flow**, so make the journey easy to follow end to end:
+
+- **Flow map** at `#/flow`, linked from the Demo panel. It shows the whole journey as a left-to-right row of numbered screen boxes joined by thin black arrows:
+  `1 Sign in → 2 Cases → 3 New case → 4 Create Franchise → 5 Prepare Quotation → 6 Finalize Offer → 7 Set Up Account → 8 Activate & Handover → 9 Inbox → 10 Reports`.
+  Each box is a white card with a 1px border: number, screen name, the role that does it, one line on what happens. Click a box to open that screen with suitable demo data. The box for the screen you were last on has a black border.
+- **Walkthrough mode** in the Demo panel: "Previous" and "Next screen" buttons plus "Step 4 of 10". Next takes you to the next screen in the flow map and switches to the right role automatically.
+- In the walkthrough, a small black numbered marker (`①`, `②`…) sits next to the one element to click next on each screen. It sits outside the content and never covers text. Markers hide when the Demo panel is closed.
+- Each work-area step in a case uses the same number as the flow map, so a reviewer can say "screen 6" and everyone knows where that is.
 
 ## 7. Screens
 
@@ -110,7 +125,7 @@ Move every demo-only control out of the product screens into one floating, colla
 - Header: "Cases" + **New case** primary button.
 - Segmented tabs: **My cases · Needs action · Waiting · All**, with counts that **match the table**.
 - Toolbar on one row: search (left, 320px), Filters button, view options menu (columns + density in one menu).
-- Columns: **Company** (name only, 500 weight; case ID below in 12px `--text-subtle`), **Step** (work-area name + small "3/5" progress), **Status** (pill), **Next action** (plain text, one line, truncated with tooltip), **Owner** (avatar + team), **Due** (relative: "5 days overdue" in danger, "Tomorrow", "Oct 15").
+- Columns: **Company** (name only, 500 weight; case ID below in 12px `--gray-500`), **Step** (work-area name + small "3/5" progress), **Status** (pill), **Next action** (plain text, one line, truncated with tooltip), **Owner** (avatar + team), **Due** (relative: "5 days overdue" in 600 weight with a `!` icon, "Tomorrow", "Oct 15").
 - Drop the franchise and MA codes from the row; show them on hover or in the case.
 - Click anywhere on the row to open. Remove the separate "open in new tab" icon column (⌘-click does it).
 - Empty state per tab with an illustration-free icon, one line, and an action.
@@ -130,8 +145,8 @@ Top to bottom, max 160px before content:
 1. Breadcrumb: `Cases / Hiraya Learning Academy`.
 2. Title row: company name (24px) + status pill. Right side: **Documents (7)**, **History**, `⋯` menu (Delete lives here, with a typed-name confirmation).
 3. Meta row in 13px muted text: `NB-2026-0007 · FR-2026-0007 · Owner: Approver`.
-4. **Next action bar**: one line, full width, `--info-soft` background when it's your turn, neutral when waiting. Text: "Review pricing · Level 1 · Approver · 5 days overdue" + a primary **Review** button that scrolls to the right section. Parallel tasks as a "+2 more" link that opens a popover.
-5. **Stepper** for the 5 work areas: compact horizontal, number or check icon, label, status in 12px. Current step highlighted with the accent underline. A small dot when one of your tasks is in that step.
+4. **Next action bar**: one line, full width, 1px black border with a 3px black left bar when it's your turn, `--gray-50` background with no bar when waiting. Text: "Review pricing · Level 1 · Approver · 5 days overdue" + a primary **Review** button that scrolls to the right section. Parallel tasks as a "+2 more" link that opens a popover.
+5. **Stepper** for the 5 work areas: compact horizontal, number or check icon, label, status in 12px. Current step has a 2px black underline and 600 weight; done steps show a check icon; future steps are `--gray-500`. A small dot when one of your tasks is in that step.
 6. Section tabs (underline style, not pills) for the sections in the current step.
 
 Rules:
@@ -159,22 +174,22 @@ Rules:
 
 ### 7.8 States (all screens)
 
-Loading skeletons (not spinners) for tables and cards. Inline field errors under the field in `--danger`. Toasts bottom-center, auto-dismiss in 4s, with an undo where possible. Saved-state indicator ("Saved" / "Saving…" / "Unsaved changes") in the section header, muted.
+Loading skeletons (not spinners) for tables and cards. Inline field errors under the field in black 500 weight with a `!` icon, and the input border turns `--black` 2px. Toasts bottom-center, auto-dismiss in 4s, with an undo where possible. Saved-state indicator ("Saved" / "Saving…" / "Unsaved changes") in the section header, muted.
 
 ## 8. Status system
 
 Replace the current mix (Awaiting AMT, With AMT, With Legal Department, In progress, Waiting on client, Active - handover in progress, Returned for correction…) with **6 statuses**. Show the owner in its own column or meta, not inside the status.
 
-| Status | Pill style |
+| Status | Pill style (black and white) |
 |---|---|
-| Draft | neutral |
-| Your turn | info |
-| Waiting | warning |
-| Returned | danger |
-| Done | success |
-| Closed | neutral, muted text |
+| Draft | Dashed `--gray-300` border, `--gray-700` text, ○ empty circle |
+| Your turn | **Black fill, white text**, ● filled circle |
+| Waiting | `--gray-300` border, black text, ◐ half circle |
+| Returned | 1.5px black border, black 600 text, ↩ return icon |
+| Done | `--gray-100` fill, black text, ✓ check icon |
+| Closed | `--gray-50` fill, `--gray-500` text, ✕ icon |
 
-Pills: 22px height, 6px radius, 12px/500 text, a 6px dot in the status color, soft background. Always text + dot, never color alone.
+Pills: 22px height, 6px radius, 12px/500 text, 12px icon on the left. Status is told apart by **icon, fill and border**, and always has its text label.
 
 Additional flags (VIP, Jumbo, Signed · Unpaid) are small outline badges next to the company name, not extra pills.
 
@@ -211,15 +226,15 @@ It should return only code comments.
 ## 11. Responsive and accessibility
 
 - Breakpoints: 1280 (wide: right rail on case page), 1024 (sidebar collapses to rail), 768 (tables become cards, sidebar becomes drawer). 16px page gutter on mobile, no horizontal scroll.
-- WCAG 2.1 AA contrast for all text and pill combinations, in both themes.
-- Visible focus ring (`0 0 0 3px` accent at 25% opacity) on every interactive element. Keyboard: `⌘K` search, `N` new case, `J/K` move in tables, `Enter` open.
+- WCAG 2.1 AA contrast for all text and pill combinations. `--gray-500` is the lightest gray allowed for text, and only at 12px+ for meta.
+- Visible focus ring (2px solid `--black`, 2px offset) on every interactive element. Keyboard: `⌘K` search, `N` new case, `J/K` move in tables, `Enter` open.
 - Hit targets at least 32px desktop, 44px touch.
 
 ## 12. How to work
 
 1. Read `docs/UI-AUDIT.md`, `app/css/app.css`, `app/js/components.js`, `app/js/main.js`, then one view at a time.
-2. **Tokens and base components first**, in `app.css` and `components.js`. Check that nothing breaks.
-3. Shell (sidebar, top bar, Demo panel).
+2. **Grayscale tokens and base components first**, in `app.css` and `components.js`. Remove every colored token and shadow. Check that nothing breaks.
+3. Shell (sidebar, top bar, Demo panel, flow map and walkthrough).
 4. Screens in this order: Cases queue → Case workspace → New case → Inbox → Reports → Directory → Sign in.
 5. Copy pass, then seed data.
 6. After each step: run the app (`python3 -m server.app --port 4180`), open the screen at 1440px and 375px, check the console, take a screenshot. Run `python3 -m pytest tests` before finishing; server behavior must not change.
@@ -227,8 +242,9 @@ It should return only code comments.
 
 ## 13. Acceptance checklist
 
-- [ ] Every color in `app.css` comes from a token. Light and dark themes work.
-- [ ] Accent appears only on the primary action, active nav and focus. Info notes are never red or crimson.
+- [ ] `app.css` uses only the 8 grayscale tokens. `grep -nE "#[0-9A-Fa-f]{3,6}|rgba?\(" app/css/app.css` finds nothing outside `:root` (except the white modal backdrop).
+- [ ] No shadows, gradients or brand color anywhere. Primary buttons are black, destructive buttons are outlined, nothing is red.
+- [ ] Statuses can be told apart in a grayscale screenshot by icon and fill alone.
 - [ ] Queue tab counts equal the rows shown.
 - [ ] Opening any case lands on the tab containing its next action.
 - [ ] Case page content starts within 160px of the top bar at 1440×900.
@@ -239,4 +255,5 @@ It should return only code comments.
 - [ ] 6 statuses only, with owner shown separately.
 - [ ] No horizontal scroll at 375px. Queues render as cards on mobile.
 - [ ] Seed data is realistic, addresses consistent, due dates spread.
+- [ ] `#/flow` shows all 10 screens in order. Walkthrough Next and Previous move through them with the right role.
 - [ ] `pytest tests` passes. No new console errors.
