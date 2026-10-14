@@ -33,7 +33,7 @@ export async function render(main, { query }) {
   document.title = "Cases · HMS3";
   const st = load();
   if (query.q !== undefined) st.q = query.q;
-  if (query.view) st.view = query.view;
+  st.view = "all"; // one unified list; the My cases / Needs action / Waiting tabs were removed
   save(st);
   main.innerHTML = html`<div class="page-head"><div><h1>Cases</h1><p>Every Corporate New Business case you can see, from lead to handover.</p></div>
     ${state.me.role === "aat" ? html`<div class="ph-actions"><a class="btn primary" href="#/new-business/create">${icon("plus")} New case</a></div>` : ""}</div>
@@ -87,8 +87,6 @@ export async function render(main, { query }) {
     const vis = COLS.filter((c) => c.always || st.cols.includes(c.key));
     box.innerHTML = html`
       <div class="toolbar">
-        <div class="seg" role="tablist" aria-label="Case views">${VIEWS.map((v) => html`<button role="tab" aria-selected="${st.view === v.key}" data-view="${v.key}">${v.label}<span class="cnt">${countFor(v.key)}</span></button>`)}</div>
-        <div class="grow"></div>
         <div class="search">${icon("search", 16)}<label class="sr-only" for="qq">Filter by company or case ID</label>
           <input id="qq" type="search" value="${st.q}" placeholder="Filter by company or case ID"></div>
         <button class="btn" id="fbtn" aria-expanded="false" aria-haspopup="dialog">${icon("filter", 16)} Filters${nf ? html` <span class="pill info plain">${nf}</span>` : ""}</button>
