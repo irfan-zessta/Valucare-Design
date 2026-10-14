@@ -1341,7 +1341,7 @@ def sob_pdf(s, ctx, p):
         doc.table(["Plan", "Member type", "Payment mode", "Rate (PHP)"],
                   [[i.get("plan"), i.get("memberType"), i.get("paymentMode"), f"{num(i.get('proposedRate')) or 0:,.2f}"] for i in prop.get("items", [])],
                   widths=[3, 2, 2, 2])
-    doc.heading("Schedule of benefits", 12)
+    doc.heading("Summary of benefits", 12)
     doc.table(["Category", "Benefit", "MBL", "Benefit limit", "Inner limit", "%", "Frequency", "Waiting", "Co-pay"],
               [[l.get("category"), l.get("subcategory"), l.get("mbl"), l.get("benefitLimit") + (f" - {l.get('limitDescription')}" if l.get("limitDescription") else ""),
                 l.get("innerLimit"), l.get("percentage"), l.get("frequency"), l.get("waitingPeriod"), l.get("copay")] for l in sob.get("lines", [])],

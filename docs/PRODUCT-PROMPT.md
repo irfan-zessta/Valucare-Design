@@ -60,7 +60,7 @@ Section layout per step:
   and commission
 - **Activate & Handover:** Member Data enrolment · Billing · Activation and handover
 
-SOB (Schedule of Benefits) lives **only** in Finalize Offer — don't duplicate the heavy
+SOB (Summary of Benefits) lives **only** in Finalize Offer — don't duplicate the heavy
 SOB editor into Set Up Account.
 
 ---

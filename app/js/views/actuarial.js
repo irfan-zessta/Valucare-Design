@@ -444,7 +444,7 @@ function areaPricing(box, ctx) {
       ${sheets.length ? sheets.slice().reverse().map((s) => rateSheetBlock(s, s.id === (latest && latest.id))) : html`<p class="tiny">No rate sheet imported yet.</p>`}</div></section>
 
     <section class="panel"><div class="ph"><h2>Marked SOB output</h2><span class="tiny">Distinct from the final signed account SOB</span></div>
-      <div class="pb"><p class="tiny muted">The marked Schedule of Benefits attached here is the <b>quotation</b> SOB handed to Sales. It is <b>not</b> the final signed account SOB produced later during account set-up.</p>
+      <div class="pb"><p class="tiny muted">The marked Summary of Benefits attached here is the <b>quotation</b> SOB handed to Sales. It is <b>not</b> the final signed account SOB produced later during account set-up.</p>
         ${latest ? docSlot({ label: "Marked SOB (quotation)", slot: "marked_sob", docs, linkedType: "rateSheet", linkedId: latest.id, caseId, canUpload: isAccusa && editable })
           : html`<p class="tiny">Import a rate sheet first; the marked SOB attaches to that version.</p>`}</div></section>
 
