@@ -41,13 +41,14 @@
   /* layout */
   --nav-w:232px; --nav-w-collapsed:56px; --top-h:56px;
 }
+/* Dark theme DISABLED — these are light-only wireframe mock-ups, so the app stays
+   light regardless of the OS appearance setting. The dark-theme twin is kept below
+   (commented) so it can be restored by un-commenting the media query.
 @media (prefers-color-scheme:dark){
   :root{
     --bg:#09090B; --surface:#18181B; --surface-muted:#232326;
     --border:#2A2A2E; --border-strong:#3F3F46;
     --text:#FAFAFA; --text-muted:#A1A1AA; --text-subtle:#8B8B93;
-    /* wireframe palette — monochrome (dark). Solid fills go light, so text on them
-       (--on-accent) goes dark. */
     --accent:#FAFAFA; --accent-strong:#FFFFFF; --accent-soft:#232326; --accent-line:#3F3F46;
     --on-accent:#18181B;
     --success:#D4D4D8; --success-soft:#232326;
@@ -64,11 +65,12 @@
     --shadow-lg:0 12px 32px rgba(0,0,0,.7);
   }
 }
+*/
 
 /* ---------- reset & base ---------- */
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;color-scheme:light}
 body{font-family:var(--font);font-size:14px;line-height:1.5;color:var(--text);background:var(--bg);
   font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased}
 .tbl,.mono,.num,.due,time,.money,.ref,.ids{font-variant-numeric:tabular-nums}
