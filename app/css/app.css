@@ -113,7 +113,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* ---------- shell ---------- */
 .app{display:grid;grid-template-columns:var(--nav-w) 1fr;min-height:100vh}
 .app.collapsed{grid-template-columns:var(--nav-w-collapsed) 1fr}
-.sidebar{position:sticky;top:0;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:12px 10px;gap:4px;z-index:40;overflow-y:auto}
+.sidebar{position:sticky;top:0;height:100vh;background:transparent;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:12px 10px;gap:4px;z-index:40;overflow-y:auto}
 .brand{display:flex;align-items:center;gap:10px;padding:4px 6px 12px}
 .brand .mark{width:30px;height:30px;border-radius:var(--r-sm);background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:700;font-size:12px;flex:none}
 .brand .nm{font-weight:600;font-size:14px;line-height:1.2}
@@ -143,7 +143,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .app.collapsed .nav .lbl,.app.collapsed .nav .count,.app.collapsed .brand .nm,.app.collapsed .create-btn .lbl,.app.collapsed .nav .sub,.app.collapsed .chev{display:none}
 .app.collapsed .create-btn{padding:0;width:38px;height:38px;align-self:center}
 .content{min-width:0;display:flex;flex-direction:column}
-.topbar{position:sticky;top:0;z-index:30;height:var(--top-h);display:flex;align-items:center;gap:12px;padding:0 20px;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(180%) blur(16px);-webkit-backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--border)}
+.topbar{position:sticky;top:0;z-index:30;height:var(--top-h);display:flex;align-items:center;gap:12px;padding:0 20px;background:transparent;border-bottom:1px solid var(--border)}
 .topbar .menu-btn{display:none}
 .topbar .qsearch{flex:1;max-width:460px;position:relative}
 .topbar .qsearch input{width:100%;height:36px;padding:0 64px 0 34px;border:1px solid var(--border-input);border-radius:var(--r-sm);background:var(--surface)}
