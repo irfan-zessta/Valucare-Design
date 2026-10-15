@@ -69,6 +69,12 @@ export async function previewApi(path, method = "GET", body) {
     return (await load("me__" + currentUser)) || { user: null };
   }
 
+  // --- read-only lookups that happen to POST a body ---
+  // The duplicate check mutates nothing; it just compares the typed company against
+  // the registry. A static preview has no live registry to compare against, so report
+  // no duplicates and let the Confirm company step continue to Lead details.
+  if (p === "companies/duplicates") return { matches: [] };
+
   // --- writes never persist in a visual preview ---
   if (method !== "GET") throw new PreviewError();
 

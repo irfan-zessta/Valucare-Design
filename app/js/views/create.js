@@ -58,7 +58,7 @@ export async function render(main) {
             html`<button class="btn sm" data-use="${i}">Start new business for this company</button>`}</div></li>`;
       })}</ul>
       <div class="row mt-lg"><span class="muted">Not the company you are looking for?</span><button class="btn" id="newco">${icon("plus", 16)} Create a new company</button></div>`
-    : html`<div class="note"><b>No company matches "${s.q}".</b> Check the spelling or search by TIN. If this is a genuinely new prospect, create it - a duplicate check still runs on the details you enter.</div>
+    : html`<div class="note"><b>No company matches "${s.q}".</b> Check the spelling or search by TIN. If this is a genuinely new prospect, create it. A duplicate check still runs on the details you enter.</div>
       <button class="btn primary mt" id="newco">${icon("plus", 16)} Create new company</button>`}`.s;
     res.querySelectorAll("[data-use]").forEach((b) => (b.onclick = () => { s.company = r[+b.dataset.use].company; s.newCompany = null; s.step = "lead"; draw(); }));
     res.querySelector("#newco").onclick = () => {
@@ -141,7 +141,7 @@ export async function render(main) {
     const co = s.company || s.newCompany;
     const L = (s.lead ||= { channel: "", intermediaryId: "", leadSource: "", estHeadcount: "", estPremium: "", probability: "", targetEffectiveDate: "", contactName: "", contactEmail: "", contactPhone: "", ownerId: state.me.id, jumbo: false });
     body.innerHTML = html`<form class="panel" data-form id="lf" novalidate><div class="ph"><h2>Lead details</h2><button type="button" class="btn ghost sm" id="back">‹ Back</button></div><div class="pb">
-      <div class="note"><b>${co.registeredName}</b> · ${s.company ? html`Existing company record ${s.company.id} - the case will be linked to it.` : html`New company${s.override ? " (separate-company override recorded)" : ""}. A company record will be created with the case.`}
+      <div class="note"><b>${co.registeredName}</b> · ${s.company ? html`Existing company record ${s.company.id}. The case will be linked to it.` : html`New company${s.override ? " (separate-company override recorded)" : ""}. A company record will be created with the case.`}
         <div class="tiny">No account number is generated at lead creation; it is issued by AMT after the contract and pricing gates.</div></div>
       <fieldset class="mt" style="border:0;padding:0"><legend class="lbl" style="font-weight:600;font-size:12.5px;color:var(--text-muted)">Business source <span class="req">*</span> <span class="tag legacy">HMS3</span></legend>
         <div class="row">${["Direct", "Agent", "Broker"].map((c) => html`<label class="check"><input type="radio" name="channel" value="${c}" ${L.channel === c ? "checked" : ""}> ${c}</label>`)}</div></fieldset>
