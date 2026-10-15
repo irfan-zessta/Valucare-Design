@@ -115,6 +115,9 @@ function renderShell() {
 // entirely when the demo bypass is off.
 function renderDemoPanel() {
   document.getElementById("demoPanel")?.remove();
+  // Hidden on the hosted visual preview so shared links stay clean; still shown in
+  // local dev, where Act as / Fill form / Reset are useful.
+  if (window.__HMS3_PREVIEW__) return;
   if (!DEMO_BYPASS) return;
   const me = state.me;
   const collapsed = prefs.get("demoCollapsed", false);
