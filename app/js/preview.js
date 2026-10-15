@@ -48,6 +48,17 @@ function emptyShape() {
   return { items: [], rows: [], history: [], notifications: [], groups: [], cols: [], results: [], total: 0 };
 }
 
+// What a write returns in the preview. There is no server to run the action, so we
+// report an optimistic success instead of dead-ending every button on the "not saved"
+// toast. The empty collections cover the handful of callers that read result fields
+// (plan-code generate/import, franchise submit conflicts) so none of them crash. The
+// action's own success toast then shows, the page reloads, and because the fixtures are
+// unchanged the record stays where it was, which is honest for a static mock: the click
+// is acknowledged, nothing persists across reload.
+function writeShape() {
+  return { ok: true, created: [], failed: [], preview: [], conflicts: [], warnings: [], sobVersion: 1 };
+}
+
 export async function previewApi(path, method = "GET", body) {
   const p = path.split("?")[0].replace(/\/+$/, "");
   method = (method || "GET").toUpperCase();
@@ -75,8 +86,14 @@ export async function previewApi(path, method = "GET", body) {
   // no duplicates and let the Confirm company step continue to Lead details.
   if (p === "companies/duplicates") return { matches: [] };
 
-  // --- writes never persist in a visual preview ---
-  if (method !== "GET") throw new PreviewError();
+  // --- writes: acknowledged, never persisted ---
+  // Every workflow action (submit, approve, generate, assign and the rest) and the few
+  // other write POSTs land here. Rather than dead-end each button on a "not saved"
+  // toast, we return an optimistic success so the action's normal confirmation shows and
+  // the page continues. Nothing is written: a reload re-reads the same fixtures, so the
+  // record stays put. Field edits are handled separately in core's SaveForm, which keeps
+  // typed values for the session.
+  if (method !== "GET") return writeShape();
 
   // --- reads: captured fixture, else a safe empty shape ---
   const data = await load(slugify(p));
