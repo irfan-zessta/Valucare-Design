@@ -33,9 +33,6 @@ export async function render(main, { query }) {
   document.title = "Cases · HMS3";
   const st = load();
   if (query.q !== undefined) st.q = query.q;
-  // The New Sales sub-menu links here with ?step=N to filter by work area. A plain
-  // visit (no step) clears that filter so the full list shows.
-  st.filters = { ...(st.filters || {}), area: query.step ? String(query.step) : "" };
   st.view = "all"; // one unified list; the My cases / Needs action / Waiting tabs were removed
   save(st);
   main.innerHTML = html`<div class="page-head"><div><h1>Cases</h1><p>Every Corporate New Business case you can see, from lead to handover.</p></div>

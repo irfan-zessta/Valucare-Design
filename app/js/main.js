@@ -46,32 +46,25 @@ function renderLogin(reason) {
 }
 
 // ---------------------------------------------------------------- shell
-// A single navigation item, New Sales, which opens the New Business list. The
-// routes behind the other screens (Inbox, Reports, Directory, Settings) still
-// work by deep link; they are just no longer shown in the sidebar.
+// Four program areas. New Business is the live workspace; the other three run
+// outside this application today, so they open a short placeholder that says so
+// rather than an empty list that could read as "no cases".
 const NAV = [
-  { key: "cases", label: "New Sales", icon: "folder", href: "#/new-business" },
+  { key: "new-business", label: "New Business", icon: "folder", href: "#/new-business" },
+  { key: "renewal-business", label: "Renewal Business", icon: "history", href: "#/renewal-business" },
+  { key: "new-ifg", label: "New IFG", icon: "building", href: "#/new-ifg" },
+  { key: "renewal-ifg", label: "Renewal IFG", icon: "history", href: "#/renewal-ifg" },
 ];
 const NAV_SETTINGS = { key: "settings", label: "Settings", icon: "settings", href: "#/settings" };
-// The five work areas of a case, shown as sub-items under New Sales. Each one opens
-// the New Business list filtered to that step (same step numbers as the case stepper).
-const NAV_STEPS = [
-  { n: 1, label: "Create Franchise" },
-  { n: 2, label: "Prepare Quotation" },
-  { n: 3, label: "Finalize Offer" },
-  { n: 4, label: "Set Up Account" },
-  { n: 5, label: "Activate & Handover" },
-];
 const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon, 18)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 items">0</span>` : html`<span></span>`}</a>`;
-const stepLink = (s) => html`<a class="sub-link" href="#/new-business?step=${s.n}" data-substep="${s.n}" title="${s.label}"><span class="sub-n" aria-hidden="true">${s.n}</span><span class="lbl">${s.label}</span></a>`;
 
 // Which primary item is active for the current route.
 function activeInfo(parts) {
   const p = parts[0];
-  if (p === "tasks") return { top: "inbox" };
-  if (p === "new-business" || p === "case" || p === "actuarial") return { top: "cases" };
-  if (p === "reports") return { top: "reports" };
-  if (p === "more" || p === "accounts") return { top: "directory" };
+  if (p === "new-business" || p === "case" || p === "actuarial") return { top: "new-business" };
+  if (p === "renewal-business") return { top: "renewal-business" };
+  if (p === "new-ifg") return { top: "new-ifg" };
+  if (p === "renewal-ifg") return { top: "renewal-ifg" };
   if (p === "settings") return { top: "settings" };
   return {};
 }
@@ -84,7 +77,7 @@ function renderShell() {
     <nav class="sidebar" aria-label="Main navigation" id="sidebar">
       <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Corporate New Business</small></span></div>
       ${me.role === "aat" ? html`<a class="btn create-btn" href="#/new-business/create" title="New Business">${icon("plus")}<span class="lbl">New Business</span></a>` : ""}
-      <div class="nav">${NAV.map(navLink)}<div class="subnav" id="subnav">${NAV_STEPS.map(stepLink)}</div></div>
+      <div class="nav">${NAV.map(navLink)}</div>
       <div class="spacer"></div>
       <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse", 18)}<span class="lbl">Collapse</span><span></span></button></div>
     </nav>
@@ -237,6 +230,9 @@ window.addEventListener("hms:changed", refreshCounts);
 const VIEWS = {
   home: () => import("./views/home.js"),
   "new-business": () => import("./views/queue.js"),
+  "renewal-business": () => import("./views/section.js"),
+  "new-ifg": () => import("./views/section.js"),
+  "renewal-ifg": () => import("./views/section.js"),
   create: () => import("./views/create.js"),
   tasks: () => import("./views/tasks.js"),
   accounts: () => import("./views/accounts.js"),
@@ -269,12 +265,6 @@ async function route(force = false) {
   document.querySelectorAll("[data-nav]").forEach((a) => {
     const n = a.dataset.nav;
     const active = n === info.top || n === info.item;
-    if (active) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
-  });
-  // Highlight the active step sub-item (set only when viewing the list filtered by step).
-  const onList = parts[0] === "new-business" && parts[1] !== "create";
-  document.querySelectorAll("[data-substep]").forEach((a) => {
-    const active = onList && String(a.dataset.substep) === String(query.step || "");
     if (active) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
   const seq = ++renderSeq;
