@@ -46,14 +46,11 @@ function renderLogin(reason) {
 }
 
 // ---------------------------------------------------------------- shell
-// Five places work lives. Inbox is the current user's queue (a badge appears only
-// when something needs action); Cases is every case; then Reports, Directory and
-// Settings. Creating a case is a quiet full-width action above the list.
+// A single navigation item, New Sales, which opens the New Business list. The
+// routes behind the other screens (Inbox, Reports, Directory, Settings) still
+// work by deep link; they are just no longer shown in the sidebar.
 const NAV = [
-  { key: "inbox", label: "Inbox", icon: "inbox", href: "#/tasks", count: true },
-  { key: "cases", label: "Cases", icon: "folder", href: "#/new-business" },
-  { key: "reports", label: "Reports", icon: "chart", href: "#/reports" },
-  { key: "directory", label: "Directory", icon: "users", href: "#/more" },
+  { key: "cases", label: "New Sales", icon: "folder", href: "#/new-business" },
 ];
 const NAV_SETTINGS = { key: "settings", label: "Settings", icon: "settings", href: "#/settings" };
 const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon, 18)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 items">0</span>` : html`<span></span>`}</a>`;
@@ -79,7 +76,6 @@ function renderShell() {
       ${me.role === "aat" ? html`<a class="btn create-btn" href="#/new-business/create" title="New case">${icon("plus")}<span class="lbl">New case</span></a>` : ""}
       <div class="nav">${NAV.map(navLink)}</div>
       <div class="spacer"></div>
-      <div class="nav">${navLink(NAV_SETTINGS)}</div>
       <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse", 18)}<span class="lbl">Collapse</span><span></span></button></div>
     </nav>
     <div class="scrim" id="scrim"></div>
