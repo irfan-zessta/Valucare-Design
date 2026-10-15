@@ -1,20 +1,22 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HMS3 · Corporate New Business</title>
-  <meta name="description" content="HMS3 Corporate New Business — a calm, guided workflow from franchise creation to account activation and handover." />
-  <link rel="stylesheet" href="assets/theme.css?v=17" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HMS3 Corporate New Business</title>
+  <meta name="description" content="HMS3 Corporate New Business. Lead to activation and handover for the Commercial and Sales team.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="app/css/app.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
   <div id="root"></div>
-  <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
-
-  <script src="assets/model.js?v=17"></script>
-  <script src="assets/ui.js?v=17"></script>
-  <script src="assets/views.js?v=17"></script>
-  <script src="assets/router.js?v=17"></script>
+  <div id="live-polite" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <div id="live-assertive" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+  <div id="toasts" class="toasts" aria-live="off"></div>
+  <noscript>This application needs JavaScript.</noscript>
+  <script type="module" src="app/js/main.js"></script>
 </body>
 </html>
