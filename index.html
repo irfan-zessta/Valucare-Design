@@ -17,6 +17,11 @@
   <div id="live-assertive" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
   <div id="toasts" class="toasts" aria-live="off"></div>
   <noscript>This application needs JavaScript.</noscript>
+  <!-- Static visual-preview mode. This entry is what a static host (e.g. Vercel)
+       serves; there is no Python backend there, so the app answers its own /api/
+       calls from canned data under app/preview/. Local dev serves app/index.html
+       (no flag) and talks to the real server. -->
+  <script>window.__HMS3_PREVIEW__ = true;</script>
   <script type="module" src="app/js/main.js"></script>
 </body>
 </html>

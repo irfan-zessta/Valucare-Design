@@ -1,5 +1,9 @@
 // Core utilities: safe templating, API client, dialogs, announcements, saving.
 
+// Static visual-preview backend. Only used when window.__HMS3_PREVIEW__ is set by a
+// hosted/static root index.html; local dev (served from app/) never touches it.
+import { previewApi } from "./preview.js";
+
 // DEMO MOCK MODE — mirrors server/domain.py DEMO_BYPASS. When true, client-side
 // required-field validation never blocks submit/advance, so a user can walk any
 // case through every stage with blank mandatory fields. Set to false to restore.
@@ -191,6 +195,7 @@ async function reauth() {
   return reauthPromise;
 }
 export async function api(path, { method = "GET", body, raw: rawBody, headers = {}, retryAuth = true } = {}) {
+  if (window.__HMS3_PREVIEW__) return previewApi(path, method, body);
   let res;
   try {
     res = await fetch("/api/" + path, {
@@ -265,6 +270,7 @@ export async function showError(e) {
     return;
   }
   if (e.code === "network") { toast(e.message, "err"); return; }
+  if (e.code === "preview") { toast(e.message); return; }
   if (e.code === "session_expired") return;
   await messageDialog(e.status === 403 ? "Not permitted" : "Could not complete this", html`<p>${e.message}</p>`);
 }
@@ -396,6 +402,18 @@ export class RecordForm {
     const changes = {};
     keys.forEach((k) => (changes[k] = clone(this.draft[k])));
     this.setStatus("saving");
+    // Visual preview: there is no server, so keep edits locally for the session and
+    // report them as saved. Nothing persists across reload, which is honest for a mock.
+    if (window.__HMS3_PREVIEW__) {
+      keys.forEach((k) => (this.base[k] = clone(this.draft[k])));
+      this.base.v = (this.base.v || 0) + 1;
+      this.orig = clone(this.base);
+      this.lastSaved = new Date();
+      this.setStatus("saved");
+      this.clearBackup();
+      this.onSaved && this.onSaved(this.base, this);
+      return true;
+    }
     this.saving = (async () => {
       try {
         const res = await api("action/record.save", { method: "POST", body: { recordId: this.id, baseVersion: this.base.v, changes } });
