@@ -204,7 +204,7 @@ export async function render(main) {
         sample = (items.find((c) => c.stageLabel === "Franchise" && !c.closed) || items.find((c) => !c.closed) || items[0] || {}).id || "";
       } catch (e) { /* fall through to the toast */ }
       toast("Visual preview: new cases are not saved. Opening a sample case so you can continue.");
-      if (sample) go(`#/case/${sample}/${ifg ? "overview" : "franchise"}`);
+      if (sample) go(`#/case/${sample}/${ifg ? "overview" : "franchise/franchise"}`);
       return;
     }
     const payload = { lead: L };
@@ -213,7 +213,10 @@ export async function render(main) {
     if (!r) return;
     if (ifg) await act("case.routeIfg", { caseId: r.caseId, note: `Below corporate minimum (${L.estHeadcount} principals).` }, { success: "Lead recorded and routed to IFG." });
     window.dispatchEvent(new Event("hms:changed"));
-    go(`#/case/${r.caseId}/${ifg ? "overview" : "franchise"}`);
+    // Land on the franchise form itself (the next action), not the step's first
+    // "Lead and pipeline" sub-tab. The /franchise/franchise segment resolves to the
+    // Franchise registration section.
+    go(`#/case/${r.caseId}/${ifg ? "overview" : "franchise/franchise"}`);
   }
   draw();
 }
