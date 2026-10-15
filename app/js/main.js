@@ -53,7 +53,17 @@ const NAV = [
   { key: "cases", label: "New Sales", icon: "folder", href: "#/new-business" },
 ];
 const NAV_SETTINGS = { key: "settings", label: "Settings", icon: "settings", href: "#/settings" };
+// The five work areas of a case, shown as sub-items under New Sales. Each one opens
+// the New Business list filtered to that step (same step numbers as the case stepper).
+const NAV_STEPS = [
+  { n: 1, label: "Create Franchise" },
+  { n: 2, label: "Prepare Quotation" },
+  { n: 3, label: "Finalize Offer" },
+  { n: 4, label: "Set Up Account" },
+  { n: 5, label: "Activate & Handover" },
+];
 const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon, 18)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 items">0</span>` : html`<span></span>`}</a>`;
+const stepLink = (s) => html`<a class="sub-link" href="#/new-business?step=${s.n}" data-substep="${s.n}" title="${s.label}"><span class="sub-n" aria-hidden="true">${s.n}</span><span class="lbl">${s.label}</span></a>`;
 
 // Which primary item is active for the current route.
 function activeInfo(parts) {
@@ -73,8 +83,8 @@ function renderShell() {
   root.innerHTML = html`<div class="app ${collapsed ? "collapsed" : ""}" id="app">
     <nav class="sidebar" aria-label="Main navigation" id="sidebar">
       <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Corporate New Business</small></span></div>
-      ${me.role === "aat" ? html`<a class="btn create-btn" href="#/new-business/create" title="New case">${icon("plus")}<span class="lbl">New case</span></a>` : ""}
-      <div class="nav">${NAV.map(navLink)}</div>
+      ${me.role === "aat" ? html`<a class="btn create-btn" href="#/new-business/create" title="New Business">${icon("plus")}<span class="lbl">New Business</span></a>` : ""}
+      <div class="nav">${NAV.map(navLink)}<div class="subnav" id="subnav">${NAV_STEPS.map(stepLink)}</div></div>
       <div class="spacer"></div>
       <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse", 18)}<span class="lbl">Collapse</span><span></span></button></div>
     </nav>
@@ -195,7 +205,7 @@ export async function guideDialog() {
     wide: true,
     body: html`<p class="muted">One Corporate New Business case travels from first lead to an active, handed-over account. Walk the whole journey by acting as each team in turn.</p>
       <ol class="guide-steps mt">
-        <li><b>Open a case</b> from Cases, or start a fresh one with New case.</li>
+        <li><b>Open a case</b> from the list, or start a fresh one with New Business.</li>
         <li><b>Follow the next action.</b> Each case shows what happens next and who owns it.</li>
         <li><b>Act as the owner.</b> When the next step belongs to another team, use Act as in the Demo panel to become that person.</li>
         <li><b>Fill forms fast</b> with Fill this form, then save or submit to move the case on.</li>
@@ -259,6 +269,12 @@ async function route(force = false) {
   document.querySelectorAll("[data-nav]").forEach((a) => {
     const n = a.dataset.nav;
     const active = n === info.top || n === info.item;
+    if (active) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  });
+  // Highlight the active step sub-item (set only when viewing the list filtered by step).
+  const onList = parts[0] === "new-business" && parts[1] !== "create";
+  document.querySelectorAll("[data-substep]").forEach((a) => {
+    const active = onList && String(a.dataset.substep) === String(query.step || "");
     if (active) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
   const seq = ++renderSeq;
