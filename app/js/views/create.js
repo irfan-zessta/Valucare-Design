@@ -193,6 +193,20 @@ export async function render(main) {
     }
     paintFieldErrors(errs, main);
     if (errs.length) { toast(`${errs.length} item(s) need attention.`, "err"); (main.querySelector('[aria-invalid="true"]') || main.querySelector('input[name="channel"]'))?.focus(); return; }
+    // A static visual preview has no backend to persist a new case, and no fixture
+    // exists for a brand-new case id. Rather than dead-end on the "not saved" toast,
+    // open a seeded sample case at the franchise step so the walkthrough continues.
+    // The message stays honest: nothing was saved.
+    if (window.__HMS3_PREVIEW__) {
+      let sample = "";
+      try {
+        const items = (await api("cases")).items || [];
+        sample = (items.find((c) => c.stageLabel === "Franchise" && !c.closed) || items.find((c) => !c.closed) || items[0] || {}).id || "";
+      } catch (e) { /* fall through to the toast */ }
+      toast("Visual preview: new cases are not saved. Opening a sample case so you can continue.");
+      if (sample) go(`#/case/${sample}/${ifg ? "overview" : "franchise"}`);
+      return;
+    }
     const payload = { lead: L };
     if (s.company) payload.companyId = s.company.id; else { payload.newCompany = s.newCompany; if (s.override) payload.override = s.override; }
     const r = await act("case.create", payload, { button: btn, success: "Case created." });
