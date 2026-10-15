@@ -1,5 +1,5 @@
 import { html, raw, api, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, money, dialog, toast, RecordForm, saveStateHtml, pickFile,
-  showError, upload, docUrl, clone, int, confirmDialog, esc, fileOrSample, DEMO_BYPASS } from "../core.js";
+  showError, upload, docUrl, clone, int, confirmDialog, esc, fileOrSample, DEMO_BYPASS, actsAs, isAdmin, ownsCase } from "../core.js";
 import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, simNote, sampleBtn, fillSampleData } from "../components.js";
 import { subnav, ownerBanner } from "./case.js";
 import { linesTable, wireLines, addLine, addSampleLine, comparisonTable } from "./lines.js";
@@ -39,7 +39,7 @@ const reqStatus = (fr) => {
   return out ? `${out} outstanding` : "complete";
 };
 const alignStatus = (al) => ["bc", "mda"].every((t) => al.acks?.[t]?.status === "Confirmed") ? "confirmed" : "pending";
-const isAM = (ctx) => state.me.role === "aat" && ctx.data.case.ownerId === state.me.id;
+const isAM = (ctx) => ownsCase(ctx.data.case);
 
 // ---------------------------------------------------------------- requirements
 function requirements(ctx) {
@@ -328,11 +328,11 @@ function proposal(ctx) {
     const name = stage === "sm" ? "proposal.smDecision" : "proposal.seniorDecision";
     if (await act(name, { id: prop.id, decision: r.action === "return" && stage === "senior" ? "reject" : r.action, reviewedVersion: prop.v, overrideAck: r.values.overrideAck, remarks: r.values.remarks }, { button: b, success: r.action === "approve" ? "Approved." : "Returned to the AAT handler." })) ctx.reload();
   };
-  if (me.role === "approver" && prop.status === "For Internal Review") prop.submittedBy === me.id ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You submitted this version; another approver must review it.</span>`) : btn("Review pricing", "primary", (b) => decide(b, "sm"));
-  if (me.role === "approver" && prop.status === "Sales Manager Approved") {
-    // Two-level segregation: the approver who gave the first-level decision cannot give the second (mirrors proposal.seniorDecision on the server).
+  if (actsAs("approver") && prop.status === "For Internal Review") (!isAdmin() && prop.submittedBy === me.id) ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You submitted this version; another approver must review it.</span>`) : btn("Review pricing", "primary", (b) => decide(b, "sm"));
+  if (actsAs("approver") && prop.status === "Sales Manager Approved") {
+    // Two-level segregation: the approver who gave the first-level decision cannot give the second (mirrors proposal.seniorDecision on the server). Admin covers the whole desk, so the demo lets one Admin give both.
     const firstBy = [...(prop.approvals || [])].reverse().find((a) => a.stage === "sm" && a.version === prop.version)?.by;
-    firstBy === me.id
+    (!isAdmin() && firstBy === me.id)
       ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You gave the first-level pricing approval; a different approver must give the second-level approval.</span>`)
       : btn("Final pricing decision", "primary", (b) => decide(b, "senior"));
   }

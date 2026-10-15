@@ -1,9 +1,9 @@
-import { html, api, state, act, go, roleLabel, industryName, interName, toast, esc, paintFieldErrors, showError, fmtDate, DEMO_BYPASS } from "../core.js";
+import { html, api, state, act, go, roleLabel, industryName, interName, toast, esc, paintFieldErrors, showError, fmtDate, DEMO_BYPASS, actsAs } from "../core.js";
 import { icon, field, mountCombos, pill, sampleBtn, fillSampleData } from "../components.js";
 
 export async function render(main) {
   document.title = "Create New Business · HMS3";
-  if (state.me.role !== "aat") {
+  if (!actsAs("aat")) {
     main.innerHTML = html`<div class="page-head"><div><h1>Create New Business</h1></div></div><div class="note">New Business cases are created by the AAT (lead generation) team. You are signed in as ${roleLabel(state.me.role)}.</div>`.s;
     return;
   }
@@ -115,7 +115,7 @@ export async function render(main) {
     };
   }
   function drawDups(box) {
-    const allowed = state.meta.config.duplicateOverrideRoles.includes(state.me.role);
+    const allowed = state.meta.config.duplicateOverrideRoles.some(actsAs);
     box.innerHTML = html`<div class="note warn mt" role="alert"><b>Possible duplicate${s.dups.length > 1 ? "s" : ""} found.</b> Use the existing company, or record why this is a separate company.</div>
       <ul class="doclist mt">${s.dups.map((m, i) => html`<li style="align-items:flex-start"><div><b>${m.company.registeredName}</b> <span class="tiny">${m.company.id}</span>
         <div class="tiny">TIN ${m.company.tin || "-"} · ${m.company.address}, ${m.company.city} · ${industryName(m.company.industry)}</div>

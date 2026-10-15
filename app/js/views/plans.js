@@ -1,4 +1,4 @@
-import { html, raw, api, state, act, userName, fmtDate, fmtDateTime, dialog, money, showError, toast, prefs, esc, messageDialog, ApiErr, DEMO_BYPASS } from "../core.js";
+import { html, raw, api, state, act, userName, fmtDate, fmtDateTime, dialog, money, showError, toast, prefs, esc, messageDialog, ApiErr, DEMO_BYPASS, actsAs } from "../core.js";
 import { icon, pill, field, mountCombos, mountProviders, controlValue } from "../components.js";
 import { ownerBanner } from "./case.js";
 import { importFlow } from "./quotation.js";
@@ -12,7 +12,7 @@ export async function render(ctx) {
     body.innerHTML = html`<div class="note">Plan Codes are created by AMT after the account is approved (BR-12). Account is <b>${parent?.status || "not created"}</b>.</div>`.s;
     return;
   }
-  const isAS = me.role === "amt" && data.case.status === "Open";
+  const isAS = actsAs("amt") && data.case.status === "Open";
   const accountOpts = accs.map((a) => ({ value: a.id, label: `${a.accountCode} · ${a.accountInfo.accountName}`, sub: a.parentId ? "Affiliate" : "Parent account" }));
   const st = prefs.get(`plans:${id}`, { account: "", status: "", q: "", page: 0, size: 50, sort: "planCode", dir: "asc" });
   let selected = new Set();

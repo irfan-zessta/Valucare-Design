@@ -1,4 +1,4 @@
-import { html, raw, state, act, roleLabel, userName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, showError, docUrl, clone, money, go, confirmDialog, DEMO_BYPASS, toast } from "../core.js";
+import { html, raw, state, act, roleLabel, userName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, showError, docUrl, clone, money, go, confirmDialog, DEMO_BYPASS, toast, actsAs, isAdmin, ownsCase } from "../core.js";
 import { icon, pill, docSlot, wireUploads } from "../components.js";
 import { linesTable, wireLines, addLine, addSampleLine, comparisonTable } from "./lines.js";
 import { ownerBanner } from "./case.js";
@@ -10,7 +10,7 @@ export async function render(ctx) {
   const me = state.me;
   const sobs = data.records.sob || [];
   const fr = (data.records.franchise || []).slice(-1)[0];
-  const am = me.role === "aat" && data.case.ownerId === me.id;
+  const am = ownsCase(data.case);
   const sob = sobs.find((s) => s.id === ctx.query.sob) || sobs.find((s) => (s.scope || "parent") === "parent") || sobs[0];
   if (!sob) {
     const torLines = (data.records.tor || [])[0]?.lines?.length;
@@ -49,7 +49,7 @@ export async function render(ctx) {
     ${(sob.scope || "parent") === "parent" ? html`<section class="panel"><div class="ph"><h2>TOR vs SOB comparison</h2><a class="tiny" href="#/case/${id}/quotation/tor">Edit TOR</a></div><div class="pb">${comparisonTable(cmp)}</div></section>` : ""}
     <section class="panel"><div class="ph"><h2>Documents and versions</h2></div><div class="pb">
       <div class="grid2">${docSlot({ label: "SOB signature-format PDF", slot: "sob_pdf", docs: data.documents, linkedType: "sob", linkedId: sob.id, caseId: id, canUpload: false })}
-        ${docSlot({ label: "Client-signed SOB", slot: "sob_signed", docs: data.documents, linkedType: "sob", linkedId: sob.id, caseId: id, canUpload: ["aat", "amt"].includes(me.role) && ["Approved"].includes(sob.status) })}</div>
+        ${docSlot({ label: "Client-signed SOB", slot: "sob_signed", docs: data.documents, linkedType: "sob", linkedId: sob.id, caseId: id, canUpload: ["aat", "amt"].some(actsAs) && ["Approved"].includes(sob.status) })}</div>
       ${(sob.history || []).length ? html`<div class="row mt"><label for="cmpV" class="tiny">Compare with version</label><select id="cmpV" class="inp" style="width:auto">${sob.history.map((h) => html`<option value="${h.version}">v${h.version} (${h.status})</option>`)}</select></div><div id="vdiff" class="mt"></div>` : html`<p class="tiny mt">No earlier versions.</p>`}</div></section>`.s;
   body.querySelector("#sobSel")?.addEventListener("change", (e) => go(`#/case/${id}/setup/sob?sob=${e.target.value}`));
   wireUploads(body, () => ctx.reload());
@@ -122,21 +122,21 @@ export async function render(ctx) {
       actions: [{ label: "Cancel" }, { label: "Return to AAT handler", value: "return", validate: (v) => (!v.remarks.trim() ? "Enter the reason." : null) }, { label: "Approve", kind: "primary", value: "approve", validate: (v) => (override && sob.reducedCount && !v.overrideAck ? "Confirm the coverage-reduction override." : null) }] });
     if (r && ["approve", "return"].includes(r.action) && (await act(name, { id: sob.id, decision: r.action, reviewedVersion: sob.v, remarks: r.values.remarks, overrideAck: r.values.overrideAck }, { button: b, success: "Decision recorded." }))) ctx.reload();
   };
-  if (me.role === "approver" && sob.status === "Sales Review") sob.preparedBy === me.id ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared this SOB.</span>`) : btn("Sales review decision", "primary", (b) => decide(b, "sob.salesReview", "Sales review of SOB", false));
-  if (state.meta.config.sobValidatorRoles.includes(me.role) && sob.status === "Independent Validation") {
-    if ([sob.preparedBy, sob.salesReviewBy].includes(me.id)) bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared or reviewed this SOB; an independent person must validate it.</span>`);
+  if (actsAs("approver") && sob.status === "Sales Review") (!isAdmin() && sob.preparedBy === me.id) ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared this SOB.</span>`) : btn("Sales review decision", "primary", (b) => decide(b, "sob.salesReview", "Sales review of SOB", false));
+  if (state.meta.config.sobValidatorRoles.some(actsAs) && sob.status === "Independent Validation") {
+    if (!isAdmin() && [sob.preparedBy, sob.salesReviewBy].includes(me.id)) bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared or reviewed this SOB; an independent person must validate it.</span>`);
     else btn("Independent validation", "primary", (b) => decide(b, "sob.validate", "Independent SOB validation (against TOR and signed proposal)", true));
   }
-  if (["aat", "amt"].includes(me.role) && sob.status === "Approved") btn("Record client signature", "primary", async (b) => {
+  if (["aat", "amt"].some(actsAs) && sob.status === "Approved") btn("Record client signature", "primary", async (b) => {
     const signed = data.documents.filter((d) => d.slot === "sob_signed" && d.linked?.id === sob.id && !d.supersededBy);
     if (!signed.length) return showError({ message: "Upload the client-signed SOB in 'Client-signed SOB' first." });
     if (await act("sob.recordSigned", { id: sob.id, docId: signed[signed.length - 1].id }, { button: b, success: "Client signature recorded." })) ctx.reload();
   });
-  if (me.role === "amt" && sob.status === "Client Signed") btn("Codify SOB", "primary", async (b) => {
+  if (actsAs("amt") && sob.status === "Client Signed") btn("Codify SOB", "primary", async (b) => {
     if (!(await confirmDialog("Codify SOB", `Codify SOB v${sob.version}? The structured benefits become the live SOB for CCD and the source for Plan Codes.`, { confirm: "Codify" }))) return;
     if (await act("sob.codify", { id: sob.id }, { button: b, success: "SOB codified." })) ctx.reload();
   });
-  if ((am || me.role === "amt") && sob.status !== "Draft" && data.case.status === "Open") btn("Amend (new version)", "", async (b) => {
+  if ((am || actsAs("amt")) && sob.status !== "Draft" && data.case.status === "Open") btn("Amend (new version)", "", async (b) => {
     const r = await dialog({ title: "Amend SOB", body: html`<p>Creates version ${sob.version + 1} as a draft. It must be reviewed, validated, signed and codified again. ${props && props.status !== "Accepted" ? "An unaccepted proposal will need re-approval." : ""}</p><div class="field mt"><label for="ar">Amendment reason *</label><textarea id="ar" name="reason" class="inp"></textarea></div>`,
       actions: [{ label: "Cancel" }, { label: "Create amendment", kind: "primary", value: "ok", validate: (v) => (!v.reason.trim() ? "Enter the reason." : null) }] });
     if (r?.action === "ok" && (await act("sob.amend", { id: sob.id, reason: r.values.reason }, { button: b, success: `SOB v${sob.version + 1} draft created.` }))) ctx.reload();

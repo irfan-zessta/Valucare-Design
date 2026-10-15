@@ -1,7 +1,7 @@
 import { html, raw, state, act, api, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, toast, RecordForm, saveStateHtml, errorSummaryHtml,
   wireErrorLinks, paintFieldErrors, showError, daysUntil, clone, confirmDialog } from "../core.js";
 import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, setComboValue, srcTag, fillSampleData } from "../components.js";
-import { DEMO_BYPASS } from "../core.js";
+import { DEMO_BYPASS, actsAs, isAdmin, ownsCase } from "../core.js";
 
 export async function render(ctx) {
   const { data, el, id } = ctx;
@@ -9,7 +9,7 @@ export async function render(ctx) {
   const frs = data.records.franchise || [];
   const fr = frs[frs.length - 1];
   const me = state.me;
-  const isOwner = me.role === "aat" && c.ownerId === me.id;
+  const isOwner = ownsCase(c);
   if (!fr || (["Rejected", "Expired"].includes(fr.status) && ctx.query.new)) {
     el.innerHTML = html`<div class="panel"><div class="pb"><h2 class="h">Franchise not started</h2>
       <p class="muted mt">The franchise registers this prospect to the AAT handler${c.channel !== "Direct" ? " and the agent/broker" : ""} for a validity period.
@@ -19,12 +19,12 @@ export async function render(ctx) {
     return;
   }
   const editable = isOwner && ["Draft", "Returned"].includes(fr.status) && c.status === "Open";
-  const acusaEditable = ["accusa", "amt"].includes(me.role) && c.status === "Open";
+  const acusaEditable = ["accusa", "amt"].some(actsAs) && c.status === "Open";
   const docs = data.documents;
   const inter = ["Agent", "Broker"].includes(fr.otherInfo?.businessSource);
   const vu = fr.validUntil ? daysUntil(fr.validUntil) : null;
   const pendingExt = (fr.extensions || []).find((x) => x.status === "Requested");
-  const canReview = me.role === "amt" && ["Submitted", "Under Review"].includes(fr.status) && fr.submittedBy !== me.id;
+  const canReview = actsAs("amt") && ["Submitted", "Under Review"].includes(fr.status) && (isAdmin() || fr.submittedBy !== me.id);
   const schema = state.meta.franchiseSchema;
   let errors = ctx.franchiseErrors || [];
 
@@ -239,12 +239,12 @@ function actionsBar(ctx, fr, { isOwner, canReview, pendingExt }) {
   const bar = ctx.el.querySelector("#frActions");
   const me = state.me;
   const btns = [];
-  if (me.role === "amt" && fr.status === "Submitted" && fr.submittedBy !== me.id) btns.push(["Start review", "start", ""]);
+  if (actsAs("amt") && fr.status === "Submitted" && (isAdmin() || fr.submittedBy !== me.id)) btns.push(["Start review", "start", ""]);
   if (canReview) { btns.push(["Return for correction", "return", ""]); btns.push(["Reject", "reject", "danger"]); btns.push(["Approve franchise", "approve", "primary"]); }
-  if (me.role === "amt" && ["Submitted", "Under Review"].includes(fr.status) && fr.submittedBy === me.id) bar.insertAdjacentHTML("beforeend", `<span class="tiny">You submitted this franchise; another AMT user must review it.</span>`);
+  if (actsAs("amt") && !isAdmin() && ["Submitted", "Under Review"].includes(fr.status) && fr.submittedBy === me.id) bar.insertAdjacentHTML("beforeend", `<span class="tiny">You submitted this franchise; another AMT user must review it.</span>`);
   if (isOwner && fr.status === "Approved" && !pendingExt && ctx.data.case.status === "Open") btns.push(["Request extension", "ext", ""]);
-  if (me.role === "amt" && pendingExt && pendingExt.requestedBy !== me.id) btns.push(["Decide extension", "decideExt", "primary"]);
-  if (!btns.length && !["aat", "amt"].includes(me.role)) bar.insertAdjacentHTML("beforeend", `<span class="tiny">Franchise decisions belong to AMT.</span>`);
+  if (actsAs("amt") && pendingExt && (isAdmin() || pendingExt.requestedBy !== me.id)) btns.push(["Decide extension", "decideExt", "primary"]);
+  if (!btns.length && !["aat", "amt"].some(actsAs)) bar.insertAdjacentHTML("beforeend", `<span class="tiny">Franchise decisions belong to AMT.</span>`);
   btns.forEach(([l, k, cls]) => {
     const b = document.createElement("button");
     b.className = `btn ${cls}`;

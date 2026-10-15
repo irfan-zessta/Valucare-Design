@@ -1,4 +1,4 @@
-import { html, raw, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, docUrl, DEMO_BYPASS, fileOrSample } from "../core.js";
+import { html, raw, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, docUrl, DEMO_BYPASS, fileOrSample, actsAs, isAdmin, ownsCase } from "../core.js";
 import { icon, pill, field, controlValue, docSlot, wireUploads, simNote, sampleBtn, fillSampleData } from "../components.js";
 
 export async function render(ctx) {
@@ -6,7 +6,7 @@ export async function render(ctx) {
   const R = data.records;
   const prop = (R.proposal || [])[0];
   const me = state.me;
-  const am = me.role === "aat" && data.case.ownerId === me.id;
+  const am = ownsCase(data.case);
   const con = (R.contract || []).find((c) => c.kind === "Contract");
   const dsa = (R.contract || []).find((c) => c.kind === "DSA");
   const kyc = (R.kyc || [])[0];
@@ -36,7 +36,7 @@ export async function render(ctx) {
   if (dsa) contractBlock(ctx, dsa, el.querySelector("#c-DSA"));
   kycBlock(ctx, kyc, am);
   onbBlock(ctx, onb, am);
-  if (me.role === "amt" && data.summary.channel !== "Direct") {
+  if (actsAs("amt") && data.summary.channel !== "Direct") {
     const b = document.createElement("button");
     b.className = "btn sm";
     b.textContent = "Record BOR change";
@@ -52,10 +52,10 @@ function contractBlock(ctx, c, box) {
   const keys = steps.map((s) => s.key);
   const cur = keys.indexOf(c.status);
   const nxt = steps[cur + 1];
-  const editable = ((me.role === "legal" && ["Requested", "Drafting", "Review"].includes(c.status)) || (me.role === "amt" && c.status !== "Completed")) && ctx.data.case.status === "Open";
+  const editable = ((actsAs("legal") && ["Requested", "Drafting", "Review"].includes(c.status)) || (actsAs("amt") && c.status !== "Completed")) && ctx.data.case.status === "Open";
   const F = (k, label, type = "text", extra = {}) => field({ key: k, label, type, src: "proposed", ...extra }, c[k], { editable });
   box.innerHTML = html`<section class="panel"><div class="ph"><div><h2>${c.kind === "DSA" ? "DSA" : "Contract"} ${pill(c.status)}</h2><div class="tiny">${c.number ? `No. ${c.number} · ` : ""}Based on proposal v${c.proposalVersion}</div></div>
-    <div class="row">${editable ? sampleBtn("fillSampleContract") : ""}${nxt && me.role === nxt.role && ctx.data.case.status === "Open" ? html`<button class="btn primary" data-adv>Record '${nxt.key}'</button>` : nxt ? html`<span class="tiny">Next: '${nxt.key}' by ${roleLabel(nxt.role)}</span>` : ""}</div></div>
+    <div class="row">${editable ? sampleBtn("fillSampleContract") : ""}${nxt && actsAs(nxt.role) && ctx.data.case.status === "Open" ? html`<button class="btn primary" data-adv>Record '${nxt.key}'</button>` : nxt ? html`<span class="tiny">Next: '${nxt.key}' by ${roleLabel(nxt.role)}</span>` : ""}</div></div>
     <div class="pb"><ol class="steps-h" aria-label="${c.kind} progress">${steps.map((s, i) => { const ev = (c.events || []).find((e) => e.step === s.key);
       return html`<li class="${i < cur ? "done" : i === cur ? (c.status === "Completed" ? "done" : "cur") : ""}" ${i === cur ? raw('aria-current="step"') : ""}>${s.key}<small>${ev ? `${fmtDate(ev.eventDate)} · ${ev.byName}` : roleLabel(s.role)}</small></li>`; })}</ol>
       <div class="fgrid mt" data-form>${F("number", "Contract number", "text", { required: true })}${F("effectiveDate", "Effectivity", "date", { required: true })}${F("expiryDate", "Expiry", "date", { required: true })}
@@ -64,7 +64,7 @@ function contractBlock(ctx, c, box) {
         <div class="field wide"><span class="lbl">Signatories</span><div class="ro">${(c.signatories || []).join(", ") || "-"}</div></div></div>
       ${editable ? html`<div class="tiny mt" data-st></div>` : ""}
       <div class="grid3 mt">${[["draft", "Draft versions", "legal"], ["signed", "Client-signed copy", "amt"], ["notarized", "Notarized copy", "amt"]].map(([slot, label, role]) =>
-        docSlot({ label, slot, docs: ctx.data.documents, linkedType: "contract", linkedId: c.id, caseId: ctx.id, canUpload: me.role === role && ctx.data.case.status === "Open" && c.status !== "Completed" }))}</div>
+        docSlot({ label, slot, docs: ctx.data.documents, linkedType: "contract", linkedId: c.id, caseId: ctx.id, canUpload: actsAs(role) && ctx.data.case.status === "Open" && c.status !== "Completed" }))}</div>
       ${(c.events || []).length ? html`<details class="mt"><summary class="tiny">Event log (${c.events.length})</summary><ul class="timeline">${c.events.map((e) => html`<li><span class="when">${fmtDate(e.eventDate)}</span><div><b>${e.step}</b> - ${e.byName} <span class="tiny">recorded ${fmtDateTime(e.at)}</span>${e.notes ? html`<div class="tiny">${e.notes}</div>` : ""}</div></li>`)}</ul></details>` : ""}
     </div></section>`.s;
   wireUploads(box, () => ctx.reload());
@@ -94,13 +94,13 @@ function kycBlock(ctx, k, am) {
   if (!k) { box.innerHTML = `<p class="tiny">KYC starts with the contract request.</p>`; return; }
   box.innerHTML = html`${simNote("SOLYTICS is not connected. The AAT handler runs the KYC check in SOLYTICS and records the reference, date and result here (manual entry plus upload, per NB-ONB-06).")}
     <div class="grid2 mt">${docSlot({ label: "KYC form (signed)", slot: "kyc_form", docs: ctx.data.documents, linkedType: "kyc", linkedId: k.id, caseId: ctx.id, canUpload: am && ctx.data.case.status === "Open", required: true })}
-      ${docSlot({ label: "Supporting evidence", slot: "kyc_evidence", docs: ctx.data.documents, linkedType: "kyc", linkedId: k.id, caseId: ctx.id, canUpload: me.role === "aat" && ctx.data.case.status === "Open" })}</div>
+      ${docSlot({ label: "Supporting evidence", slot: "kyc_evidence", docs: ctx.data.documents, linkedType: "kyc", linkedId: k.id, caseId: ctx.id, canUpload: actsAs("aat") && ctx.data.case.status === "Open" })}</div>
     <dl class="dl mt"><div><dt>Status</dt><dd>${pill(k.status)}</dd></div><div><dt>External reference</dt><dd>${k.externalRef || "-"}</dd></div><div><dt>Check date</dt><dd>${fmtDate(k.checkDate) || "-"}</dd></div><div><dt>Checker</dt><dd>${k.checkerName || "-"}</dd></div></dl>
     ${(k.flags || []).length ? html`<h3 class="h mt">Flags</h3><ul class="timeline">${k.flags.map((f) => html`<li><span class="when">${fmtDateTime(f.raisedAt)}</span><div>${pill(f.status)} ${f.description}
-      ${f.resolution ? html`<div class="tiny">Resolved by ${f.resolvedByName} ${fmtDateTime(f.resolvedAt)}: ${f.resolution} · <a href="${docUrl(f.evidenceDocId)}">evidence</a></div>` : me.role === "aat" ? html`<button class="btn sm mt" data-resolve="${f.id}">Resolve with evidence</button>` : ""}</div></li>`)}</ul>` : ""}`.s;
+      ${f.resolution ? html`<div class="tiny">Resolved by ${f.resolvedByName} ${fmtDateTime(f.resolvedAt)}: ${f.resolution} · <a href="${docUrl(f.evidenceDocId)}">evidence</a></div>` : actsAs("aat") ? html`<button class="btn sm mt" data-resolve="${f.id}">Resolve with evidence</button>` : ""}</div></li>`)}</ul>` : ""}`.s;
   wireUploads(box, () => ctx.reload());
   const bar = ctx.el.querySelector("#kAct");
-  if (me.role === "aat" && ["Pending", "Flagged"].includes(k.status)) {
+  if (actsAs("aat") && ["Pending", "Flagged"].includes(k.status)) {
     const b = document.createElement("button");
     b.className = "btn primary";
     b.textContent = "Record check result";
@@ -134,12 +134,12 @@ function onbBlock(ctx, o, am) {
   const box = ctx.el.querySelector("#oBody");
   if (!o) { box.innerHTML = `<p class="tiny">Starts with the contract request.</p>`; return; }
   const cfg = state.meta.config;
-  const canWaive = cfg.waiverRoles.includes(me.role);
+  const canWaive = cfg.waiverRoles.some(actsAs);
   box.innerHTML = html`<div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Onboarding checklist</caption><thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Files</th><th scope="col">Waiver</th></tr></thead><tbody>
     ${ctx.data.onboarding.map((it) => html`<tr><td><b>${it.label}</b></td><td>${it.mandatory ? html`<span class="pill warn plain">Mandatory</span>` : html`<span class="pill neutral plain">Optional</span>`} <span class="tag pending">configurable</span></td>
       <td>${pill(it.status)}</td>
-      <td style="min-width:320px">${docSlot({ label: it.label, slot: `onb:${it.key}`, docs: ctx.data.documents, linkedType: "onboarding", linkedId: o.id, caseId: ctx.id, canUpload: (am || me.role === "amt") && ctx.data.case.status === "Open" })}</td>
-      <td>${it.waiver ? html`<div class="tiny">Waived by ${it.waiver.approvedByName}: ${it.waiver.reason}</div>${me.role === "amt" ? html`<button class="btn sm mt" data-revoke="${it.key}">Revoke</button>` : ""}`
+      <td style="min-width:320px">${docSlot({ label: it.label, slot: `onb:${it.key}`, docs: ctx.data.documents, linkedType: "onboarding", linkedId: o.id, caseId: ctx.id, canUpload: (am || actsAs("amt")) && ctx.data.case.status === "Open" })}</td>
+      <td>${it.waiver ? html`<div class="tiny">Waived by ${it.waiver.approvedByName}: ${it.waiver.reason}</div>${actsAs("amt") ? html`<button class="btn sm mt" data-revoke="${it.key}">Revoke</button>` : ""}`
         : canWaive && it.status !== "Received" ? (it.mandatory && !cfg.allowMandatoryWaiver ? html`<span class="tiny">Mandatory - cannot be waived (current configuration)</span>` : html`<button class="btn sm" data-waive="${it.key}">Record approved waiver</button>`) : ""}</td></tr>`)}
     </tbody></table></div>`.s;
   wireUploads(box, () => ctx.reload());

@@ -1,4 +1,4 @@
-import { html, api, state, roleLabel, dueHtml, fmtDate, fmtDateTime, daysUntil } from "../core.js";
+import { html, api, state, roleLabel, dueHtml, fmtDate, fmtDateTime, daysUntil, actsAs, isAdmin } from "../core.js";
 import { icon, pill, ownerText } from "../components.js";
 
 export async function render(main) {
@@ -16,7 +16,7 @@ export async function render(main) {
   const byId = Object.fromEntries(cases.items.map((c) => [c.id, c]));
   const recentCases = recent.items.map((r) => ({ ...byId[r.caseId], touched: r.at })).filter((c) => c.id).slice(0, 6);
   const ownCases = cases.items.filter((c) => c.ownerId === me.id || c.salesManagerId === me.id || recent.items.some((r) => r.caseId === c.id));
-  const waiting = (me.role === "aat" ? cases.items.filter((c) => c.ownerId === me.id || c.salesManagerId === me.id) : ownCases)
+  const waiting = (isAdmin() ? cases.items : actsAs("aat") ? cases.items.filter((c) => c.ownerId === me.id || c.salesManagerId === me.id) : ownCases)
     .filter((c) => !c.closed && c.next && (c.next.waiting || !c.myTasks.length))
     .slice(0, 8);
   const eff = cases.items.filter((c) => !c.closed && c.effectivity && daysUntil(c.effectivity) <= 45 && !["Active", "Handover Complete"].includes(c.activationStatus))
@@ -28,7 +28,7 @@ export async function render(main) {
   main.innerHTML = html`
   <div class="page-head"><div><h1>${greet}, ${me.name.split(" ")[0]}</h1>
     <p>${roleLabel(me.role)} · ${tasks.items.length} task(s) need your action${overdue ? `, ${overdue} overdue` : ""}.</p></div>
-    ${me.role === "aat" ? html`<a class="btn primary lg" href="#/new-business/create">${icon("plus")} Create New Business</a>` : ""}</div>
+    ${actsAs("aat") ? html`<a class="btn primary lg" href="#/new-business/create">${icon("plus")} Create New Business</a>` : ""}</div>
   <div class="home-grid">
     <div class="stack">
       <section class="panel" aria-labelledby="h-tasks"><div class="ph"><h2 id="h-tasks">Needs my action</h2><a href="#/tasks" class="tiny">All my tasks (${tasks.items.length})</a></div>

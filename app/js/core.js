@@ -81,7 +81,22 @@ export const userName = (id) => state.meta?.users?.find((u) => u.id === id)?.nam
 export const optLabel = (key, v) => state.meta?.options?.[key]?.find((o) => o.value === v)?.label ?? v ?? "";
 export const industryName = (c) => state.meta?.industries?.find((i) => i.code === c)?.name || c || "";
 export const interName = (id) => state.meta?.intermediaries?.find((i) => i.id === id)?.name || id || "";
-export const can = (...roles) => roles.includes(state.me?.role);
+
+// ---------------------------------------------------------------- demo identity
+// The demo collapses the whole internal New Business desk into one "Admin" person
+// who can create, review, approve and handle legal without switching users. The
+// three departments that genuinely sit outside that desk — Actuarial, MDA and
+// Billing — stay as separate personas you switch into. This is a presentation-layer
+// convenience for the mock (same spirit as DEMO_BYPASS); server roles are unchanged.
+export const INTERNAL_NB_ROLES = ["aat", "amt", "approver", "legal"];
+export const isAdmin = () => state.me?.role === "admin";
+// True when the current identity may act in `role`. Admin stands in for every
+// internal New Business role; everyone else only acts in their own role.
+export const actsAs = (role) => state.me?.role === role || (isAdmin() && INTERNAL_NB_ROLES.includes(role));
+export const can = (...roles) => roles.some(actsAs);
+// AAT owner gate: a plain AAT handler acts only on their own book; Admin owns the
+// whole desk, so the per-handler ownership check does not apply to them.
+export const ownsCase = (c) => actsAs("aat") && (isAdmin() || c?.ownerId === state.me?.id);
 
 // ---------------------------------------------------------------- announcements / toasts
 export function announce(msg, assertive = false) {

@@ -1,5 +1,5 @@
 import { html, raw, api, state, act, roleLabel, userName, industryName, interName, fmtDate, fmtDateTime, dueHtml, money, int, go, dialog, toast, can, esc, daysUntil,
-  RecordForm, saveStateHtml, flushForms, disposeForms, confirmDialog, DEMO_BYPASS } from "../core.js";
+  RecordForm, saveStateHtml, flushForms, disposeForms, confirmDialog, DEMO_BYPASS, actsAs, isAdmin, ownsCase } from "../core.js";
 import { icon, pill, stageBar, ownerText, docRow, wireUploads, field, mountCombos, controlValue, sampleBtn, fillSampleData } from "../components.js";
 import { switchUser } from "../main.js";
 
@@ -79,7 +79,9 @@ export async function render(main, { parts, query, force }) {
     reload: async () => { const y = window.scrollY; if (!(await flushForms())) return; disposeForms(); await render(main, { parts: location.hash.replace(/^#\/?/, "").split("?")[0].split("/"), query: Object.fromEntries(new URLSearchParams(location.hash.split("?")[1] || "")), force: true }); window.scrollTo(0, y); window.dispatchEvent(new Event("hms:changed")); },
   };
   const n = s.next;
-  const mine = n && s.myTasks.some((t) => t.key === n.key);
+  // Admin acts in every internal role, so an internal next action counts as theirs
+  // (unless it is waiting on the client, which no internal role can action).
+  const mine = n && (s.myTasks.some((t) => t.key === n.key) || (actsAs(n.role) && n.waiting !== "client"));
   // Suggest who should take the next step so the demo driver knows which user to switch to.
   const suggested = (() => {
     if (!DEMO_BYPASS || !n || mine || n.waiting === "client") return null;
@@ -256,7 +258,7 @@ function caseDetails(data) {
 
 function leadPanel(ctx, below) {
   const c = ctx.data.case;
-  const canEdit = c.status === "Open" && state.me.role === "aat" && c.ownerId === state.me.id;
+  const canEdit = c.status === "Open" && ownsCase(c);
   const stages = state.meta.config.pipelineStages.filter((x) => !x.startsWith("Closed"));
   return html`<section class="panel" data-form id="leadForm"><div class="ph"><h2>Lead and pipeline</h2>${canEdit ? html`<div class="row tight">${sampleBtn("fillSampleLeadC")}<span class="tiny" id="leadState"></span></div>` : html`<span class="tiny">${icon("lock", 12)} View only</span>`}</div>
     <div class="pb"><div class="fgrid two">
@@ -272,12 +274,12 @@ function leadPanel(ctx, below) {
       ${field({ key: "contactEmail", label: "Contact email", type: "email", src: "legacy", wide: true }, c.contactEmail, { editable: canEdit })}
     </div>
     ${below && c.status === "Open" ? html`<div class="note warn mt"><b>Below the corporate minimum.</b> ${c.estHeadcount} principal(s) is fewer than ${state.meta.config.corporateMinPrincipals}. The prospect must be routed to the IFG team (outside this application).</div>` : ""}
-    ${c.status === "Open" && (canEdit || state.me.role === "approver") ? html`<div class="row mt">
+    ${c.status === "Open" && (canEdit || actsAs("approver")) ? html`<div class="row mt">
       ${canEdit ? html`<button class="btn sm" id="logAct">Log activity</button>` : ""}
       ${canEdit && below ? html`<button class="btn sm" id="ifg">Route to IFG</button>` : ""}
       ${canEdit ? html`<button class="btn sm danger" id="lost">Close as lost</button>` : ""}
-      ${state.me.role === "approver" ? html`<button class="btn sm" id="reassign">Reassign owner</button>` : ""}</div>` : ""}
-    ${c.status === "Closed Lost" && state.me.role === "approver" ? html`<button class="btn sm mt" id="reopen">Reopen case</button>` : ""}
+      ${actsAs("approver") ? html`<button class="btn sm" id="reassign">Reassign owner</button>` : ""}</div>` : ""}
+    ${c.status === "Closed Lost" && actsAs("approver") ? html`<button class="btn sm mt" id="reopen">Reopen case</button>` : ""}
     </div></section>`;
 }
 function activities(c) {
@@ -436,6 +438,6 @@ export function subnav(ctx, items, current) {
   return html`<nav class="subtabs" aria-label="${label} sections">${items.map((i) => html`<a href="#/case/${ctx.id}/${ctx.tab}/${i.key}" ${i.key === current ? raw('aria-current="page"') : ""}>${i.label}${i.status ? html` <span class="st">· ${i.status}</span>` : ""}</a>`)}</nav>`;
 }
 export function ownerBanner(roleKeys, what) {
-  if (roleKeys.includes(state.me.role)) return "";
+  if (roleKeys.some(actsAs)) return "";
   return html`<div class="note mb">${icon("lock", 14)} ${what} is owned by <b>${roleKeys.map(roleLabel).join(" / ")}</b>. You are viewing it as ${roleLabel(state.me.role)}; status and handoffs are shown read-only.</div>`;
 }

@@ -1,4 +1,4 @@
-import { html, raw, api, state, act, roleLabel, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, toast, confirmDialog, docUrl, messageDialog, pickFile, DEMO_BYPASS } from "../core.js";
+import { html, raw, api, state, act, roleLabel, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, toast, confirmDialog, docUrl, messageDialog, pickFile, DEMO_BYPASS, actsAs } from "../core.js";
 import { icon, pill, srcTag } from "../components.js";
 import { linesTable, wireLines, addLine, addSampleLine } from "./lines.js";
 
@@ -16,14 +16,14 @@ async function intermediaries(main) {
   state.meta.intermediaries = items;
   const me = state.me;
   main.innerHTML = html`<div class="page-head"><div><h1>Agents and Brokers</h1><p>Only Active intermediaries with a verified agreement can be tagged to franchises (NB-AGT-05). One active AOR/BOR per account (BR-02).</p></div>
-    ${["aat", "amt"].includes(me.role) ? html`<button class="btn primary" id="reg">${icon("plus")} Register intermediary</button>` : ""}</div>
+    ${["aat", "amt"].some(actsAs) ? html`<button class="btn primary" id="reg">${icon("plus")} Register intermediary</button>` : ""}</div>
     <div class="panel"><div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Intermediaries</caption><thead><tr><th>Name</th><th>Type</th><th>Code</th><th>Contact email</th><th>Status</th><th>Validity</th><th>Agreement</th><th>Accounts (AOR/BOR)</th><th>Action</th></tr></thead><tbody>
     ${items.map((i) => html`<tr><td><b>${i.name}</b><span class="sub">${i.contactPerson || ""} · ${i.mobile || ""}</span></td><td>${i.intermediaryType}</td><td class="mono">${i.code}</td><td>${i.email}</td><td>${pill(i.status)}</td>
       <td>${fmtDate(i.validFrom)} - ${fmtDate(i.validTo)}</td><td>${(i.documents || []).filter((d) => d.slot === "agreement").map((d) => html`<a href="${docUrl(d.id)}">${d.filename}</a>`)}
-        ${["aat", "amt"].includes(me.role) ? html`<button class="btn sm" data-up="${i.id}">${icon("upload", 13)} Upload</button>` : ""}</td>
+        ${["aat", "amt"].some(actsAs) ? html`<button class="btn sm" data-up="${i.id}">${icon("upload", 13)} Upload</button>` : ""}</td>
       <td>${(i.aors || []).length ? i.aors.map((a) => html`<div class="tiny">${a.status} since ${fmtDate(a.effectiveFrom)}</div>`) : html`<span class="tiny">None</span>`}</td>
-      <td>${me.role === "amt" && i.status === "Uploaded" ? html`<button class="btn sm" data-v="${i.id}">Verify agreement</button>` : ""}${me.role === "amt" && i.status === "Verified" ? html`<button class="btn sm primary" data-v="${i.id}">Activate</button>` : ""}
-        ${me.role === "amt" && i.status === "Active" ? html`<button class="btn sm" data-in="${i.id}">Deactivate</button>` : ""}</td></tr>`)}</tbody></table></div></div>`.s;
+      <td>${actsAs("amt") && i.status === "Uploaded" ? html`<button class="btn sm" data-v="${i.id}">Verify agreement</button>` : ""}${actsAs("amt") && i.status === "Verified" ? html`<button class="btn sm primary" data-v="${i.id}">Activate</button>` : ""}
+        ${actsAs("amt") && i.status === "Active" ? html`<button class="btn sm" data-in="${i.id}">Deactivate</button>` : ""}</td></tr>`)}</tbody></table></div></div>`.s;
   main.querySelector("#reg")?.addEventListener("click", async (e) => {
     const r = await dialog({ title: "Register agent or broker", wide: true, body: html`<div class="fgrid two">
       <div class="field"><label for="it">Type *</label><select id="it" name="intermediaryType" class="inp"><option>Agent</option><option>Broker</option></select></div>

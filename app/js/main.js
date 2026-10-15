@@ -1,4 +1,4 @@
-import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, confirmDialog, toast, announce, DEMO_BYPASS } from "./core.js";
+import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, confirmDialog, toast, announce, DEMO_BYPASS, actsAs } from "./core.js";
 import { icon, avatar, cleanLabel, fillSampleData } from "./components.js";
 
 const root = document.getElementById("root");
@@ -14,14 +14,15 @@ async function boot() {
 }
 
 // ---------------------------------------------------------------- sign in
-// A quiet centered card. Each row signs in as that team's demo user and opens
-// their work. No passwords, no dead-end tiles, no production disclaimers — the
-// Demo panel makes clear this is a mock.
+// A quiet centered card. Four identities cover the whole demo. Admin is the internal
+// New Business desk — one person who creates, reviews, approves and handles legal, so
+// you never switch to walk a case through. Actuarial, MDA and Billing are the three
+// departments that sit outside that desk; switch into them only when a case needs them.
 const SIGNIN = [
-  { user: "u-am1", role: "Sales", desc: "Create and move New Business cases" },
-  { user: "u-ac1", role: "Actuarial", desc: "Price quotations and release rates" },
-  { user: "u-bc1", role: "Billing", desc: "Billing and collection" },
-  { user: "u-cc1", role: "Customer Care", desc: "Downstream account care" },
+  { user: "u-ad1", key: "admin", role: "Admin", desc: "The whole New Business desk: create, review, approve and legal" },
+  { user: "u-ac1", key: "accusa", role: "Actuarial", desc: "Price quotations and release rates" },
+  { user: "u-md1", key: "mda", role: "MDA", desc: "Record member data alignment results" },
+  { user: "u-bc1", key: "bc", role: "Billing", desc: "Set up billing and collection" },
 ];
 
 function renderLogin(reason) {
@@ -76,7 +77,7 @@ function renderShell() {
   root.innerHTML = html`<div class="app ${collapsed ? "collapsed" : ""}" id="app">
     <nav class="sidebar" aria-label="Main navigation" id="sidebar">
       <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Corporate New Business</small></span></div>
-      ${me.role === "aat" ? html`<a class="btn create-btn" href="#/new-business/create" title="New Business">${icon("plus")}<span class="lbl">New Business</span></a>` : ""}
+      ${actsAs("aat") ? html`<a class="btn create-btn" href="#/new-business/create" title="New Business">${icon("plus")}<span class="lbl">New Business</span></a>` : ""}
       <div class="nav">${NAV.map(navLink)}</div>
       <div class="spacer"></div>
       <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse", 18)}<span class="lbl">Collapse</span><span></span></button></div>
@@ -175,10 +176,11 @@ async function userMenu(btn) {
   const r = await dialog({
     title: "Account",
     body: html`<p class="muted">Signed in as <b>${cleanLabel(me.name)}</b> (${cleanLabel(roleLabel(me.role))}). Switching keeps your place; unsaved changes are saved first.</p>
-      ${sug && sug.id && sug.id !== me.id ? html`<p class="note info mt">The next step needs <b>${cleanLabel(sug.name)}</b>. They are selected below.</p>` : ""}
-      <div class="field mt"><label for="sw">Act as</label><select id="sw" name="user" class="inp">${state.meta.users.map((u) => {
-        const pick = sug && sug.id ? u.id === sug.id : u.id === me.id;
-        return html`<option value="${u.id}" ${pick ? "selected" : ""}>${cleanLabel(u.name)} · ${cleanLabel(roleLabel(u.role))}</option>`;
+      <p class="tiny mt">Admin covers the whole internal desk: create, review, approve and legal. Switch only for Actuarial, MDA or Billing.</p>
+      ${sug && sug.id && sug.id !== me.id ? html`<p class="note info mt">The next step needs <b>${cleanLabel(roleLabel(sug.role))}</b>. They are selected below.</p>` : ""}
+      <div class="field mt"><label for="sw">Act as</label><select id="sw" name="user" class="inp">${SIGNIN.map((p) => {
+        const pick = sug && sug.id ? p.user === sug.id || p.key === sug.role : p.key === me.role;
+        return html`<option value="${p.user}" ${pick ? "selected" : ""}>${p.role}</option>`;
       })}</select></div>`,
     actions: [{ label: "Sign out", value: "out" }, { label: "Cancel" }, { label: "Switch", kind: "primary", value: "ok" }],
   });

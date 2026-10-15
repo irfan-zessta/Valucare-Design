@@ -12,7 +12,7 @@
 // "pending confirmation". Actuarial pricing happens OUTSIDE HMS; this never implies an
 // automated pricing engine exists. Email and delivery are simulated.
 import { html, raw, api, state, act, userName, roleLabel, fmtDate, fmtDateTime, money, dialog, confirmDialog, toast,
-  upload, docUrl, showError, parseHash, go, DEMO_BYPASS } from "../core.js";
+  upload, docUrl, showError, parseHash, go, DEMO_BYPASS, isAdmin, ownsCase } from "../core.js";
 import { icon, pill, docSlot, wireUploads, simNote } from "../components.js";
 import { importFlow } from "./quotation.js";
 import { switchUser } from "../main.js";
@@ -261,7 +261,9 @@ async function workspace(main, caseId, area) {
   };
   const pend = pendingOf(rr, latest);
   ctx.pend = pend;
-  ctx.canAct = (a) => pend && pend.area === a && pend.role === ctx.persona.pend;
+  // Admin covers every internal persona (Sales, first- and second-level approval);
+  // only Actuarial (accusa) is a separate switchable department.
+  ctx.canAct = (a) => pend && pend.area === a && (pend.role === ctx.persona.pend || (isAdmin() && pend.role !== "accusa"));
 
   if (!rr) {
     main.innerHTML = html`${journeyHead("work", ownerId)}<div class="panel"><div class="pb"><h2 class="h">No rate request yet</h2>
@@ -306,7 +308,7 @@ function workspaceHeader(ctx, pend) {
 function wireHeader(root, ctx, pend) {
   const slot = root.querySelector("#awhNext");
   if (!pend) return;
-  const mine = pend.role === ctx.persona.pend;
+  const mine = pend.role === ctx.persona.pend || (isAdmin() && pend.role !== "accusa");
   if (mine) {
     const b = document.createElement("a");
     b.className = "btn primary";
@@ -326,7 +328,7 @@ function wireHeader(root, ctx, pend) {
 function areaReview(box, ctx) {
   const { data, rr, franchise, docs, summary, caseId } = ctx;
   const me = ctx.persona;
-  const amOwner = state.me.role === "aat" && data.case.ownerId === state.me.id;
+  const amOwner = ownsCase(data.case);
   const reqs = state.meta.requirements || [];
   const frOk = franchise && ["Approved", "Converted to Account"].includes(franchise.status);
   box.innerHTML = html`
@@ -537,8 +539,9 @@ function areaApprove(box, ctx) {
   const log = latest.approvalLog || [];
   const l1 = approvals.find((a) => a.level === 1 && a.decision === "approve");
   const l2 = approvals.find((a) => a.level === 2 && a.decision === "approve");
-  const canL1 = me.pend === "l1" && qs === "Submitted for Review";
-  const canL2 = me.pend === "l2" && qs === "L1 Approved";
+  // Admin covers both approval functions; a plain approver persona covers only its level.
+  const canL1 = (me.pend === "l1" || isAdmin()) && qs === "Submitted for Review";
+  const canL2 = (me.pend === "l2" || isAdmin()) && qs === "L1 Approved";
 
   box.innerHTML = html`
     <div id="apprAct" class="actbar"></div>
@@ -598,7 +601,7 @@ function areaRelease(box, ctx) {
   const { latest, caseId, summary, rr } = ctx;
   const me = ctx.persona;
   const qs = latest ? (latest.quoteStatus || "Released") : null;
-  const amOwner = state.me.role === "aat" && ctx.data.case.ownerId === state.me.id;
+  const amOwner = ownsCase(ctx.data.case);
   if (!latest) {
     box.innerHTML = html`<section class="panel"><div class="pb"><h2 class="h">Nothing to release yet</h2><p class="muted mt">The quotation must be prepared and approved first.</p></div></section>`.s;
     return;

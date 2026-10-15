@@ -1,4 +1,4 @@
-import { html, api, state, prefs, fmtDate, daysUntil, go } from "../core.js";
+import { html, api, state, prefs, fmtDate, daysUntil, go, actsAs, isAdmin } from "../core.js";
 import { icon, statusPill, caseStatus, ownerCell, relDue, flags, area, AREA_TOTAL, cleanLabel, emptyState, plural } from "../components.js";
 
 // Bumped from "queue:nb": the redesigned table uses new column keys (step, handler)
@@ -36,7 +36,7 @@ export async function render(main, { query }) {
   st.view = "all"; // one unified list; the My cases / Needs action / Waiting tabs were removed
   save(st);
   main.innerHTML = html`<div class="page-head"><div><h1>Cases</h1><p>Every Corporate New Business case you can see, from lead to handover.</p></div>
-    ${state.me.role === "aat" ? html`<div class="ph-actions"><a class="btn primary" href="#/new-business/create">${icon("plus")} New Business</a></div>` : ""}</div>
+    ${actsAs("aat") ? html`<div class="ph-actions"><a class="btn primary" href="#/new-business/create">${icon("plus")} New Business</a></div>` : ""}</div>
     <div class="panel" id="q"><div class="state-box" aria-busy="true"><div class="skeleton"></div><div class="skeleton mt"></div><div class="skeleton mt"></div><p class="tiny mt">Loading cases…</p></div></div>`.s;
   const box = main.querySelector("#q");
   let items, recent;
@@ -61,7 +61,7 @@ export async function render(main, { query }) {
     const mine = c.myTasks || [];
     if (view === "mine") return c.ownerId === me.id || c.salesManagerId === me.id || involved.has(c.id) || mine.length > 0;
     if (view === "action") return mine.length > 0;
-    if (view === "waiting") return !c.closed && !mine.length && c.next && (me.role === "aat" ? (c.ownerId === me.id || c.salesManagerId === me.id) : involved.has(c.id));
+    if (view === "waiting") return !c.closed && !mine.length && c.next && (isAdmin() || (actsAs("aat") ? (c.ownerId === me.id || c.salesManagerId === me.id) : involved.has(c.id)));
     return true;
   }
   // Search + filters, applied the same way to the rows and to every tab count, so

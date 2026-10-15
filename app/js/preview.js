@@ -9,7 +9,7 @@
 // dev server. The real UI renders and is clickable; nothing is actually saved.
 
 const BASE = new URL("../preview/", import.meta.url); // -> /app/preview/
-const KNOWN_USERS = ["u-am1", "u-ac1", "u-bc1", "u-cc1"];
+const KNOWN_USERS = ["u-ad1", "u-ac1", "u-md1", "u-bc1"];
 
 // A gentle, honest error for anything that would write. Code "preview" is handled
 // in core's showError as a quiet toast, never a fake success.
@@ -54,8 +54,8 @@ export async function previewApi(path, method = "GET", body) {
 
   // --- fake auth (no passwords, any role) ---
   if (p === "login") {
-    currentUser = (body && body.userId) || "u-am1";
-    if (!KNOWN_USERS.includes(currentUser)) currentUser = "u-am1";
+    currentUser = (body && body.userId) || "u-ad1";
+    if (!KNOWN_USERS.includes(currentUser)) currentUser = "u-ad1";
     try { sessionStorage.setItem("hms3PreviewUser", currentUser); } catch (e) { /* ignore */ }
     return { ok: true };
   }

@@ -1,4 +1,4 @@
-import { html, raw, api, state, act, pickFile, showError, toast, dialog, fmtDateTime, roleLabel, int, upload, docUrl, esc, fileOrSample, DEMO_BYPASS } from "../core.js";
+import { html, raw, api, state, act, pickFile, showError, toast, dialog, fmtDateTime, roleLabel, int, upload, docUrl, esc, fileOrSample, DEMO_BYPASS, actsAs } from "../core.js";
 import { icon, pill, simNote } from "../components.js";
 
 export async function renderMemberData(ctx, box, purpose) {
@@ -7,7 +7,7 @@ export async function renderMemberData(ctx, box, purpose) {
   const batches = (data.records.memberBatch || []).filter((b) => b.purpose === purpose);
   const batch = batches.filter((b) => b.status !== "Superseded").slice(-1)[0];
   const ownerRoles = purpose === "enrollment" ? ["amt"] : ["aat"];
-  const owns = ownerRoles.includes(me.role) && data.case.status === "Open";
+  const owns = ownerRoles.some(actsAs) && data.case.status === "Open";
   const cols = state.meta.memberColumns;
   const acc = (data.records.account || []).find((a) => !a.parentId);
   const enrollmentBlocked = purpose === "enrollment" && (!acc || !["Approved", "Scheduled", "Active"].includes(acc.status));
@@ -74,7 +74,7 @@ export async function renderMemberData(ctx, box, purpose) {
   const actions = [];
   if (owns && ["Has errors", "Validated"].includes(batch.status) && purpose === "enrollment") actions.push(html`<button class="btn" id="assign">Assign approved Plan Codes</button>`);
   if (owns && ["Has errors", "Validated"].includes(batch.status)) actions.push(html`<button class="btn ${batch.status === "Validated" ? "primary" : ""}" id="accept">Accept Member Data</button>`);
-  if (me.role === "amt" && batch.status === "Accepted" && purpose === "enrollment") actions.push(html`<button class="btn primary" id="toMda">Submit to MDA</button>`);
+  if (actsAs("amt") && batch.status === "Accepted" && purpose === "enrollment") actions.push(html`<button class="btn primary" id="toMda">Submit to MDA</button>`);
   if (me.role === "mda" && batch.status === "Submitted to MDA") actions.push(html`<button class="btn primary" id="mdaRes">Record MDA result</button>`);
   body.innerHTML = html`${head}
     ${batch.status === "Returned by MDA" ? html`<div class="note danger mb"><b>Returned by MDA:</b> ${batch.mda?.notes}. Correct the rows or re-upload, then accept and resubmit.</div>` : ""}
@@ -94,13 +94,13 @@ export async function renderMemberData(ctx, box, purpose) {
       body.querySelector("#mInfo").textContent = `${r.total} row(s) · loaded in ${Math.round(performance.now() - t0)} ms`;
       const editable = owns && ["Has errors", "Validated", "Returned by MDA"].includes(batch.status);
       rowsBox.innerHTML = html`<div class="tbl-wrap"><table class="tbl compact"><caption class="sr-only">Member Data rows</caption><thead><tr><th scope="col" class="frozen">Row</th>
-        ${cols.map((x) => html`<th scope="col">${x.label}</th>`)}<th scope="col">Status / issues</th>${editable || me.role === "amt" ? html`<th scope="col"><span class="sr-only">Action</span></th>` : ""}</tr></thead><tbody>
+        ${cols.map((x) => html`<th scope="col">${x.label}</th>`)}<th scope="col">Status / issues</th>${editable || actsAs("amt") ? html`<th scope="col"><span class="sr-only">Action</span></th>` : ""}</tr></thead><tbody>
         ${r.items.length ? r.items.map((row) => html`<tr class="${row.status === "error" ? "err" : row.status === "exception" ? "exc" : ""}"><td class="frozen">${row.rowNo}</td>
           ${cols.map((x) => html`<td class="${row.errors.some((e) => e.field === x.key) ? "due overdue" : ""}">${row.data[x.key] || ""}</td>`)}
           <td style="min-width:240px">${pill(row.status === "error" ? "Error" : row.status === "exception" ? "Exception - needs approval" : row.status === "approved-exception" ? "Approved exception" : "Valid")}
             ${row.errors.map((e) => html`<span class="sub">${e.message}</span>`)}</td>
-          ${editable || me.role === "amt" ? html`<td class="nowrap">${editable ? html`<button class="btn sm" data-edit="${row.rowNo}">Correct</button>` : ""}
-            ${me.role === "amt" && row.status === "exception" && purpose === "enrollment" ? html` <button class="btn sm" data-exc="${row.rowNo}">Approve exception</button>` : ""}</td>` : ""}</tr>`)
+          ${editable || actsAs("amt") ? html`<td class="nowrap">${editable ? html`<button class="btn sm" data-edit="${row.rowNo}">Correct</button>` : ""}
+            ${actsAs("amt") && row.status === "exception" && purpose === "enrollment" ? html` <button class="btn sm" data-exc="${row.rowNo}">Approve exception</button>` : ""}</td>` : ""}</tr>`)
           : html`<tr><td colspan="${cols.length + 3}"><div class="empty">${filter === "problems" ? "No rows need attention." : "No rows."}</div></td></tr>`}</tbody></table></div>
         <div class="pager"><span>Page ${page + 1} of ${Math.max(1, Math.ceil(r.total / size))}</span><div class="row tight"><button class="btn sm" id="mp" ${page ? "" : "disabled"}>Previous</button><button class="btn sm" id="mn" ${(page + 1) * size >= r.total ? "disabled" : ""}>Next</button></div></div>`.s;
       rowsBox.querySelector("#mp").onclick = () => { page--; loadRows(); };
