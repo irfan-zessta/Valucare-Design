@@ -88,7 +88,7 @@ export function accountForm(ctx, a, box, { isAffiliate = false } = {}) {
     b.setAttribute("aria-busy", "true"); b.disabled = true;
     try {
       await api("action/account.submit", { method: "POST", body: { id: a.id, baseVersion: form.base.v } });
-      toast("Submitted for approval. A different AMT user must approve it.", "ok");
+      toast(isAdmin() ? "Submitted for approval." : "Submitted for approval. A different AMT user must approve it.", "ok");
       (ctx.accountErrors ||= {})[a.id] = [];
       form.dispose();
       ctx.reload();
