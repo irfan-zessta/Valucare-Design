@@ -171,6 +171,11 @@ function stepTab(ctx, step, activeKey) {
 
 // ---------------------------------------------------------------- step composition
 const secId = (sid) => "sec-" + sid;
+// The last section (tab) the user viewed within each step, keyed by `${caseId}::${step}`.
+// Section tabs toggle client-side without changing the URL, so a soft reload (e.g. after
+// uploading a document) would otherwise re-render from the URL alone and snap back to the
+// first tab. Remembering it here keeps every step on the current tab across reloads.
+const lastSection = new Map();
 function stepGuard(stepKey, data) {
   const fr = (data.records.franchise || []).slice(-1)[0];
   if (["quotation", "offer"].includes(stepKey) && !(fr && ["Approved", "Converted to Account"].includes(fr.status)))
@@ -220,13 +225,19 @@ async function renderStep(ctx, stepKey, anchor) {
   const secs = stepSections(stepKey, ctx.data);
   // Each section is a tab within the work area: one is shown at a time, rather than
   // every section stacked into one long form. A legacy deep link to a section opens
-  // its tab directly; otherwise the first section is shown.
-  const active = (anchor && secs.some((x) => secId(x.id) === anchor)) ? anchor : (secs[0] ? secId(secs[0].id) : null);
+  // its tab directly; otherwise restore the last tab the user had open in this step
+  // (so an in-section action that reloads the record keeps you here); else the first.
+  const memKey = `${ctx.id}::${stepKey}`;
+  const valid = (sec) => sec && secs.some((x) => secId(x.id) === sec);
+  const remembered = lastSection.get(memKey);
+  const active = valid(anchor) ? anchor : valid(remembered) ? remembered : (secs[0] ? secId(secs[0].id) : null);
+  lastSection.set(memKey, active);
   el.innerHTML = html`
     ${secs.length > 1 ? html`<nav class="secnav step-tabs" role="tablist" aria-label="Sections in this work area">${secs.map((x) => html`<a href="#${secId(x.id)}" role="tab" data-tab="${secId(x.id)}" aria-selected="${secId(x.id) === active ? "true" : "false"}">${x.label}</a>`)}</nav>` : ""}
     <div class="step-secs">${secs.map((x) => html`<div class="step-sec" id="${secId(x.id)}" role="tabpanel" ${secId(x.id) === active ? "" : raw("hidden")}></div>`)}</div>`.s;
   const tabs = [...el.querySelectorAll("[data-tab]")];
   const show = (id) => {
+    lastSection.set(memKey, id);
     secs.forEach((x) => { const p = el.querySelector("#" + CSS.escape(secId(x.id))); if (p) p.hidden = secId(x.id) !== id; });
     tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === id)));
   };

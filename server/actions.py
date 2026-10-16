@@ -152,7 +152,9 @@ def attach_document(s, ctx, case_id, linked, slot, doc_type, filename, data, mim
     """User upload + record side-effects (KYC form, onboarding checklist)."""
     st = s.store
     rule = next((roles for pre, roles in UPLOAD_ROLES if slot == pre or (pre.endswith(":") and slot.startswith(pre))), None)
-    if rule and ctx.role not in rule:
+    # Admin carries every internal step solo, so Admin uploads/replaces any document slot.
+    # DEMO_SKIP_DATA (document uploads) relaxes the per-slot uploader gate for the mock too.
+    if rule and ctx.role != "admin" and not DEMO_SKIP_DATA and ctx.role not in rule:
         raise ApiError(403, "forbidden", f"This document is uploaded by {', '.join(meta.ROLES[r] for r in rule)}.")
     target = st.get(linked["id"]) if linked.get("id") else None
     if target and target.get("caseId") and case_id and target["caseId"] != case_id:
