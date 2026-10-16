@@ -4,23 +4,26 @@
       "prefer": [
         "app/js/views/**/*.js",
         "app/js/main.js",
+        "app/js/components.js",
         "app/css/app.css",
         "app/index.html"
       ],
       "deprioritize": [
+        "app/js/core.js",
+        "app/js/preview.js",
         "assets/**/*",
-        "app/js/core.js"
+        "hms3-nb/**/*"
       ],
       "exclude": [
         "server/**/*",
-        "server/__pycache__/**/*",
         "tests/**/*",
         "docs/**/*",
-        ".git/**/*",
+        "app/preview/**/*",
         ".figma/**/*",
+        ".git/**/*",
         "*.md",
-        "docs/**/*.md",
-        "run.sh"
+        "*.sh",
+        ".claude/**/*"
       ]
     },
     "libraryPaths": {
@@ -35,39 +38,39 @@
     "exclusions": [
       {
         "glob": "server/**/*",
-        "reason": "Python back-end API and domain logic — not UI source and cannot be a point-and-edit anchor."
-      },
-      {
-        "glob": "server/__pycache__/**/*",
-        "reason": "Compiled Python bytecode — generated, not source."
+        "reason": "Python backend API and domain logic — not UI source and cannot serve as a point-and-edit anchor."
       },
       {
         "glob": "tests/**/*",
-        "reason": "Automated API test suite — not UI source."
+        "reason": "Python automated test suite — not UI source."
       },
       {
         "glob": "docs/**/*",
-        "reason": "Documentation files — not UI source."
+        "reason": "Markdown documentation files — not UI source."
+      },
+      {
+        "glob": "app/preview/**/*",
+        "reason": "Canned JSON fixture files for the static Vercel preview backend — data files, not UI source."
+      },
+      {
+        "glob": ".figma/**/*",
+        "reason": "Figma Make configuration and generated files — not UI source anchors."
       },
       {
         "glob": ".git/**/*",
         "reason": "Git internals — not source files."
       },
       {
-        "glob": ".figma/**/*",
-        "reason": "Figma Make configuration scripts — not UI source."
-      },
-      {
         "glob": "*.md",
         "reason": "Markdown documentation at the repo root — not UI source."
       },
       {
-        "glob": "docs/**/*.md",
-        "reason": "Markdown documentation files — not UI source."
+        "glob": "*.sh",
+        "reason": "Shell launcher scripts — tooling, not UI source."
       },
       {
-        "glob": "run.sh",
-        "reason": "Shell launcher script — tooling, not UI source."
+        "glob": ".claude/**/*",
+        "reason": "Claude Code configuration and memory files — tooling, not UI source."
       }
     ],
     "generated": {
@@ -75,9 +78,9 @@
       "source": "setup-agent.point-and-edit-path-classifier",
       "prompt": "same-turn-setup-subagent-v5",
       "model": "claude-sonnet-4-6",
-      "createdAt": "2026-10-08T00:00:00Z",
-      "confidence": 0.93,
-      "explanation": "The app/ directory is the sole active hi-fi front-end with a clear module boundary; view files are unambiguous UI anchors, and all non-UI paths (server, tests, docs, assets wireframe legacy) are straightforward to exclude."
+      "createdAt": "2026-10-16T00:00:00Z",
+      "confidence": 0.95,
+      "explanation": "The app/ directory is the sole active frontend with an unambiguous module boundary: view files in app/js/views/ are the primary UI anchors, app/js/components.js is the only local shared-component library, and all non-UI paths (Python server, tests, docs, legacy assets/, hms3-nb/ snapshot, and JSON fixtures) are straightforwardly classifiable."
     }
   }
 }
