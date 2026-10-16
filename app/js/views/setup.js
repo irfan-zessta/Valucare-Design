@@ -278,7 +278,7 @@ function billing(ctx, acc, { hideOrientation = false } = {}) {
     if (DEMO_BYPASS) btn(bar, "Fill sample", "ghost", () => fillSampleData(fe));
     btn(bar, "Submit for approval", "primary", async (b) => { if (!(await form.save())) return; if (await act("billing.submit", { id: bl.id, baseVersion: form.base.v }, { button: b, success: "Billing setup submitted for approval." })) ctx.reload(); });
   }
-  if (me.role === "bc" && bl.status === "For Approval") bl.makerId === me.id ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared it; another B&C user approves.</span>`) : btn(bar, "Approve billing setup", "primary", async (b) => {
+  if (me.role === "bc" && bl.status === "For Approval") (!DEMO_BYPASS && bl.makerId === me.id) ? bar.insertAdjacentHTML("beforeend", `<span class="tiny">You prepared it; another B&C user approves.</span>`) : btn(bar, "Approve billing setup", "primary", async (b) => {
     const r = await dialog({ title: "Approve billing setup", body: html`<div class="field"><label for="br">Remarks (required to return)</label><textarea id="br" name="remarks" class="inp"></textarea></div>`,
       actions: [{ label: "Cancel" }, { label: "Return", value: "return", validate: (v) => (!v.remarks.trim() ? "Enter the reason." : null) }, { label: "Approve", kind: "primary", value: "approve" }] });
     if (r && ["approve", "return"].includes(r.action) && (await act("billing.decide", { id: bl.id, decision: r.action, reviewedVersion: bl.v, remarks: r.values.remarks }, { button: b, success: "Decision recorded." }))) ctx.reload();

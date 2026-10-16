@@ -1,5 +1,5 @@
 import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, confirmDialog, toast, announce, DEMO_BYPASS, actsAs } from "./core.js";
-import { icon, avatar, cleanLabel, fillSampleData } from "./components.js";
+import { icon, cleanLabel } from "./components.js";
 
 const root = document.getElementById("root");
 let lastHash = location.hash;
@@ -77,7 +77,7 @@ function renderShell() {
   root.innerHTML = html`<div class="app ${collapsed ? "collapsed" : ""}" id="app">
     <nav class="sidebar" aria-label="Main navigation" id="sidebar">
       <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Corporate New Business</small></span></div>
-      ${actsAs("aat") ? html`<a class="btn create-btn" href="#/new-business/create" title="New Business">${icon("plus")}<span class="lbl">New Business</span></a>` : ""}
+      ${actsAs("aat") ? html`<a class="btn create-btn" href="#/new-business/create" title="Create New Business">${icon("plus")}<span class="lbl">Create New Business</span></a>` : ""}
       <div class="nav">${NAV.map(navLink)}</div>
       <div class="spacer"></div>
       <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse", 18)}<span class="lbl">Collapse</span><span></span></button></div>
@@ -105,55 +105,19 @@ function renderShell() {
   document.getElementById("qsearch").onsubmit = (e) => { e.preventDefault(); const q = document.getElementById("qs").value.trim(); go(`#/new-business?q=${encodeURIComponent(q)}&view=all`); };
   document.getElementById("whoBtn").onclick = (e) => userMenu(e.currentTarget);
   document.getElementById("bellBtn").onclick = () => go("#/tasks");
-  renderDemoPanel();
   refreshCounts();
 }
 
-// ---------------------------------------------------------------- demo panel
-// All demo-only controls live here, out of the product chrome: who you are acting
-// as, a quick switch, fill the current form, the walkthrough, and reset. Hidden
-// entirely when the demo bypass is off.
-function renderDemoPanel() {
-  document.getElementById("demoPanel")?.remove();
-  // Hidden on the hosted visual preview so shared links stay clean; still shown in
-  // local dev, where Act as / Fill form / Reset are useful.
-  if (window.__HMS3_PREVIEW__) return;
-  if (!DEMO_BYPASS) return;
-  const me = state.me;
-  const collapsed = prefs.get("demoCollapsed", false);
-  const el = document.createElement("div");
-  el.id = "demoPanel";
-  el.className = `demo-panel ${collapsed ? "collapsed" : ""}`;
-  el.innerHTML = html`
-    <div class="dp-head" id="dpHead" role="button" tabindex="0" aria-expanded="${!collapsed}">
-      <b>Demo</b><span class="row tight"><span class="tiny">${cleanLabel(me.name)}</span>${icon(collapsed ? "expand" : "collapse", 14)}</span></div>
-    <div class="dp-body">
-      <div class="dp-who">${avatar(me.name)}<div class="tiny">Acting as <b>${cleanLabel(me.name)}</b><br>${cleanLabel(roleLabel(me.role))}</div></div>
-      <div class="dp-actions">
-        <button class="btn sm" data-dp="act">${icon("user", 15)} Act as…</button>
-        <button class="btn sm" data-dp="fill">${icon("check", 15)} Fill this form</button>
-        <button class="btn sm" data-dp="guide">${icon("help", 15)} Show guide</button>
-        <button class="btn sm danger-ghost" data-dp="reset">${icon("history", 15)} Reset demo data</button>
-      </div>
-    </div>`.s;
-  document.body.appendChild(el);
-  const toggle = () => { prefs.set("demoCollapsed", !el.classList.contains("collapsed")); renderDemoPanel(); };
-  const head = el.querySelector("#dpHead");
-  head.onclick = toggle;
-  head.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } };
-  el.querySelector('[data-dp="act"]').onclick = () => userMenu(document.getElementById("whoBtn"));
-  el.querySelector('[data-dp="fill"]').onclick = () => {
-    const form = document.querySelector("#main [data-form], #main form");
-    if (form) fillSampleData(form); else toast("No form to fill on this page.", "info");
-  };
-  el.querySelector('[data-dp="guide"]').onclick = () => guideDialog();
-  el.querySelector('[data-dp="reset"]').onclick = async () => {
-    if (!(await confirmDialog("Reset demo data?", "This restores the sample companies and cases to their starting state.", { confirm: "Reset", kind: "danger" }))) return;
-    await api("demo/reset", { method: "POST" });
-    toast("Demo data reset.", "ok");
-    go("#/new-business");
-    route(true);
-  };
+// The floating demo panel was removed: its only non-redundant controls (switch
+// identity, guide, reset) now live in the quiet account menu, and every form
+// already carries its own inline "Fill sample" button. Reset stays out of the
+// ordinary creation workflow — it is reachable only from the account menu.
+async function resetDemoData() {
+  if (!(await confirmDialog("Reset demo data?", "This restores the sample companies and cases to their starting state.", { confirm: "Reset", kind: "danger" }))) return;
+  await api("demo/reset", { method: "POST" });
+  toast("Demo data reset.", "ok");
+  go("#/new-business");
+  route(true);
 }
 
 // Perform the real server-side session switch for the demo, then re-render.
@@ -181,8 +145,13 @@ async function userMenu(btn) {
       <div class="field mt"><label for="sw">Act as</label><select id="sw" name="user" class="inp">${SIGNIN.map((p) => {
         const pick = sug && sug.id ? p.user === sug.id || p.key === sug.role : p.key === me.role;
         return html`<option value="${p.user}" ${pick ? "selected" : ""}>${p.role}</option>`;
-      })}</select></div>`,
+      })}</select></div>
+      ${DEMO_BYPASS ? html`<div class="row tight mt"><button type="button" class="btn ghost sm" id="menuGuide">${icon("help", 15)} How this demo works</button><button type="button" class="btn ghost sm danger-ghost" id="menuReset">${icon("history", 15)} Reset demo data</button></div>` : ""}`,
     actions: [{ label: "Sign out", value: "out" }, { label: "Cancel" }, { label: "Switch", kind: "primary", value: "ok" }],
+    onOpen: (dlg, close) => {
+      dlg.querySelector("#menuGuide")?.addEventListener("click", () => { close(null); guideDialog(); });
+      dlg.querySelector("#menuReset")?.addEventListener("click", () => { close(null); resetDemoData(); });
+    },
   });
   if (!r || (r.action !== "ok" && r.action !== "out")) return;
   if (r.action === "out") { if (!(await flushForms())) return; await api("logout", { method: "POST" }); state.me = null; return renderLogin(); }
@@ -198,12 +167,12 @@ export async function guideDialog() {
   const r = await dialog({
     title: "How this demo works",
     wide: true,
-    body: html`<p class="muted">One Corporate New Business case travels from first lead to an active, handed-over account. Walk the whole journey by acting as each team in turn.</p>
+    body: html`<p class="muted">One Corporate New Business case travels from first lead to an active, handed-over account. As Admin you run the whole internal desk, so you can walk the entire journey without switching identity.</p>
       <ol class="guide-steps mt">
-        <li><b>Open a case</b> from the list, or start a fresh one with New Business.</li>
-        <li><b>Follow the next action.</b> Each case shows what happens next and who owns it.</li>
-        <li><b>Act as the owner.</b> When the next step belongs to another team, use Act as in the Demo panel to become that person.</li>
-        <li><b>Fill forms fast</b> with Fill this form, then save or submit to move the case on.</li>
+        <li><b>Open a case</b> from the list, or start a fresh one with Create New Business.</li>
+        <li><b>Follow the next action.</b> Each case shows what happens next; as Admin it is your task to create, review, approve and prepare legal.</li>
+        <li><b>Fill forms fast</b> with the Fill sample button on each form, then save or submit to move the case on.</li>
+        <li><b>Switch only for a department.</b> Actuarial, MDA and Billing sit outside the desk; switch into them from the account menu when a case needs their result.</li>
         <li><b>Repeat</b> until the account is set up and handed over.</li>
       </ol>
       <p class="note info mt">${icon("help", 16)} Everything here is fictional demo data. Approvals and mandatory fields are relaxed so you never get stuck.</p>`,
@@ -289,8 +258,12 @@ async function route(force = false) {
 window.addEventListener("hashchange", async () => {
   if (navigating) return;
   const target = location.hash;
-  const prevParts = (lastHash || "").split("?")[0].split("/").slice(0, 3).join("/");
-  const nextParts = target.split("?")[0].split("/").slice(0, 3).join("/");
+  // Compare through the work-area segment (#/case/ID/step), not just #/case/ID, so a
+  // move between work areas still flushes dirty forms. The section (5th segment) is
+  // intentionally excluded: section tabs change the URL via replaceState without a
+  // route change, so they never reach here and must not force a re-render.
+  const prevParts = (lastHash || "").split("?")[0].split("/").slice(0, 4).join("/");
+  const nextParts = target.split("?")[0].split("/").slice(0, 4).join("/");
   if (prevParts !== nextParts) {
     navigating = true;
     history.replaceState(null, "", lastHash || "#/new-business");

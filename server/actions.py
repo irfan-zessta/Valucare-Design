@@ -6,7 +6,7 @@ import os
 
 from . import meta, pdf, providers, members
 from .domain import (Bundle, ApiError, DEMO_BYPASS, DEMO_SKIP_DATA, DEMO_SKIP_APPROVALS, account_gates, add_workdays,
-                     compare_benefits, config, derive, iso, ma_code, name_similarity, next_id, norm_addr, norm_tin,
+                     can, compare_benefits, config, derive, iso, ma_code, name_similarity, next_id, norm_addr, norm_tin,
                      notify, num, onboarding_status, parse_date, readiness, reduced_codes, require_not_maker, require_role,
                      require_status, user_name, valid_email, valid_tel, visible_case, USERS)
 
@@ -41,7 +41,7 @@ def run(store, ctx, name, payload):
     if name not in ACTIONS:
         raise ApiError(404, "unknown_action", f"Unknown action {name}.")
     fn, roles = ACTIONS[name]
-    if roles and ctx.role not in roles:
+    if roles and not can(ctx, roles):
         raise ApiError(403, "forbidden", f"{meta.ROLES.get(ctx.role, ctx.role)} cannot perform '{name}'. "
                                          f"Allowed: {', '.join(meta.ROLES.get(r, r) for r in roles)}.")
     with store.tx():
@@ -275,13 +275,17 @@ def case_create(s, ctx, p):
     err = _intermediary_ok(s, lead.get("intermediaryId"), channel)
     if err and not DEMO_BYPASS:
         raise ApiError(422, "validation", err, {"fields": [{"field": "intermediaryId", "message": err}]})
-    if ctx.role == "aat":
+    # Ownership follows the actor. Whoever carries the AAT handler role owns the case:
+    # a plain AAT handler owns their own book, and the demo Admin (who IS the internal
+    # desk) owns the cases they create. We never silently hand a new case to an
+    # unrelated fallback AAT account - the real creator is recorded as the owner.
+    if can(ctx, "aat") and not lead.get("ownerId"):
         owner = ctx.uid
     else:
-        owner = lead.get("ownerId")
-        if not owner or USERS.get(owner, {}).get("role") != "aat":
+        owner = lead.get("ownerId") or ctx.uid
+        if USERS.get(owner, {}).get("role") not in ("aat", "admin"):
             if DEMO_BYPASS:
-                owner = owner if USERS.get(owner, {}).get("role") == "aat" else next((u["id"] for u in meta.USERS if u["role"] == "aat"), ctx.uid)
+                owner = ctx.uid if can(ctx, "aat") else next((u["id"] for u in meta.USERS if u["role"] == "aat"), ctx.uid)
             else:
                 raise ApiError(422, "validation", "Choose the AAT handler who will own this case.", {"fields": [{"field": "ownerId", "message": "Required."}]})
     if not lead.get("leadSource") and not DEMO_BYPASS:
@@ -319,7 +323,7 @@ def case_create(s, ctx, p):
             if not ov:
                 raise ApiError(409, "possible_duplicate", "Possible duplicate company found. Use the existing record, or record an authorized override.",
                                {"matches": dups})
-            if ctx.role not in cfg["duplicateOverrideRoles"]:
+            if not can(ctx, cfg["duplicateOverrideRoles"]):
                 raise ApiError(403, "override_not_allowed",
                                "Creating a separate company despite a possible duplicate needs "
                                + " or ".join(meta.ROLES[r] for r in cfg["duplicateOverrideRoles"]) + " authorization.")
@@ -776,7 +780,7 @@ def intermediary_verify(s, ctx, p):
         raise ApiError(409, "invalid_state", f"Intermediary is {it.get('status')}.")
     if nxt == "Verified" and not _docs(s, it["id"], "agreement"):
         raise ApiError(422, "validation", "Upload the signed agent/brokerage agreement before verifying (NB-AGT-05).")
-    if nxt == "Active" and ctx.role != "amt":
+    if nxt == "Active" and not can(ctx, "amt"):
         raise ApiError(403, "forbidden", "AMT activates verified intermediaries.")
     _set(s, ctx, it, {"status": nxt, "agreementVerified": nxt in ("Verified", "Active") or it.get("agreementVerified"),
                       f"{nxt.lower()}By": ctx.uid}, f"intermediary.{nxt.lower()}", reason=p.get("remarks"))
@@ -1031,7 +1035,10 @@ def quote_decide(s, ctx, p):
         raise ApiError(409, "bad_state", f"Level {level} review needs status '{need}', but the quotation is '{qs}'.")
     _check_quote_version(rs, p.get("reviewedVersion"))
     # Separation of duty: the 2nd-level approver must be a different person than the 1st.
-    if level == 2 and not DEMO_SKIP_APPROVALS:
+    # The single-identity Admin demo is exempt (same pattern as prop_senior / sob_validate);
+    # the real admin id is still recorded on each decision. Production keeps strict two-eyes.
+    admin_single = DEMO_BYPASS and ctx.role == "admin"
+    if level == 2 and not DEMO_SKIP_APPROVALS and not admin_single:
         l1 = next((a for a in rs.get("approvals", []) if a.get("level") == 1 and a.get("decision") == "approve"), None)
         if l1 and l1.get("by") == ctx.uid:
             raise ApiError(409, "maker_checker",
@@ -1255,14 +1262,20 @@ def sob_sales_review(s, ctx, p):
 
 @action("sob.validate")
 def sob_validate(s, ctx, p):
-    if ctx.role not in s.cfg["sobValidatorRoles"]:
+    if not can(ctx, s.cfg["sobValidatorRoles"]):
         raise ApiError(403, "forbidden", "Only the configured independent SOB validation function can validate: "
                        + ", ".join(meta.ROLES[r] for r in s.cfg["sobValidatorRoles"]) + ".")
     sob = s.store.must(p["id"], "sob")
     require_status(sob, "Independent Validation", what="SOB")
     _check_version(sob, p.get("reviewedVersion"))
-    if ctx.uid in (sob.get("preparedBy"), sob.get("salesReviewBy")) and not DEMO_SKIP_APPROVALS:
-        raise ApiError(403, "segregation", "The SOB preparer and Sales reviewer cannot be the independent validator (NB-AUD-03). Switch to another authorized user to validate.")
+    # Separation of duties: the preparer / Sales reviewer cannot also be the independent
+    # validator. The single-identity Admin demo intentionally performs every internal
+    # step in one session (same exemption as require_not_maker); the real admin id is
+    # still recorded on each decision, so history stays honest. Production (HMS_DEMO=0)
+    # keeps strict segregation for everyone.
+    admin_single = DEMO_BYPASS and ctx.role == "admin"
+    if ctx.uid in (sob.get("preparedBy"), sob.get("salesReviewBy")) and not DEMO_SKIP_APPROVALS and not admin_single:
+        raise ApiError(403, "segregation", "The SOB preparer and Sales reviewer cannot be the independent validator. Switch to another authorized user to validate.")
     d = p.get("decision")
     ap = sob.get("approvals", []) + [{"stage": "validation", "decision": d, "by": ctx.uid, "byName": ctx.user["name"], "at": ctx.now_iso(),
                                       "remarks": p.get("remarks", ""), "version": sob["version"]}]
@@ -1495,7 +1508,12 @@ def prop_senior(s, ctx, p):
     # confirmation "approver" role, but the two approvals must be given by different
     # people so the two-eyes principle survives the role consolidation.
     first = next((a for a in reversed(prop.get("approvals", [])) if a.get("stage") == "sm" and a.get("decision") == "approve"), None)
-    if first and first.get("by") == ctx.uid and not DEMO_SKIP_APPROVALS:
+    # The single-identity Admin demo intentionally performs every internal step in one
+    # session (same exemption as require_not_maker / sob_validate); the real admin id is
+    # still recorded on each decision, so the two-level history stays honest. Production
+    # (HMS_DEMO=0) keeps strict two-eyes separation for everyone.
+    admin_single = DEMO_BYPASS and ctx.role == "admin"
+    if first and first.get("by") == ctx.uid and not DEMO_SKIP_APPROVALS and not admin_single:
         raise ApiError(403, "segregation", "The second-level pricing approval must be given by a different approver than the first-level approval. Switch to another authorized approver to continue.")
     d = p.get("decision")
     rec = {"stage": "senior", "decision": d, "by": ctx.uid, "byName": ctx.user["name"], "at": ctx.now_iso(), "remarks": p.get("remarks", ""),
@@ -1726,7 +1744,7 @@ def contract_advance(s, ctx, p):
     nxt = steps[cur + 1]
     if p.get("toStep") and p["toStep"] != nxt["key"]:
         raise ApiError(409, "out_of_order", f"The next step is '{nxt['key']}'. Steps cannot be skipped.")
-    if ctx.role != nxt["role"]:
+    if not can(ctx, nxt["role"]):
         raise ApiError(403, "forbidden", f"'{nxt['key']}' is recorded by {meta.ROLES[nxt['role']]}.")
     if p.get("baseVersion") is not None and int(p["baseVersion"]) != con["v"]:
         raise ApiError(409, "stale_version", "This contract changed after you opened it. Reload first.", {"current": con})
@@ -1788,7 +1806,7 @@ def kyc_resolve(s, ctx, p):
 
 @action("onboarding.waive")
 def onb_waive(s, ctx, p):
-    if ctx.role not in s.cfg["waiverRoles"]:
+    if not can(ctx, s.cfg["waiverRoles"]):
         raise ApiError(403, "forbidden", "Only " + ", ".join(meta.ROLES[r] for r in s.cfg["waiverRoles"]) + " can approve document waivers (configurable, OQ-02).")
     o = s.store.must(p["id"], "onboarding")
     item = next((i for i in s.cfg["onboardingChecklist"] if i["key"] == p.get("key")), None)
@@ -2536,9 +2554,9 @@ def members_map(s, ctx, p):
 
 
 def _members_role(ctx, bt):
-    if bt.get("purpose") == "enrollment" and ctx.role not in ("amt",):
+    if bt.get("purpose") == "enrollment" and not can(ctx, "amt"):
         raise ApiError(403, "forbidden", "AMT manages enrollment Member Data.")
-    if bt.get("purpose") == "quotation" and ctx.role not in ("aat",):
+    if bt.get("purpose") == "quotation" and not can(ctx, "aat"):
         raise ApiError(403, "forbidden", "The AAT handler manages quotation Member Data.")
 
 
@@ -2925,7 +2943,7 @@ def record_save(s, ctx, p):
             raise ApiError(403, "forbidden", "Actuarial (ACCUSA) / AMT can only edit ACUSA Remarks on the franchise.")
         oi["acusaRemarks"] = new_oi.get("acusaRemarks", oi.get("acusaRemarks"))
         return {"record": s.store.update(rec, {"otherInfo": oi}, ctx, "franchise.acusaRemarks", base_version=p.get("baseVersion"))}
-    if ctx.role not in roles:
+    if not can(ctx, roles):
         raise ApiError(403, "forbidden", f"{meta.ROLES.get(ctx.role)} cannot edit this {t}. Owned by: {', '.join(meta.ROLES[r] for r in roles)}.")
     if statuses and rec.get("status") not in statuses:
         raise ApiError(409, "locked", f"This {t} is '{rec.get('status')}' and can no longer be edited here." +

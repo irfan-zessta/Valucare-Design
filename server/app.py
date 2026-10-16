@@ -15,7 +15,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import actions, meta, members, providers, tables
-from .domain import (Bundle, Ctx, SYSTEM_USER, USERS, account_gates, add_workdays, compare_benefits, config, config_payload,
+from .domain import (Bundle, Ctx, SYSTEM_USER, USERS, account_gates, add_workdays, can, compare_benefits, config, config_payload,
                      derive, iso, next_id, onboarding_status, parse_date, readiness, user_tasks, user_name, visible_case,
                      matches_validator)
 from .store import ApiError, Store
@@ -690,9 +690,9 @@ class Handler(BaseHTTPRequestHandler):
         t0 = time.time()
         if kind == "members":
             purpose = q.get("purpose") or "enrollment"
-            if purpose == "enrollment" and ctx.role != "amt":
+            if purpose == "enrollment" and not can(ctx, "amt"):
                 raise ApiError(403, "forbidden", "AMT uploads enrollment Member Data.")
-            if purpose == "quotation" and ctx.role not in ("aat",):
+            if purpose == "quotation" and not can(ctx, "aat"):
                 raise ApiError(403, "forbidden", "The AAT handler uploads quotation Member Data.")
             with st.tx():
                 b = Bundle(st, case_id)
@@ -727,7 +727,7 @@ class Handler(BaseHTTPRequestHandler):
         elif kind == "tor":
             ok, errs = actions.validate_line_rows(rows)
         elif kind == "planCode":
-            if ctx.role != "amt":
+            if not can(ctx, "amt"):
                 raise ApiError(403, "forbidden", "AMT imports Plan Codes.")
             ok, errs = actions.validate_pc_import(s, rows, case_id)
         else:

@@ -7,19 +7,43 @@ export async function render(main) {
     main.innerHTML = html`<div class="page-head"><div><h1>Create New Business</h1></div></div><div class="note">New Business cases are created by the AAT (lead generation) team. You are signed in as ${roleLabel(state.me.role)}.</div>`.s;
     return;
   }
-  const s = { step: "find", q: "", results: null, company: null, newCompany: null, dups: null, override: null };
+  // An unfinished intake survives a refresh or a trip away and back: the whole
+  // wizard state (minus the re-fetchable search results) is mirrored to
+  // sessionStorage on every change and restored here. It is cleared only on a
+  // confirmed create or a deliberate discard — never silently.
+  const DRAFT_KEY = "hms3:nb-create-draft";
+  const defaults = () => ({ step: "find", q: "", results: null, company: null, newCompany: null, lead: null, dups: null, override: null });
+  const loadDraft = () => { try { return JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null"); } catch (e) { return null; } };
+  const saveDraft = () => { try { const { results, ...rest } = s; sessionStorage.setItem(DRAFT_KEY, JSON.stringify(rest)); } catch (e) { /* storage full / disabled */ } };
+  const clearDraft = () => { try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ } };
+  const saved = loadDraft();
+  const s = Object.assign(defaults(), saved || {});
+  // A restored draft is only worth announcing if the tester had moved past the
+  // empty search step or typed something.
+  let restored = !!saved && (s.step !== "find" || !!s.q || !!s.newCompany || !!s.lead);
   const min = state.meta.config.corporateMinPrincipals;
+
+  function discardDraft() {
+    clearDraft();
+    Object.assign(s, defaults());
+    restored = false;
+    draw();
+    toast("Draft discarded.", "info");
+  }
 
   function draw() {
     main.innerHTML = html`<div class="page-head"><div><h1>Create New Business</h1>
       <p>Find the company first so nothing is duplicated. Then continue its existing case, or start a new case for an existing or genuinely new company.</p></div></div>
+      ${restored ? html`<div class="note info mb" role="status" id="draftNote"><b>Unfinished draft restored.</b> We kept what you had entered. <button type="button" class="btn ghost sm" id="discardDraft">Discard and start over</button></div>` : ""}
       <ol class="steps-h mb" aria-label="Steps">${[["find", "1. Find company"], ["company", "2. Confirm company"], ["lead", "3. Lead details"]].map(([k, l]) =>
         html`<li class="${s.step === k ? "cur" : ["find", "company", "lead"].indexOf(k) < ["find", "company", "lead"].indexOf(s.step) ? "done" : ""}" ${s.step === k ? 'aria-current="step"' : ""}>${l}</li>`)}</ol>
       <div id="body"></div>`.s;
+    main.querySelector("#discardDraft")?.addEventListener("click", discardDraft);
     const body = main.querySelector("#body");
     if (s.step === "find") drawFind(body);
     if (s.step === "company") drawCompany(body);
     if (s.step === "lead") drawLead(body);
+    saveDraft();
   }
 
   // ---- step 1: search
@@ -34,6 +58,7 @@ export async function render(main) {
       s.q = body.querySelector("#sq").value.trim();
       if (s.q.length < 2) { res.innerHTML = `<p class="tiny">Enter at least 2 characters.</p>`; return; }
       res.innerHTML = `<p class="tiny">Searching…</p>`;
+      saveDraft(); // remember the search term across a refresh
       try { s.results = (await api(`companies/search?q=${encodeURIComponent(s.q)}`)).items; } catch (e) { res.innerHTML = html`<div class="note danger">${e.message} <button class="btn sm" id="rt">Retry</button></div>`.s; res.querySelector("#rt").onclick = run; return; }
       drawResults(res);
     };
@@ -95,11 +120,16 @@ export async function render(main) {
         if (!(state.meta.geo[c.province]?.cities || []).includes(c.city)) { c.city = ""; cityBox.querySelector('input[type="hidden"]').value = ""; cityBox.querySelector('input[type="text"]').value = ""; cityBox.querySelector('input[type="text"]').dataset.label = ""; }
         form.querySelector('[data-ro="region"]').textContent = state.meta.geo[c.province]?.region || "Not provided";
       }
+      // Any detail change invalidates an earlier duplicate verdict so a stale
+      // result can never resurface.
       s.dups = null; s.override = null;
+      saveDraft();
     });
-    form.addEventListener("input", (e) => { if (e.target.name && e.target.type !== "hidden") c[e.target.name] = e.target.value; });
+    form.addEventListener("input", (e) => { if (e.target.name && e.target.type !== "hidden") { c[e.target.name] = e.target.value; saveDraft(); } });
     body.querySelector("#back").onclick = () => { s.step = "find"; draw(); };
-    if (s.dups) drawDups(body.querySelector("#dups"));
+    // Only show the duplicate panel when real matches exist. An empty matches
+    // array (zero duplicates found) must never read as "Possible duplicate found".
+    if (s.dups && s.dups.length) drawDups(body.querySelector("#dups"));
     form.onsubmit = async (e) => {
       e.preventDefault();
       const errs = [];
@@ -110,7 +140,9 @@ export async function render(main) {
       const btn = form.querySelector("#chk");
       btn.setAttribute("aria-busy", "true");
       try { s.dups = (await api("companies/duplicates", { method: "POST", body: { newCompany: c } })).matches; } catch (err) { await showError(err); return; } finally { btn.removeAttribute("aria-busy"); }
-      if (!s.dups.length) { s.step = "lead"; draw(); return; }
+      // Normalize "no matches" to null so it is never mistaken for a positive
+      // duplicate result on a later Back/Continue.
+      if (!s.dups || !s.dups.length) { s.dups = null; s.step = "lead"; draw(); return; }
       drawDups(body.querySelector("#dups"));
     };
   }
@@ -173,10 +205,11 @@ export async function render(main) {
       form.querySelector("#ifg")?.addEventListener("click", (e) => create(e.currentTarget, true));
     };
     warn();
-    form.addEventListener("input", (e) => { if (e.target.name && e.target.type !== "radio") { L[e.target.name] = e.target.value; if (e.target.name === "estHeadcount") warn(); } });
+    form.addEventListener("input", (e) => { if (e.target.name && e.target.type !== "radio") { L[e.target.name] = e.target.value; if (e.target.name === "estHeadcount") warn(); saveDraft(); } });
     form.addEventListener("change", (e) => {
       if (!e.target.name) return;
       L[e.target.name] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+      saveDraft();
       if (e.target.name === "channel") { L.intermediaryId = ""; drawLead(body); body.querySelector(`input[name="channel"][value="${L.channel}"]`).focus(); }
     });
     body.querySelector("#back").onclick = () => { s.step = s.company ? "find" : "company"; draw(); };
@@ -210,7 +243,9 @@ export async function render(main) {
     const payload = { lead: L };
     if (s.company) payload.companyId = s.company.id; else { payload.newCompany = s.newCompany; if (s.override) payload.override = s.override; }
     const r = await act("case.create", payload, { button: btn, success: "Case created." });
-    if (!r) return;
+    if (!r) return; // act() kept the entered values and the idempotency key for a safe retry
+    // Success is confirmed: the draft can be cleared now (and only now).
+    clearDraft();
     if (ifg) await act("case.routeIfg", { caseId: r.caseId, note: `Below corporate minimum (${L.estHeadcount} principals).` }, { success: "Lead recorded and routed to IFG." });
     window.dispatchEvent(new Event("hms:changed"));
     // Land on the franchise form itself (the next action), not the step's first

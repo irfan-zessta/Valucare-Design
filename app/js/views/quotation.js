@@ -1,5 +1,5 @@
 import { html, raw, api, state, act, roleLabel, userName, interName, fmtDate, fmtDateTime, money, dialog, toast, RecordForm, saveStateHtml, pickFile,
-  showError, upload, docUrl, clone, int, confirmDialog, esc, fileOrSample, DEMO_BYPASS, actsAs, isAdmin, ownsCase } from "../core.js";
+  showError, upload, docUrl, clone, int, confirmDialog, esc, fileOrSample, sampleFile, DEMO_BYPASS, actsAs, isAdmin, ownsCase } from "../core.js";
 import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, simNote, sampleBtn, fillSampleData } from "../components.js";
 import { subnav, ownerBanner } from "./case.js";
 import { linesTable, wireLines, addLine, addSampleLine, comparisonTable } from "./lines.js";
@@ -170,7 +170,10 @@ function rates(ctx) {
         actions: [{ label: "Cancel" }, { label: "Return for information", kind: "primary", value: "ok", validate: (v) => (!v.question.trim() ? "Enter the question." : null) }] });
       if (r?.action === "ok" && (await act("rateRequest.returnForInfo", { id: rr.id, question: r.values.question }, { button: b, success: "Returned to the AAT handler." }))) ctx.reload();
     });
-    if (rr.status === "In Review") btn("Import rate sheet", "primary", () => importFlow(ctx, "rateSheet", (imp) => issueSheet(ctx, rr, imp)));
+    if (rr.status === "In Review") {
+      btn("Import rate sheet", "primary", () => importFlow(ctx, "rateSheet", (imp) => issueSheet(ctx, rr, imp)));
+      if (DEMO_BYPASS) btn("Use sample rate sheet", "sm ghost", async () => { const f = await sampleRateFile(); if (f) importFlow(ctx, "rateSheet", (imp) => issueSheet(ctx, rr, imp), ".csv,.xlsx", f); });
+    }
     bar.insertAdjacentHTML("beforeend", `<a class="btn sm ghost" href="/api/templates/rate-sheet.csv" download>Rate sheet template</a>`);
   }
   if (am && rr.status === "Returned for Info") btn("Answer clarification", "primary", async (b) => {
@@ -205,6 +208,16 @@ function rates(ctx) {
     if (!(await form.save())) return;
     if (await act("rateRequest.submit", { id: rr.id, baseVersion: form.base.v }, { button: e.currentTarget, success: "Rate request submitted to Actuarial." })) { form.dispose(); ctx.reload(); }
   };
+}
+// DEMO MOCK MODE — load a generated sample rate sheet so the Admin-led journey can
+// issue a sheet without a real file on hand (mirrors actuarial.js; no native picker).
+async function sampleRateFile() {
+  if (window.__HMS3_PREVIEW__) return sampleFile("rate-sheet.csv", "Rate sheet sample");
+  try {
+    const res = await fetch("/api/samples/rate-sheet.csv", { credentials: "same-origin" });
+    const text = await res.text();
+    return new File([text], "rate-sheet.csv", { type: "text/csv" });
+  } catch (e) { toast("Could not load the sample rate sheet.", "err"); return null; }
 }
 async function issueSheet(ctx, rr, imp) {
   if (imp.errorCount) { toast("Correct the rate sheet errors and import again - a rate sheet must be complete.", "err"); return; }
@@ -368,7 +381,7 @@ function negotiation(ctx) {
         <div class="tiny">${r.participants ? `Participants: ${r.participants}. ` : ""}${r.counterOffer ? `Counter-offer: ${r.counterOffer}. ` : ""}${r.commissionChange ? `Commission: ${r.commissionChange}. ` : ""}${r.benefitChanges ? `Benefits: ${r.benefitChanges}. ` : ""}${r.outcome ? `Outcome: ${r.outcome}.` : ""} Logged by ${r.byName}.</div>
         ${r.attachmentDocId ? html`<a class="tiny" href="${docUrl(r.attachmentDocId)}">Attachment</a>` : ""}</div></li>`)}</ul>` : html`<p class="tiny">No rounds logged.</p>`}
       ${prop.status === "Rejected" ? html`<div class="note danger mt"><b>Client declined:</b> ${prop.declineReason}. Revise the offer (new version) or close the lead as lost from Overview.</div>` : ""}
-      ${acc ? html`<div class="note ok mt"><b>Accepted</b> on ${fmtDate(acc.date)} (version ${acc.version}) · recorded by ${userName(acc.recordedBy)} · <a href="${docUrl(acc.docId)}">acceptance evidence</a>${acc.notes ? ` · ${acc.notes}` : ""}</div>` : ""}
+      ${acc ? html`<div class="note ok mt"><b>Accepted</b> on ${fmtDate(acc.date)} (version ${acc.version}) · recorded by ${userName(acc.recordedBy)} · ${acc.docId ? html`<a href="${docUrl(acc.docId)}">acceptance evidence</a>` : "evidence skipped for demo"}${acc.notes ? ` · ${acc.notes}` : ""}</div>` : ""}
     </div></section>`.s;
   const bar = body.querySelector("#nAct");
   const btn = (label, cls, fn) => { const b = document.createElement("button"); b.className = `btn ${cls}`; b.textContent = label; b.onclick = () => fn(b); bar.appendChild(b); };
@@ -399,11 +412,11 @@ function negotiation(ctx) {
       if (r?.action === "ok" && (await act("proposal.decline", { id: prop.id, reason: r.values.reason }, { button: b, success: "Decline recorded." }))) ctx.reload();
     });
     btn("Record acceptance", "primary", async (b) => {
-      const r = await dialog({ title: `Record client acceptance - version ${prop.version}`, body: html`<p>Only the fully approved version ${prop.version} (second-level pricing approval) can be accepted.</p>
-        <div class="field mt"><label for="af">Acceptance evidence (signed conforme, email) *</label><input id="af" type="file" name="file"></div>
+      const r = await dialog({ title: `Record client acceptance (version ${prop.version})`, body: html`<p>Only the fully approved version ${prop.version} (second-level pricing approval) can be accepted.</p>
+        <div class="field mt"><label for="af">Acceptance evidence (signed conforme, email)${DEMO_BYPASS ? "" : " *"}</label><input id="af" type="file" name="file">${DEMO_BYPASS ? html`<div class="tiny mt">Optional in this demo. If left empty, the evidence is recorded as skipped.</div>` : ""}</div>
         <div class="field mt"><label for="ad">Acceptance date *</label><input id="ad" type="date" name="date" class="inp" value="${new Date().toISOString().slice(0, 10)}"></div>
         <div class="field mt"><label for="an">Notes</label><textarea id="an" name="notes" class="inp"></textarea></div>`,
-        actions: [{ label: "Cancel" }, { label: "Record acceptance", kind: "primary", value: "ok", validate: (v) => (!v.file?.length ? "Attach the acceptance evidence." : !v.date ? "Enter the date." : null) }] });
+        actions: [{ label: "Cancel" }, { label: "Record acceptance", kind: "primary", value: "ok", validate: (v) => ((!v.file?.length && !DEMO_BYPASS) ? "Attach the acceptance evidence." : !v.date ? "Enter the date." : null) }] });
       if (r?.action !== "ok") return;
       try {
         const up = r.values.file?.length ? await upload(r.values.file[0], { caseId: id, linkedType: "proposal", linkedId: prop.id, slot: "acceptance" }) : null;

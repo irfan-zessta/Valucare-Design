@@ -491,17 +491,6 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 .flow-item:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-strong)}
 .progress{height:6px;background:var(--surface-muted);border-radius:3px;overflow:hidden}.progress>i{display:block;height:100%;background:var(--accent)}
 
-/* ---------- Demo panel (all demo-only controls live here) ---------- */
-.demo-panel{position:fixed;right:16px;bottom:16px;z-index:140;width:320px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow-md);font-size:13px}
-.demo-panel.collapsed{width:auto}
-.demo-panel .dp-head{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:10px 12px;cursor:pointer}
-.demo-panel .dp-head b{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-subtle)}
-.demo-panel .dp-body{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--border)}
-.demo-panel.collapsed .dp-body{display:none}
-.demo-panel .dp-who{display:flex;align-items:center;gap:8px;padding-top:10px}
-.demo-panel .dp-actions{display:flex;flex-direction:column;gap:6px}
-.demo-fab{position:fixed;right:16px;bottom:16px;z-index:140}
-
 /* ---------- Actuarial quotation journey ---------- */
 .ajourney{margin-bottom:16px}
 .ajhead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
@@ -581,7 +570,6 @@ dl.kv.cols .wide{grid-column:1/-1}
   .fgrid,.fgrid.two,.grid2,.grid3{grid-template-columns:1fr}
   .userpick{grid-template-columns:1fr 1fr}
   .timeline li{grid-template-columns:1fr}
-  .demo-panel{right:8px;bottom:8px;width:calc(100vw - 16px)}
   /* queue rows become cards */
   .cardify thead{display:none}
   .cardify tbody tr{display:block;border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;padding:4px 0}

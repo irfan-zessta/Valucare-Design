@@ -1,5 +1,5 @@
 import { html, api, state, prefs, fmtDate, daysUntil, go, actsAs, isAdmin } from "../core.js";
-import { icon, statusPill, caseStatus, ownerCell, relDue, flags, area, AREA_TOTAL, cleanLabel, emptyState, plural } from "../components.js";
+import { icon, statusPill, caseStatus, ownerCell, primaryTask, relDue, flags, area, AREA_TOTAL, cleanLabel, emptyState, plural } from "../components.js";
 
 // Bumped from "queue:nb": the redesigned table uses new column keys (step, handler)
 // so any pref saved by the old table would hide the Step column and stale filters.
@@ -10,9 +10,9 @@ const COLS = [
   { key: "company", label: "Company", always: true, sort: (c) => c.company.toLowerCase() },
   { key: "step", label: "Step", sort: (c) => c.stage },
   { key: "status", label: "Status", sort: (c) => caseStatus(c).label },
-  { key: "next", label: "Next action", sort: (c) => cleanLabel(c.next?.title || "") },
-  { key: "owner", label: "Owner", sort: (c) => cleanLabel(c.next?.assigneeName || c.next?.roleLabel || "") },
-  { key: "due", label: "Due", sort: (c) => c.nextDue || "9999" },
+  { key: "next", label: "Next action", sort: (c) => cleanLabel(primaryTask(c)?.title || "") },
+  { key: "owner", label: "Owner", sort: (c) => cleanLabel(primaryTask(c)?.assigneeName || primaryTask(c)?.roleLabel || "") },
+  { key: "due", label: "Due", sort: (c) => primaryTask(c)?.due || c.nextDue || "9999" },
   { key: "effectivity", label: "Effectivity", sort: (c) => c.effectivity || "9999", def: false },
   { key: "handler", label: "Handler", sort: (c) => c.ownerName || "", def: false },
 ];
@@ -119,9 +119,9 @@ export async function render(main, { query }) {
       case "company": return html`<span class="co"><a href="#/case/${c.id}">${c.company}</a></span> ${flags(c)}<span class="sub">${c.id}</span>`;
       case "step": { const a = area(c.stage); return html`${a.label}<span class="sub">${a.n}/${AREA_TOTAL}</span>`; }
       case "status": return statusPill(c);
-      case "next": return c.next ? html`<span class="truncate" title="${cleanLabel(c.next.title)}" style="max-width:260px;display:inline-block">${cleanLabel(c.next.title)}</span>` : html`<span class="tiny">No open work</span>`;
+      case "next": { const t = primaryTask(c); return t ? html`<span class="truncate" title="${cleanLabel(t.title)}" style="max-width:260px;display:inline-block">${cleanLabel(t.title)}</span>` : html`<span class="tiny">No open work</span>`; }
       case "owner": return ownerCell(c);
-      case "due": return c.next ? relDue(c.nextDue) : html`<span class="tiny">—</span>`;
+      case "due": { const t = primaryTask(c); return t ? relDue(t.due || c.nextDue) : html`<span class="tiny">—</span>`; }
       case "effectivity": return c.effectivity ? fmtDate(c.effectivity) : html`<span class="tiny">—</span>`;
       case "handler": return c.ownerName || html`<span class="tiny">—</span>`;
     }

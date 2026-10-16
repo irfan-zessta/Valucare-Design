@@ -84,12 +84,27 @@ export function caseStatus(c) {
 }
 export function statusPill(c) { const s = caseStatus(c); return html`<span class="pill ${s.tone}">${s.label}</span>`; }
 
+// The task to surface for a case: when the viewer has their own open tasks on it, show
+// the one they should act on first (returned first, then earliest stage, then soonest
+// due) so the Next action / Owner / Due read the same way as a "Your turn" / "Returned"
+// status. Everyone without a personal task sees the case's global next action. This is
+// what keeps the Admin single identity honest - a case only reads "Your turn" when it
+// also points at something the Admin can actually do.
+export function primaryTask(c) {
+  const mine = c.myTasks || [];
+  if (!mine.length) return c.next;
+  return [...mine].sort((a, b) =>
+    (a.kind === "returned" ? 0 : 1) - (b.kind === "returned" ? 0 : 1)
+    || (a.stage || 0) - (b.stage || 0)
+    || String(a.due || "9999").localeCompare(String(b.due || "9999")))[0];
+}
+
 // Small outline flags beside a company name — never a status pill.
 export const flags = (c) => html`${c.vip ? html`<span class="badge">VIP</span>` : ""}${c.jumbo ? html`<span class="badge">Jumbo</span>` : ""}${c.signedUnpaid ? html`<span class="badge warn">Signed · Unpaid</span>` : ""}`;
 
 // Owner of the next step: avatar + one line. Client-waiting reads "Client".
 export function ownerCell(c) {
-  const t = c.next;
+  const t = primaryTask(c);
   if (!t) return html`<span class="tiny">—</span>`;
   if (t.waiting === "client") return html`<span class="row tight">${avatar("Client", "sm")}<span>Client</span></span>`;
   const name = cleanLabel(t.assigneeName || t.roleLabel);
@@ -418,6 +433,14 @@ function fireInput(el) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
   el.dispatchEvent(new Event("change", { bubbles: true }));
 }
+// A token that changes on every "Fill sample" run so the identifiers it writes
+// (TIN, address, company name) never collide with an earlier sampled record and
+// trip a false duplicate. Set at the top of each fillSampleData() call.
+let sampleSeed = 0;
+function sampleTin() {
+  const n = String(sampleSeed).padStart(9, "0").slice(-9);
+  return `${n.slice(0, 3)}-${n.slice(3, 6)}-${n.slice(6, 9)}-000`;
+}
 function sampleValue(el) {
   const name = (el.name || "").toLowerCase();
   const kind = el.dataset.kind;
@@ -431,7 +454,7 @@ function sampleValue(el) {
   // A tax number belongs ONLY in the actual TIN field. Match it precisely so a
   // tax-number-shaped value can never leak into a person's position, short name
   // or any field that merely happens to contain the letters "tin".
-  if (name === "tin" || name.endsWith("tin")) return "000-123-456-789";
+  if (name === "tin" || name.endsWith("tin")) return sampleTin();
   // Person-appropriate fields first, so they never fall through to a company
   // name or a tax number.
   if (name.includes("position") || name.includes("designation") || name.includes("jobtitle")) return "HR Manager";
@@ -440,14 +463,17 @@ function sampleValue(el) {
   if (name.includes("contactperson") || name.includes("contactname") || name.includes("person") || name.includes("signatory") || name.includes("authorizedrep") || name.includes("attention")) return "Teresa Uy";
   if (name.includes("email")) return "demo.contact@example.com";
   if (name.includes("phone") || name.includes("mobile") || name.includes("contactno") || name.includes("contactnumber")) return "+63 917 123 4567";
-  if (name.includes("name")) return "Demo Sample Corporation";
-  if (name.includes("address")) return "123 Ayala Avenue, Makati City";
+  if (name.includes("name")) return `Demo Sample Corporation ${sampleSeed % 1000}`;
+  if (name.includes("address")) return `${100 + (sampleSeed % 899)} Sample Avenue, Makati City`;
   if (name.includes("city")) return "Makati City";
   if (name.includes("note") || name.includes("remark") || name.includes("reason") || name.includes("comment")) return "Demo sample entry for mock walkthrough.";
   return "Sample " + (el.name || "value");
 }
 export function fillSampleData(root) {
   let n = 0;
+  // Fresh identifiers for this run so sampled TIN/address/name never collide with
+  // a previously sampled record (which would raise a false duplicate warning).
+  sampleSeed = Date.now() % 1000000000;
   // 1) Comboboxes (industry, province, city, intermediary, user, account): pick the
   //    first real, selectable option. Fill dependent combos (city needs a province)
   //    last so the parent is already set when we read its options.

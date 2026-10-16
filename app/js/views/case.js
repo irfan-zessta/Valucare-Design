@@ -1,6 +1,6 @@
 import { html, raw, api, state, act, roleLabel, userName, industryName, interName, fmtDate, fmtDateTime, dueHtml, money, int, go, dialog, toast, can, esc, daysUntil,
   RecordForm, saveStateHtml, flushForms, disposeForms, confirmDialog, DEMO_BYPASS, actsAs, isAdmin, ownsCase } from "../core.js";
-import { icon, pill, stageBar, ownerText, docRow, wireUploads, field, mountCombos, controlValue, sampleBtn, fillSampleData } from "../components.js";
+import { icon, pill, stageBar, ownerText, docRow, wireUploads, field, mountCombos, controlValue, sampleBtn, fillSampleData, primaryTask } from "../components.js";
 import { switchUser } from "../main.js";
 
 // The record is organised as five user-facing work areas (steps). Each step is a
@@ -78,7 +78,9 @@ export async function render(main, { parts, query, force }) {
     id, data, step: stepKey, tab: stepKey, sub: parts[3], query, main,
     reload: async () => { const y = window.scrollY; if (!(await flushForms())) return; disposeForms(); await render(main, { parts: location.hash.replace(/^#\/?/, "").split("?")[0].split("/"), query: Object.fromEntries(new URLSearchParams(location.hash.split("?")[1] || "")), force: true }); window.scrollTo(0, y); window.dispatchEvent(new Event("hms:changed")); },
   };
-  const n = s.next;
+  // Headline the task the viewer can actually act on when they have one (so the record
+  // reads "Your task" and points at Admin's own work), else the case's global next.
+  const n = primaryTask(s);
   // Admin acts in every internal role, so an internal next action counts as theirs
   // (unless it is waiting on the client, which no internal role can action).
   const mine = n && (s.myTasks.some((t) => t.key === n.key) || (actsAs(n.role) && n.waiting !== "client"));
@@ -228,16 +230,33 @@ async function renderStep(ctx, stepKey, anchor) {
   // its tab directly; otherwise restore the last tab the user had open in this step
   // (so an in-section action that reloads the record keeps you here); else the first.
   const memKey = `${ctx.id}::${stepKey}`;
+  const ssKey = `hms3:sec:${memKey}`;
   const valid = (sec) => sec && secs.some((x) => secId(x.id) === sec);
+  // Priority: the URL's section anchor wins (task deep links, a browser refresh and
+  // back/forward all carry it); then the section remembered this session (in-memory
+  // Map, then sessionStorage so it survives a full browser refresh); else the first.
+  let stored = null; try { stored = sessionStorage.getItem(ssKey); } catch (e) {}
   const remembered = lastSection.get(memKey);
-  const active = valid(anchor) ? anchor : valid(remembered) ? remembered : (secs[0] ? secId(secs[0].id) : null);
+  const active = valid(anchor) ? anchor : valid(remembered) ? remembered : valid(stored) ? stored
+    : (secs[0] ? secId(secs[0].id) : null);
   lastSection.set(memKey, active);
+  try { if (active) sessionStorage.setItem(ssKey, active); } catch (e) {}
+  // Reflect the resolved section in the URL so a later refresh or back/forward carries
+  // it even when the user arrived via a section-less link (e.g. the work-area tab).
+  if (active && secs.length > 1) {
+    try { history.replaceState(history.state, "", `#/case/${ctx.id}/${stepKey}/${active.replace(/^sec-/, "")}`); } catch (e) {}
+  }
   el.innerHTML = html`
     ${secs.length > 1 ? html`<nav class="secnav step-tabs" role="tablist" aria-label="Sections in this work area">${secs.map((x) => html`<a href="#${secId(x.id)}" role="tab" data-tab="${secId(x.id)}" aria-selected="${secId(x.id) === active ? "true" : "false"}">${x.label}</a>`)}</nav>` : ""}
     <div class="step-secs">${secs.map((x) => html`<div class="step-sec" id="${secId(x.id)}" role="tabpanel" ${secId(x.id) === active ? "" : raw("hidden")}></div>`)}</div>`.s;
   const tabs = [...el.querySelectorAll("[data-tab]")];
   const show = (id) => {
     lastSection.set(memKey, id);
+    try { sessionStorage.setItem(ssKey, id); } catch (e) {}
+    // Encode the selected section in the URL via replaceState: it updates the address
+    // (so refresh and back/forward restore this tab) without firing a route change or
+    // adding a history entry per tab click, so the mounted forms stay put.
+    try { history.replaceState(history.state, "", `#/case/${ctx.id}/${stepKey}/${id.replace(/^sec-/, "")}`); } catch (e) {}
     secs.forEach((x) => { const p = el.querySelector("#" + CSS.escape(secId(x.id))); if (p) p.hidden = secId(x.id) !== id; });
     tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === id)));
   };

@@ -130,9 +130,38 @@ def ma_code(store, cfg, ctx):
     return pattern.format(year=ctx.today().year, seq=seq)
 
 
+# ------------------------------------------------------------------ capability policy
+# ONE capability model, shared by the UI (app/js/core.js INTERNAL_NB_ROLES) and the
+# server. The Admin identity is the whole internal New Business desk: in the demo it
+# performs every action production splits across AAT, AMT, Legal and the pending
+# approver, WITHOUT impersonating them - the real admin id is what lands in history
+# and audit. The roles that genuinely sit outside that desk (Actuarial/ACCUSA, MDA,
+# Billing and the CCD handover ack) stay separate personas you switch into. This
+# Admin capability is the DEMO policy only: with HMS_DEMO=0 (production) admin has no
+# special powers and real segregation-of-duty applies to everyone.
+ADMIN_COVERS = ("aat", "amt", "approver", "legal")
+
+
+def admin_covers(ctx, roles):
+    """True when ctx is the demo Admin standing in for one of the internal NB roles."""
+    return DEMO_BYPASS and ctx.role == "admin" and any(r in ADMIN_COVERS for r in (roles or ()))
+
+
+def can(ctx, *roles):
+    """One capability check for every gate. Empty = open. Admin covers internal NB."""
+    flat = []
+    for r in roles:
+        flat.extend(r if isinstance(r, (list, tuple, set)) else [r])
+    if not flat:
+        return True
+    if ctx.role in flat:
+        return True
+    return admin_covers(ctx, flat)
+
+
 # ------------------------------------------------------------------ permissions helpers
 def require_role(ctx, *roles):
-    if ctx.role not in roles:
+    if not can(ctx, *roles):
         names = ", ".join(meta.ROLES.get(r, r) for r in roles)
         raise ApiError(403, "forbidden", f"Only {names} can do this. You are signed in as {meta.ROLES.get(ctx.role, ctx.role)}.")
 
@@ -140,6 +169,17 @@ def require_role(ctx, *roles):
 def require_not_maker(ctx, maker_id, what="record"):
     # Maker-checker is an approval rule, enforced even in demo (switch user to review).
     if DEMO_SKIP_APPROVALS:
+        return
+    # The single-identity Admin demo intentionally performs maker AND checker in one
+    # session; the real admin id is still recorded on both the prepare and the decide,
+    # so history stays honest. Production (HMS_DEMO=0) keeps strict maker-checker.
+    if DEMO_BYPASS and ctx.role == "admin":
+        return
+    # The switchable downstream personas (Actuarial, MDA, Billing) each have exactly one
+    # demo identity, so there is no second same-role user to switch into for review. In
+    # the demo they self-review; the real uid is still recorded on prepare and decide so
+    # history stays honest. Production (HMS_DEMO=0) restores strict maker-checker.
+    if DEMO_BYPASS and ctx.role in ("accusa", "mda", "bc"):
         return
     if maker_id and maker_id == ctx.uid:
         raise ApiError(403, "same_maker", f"You prepared this {what}. A different authorized person must review it (maker-checker).")
@@ -521,28 +561,28 @@ def derive(b, cfg, today):
         # ---- Lead / Franchise
         if not fr:
             T.append(_task(b, "franchise_start", "Start the franchise form", "aat", c.get("createdAt"), "franchise_submit", cfg,
-                           "franchise", stage=1))
+                           "franchise/franchise", stage=1))
         else:
             s = st(fr)
             stage = 2
             if s == "Draft":
-                T.append(_task(b, "franchise_submit", "Complete and submit the franchise form", "aat", at(fr), "franchise_submit", cfg, "franchise", stage=2))
+                T.append(_task(b, "franchise_submit", "Complete and submit the franchise form", "aat", at(fr), "franchise_submit", cfg, "franchise/franchise", stage=2))
             elif s == "Returned":
                 T.append(_task(b, "franchise_fix", "Correct the returned franchise and resubmit", "aat", at(fr), "franchise_submit", cfg,
-                               "franchise", kind="returned", blocker=f"Returned: {fr.get('returnReason', '')}", stage=2))
+                               "franchise/franchise", kind="returned", blocker=f"Returned: {fr.get('returnReason', '')}", stage=2))
             elif s in ("Submitted", "Under Review"):
                 T.append(_task(b, "franchise_review", "Review and upload the franchise" if s == "Submitted" else "Decide on franchise", "amt",
-                               at(fr), "franchise_review", cfg, "franchise", kind="approval", stage=2, exclude=fr.get("submittedBy")))
+                               at(fr), "franchise_review", cfg, "franchise/franchise", kind="approval", stage=2, exclude=fr.get("submittedBy")))
             elif s == "Rejected":
                 T.append(_task(b, "franchise_rejected", "Franchise rejected - close the lead or start a corrected request", "aat",
-                               at(fr), "franchise_submit", cfg, "franchise", kind="returned", blocker=f"Rejected: {fr.get('rejectReason', '')}", stage=2))
+                               at(fr), "franchise_submit", cfg, "franchise/franchise", kind="returned", blocker=f"Rejected: {fr.get('rejectReason', '')}", stage=2))
             elif s == "Expired":
                 T.append(_task(b, "franchise_expired", "Franchise expired - request a new franchise or close the lead", "aat",
-                               at(fr), "franchise_submit", cfg, "franchise", kind="returned", blocker="Franchise expired and was auto-cancelled", stage=2))
+                               at(fr), "franchise_submit", cfg, "franchise/franchise", kind="returned", blocker="Franchise expired and was auto-cancelled", stage=2))
             ext = [e for e in fr.get("extensions", []) if e.get("status") == "Requested"]
             if ext:
                 T.append(_task(b, "franchise_ext", "Decide on franchise extension request", "amt", ext[-1].get("requestedAt"),
-                               "franchise_review", cfg, "franchise", kind="approval", stage=2, exclude=ext[-1].get("requestedBy")))
+                               "franchise_review", cfg, "franchise/franchise", kind="approval", stage=2, exclude=ext[-1].get("requestedBy")))
             if s in ("Approved", "Converted to Account"):
                 milestones["franchise"] = True
                 stage = 3
@@ -550,7 +590,7 @@ def derive(b, cfg, today):
                 vu = parse_date(fr.get("validUntil"))
                 if vu and (vu - today).days <= cfg["franchiseExpiryReminderDays"] and not milestones.get("contract_done"):
                     T.append(_task(b, "franchise_expiring", f"Franchise expires {vu.isoformat()} - request an extension if needed", "aat",
-                                   iso(vu - dt.timedelta(days=cfg["franchiseExpiryReminderDays"])), None, cfg, "franchise",
+                                   iso(vu - dt.timedelta(days=cfg["franchiseExpiryReminderDays"])), None, cfg, "franchise/franchise",
                                    blocker=f"Franchise expires in {(vu - today).days} day(s)", stage=2))
 
         # ---- Quotation
@@ -839,6 +879,11 @@ def derive(b, cfg, today):
             status, tone = "Waiting on client", "warn"
         elif main["role"] == "aat":
             status, tone = ("Draft" if stage <= 2 and st(fr) in (None, "Draft") else "In progress"), "info"
+        elif DEMO_BYPASS and main["role"] in ADMIN_COVERS:
+            # One internal desk in the demo: an internal review/approval is in-house
+            # work, not an external wait, so the list never reads "Awaiting <other
+            # team>" for the same record My Tasks shows as Admin's own task.
+            status, tone = ("For review" if main["kind"] == "approval" else "In progress"), "info"
         elif main["kind"] == "approval":
             status, tone = f"Awaiting {ROLE_LABEL.get(main['role'])}", "info"
         else:
@@ -879,12 +924,17 @@ def derive(b, cfg, today):
 
 
 def task_matches_user(t, user):
-    if t.get("excludeUserId") == user["id"]:
+    # The demo Admin is the whole internal desk, so every internal-role task is
+    # Admin's task - including the review/approve of something Admin prepared
+    # (maker-checker is relaxed for the single-identity demo). Everyone else only
+    # sees their own role's tasks, with the maker excluded from their own review.
+    admin = DEMO_BYPASS and user["role"] == "admin"
+    if t.get("excludeUserId") == user["id"] and not admin:
         return False
-    if t["role"] != user["role"]:
+    if not (t["role"] == user["role"] or (admin and t["role"] in ADMIN_COVERS)):
         return False
-    # AAT tasks pinned to a specific handler stay with that handler.
-    if t["role"] == "aat" and t.get("assigneeId") and t["assigneeId"] != user["id"]:
+    # AAT tasks pinned to a specific handler stay with that handler (Admin owns all).
+    if t["role"] == "aat" and t.get("assigneeId") and t["assigneeId"] != user["id"] and not admin:
         return False
     return True
 
@@ -892,8 +942,11 @@ def task_matches_user(t, user):
 def matches_validator(t, user, cfg):
     # Independent SOB validation can be routed to any configured role, not only the
     # task's own role. The owning title is unconfirmed (see sobValidatorRoles).
-    return t.get("key", "").startswith("sob_validate") and user["role"] in cfg["sobValidatorRoles"] \
-        and t.get("excludeUserId") != user["id"]
+    if not t.get("key", "").startswith("sob_validate"):
+        return False
+    admin = DEMO_BYPASS and user["role"] == "admin"
+    role_ok = user["role"] in cfg["sobValidatorRoles"] or admin
+    return role_ok and (t.get("excludeUserId") != user["id"] or admin)
 
 
 def user_tasks(summary, user, cfg):
