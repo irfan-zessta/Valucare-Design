@@ -12,7 +12,7 @@
 // "pending confirmation". Actuarial pricing happens OUTSIDE HMS; this never implies an
 // automated pricing engine exists. Email and delivery are simulated.
 import { html, raw, api, state, act, userName, roleLabel, fmtDate, fmtDateTime, money, dialog, confirmDialog, toast,
-  upload, docUrl, showError, parseHash, go, DEMO_BYPASS, isAdmin, ownsCase } from "../core.js";
+  upload, docUrl, showError, parseHash, go, sampleFile, DEMO_BYPASS, isAdmin, ownsCase } from "../core.js";
 import { icon, pill, docSlot, wireUploads, simNote } from "../components.js";
 import { importFlow } from "./quotation.js";
 import { switchUser } from "../main.js";
@@ -502,6 +502,7 @@ function rateSheetBlock(s, open) {
 }
 async function sampleRateFile(withErrors) {
   const name = withErrors ? "rate-sheet-errors" : "rate-sheet";
+  if (window.__HMS3_PREVIEW__) return sampleFile(`${name}.csv`, "Rate sheet sample");
   try {
     const res = await fetch(`/api/samples/${name}.csv`, { credentials: "same-origin" });
     const text = await res.text();

@@ -1,4 +1,4 @@
-import { html, raw, api, state, act, pickFile, showError, toast, dialog, fmtDateTime, roleLabel, int, upload, docUrl, esc, fileOrSample, DEMO_BYPASS, actsAs } from "../core.js";
+import { html, raw, api, state, act, pickFile, showError, toast, dialog, fmtDateTime, roleLabel, int, upload, docUrl, esc, fileOrSample, sampleFile, DEMO_BYPASS, actsAs } from "../core.js";
 import { icon, pill, simNote } from "../components.js";
 
 export async function renderMemberData(ctx, box, purpose) {
@@ -43,9 +43,15 @@ export async function renderMemberData(ctx, box, purpose) {
     b.setAttribute("aria-busy", "true"); b.disabled = true;
     let f;
     try {
-      const res = await fetch(`/api/samples/member-data-case.csv?caseId=${encodeURIComponent(id)}`, { credentials: "same-origin" });
-      if (!res.ok) throw new Error("Could not load the sample Member Data file.");
-      f = new File([await res.text()], "member-data-sample.csv", { type: "text/csv" });
+      if (window.__HMS3_PREVIEW__) {
+        // No backend to generate the sample in the static preview; a client-side file is
+        // enough because the preview import returns canned, already-validated rows.
+        f = sampleFile("member-data-sample.csv", "Member Data sample");
+      } else {
+        const res = await fetch(`/api/samples/member-data-case.csv?caseId=${encodeURIComponent(id)}`, { credentials: "same-origin" });
+        if (!res.ok) throw new Error("Could not load the sample Member Data file.");
+        f = new File([await res.text()], "member-data-sample.csv", { type: "text/csv" });
+      }
     } catch (err) { if (b.isConnected) { b.removeAttribute("aria-busy"); b.disabled = false; } return showError(err); }
     doImport(f, b);
   });
