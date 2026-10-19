@@ -1,6 +1,6 @@
 /* HMS3 Corporate New Business — calm, dense, accessible B2B design system.
    One source of truth: every colour, space, radius and shadow is a token on :root.
-   Token names describe ROLE, not hue (--accent is the brand crimson; --neutral is slate).
+   Token names describe ROLE, not hue (--accent is the brand deep-blue; --neutral is slate).
    A dark theme redefines the same names under prefers-color-scheme.
 
    WIREFRAME SKETCH MODE — these are low-fidelity mock-ups, so the whole system wears a
@@ -15,22 +15,23 @@
   --dot:#D2D2DA; /* sketch-paper dot grid drawn on the page background */
   --border:#BDBDC4; --border-strong:#8E8E96;
   --text:#18181B; --text-muted:#52525B; --text-subtle:#71717A;
-  /* WIREFRAME PALETTE — monochrome. These are mock-ups, not final UI, so colour
-     is switched off: every token below keeps its ROLE name but resolves to a grey
-     (or black/white). Statuses stay legible through tone + dot + label, not hue.
-     To restore the branded UI, swap this block (and its dark-theme twin) back to
-     the crimson/semantic values. --on-accent is the text colour on solid fills. */
-  --accent:#18181B; --accent-strong:#000000; --accent-soft:#F4F4F5; --accent-line:#D4D4D8;
+  /* MINIMAL COLOUR PALETTE — a restrained wash of colour over the sketch wireframe:
+     ONE deep-blue brand accent for interactive / selected / focus states, plus the
+     conventional semantic hues (green / amber / red / blue) reserved for STATUS only.
+     Everything else stays neutral so the UI still reads calm. To return to pure
+     monochrome, point --accent and the four semantic tokens back at the greys.
+     --on-accent is the text colour on solid fills. */
+  --accent:#2563EB; --accent-strong:#1D4ED8; --accent-soft:#EEF4FE; --accent-line:#C5D9FA;
   --on-accent:#FFFFFF;
-  /* semantic — status only (greys, ordered by emphasis) */
-  --success:#3F3F46; --success-soft:#F4F4F5;
-  --warning:#52525B; --warning-soft:#F4F4F5;
-  --danger:#18181B; --danger-soft:#F4F4F5;
-  --info:#27272A; --info-soft:#F4F4F5;
+  /* semantic — status only (true hues, ordered by emphasis) */
+  --success:#15803D; --success-soft:#E9F7EE;
+  --warning:#B45309; --warning-soft:#FBF1E2;
+  --danger:#DC2626; --danger-soft:#FCECEC;
+  --info:#2563EB; --info-soft:#EEF4FE;
   --neutral:#71717A; --neutral-soft:#F4F4F5;
   /* interactive surfaces */
-  --border-input:#9A9AA2; --border-input-hover:#7A7A82; --border-input-focus:#52525B;
-  --ring:0 0 0 3px rgba(24,24,27,.18); --focus-outline:var(--accent);
+  --border-input:#9A9AA2; --border-input-hover:#7A7A82; --border-input-focus:#6EA0F2;
+  --ring:0 0 0 3px rgba(37,99,235,.22); --focus-outline:var(--accent);
   --row-hover:#F4F4F5; --selected:var(--accent-soft);
   /* spacing (4px grid) */
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-7:32px; --sp-8:48px;
@@ -66,15 +67,15 @@
     --bg:#09090B; --surface:#18181B; --surface-muted:#232326;
     --border:#2A2A2E; --border-strong:#3F3F46;
     --text:#FAFAFA; --text-muted:#A1A1AA; --text-subtle:#8B8B93;
-    --accent:#FAFAFA; --accent-strong:#FFFFFF; --accent-soft:#232326; --accent-line:#3F3F46;
-    --on-accent:#18181B;
-    --success:#D4D4D8; --success-soft:#232326;
-    --warning:#A1A1AA; --warning-soft:#232326;
-    --danger:#FAFAFA; --danger-soft:#232326;
-    --info:#E4E4E7; --info-soft:#232326;
+    --accent:#60A5FA; --accent-strong:#93C5FD; --accent-soft:#17233B; --accent-line:#2B4066;
+    --on-accent:#0B1220;
+    --success:#4ADE80; --success-soft:#143021;
+    --warning:#FBBF24; --warning-soft:#39290A;
+    --danger:#F87171; --danger-soft:#3A1818;
+    --info:#60A5FA; --info-soft:#17233B;
     --neutral:#A1A1AA; --neutral-soft:#232326;
-    --border-input:#3F3F46; --border-input-hover:#52525B; --border-input-focus:#71717A;
-    --ring:0 0 0 3px rgba(250,250,250,.22);
+    --border-input:#3F3F46; --border-input-hover:#52525B; --border-input-focus:#3B6FD4;
+    --ring:0 0 0 3px rgba(96,165,250,.3);
     --row-hover:#232326; --selected:var(--accent-soft);
     --shadow-xs:0 1px 1px rgba(0,0,0,.4);
     --shadow:0 1px 2px rgba(0,0,0,.5);
