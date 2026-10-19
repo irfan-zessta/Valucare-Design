@@ -1,5 +1,6 @@
-import { html, api, state, prefs, fmtDate, daysUntil, go, actsAs, isAdmin } from "../core.js";
+import { html, api, state, prefs, fmtDate, daysUntil, go, actsAs, isAdmin, DEMO_BYPASS } from "../core.js";
 import { icon, statusPill, caseStatus, ownerCell, primaryTask, relDue, flags, area, AREA_TOTAL, cleanLabel, emptyState, plural } from "../components.js";
+import { openGuideMenu, guideActive } from "../guide.js";
 
 // Bumped from "queue:nb": the redesigned table uses new column keys (step, handler)
 // so any pref saved by the old table would hide the Step column and stale filters.
@@ -36,8 +37,9 @@ export async function render(main, { query }) {
   st.view = "all"; // one unified list; the My cases / Needs action / Waiting tabs were removed
   save(st);
   main.innerHTML = html`<div class="page-head"><div><h1>Cases</h1><p>Every Corporate New Business case you can see, from lead to handover.</p></div>
-    ${actsAs("aat") ? html`<div class="ph-actions"><a class="btn primary" href="#/new-business/create">${icon("plus")} New Business</a></div>` : ""}</div>
+    <div class="ph-actions">${DEMO_BYPASS ? html`<button class="btn" id="guideBtn" title="New here? Walk the whole journey with step-by-step guidance">${icon("help")} Guide me${guideActive() ? html` <span class="pill info plain">On</span>` : ""}</button>` : ""}${actsAs("aat") ? html`<a class="btn primary" href="#/new-business/create">${icon("plus")} New Business</a>` : ""}</div></div>
     <div class="panel" id="q"><div class="state-box" aria-busy="true"><div class="skeleton"></div><div class="skeleton mt"></div><div class="skeleton mt"></div><p class="tiny mt">Loading cases…</p></div></div>`.s;
+  main.querySelector("#guideBtn")?.addEventListener("click", () => openGuideMenu());
   const box = main.querySelector("#q");
   let items, recent;
   try {

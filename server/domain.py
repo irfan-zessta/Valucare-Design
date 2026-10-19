@@ -713,9 +713,15 @@ def derive(b, cfg, today):
                                    blocker="KYC flagged: " + "; ".join(f["description"] for f in kyc.get("flags", []) if f.get("status") == "Open"), stage=5))
                 onb = onboarding_status(b, cfg)
                 missing = [i["label"] for i in onb if i["mandatory"] and i["status"] not in ("Received", "Waived")]
-                if missing:
-                    T.append(_task(b, "onboarding_docs", "Collect mandatory onboarding documents", "aat", at(con), "kyc", cfg,
-                                   "contract#onboarding", waiting="client", blocker="Missing: " + ", ".join(missing), stage=5))
+                if missing and not b.parent_account:
+                    if DEMO_SKIP_DATA:
+                        # Demo waives mandatory uploads: offer as an optional follow-up, never a blocker,
+                        # so task banners agree with the readiness gate ("Skipped for demo - not verified").
+                        T.append(_task(b, "onboarding_docs", "Collect onboarding documents (optional for this demo)", "aat", at(con), "kyc", cfg,
+                                       "contract#onboarding", waiting="client", stage=5))
+                    else:
+                        T.append(_task(b, "onboarding_docs", "Collect mandatory onboarding documents", "aat", at(con), "kyc", cfg,
+                                       "contract#onboarding", waiting="client", blocker="Missing: " + ", ".join(missing), stage=5))
             al = b.one("alignment")
             if not al:
                 T.append(_task(b, "alignment", "Start internal alignment with B&C and MDA", "aat", prop.get("acceptance", {}).get("recordedAt"),

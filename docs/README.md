@@ -14,6 +14,8 @@ version-bound approvals, concurrency control, an audit trail and a document repo
 | [PARITY.md](PARITY.md) | Legacy HMS3 field-parity checklist |
 | [TRACEABILITY.md](TRACEABILITY.md) | User stories, functional requirements and business rules → implementation |
 | [TEST-RESULTS.md](TEST-RESULTS.md) | Passed / Failed / Untested results with evidence and performance measurements |
+| [GUIDED-MODE-QA.md](GUIDED-MODE-QA.md) | QA for the contextual guidance and optional "Guide me" walkthrough - Passed / Not tested |
+| [FIRST-TIME-USER-TEST.md](FIRST-TIME-USER-TEST.md) | Unmoderated first-time user test materials (guidance only vs guidance + Guide me) |
 | [DECISIONS.md](DECISIONS.md) | Unresolved business decisions, assumptions and the configuration that holds them |
 
 Sources: the verified HMS3 New Sales field inventory (`HMS3-New-Sales-Audit-2026-10-08.md`),

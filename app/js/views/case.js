@@ -2,6 +2,8 @@ import { html, raw, api, state, act, roleLabel, userName, industryName, interNam
   RecordForm, saveStateHtml, flushForms, disposeForms, confirmDialog, DEMO_BYPASS, actsAs, isAdmin, ownsCase } from "../core.js";
 import { icon, pill, stageBar, ownerText, docRow, wireUploads, field, mountCombos, controlValue, sampleBtn, fillSampleData, primaryTask } from "../components.js";
 import { switchUser } from "../main.js";
+import { gloss, ctaFor, whyFor } from "../guidance.js";
+import { mountGuide, openGuideMenu, guideActive } from "../guide.js";
 
 // The record is organised as five user-facing work areas (steps). Each step is a
 // single scrolling work area built from stacked sections — no competing rows of
@@ -116,8 +118,9 @@ export async function render(main, { parts, query, force }) {
     <nav class="tiny mb" aria-label="Breadcrumb"><a href="#/new-business">New Business</a> › ${s.company}</nav>
     <div class="rec-head">
       <div class="rec-title"><h1>${s.company} ${pill(s.status, s.statusTone)}${s.vip ? html` <span class="badge-vip">VIP</span>` : ""}${s.jumbo ? html` <span class="badge-jumbo">JUMBO</span>` : ""}${s.signedUnpaid ? html` <span class="pill warn plain" title="Contract signed; first payment not yet posted (BR-21)">Signed - unpaid</span>` : ""}</h1>
-        <div class="refs"><span>Case <b>${s.id}</b></span>${s.franchiseCode ? html`<span>Franchise ${s.franchiseCode}</span>` : ""}${s.maCode ? html`<span>MA Code ${s.maCode}</span>` : ""}<span>Responsible: <b>${n ? (n.waiting === "client" ? "Client" : ownerText(n)) : s.ownerName}</b></span></div></div>
-      <div class="row"><button class="btn" id="docsBtn">${icon("file", 16)} Documents <span class="pill neutral plain">${data.documents.filter((d) => !d.supersededBy).length}</span></button>
+        <div class="refs"><span>Case <b>${s.id}</b></span>${s.franchiseCode ? html`<span>Franchise ${s.franchiseCode}</span>` : ""}${s.maCode ? html`<span>MA Code ${s.maCode}</span>` : ""}<span>Responsible: <b>${s.closed ? "Complete" : n ? (n.waiting === "client" ? "Client" : ownerText(n)) : s.ownerName}</b></span></div></div>
+      <div class="row">${DEMO_BYPASS ? html`<button class="btn" id="guideBtn" title="Walk this journey with step-by-step guidance">${icon("help", 16)} Guide me${guideActive() ? html` <span class="pill info plain">On</span>` : ""}</button>` : ""}
+        <button class="btn" id="docsBtn">${icon("file", 16)} Documents <span class="pill neutral plain">${data.documents.filter((d) => !d.supersededBy).length}</span></button>
         <button class="btn" id="histBtn">${icon("history", 16)} History</button>
         ${DEMO_BYPASS ? html`<button class="btn ghost danger" id="delCaseBtn" title="Permanently delete this record and its company (demo only)">Delete</button>` : ""}</div>
     </div>
@@ -144,8 +147,13 @@ export async function render(main, { parts, query, force }) {
     if (ok) go(n.link); else { b.removeAttribute("aria-busy"); b.disabled = false; }
   });
 
+  main.querySelector("#guideBtn")?.addEventListener("click", () => openGuideMenu());
+
   ctx.el = main.querySelector("#step");
   await renderStep(ctx, stepKey, anchor, focus);
+  // Optional guided mode: mounts an accessible, anchored explanation panel only when
+  // the guide is switched on AND this is its isolated demo case (checked inside).
+  mountGuide(ctx, { n, mine });
 }
 
 // Scroll a within-section target into view and move focus to it accessibly, without
@@ -166,20 +174,60 @@ function focusTarget(el, focus) {
 }
 
 // ---------------------------------------------------------------- record header: next action
+// Which work area (step) a task belongs to, used for the "Where am I" context line.
+function stepForTask(link) {
+  const k = linkStep(link);
+  return STEPS.find((st) => st.key === k) || null;
+}
+// The next-action card answers the four questions every screen owes a user:
+//   Where am I?     -> the work-area context line in the eyebrow
+//   What now?       -> the task title + a destination-specific button (never "Open")
+//   Why?            -> the one-sentence rationale from the shared guidance map
+//   What happens next? -> the owner / category chip (your task vs client vs another team)
 function nextStrip(ctx, { n, mine, suggested }) {
   const s = ctx.data.summary, c = ctx.data.case;
   const others = s.tasks.filter((t) => t !== n && t.key !== n?.key);
-  if (s.closed && !n) {
-    return html`<div class="rec-next done"><div><span class="eyebrow">Record status</span><b>${s.status}</b> — ${c.status === "Closed Lost" ? `Lost: ${c.lostReason}${c.lostNote ? " - " + c.lostNote : ""}` : c.status === "Routed to IFG" ? "Below the corporate minimum; routed to the IFG team (outside this application)." : "All New Business steps are complete. The account is active and handed over."}</div></div>`;
+  // Milestone-accurate completion state — never claims "handed over" unless it is.
+  // Once a case is closed the completion state is authoritative: any leftover
+  // non-blocking tasks are demoted to optional follow-ups, never headlined as the
+  // "next action" (so a handed-over case never reads as if work is still pending).
+  if (s.closed) {
+    const lost = c.status === "Closed Lost";
+    const ifg = c.status === "Routed to IFG";
+    const note = lost
+      ? `Lost: ${c.lostReason}${c.lostNote ? " - " + c.lostNote : ""}`
+      : ifg
+        ? "Below the corporate minimum; routed to the IFG team (outside this application)."
+        : /handover/i.test(s.status || "")
+          ? "The account is active and every downstream team has acknowledged the handover. Nothing further is required here."
+          : "All New Business steps are complete and the account is active.";
+    const left = s.tasks || [];
+    return html`<div class="rec-next done">
+      <div class="rn-main"><span class="eyebrow">Record status</span><b>${gloss(s.status)}</b>
+        <span class="rn-why">${gloss(note)}</span></div>
+      ${left.length ? html`<details class="rn-par"><summary>${left.length} optional follow-up task(s)</summary><ul class="rn-par-list">${left.map((t) => { const os = stepForTask(t.link); return html`<li><a href="${t.link}">${gloss(t.title)}</a> — ${t.waiting === "client" ? "Client" : ownerText(t)}${os ? ` · ${os.label}` : ""} · ${dueHtml(t.due)}</li>`; })}</ul></details>` : ""}
+    </div>`;
   }
   if (!n) return html`<div class="rec-next"><b>No open work.</b></div>`;
+  const step = stepForTask(n.link);
+  const where = step ? `Work area ${step.n} of ${STEPS.length}: ${step.label}` : "New Business";
+  const why = whyFor(n);
+  // Category chip so the user can tell their own work apart from a client wait or
+  // another team's turn — the three states the spec asks us to distinguish.
+  const cat = n.waiting === "client"
+    ? { label: "Waiting on client", tone: "warn" }
+    : mine
+      ? { label: "Your task", tone: "info" }
+      : { label: `With ${roleLabel(n.role)}`, tone: "neutral" };
+  const cta = ctaFor(n, { mine, stepLabel: step ? step.label : "" });
   return html`<div class="rec-next">
-    <div class="rn-main"><span class="eyebrow">Next action</span><b>${n.title}</b>
-      <span class="rn-meta">Owner: ${n.waiting === "client" ? `Client${s.channel !== "Direct" ? " via " + interName(s.intermediaryId) : ""}` : ownerText(n)} · Due ${dueHtml(n.due)}${mine ? html` · <span class="pill info plain">Your task</span>` : ""}</span></div>
-    <div class="rn-act"><a class="btn ${mine ? "primary" : ""}" href="${n.link}">${mine ? "Go to task" : "Open"} ›</a>
-      ${suggested ? html`<button type="button" class="btn primary blink-switch" id="switchNext">Switch to ${suggested.name} (${roleLabel(suggested.role)})</button>` : ""}</div>
-    ${s.blocker ? html`<div class="note warn rn-block">${icon("alert", 14)} <b>Blocker:</b> ${s.blocker}</div>` : ""}
-    ${others.length ? html`<details class="rn-par"><summary>${others.length} other task(s) can proceed in parallel</summary><ul class="rn-par-list">${others.map((t) => html`<li><a href="${t.link}">${t.title}</a> — ${t.waiting === "client" ? "Client" : ownerText(t)}${t.waiting !== "client" && s.myTasks.some((m) => m.key === t.key) ? html` <span class="pill info plain">You</span>` : ""} · ${dueHtml(t.due)}</li>`)}</ul></details>` : ""}
+    <div class="rn-main"><span class="eyebrow">Next action · ${where}</span><b>${gloss(n.title)}</b>
+      ${why ? html`<span class="rn-why">${gloss(why)}</span>` : ""}
+      <span class="rn-meta">Owner: ${n.waiting === "client" ? `Client${s.channel !== "Direct" ? " via " + interName(s.intermediaryId) : ""}` : ownerText(n)} · Due ${dueHtml(n.due)} · <span class="pill ${cat.tone} plain">${cat.label}</span></span></div>
+    <div class="rn-act"><a class="btn ${mine ? "primary" : ""}" href="${n.link}">${cta} ›</a>
+      ${suggested ? html`<button type="button" class="btn primary" id="switchNext">Switch to ${suggested.name} (${roleLabel(suggested.role)})</button>` : ""}</div>
+    ${s.blocker ? html`<div class="note warn rn-block">${icon("alert", 14)} <b>Blocker:</b> ${gloss(s.blocker)}</div>` : ""}
+    ${others.length ? html`<details class="rn-par"><summary>${others.length} other task(s) can proceed in parallel</summary><ul class="rn-par-list">${others.map((t) => { const os = stepForTask(t.link); return html`<li><a href="${t.link}">${gloss(t.title)}</a> — ${t.waiting === "client" ? "Client" : ownerText(t)}${t.waiting !== "client" && s.myTasks.some((m) => m.key === t.key) ? html` <span class="pill info plain">You</span>` : ""}${os ? ` · ${os.label}` : ""} · ${dueHtml(t.due)}</li>`; })}</ul></details>` : ""}
   </div>`;
 }
 
