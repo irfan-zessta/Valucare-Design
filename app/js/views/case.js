@@ -454,7 +454,7 @@ const ACTION_TEXT = {
   "franchise.startReview": "Started the franchise review", "franchise.approve": "Approved the franchise", "franchise.return": "Returned the franchise for correction",
   "franchise.reject": "Rejected the franchise", "franchise.requestExtension": "Requested a franchise extension", "franchise.extension.approve": "Approved the franchise extension",
   "franchise.extension.reject": "Rejected the franchise extension", "franchise.autoExpire": "Franchise expired automatically", "franchise.requirement": "Updated a requirement",
-  "franchise.convert": "Converted the franchise to an account", "franchise.acusaRemarks": "Edited ACUSA remarks", "aor.create": "Recorded the AOR/BOR", "aor.change": "Recorded a BOR change", "aor.end": "End-dated the previous AOR/BOR",
+  "franchise.convert": "Converted the franchise to an account", "franchise.acusaRemarks": "Edited Actuarial remarks", "aor.create": "Recorded the AOR/BOR", "aor.change": "Recorded a BOR change", "aor.end": "End-dated the previous AOR/BOR",
   "rateRequest.create": "Created the rate request", "rateRequest.save": "Edited the rate request", "rateRequest.submit": "Submitted the rate request to Actuarial",
   "rateRequest.startReview": "Actuarial started the review", "rateRequest.returnForInfo": "Actuarial asked for information", "rateRequest.respond": "Answered Actuarial",
   "rateRequest.revise": "Requested revised rates", "rateRequest.issued": "Rate request marked issued", "rateSheet.issue": "Issued a rate sheet", "rateSheet.supersede": "Superseded the previous rate sheet",

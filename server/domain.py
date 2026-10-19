@@ -135,7 +135,7 @@ def ma_code(store, cfg, ctx):
 # server. The Admin identity is the whole internal New Business desk: in the demo it
 # performs every action production splits across AAT, AMT, Legal and the pending
 # approver, WITHOUT impersonating them - the real admin id is what lands in history
-# and audit. The roles that genuinely sit outside that desk (Actuarial/ACCUSA, MDA,
+# and audit. The roles that genuinely sit outside that desk (Actuarial, MDA,
 # Billing and the CCD handover ack) stay separate personas you switch into. This
 # Admin capability is the DEMO policy only: with HMS_DEMO=0 (production) admin has no
 # special powers and real segregation-of-duty applies to everyone.
@@ -202,7 +202,7 @@ def user_name(uid):
 def visible_case(ctx, case):
     r = ctx.role
     # AAT handlers see the cases they own or co-handle. Every other role (AMT,
-    # ACCUSA, Legal, the pending-confirmation approver, and the internal-alignment
+    # Actuarial, Legal, the pending-confirmation approver, and the internal-alignment
     # participants) sees the full book so cross-department handoffs never dead-end.
     if r == "aat":
         return case.get("ownerId") == ctx.uid or case.get("salesManagerId") == ctx.uid
@@ -605,22 +605,22 @@ def derive(b, cfg, today):
                                    "requirements", cfg, "quotation/requirements", waiting="client",
                                    blocker="Outstanding: " + ", ".join(outstanding), stage=3))
                 if not rr or st(rr) == "Draft":
-                    T.append(_task(b, "rate_request", "Submit the rate request to ACCUSA (Actuarial)", "aat", at(rr) if rr else fr.get("approvedAt"),
+                    T.append(_task(b, "rate_request", "Submit the rate request to Actuarial", "aat", at(rr) if rr else fr.get("approvedAt"),
                                    "rate_request", cfg, "quotation/rates", stage=3))
                 elif st(rr) in ("Submitted", "In Review", "Revised"):
                     T.append(_task(b, "rate_sheet", "Prepare and issue the rate sheet", "accusa", at(rr), "rate_sheet", cfg,
                                    "quotation/rates", stage=3))
                 elif st(rr) == "Returned for Info":
                     q = (rr.get("clarifications") or [{}])[-1].get("question", "")
-                    T.append(_task(b, "rate_clarify", "Answer ACCUSA's clarification", "aat", at(rr), "rate_request", cfg,
-                                   "quotation/rates", kind="returned", blocker=f"ACCUSA asked: {q}", stage=3))
+                    T.append(_task(b, "rate_clarify", "Answer Actuarial's clarification", "aat", at(rr), "rate_request", cfg,
+                                   "quotation/rates", kind="returned", blocker=f"Actuarial asked: {q}", stage=3))
             else:
                 milestones["rates"] = True
                 stage = 4
                 if rr and st(rr) in ("Revised",):
                     T.append(_task(b, "rate_sheet", "Issue the revised rate sheet", "accusa", at(rr), "rate_sheet", cfg, "quotation/rates", stage=4))
                 elif rr and st(rr) == "Returned for Info":
-                    T.append(_task(b, "rate_clarify", "Answer ACCUSA's clarification", "aat", at(rr), "rate_request", cfg,
+                    T.append(_task(b, "rate_clarify", "Answer Actuarial's clarification", "aat", at(rr), "rate_request", cfg,
                                    "quotation/rates", kind="returned", stage=4))
 
         # ---- SOB draft (Sales prepares during proposal; validation by independent function)

@@ -1,4 +1,4 @@
-// Actuarial / ACCUSA — Corporate New Business quotation journey.
+// Actuarial — Corporate New Business quotation journey.
 //
 // A focused, self-contained surface for the documented quotation sequence:
 //   Sales endorsement/ticket → supporting documents → franchise approval check →
@@ -6,7 +6,7 @@
 //   second-level approval → release quotation + marked SOB to Sales.
 //
 // It is ADDITIVE: it reuses the existing rate-request / rate-sheet engine and screens
-// (nothing in the case workspace changes). Four demo personas (Sales, Actuarial/ACCUSA,
+// (nothing in the case workspace changes). Four demo personas (Sales, Actuarial,
 // First- and Second-level Approver) can walk one request end to end. The approver labels
 // are documented approval FUNCTIONS, not confirmed job titles — shown as
 // "pending confirmation". Actuarial pricing happens OUTSIDE HMS; this never implies an
@@ -23,7 +23,7 @@ import { switchUser } from "../main.js";
 // so maker-checker (1st ≠ 2nd level) holds in the demo exactly as the server enforces it.
 const PERSONAS = [
   { key: "sales", label: "Sales Demo User", sub: "Requesting account manager", role: "aat", user: "u-am1", pend: "aat" },
-  { key: "accusa", label: "Actuarial / ACCUSA Demo User", sub: "Pricing analyst", role: "accusa", user: "u-ac1", pend: "accusa" },
+  { key: "accusa", label: "Actuarial Demo User", sub: "Pricing analyst", role: "accusa", user: "u-ac1", pend: "accusa" },
   { key: "l1", label: "First-Level Approver Demo User", sub: "Pricing approval · pending confirmation", role: "approver", user: "u-sm1", pend: "l1" },
   { key: "l2", label: "Second-Level Approver Demo User", sub: "Pricing approval · pending confirmation", role: "approver", user: "u-sm2", pend: "l2" },
 ];
@@ -33,7 +33,7 @@ function myPersona() {
   if (me.role === "approver") return me.id === "u-sm2" ? PERSONAS[3] : PERSONAS[2];
   return PERSONAS[0]; // any AAT acts as the Sales demo persona
 }
-const PEND_LABEL = { aat: "Sales", accusa: "Actuarial / ACCUSA", l1: "First-level approver", l2: "Second-level approver" };
+const PEND_LABEL = { aat: "Sales", accusa: "Actuarial", l1: "First-level approver", l2: "Second-level approver" };
 const userForPend = (role, ownerId) => ({ aat: ownerId || "u-am1", accusa: "u-ac1", l1: "u-sm1", l2: "u-sm2" }[role]);
 
 const ASSUMPTIONS = [
@@ -650,7 +650,7 @@ function areaRelease(box, ctx) {
     };
     bar.appendChild(b);
   } else if (qs === "L2 Approved" && me.role !== "accusa") {
-    const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.textContent = "Switch to Actuarial / ACCUSA";
+    const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.textContent = "Switch to Actuarial";
     b.onclick = () => switchUser("u-ac1"); bar.appendChild(b);
   } else if (!released) {
     bar.innerHTML = html`<span class="tiny muted">Release becomes available after second-level approval (currently ${quoteState(ctx)}).</span>`.s;

@@ -54,8 +54,8 @@ export async function render(ctx) {
           return field(def, v, { name: `${sec.key}.${f.key}`, editable: ed, values: fr.otherInfo || {}, errors: Object.fromEntries(errors.map((e) => [e.field, e.message])) });
         })}</div>
         ${sec.key === "otherInfo" ? html`<div class="note mt tiny">Product (Account Type), Business Source, Current Coverage, Manner of Payment (contribution) and payment frequency are kept as <b>separate fields</b> with their original HMS3 values and codes.</div>` : ""}
-        ${sec.key === "otherInfo" && acusaEditable ? html`<div class="mt" data-acusa><div class="field"><label for="acusa">ACUSA Remarks (Actuarial (ACCUSA) / AMT) <span class="tag legacy">HMS3</span></label>
-          <textarea id="acusa" class="inp">${fr.otherInfo?.acusaRemarks || ""}</textarea></div><button class="btn sm mt" id="saveAcusa">Save ACUSA remarks</button></div>` : ""}
+        ${sec.key === "otherInfo" && acusaEditable ? html`<div class="mt" data-acusa><div class="field"><label for="acusa">Actuarial Remarks (Actuarial / AMT) <span class="tag legacy">HMS3</span></label>
+          <textarea id="acusa" class="inp">${fr.otherInfo?.acusaRemarks || ""}</textarea></div><button class="btn sm mt" id="saveAcusa">Save Actuarial remarks</button></div>` : ""}
         </div></section>`)}
       <section class="panel form-sec" id="sec-documents"><div class="ph"><h2>Documents</h2><span class="tiny">Each slot keeps versions; AMT can mark a file as needing correction.</span></div><div class="pb">
         ${state.meta.franchiseDocs.map((d) => docSlot({ label: d.label, slot: d.key, docs, linkedType: "franchise", linkedId: fr.id, caseId: id, canUpload: isOwner && c.status === "Open" && !["Converted to Account", "Rejected", "Expired"].includes(fr.status),
@@ -91,7 +91,7 @@ export async function render(ctx) {
   };
   drawAff();
   el.querySelector("#saveAcusa")?.addEventListener("click", async (e) => {
-    const r = await act("record.save", { recordId: fr.id, baseVersion: fr.v, changes: { otherInfo: { ...fr.otherInfo, acusaRemarks: el.querySelector("#acusa").value } } }, { button: e.currentTarget, success: "ACUSA remarks saved." });
+    const r = await act("record.save", { recordId: fr.id, baseVersion: fr.v, changes: { otherInfo: { ...fr.otherInfo, acusaRemarks: el.querySelector("#acusa").value } } }, { button: e.currentTarget, success: "Actuarial remarks saved." });
     if (r) ctx.reload();
   });
   if (!editable) return;

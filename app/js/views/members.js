@@ -16,7 +16,7 @@ export async function renderMemberData(ctx, box, purpose) {
   const size = 25;
 
   box.innerHTML = html`<section class="panel"><div class="ph"><div><h2>Member Data${purpose === "quotation" ? " for quotation (Master List)" : " (Master List) for enrollment"}</h2>
-      <div class="tiny">${purpose === "quotation" ? "Validated before the rate request; Actuarial (ACCUSA) rates from it. Owner: AAT handler." : "Owner: AMT. Accepted data is submitted to MDA with approved Plan Codes."} Sensitive personal data (Data Privacy Act).</div></div>
+      <div class="tiny">${purpose === "quotation" ? "Validated before the rate request; Actuarial rates from it. Owner: AAT handler." : "Owner: AMT. Accepted data is submitted to MDA with approved Plan Codes."} Sensitive personal data (Data Privacy Act).</div></div>
       <div class="row"><a class="btn sm" href="/api/templates/member-data.csv" download>${icon("download", 14)} Template</a>
         ${owns && !locked && !enrollmentBlocked ? html`<button class="btn sm ${batch ? "" : "primary"}" id="mUp">${icon("upload", 14)} ${batch ? "Re-upload (new version)" : "Upload file"}</button>` : ""}
         ${DEMO_BYPASS && owns && !locked && !enrollmentBlocked ? html`<button class="btn sm ghost" id="mSample" title="Load a generated demo Member Data file (300 clean rows)">Use sample</button>` : ""}</div></div>

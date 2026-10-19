@@ -8,7 +8,7 @@
 // reads the same map so its guidance can never contradict the live case state.
 //
 // Acronyms are glossed on first use via gloss() so a first-time user is never
-// left staring at "ACCUSA" or "SOB" with no explanation.
+// left staring at "SOB" or "COC" with no explanation.
 
 import { html } from "./core.js";
 
@@ -16,7 +16,6 @@ import { html } from "./core.js";
 // Short, plain-language expansions. Business names people already know (e.g. the
 // client's company) are deliberately NOT listed — we only gloss internal jargon.
 export const ABBR = {
-  "ACCUSA": "Actuarial pricing team",
   "SOB": "Schedule of Benefits",
   "COC": "Certificate of Coverage",
   "KYC": "Know Your Customer identity and compliance checks",
@@ -86,9 +85,9 @@ export const TASK_GUIDE = {
 
   // Work area 2 — Prepare Quotation
   requirements:  { cta: "Review requirements", why: "Franchise approved. Record what the client has provided and note anything still outstanding." },
-  rate_request:  { cta: "Request rates",       why: "Send the rate request to ACCUSA so Actuarial can price the quotation." },
-  rate_sheet:    { cta: "Prepare rate sheet",  why: "ACCUSA prices the request and issues the rate sheet." },
-  rate_clarify:  { cta: "Answer ACCUSA",       why: "ACCUSA needs more information before they can finish pricing." },
+  rate_request:  { cta: "Request rates",       why: "Send the rate request so Actuarial can price the quotation." },
+  rate_sheet:    { cta: "Prepare rate sheet",  why: "Actuarial prices the request and issues the rate sheet." },
+  rate_clarify:  { cta: "Answer Actuarial",    why: "Actuarial needs more information before they can finish pricing." },
   sob_create:    { cta: "Create the SOB",      why: "Build the Schedule of Benefits (SOB) from the approved template." },
   sob_draft:     { cta: "Continue the SOB",    why: "Finish the Schedule of Benefits draft and send it for review." },
   sob_review:    { cta: "Review the SOB",      why: "Review the Schedule of Benefits, then approve it or return it." },

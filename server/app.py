@@ -458,8 +458,8 @@ class Handler(BaseHTTPRequestHandler):
         return out
 
     def _quotations(self, ctx):
-        # One row per case that has a rate request, for the Actuarial / ACCUSA journey.
-        # Visibility follows the normal rule (ACCUSA/approvers see the whole book; a
+        # One row per case that has a rate request, for the Actuarial journey.
+        # Visibility follows the normal rule (Actuarial/approvers see the whole book; a
         # Sales AAT user sees only their own portfolio). The pending step, its owning
         # demo persona and a single due date are computed here so the client stays thin.
         st = store()
@@ -722,7 +722,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"batch": st.get(bt["id"]), "autoMapped": complete, "elapsedMs": int((time.time() - t0) * 1000)})
         if kind == "rateSheet":
             if ctx.role != "accusa":
-                raise ApiError(403, "forbidden", "Actuarial (ACCUSA) imports rate sheets.")
+                raise ApiError(403, "forbidden", "Actuarial imports rate sheets.")
             ok, errs = actions.validate_rate_rows(rows)
         elif kind == "tor":
             ok, errs = actions.validate_line_rows(rows)

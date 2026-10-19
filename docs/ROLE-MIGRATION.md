@@ -52,7 +52,7 @@ assumed production right.
 | `compliance` | `aat` | KYC/SOLYTICS is an AAT responsibility in the flowchart (no separate Compliance login) |
 | `as` (Account Services) | `amt` | AMT owns franchise approval, contract endorsement, account/plan/COC setup |
 | `wellness` | `amt` | Health-benefit orientation is an AMT step; Wellness has no login in this build |
-| `actuarial` | `accusa` | Same function, source label is ACCUSA (display kept as "Actuarial (ACCUSA)") |
+| `actuarial` | `accusa` | Same function; source label was ACCUSA. Internal role key stays `accusa`; the user-facing display name is now "Actuarial" (the ACCUSA acronym was removed from the UI) |
 | `sm` (Sales Manager) | `approver` | Pricing/SOB sign-off owner is not titled by the source → pending-confirmation approver |
 | `senior` (Senior Management) | `approver` | Same — collapsed into the single pending approver role |
 | `validator` | `approver` | Independent SOB validation routed to the pending approver (configurable, §3) |

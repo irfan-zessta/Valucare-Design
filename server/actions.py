@@ -863,7 +863,7 @@ def rr_submit(s, ctx, p):
                        {"fields": [{"field": "requirements", "message": "Member Data (Master List) must be received before requesting rates."}]})
     _set(s, ctx, rr, {"status": "Submitted", "submittedBy": ctx.uid, "submittedAt": ctx.now_iso()}, "rateRequest.submit", base=p.get("baseVersion"))
     _set(s, ctx, c, {"pipelineStage": "For Rates Creation"}, "lead.stage")
-    notify(s.store, ctx, c["id"], "rateRequest.submitted", ["Actuarial (ACCUSA) queue"], f"Rate request {rr['code']} submitted")
+    notify(s.store, ctx, c["id"], "rateRequest.submitted", ["Actuarial queue"], f"Rate request {rr['code']} submitted")
     return {}
 
 
@@ -976,7 +976,7 @@ def rs_issue(s, ctx, p):
 
 
 # =========================================================== quotation approval & release
-# The documented Actuarial / ACCUSA sequence (source: Actuarial New Business process)
+# The documented Actuarial sequence (source: Actuarial New Business process)
 # is: prepare quotation -> first-level approval -> second-level approval -> release the
 # quotation and marked SOB to Sales. The two approval FUNCTIONS are documented, but the
 # approving JOB TITLES are not confirmed by the business, so both levels route to the
@@ -1055,7 +1055,7 @@ def quote_decide(s, ctx, p):
              "quote.approve", reason=entry["comments"] or None)
         who = "second-level" if level == 2 else "first-level"
         nxt = "ready to release to Sales" if level == 2 else "awaiting second-level approval"
-        notify(s.store, ctx, c["id"], "quote.approved", ["Actuarial (ACCUSA) queue"],
+        notify(s.store, ctx, c["id"], "quote.approved", ["Actuarial queue"],
                f"Quotation {rs['code']} {who}-approved — {nxt}")
     else:
         if not entry["comments"] and not DEMO_BYPASS:
@@ -1067,7 +1067,7 @@ def quote_decide(s, ctx, p):
         rr = s.store.get(rs["requestId"])
         if rr and rr.get("status") != "In Review":
             _set(s, ctx, rr, {"status": "In Review"}, "rateRequest.reopen")
-        notify(s.store, ctx, c["id"], "quote.returned", ["Actuarial (ACCUSA) queue"],
+        notify(s.store, ctx, c["id"], "quote.returned", ["Actuarial queue"],
                f"Quotation {rs['code']} returned for correction by level-{level} review")
     return {}
 
@@ -2938,12 +2938,12 @@ def record_save(s, ctx, p):
             raise ApiError(403, "forbidden", "You do not have access to this case.")
         if c and c.get("status") != "Open" and t != "case":
             raise ApiError(409, "case_closed", f"Case is {c.get('status')}.")
-    # Field-level rule: ACUSA remarks are written by Actuarial (ACCUSA) / AMT only.
+    # Field-level rule: Actuarial remarks are written by Actuarial / AMT only.
     if t == "franchise" and ctx.role in ("accusa", "amt"):
         oi = dict(rec.get("otherInfo", {}))
         new_oi = changes.get("otherInfo") or {}
         if set(changes) - {"otherInfo"} or any(new_oi.get(k) != oi.get(k) for k in new_oi if k != "acusaRemarks"):
-            raise ApiError(403, "forbidden", "Actuarial (ACCUSA) / AMT can only edit ACUSA Remarks on the franchise.")
+            raise ApiError(403, "forbidden", "Actuarial / AMT can only edit Actuarial Remarks on the franchise.")
         oi["acusaRemarks"] = new_oi.get("acusaRemarks", oi.get("acusaRemarks"))
         return {"record": s.store.update(rec, {"otherInfo": oi}, ctx, "franchise.acusaRemarks", base_version=p.get("baseVersion"))}
     if not can(ctx, roles):

@@ -8,8 +8,8 @@ Provenance tags used throughout (shown in the UI and the parity checklist):
 """
 
 # ROLES — aligned to the two source-of-truth documents:
-#   * SALES NEW BUSINESS CORP. PROCESS FLOWCHART 2026 (AAT / AMT / ACCUSA / LEGAL)
-#   * Actuarial Process Flow (ACCUSA quotation routing)
+#   * SALES NEW BUSINESS CORP. PROCESS FLOWCHART 2026 (AAT / AMT / Actuarial / LEGAL)
+#   * Actuarial Process Flow (Actuarial quotation routing)
 # The exact labels AAT and AMT are preserved; their full names are NOT confirmed
 # by the source, so they are never expanded. Only the roles the documents assign
 # are treated as confirmed. Everything the source leaves silent (pricing/SOB
@@ -20,7 +20,7 @@ ROLES = {
     # ---- Source-confirmed Corporate New Business participants ----
     "aat": "AAT",
     "amt": "AMT",
-    "accusa": "Actuarial (ACCUSA)",
+    "accusa": "Actuarial",
     "legal": "Legal Department",
     # ---- Ownership not established by the source (kept visible + configurable) ----
     "approver": "Approver (pending confirmation)",
@@ -47,8 +47,8 @@ USERS = [
     {"id": "u-as1", "name": "AMT Demo User", "role": "amt", "team": None},
     {"id": "u-as2", "name": "AMT Demo User 2", "role": "amt", "team": None},
     {"id": "u-we1", "name": "AMT Demo User 3 (orientation)", "role": "amt", "team": None},
-    # ACCUSA — rate sheet / quotation routing
-    {"id": "u-ac1", "name": "ACCUSA Demo User", "role": "accusa", "team": None},
+    # Actuarial — rate sheet / quotation routing
+    {"id": "u-ac1", "name": "Actuarial Demo User", "role": "accusa", "team": None},
     # Legal — draft contract preparation and review
     {"id": "u-lg1", "name": "Legal Demo User", "role": "legal", "team": None},
     # Approver — first/second-level approvals the source does not title (pending)
@@ -441,8 +441,8 @@ def franchise_schema():
             S("currentContractExpiry", "Current contract expiry", "date", src="proposed"),
             S("targetEffectiveDate", "Target effective date", "date", src="proposed"),
             S("salesRemarks", "Sales Remarks", "textarea", src="legacy", wide=True),
-            S("acusaRemarks", "ACCUSA Remarks", "textarea", src="legacy", wide=True, editRoles=["accusa", "amt"],
-              help="Entered by ACCUSA (Actuarial) or AMT."),
+            S("acusaRemarks", "Actuarial Remarks", "textarea", src="legacy", wide=True, editRoles=["accusa", "amt"],
+              help="Entered by Actuarial or AMT."),
         ]},
     ]
 
