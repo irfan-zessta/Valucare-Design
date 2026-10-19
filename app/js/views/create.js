@@ -1,5 +1,6 @@
 import { html, api, state, act, go, roleLabel, industryName, interName, toast, esc, paintFieldErrors, showError, fmtDate, DEMO_BYPASS, actsAs } from "../core.js";
 import { icon, field, mountCombos, pill, sampleBtn, fillSampleData } from "../components.js";
+import { mountCreateGuide } from "../guide.js";
 
 export async function render(main) {
   document.title = "Create New Business · HMS3";
@@ -44,6 +45,9 @@ export async function render(main) {
     if (s.step === "company") drawCompany(body);
     if (s.step === "lead") drawLead(body);
     saveDraft();
+    // If the guided demo is on and still in its pre-case phase, point out the control to
+    // use on this step (it mounts nothing otherwise).
+    mountCreateGuide(main);
   }
 
   // ---- step 1: search

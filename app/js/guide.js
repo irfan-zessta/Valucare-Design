@@ -1,9 +1,10 @@
 // Optional self-serve guided mode for the New Business journey ("Guide me").
 //
 // Design contract (the parts that keep this honest and safe):
-//   - It NEVER resets, overwrites or mutates an existing user case. Starting the
-//     guide spawns a brand-new, isolated, clearly-fictional demo case through the
-//     real `case.create` action, exactly as a person would.
+//   - It NEVER resets, overwrites or mutates an existing user case. Starting the guide
+//     takes the person to the very beginning of New Business — the Create flow — and walks
+//     them through searching the company, confirming it and entering the lead. They create
+//     the brand-new, isolated, clearly-fictional demo case themselves; the guide only points.
 //   - It NEVER submits a form, approves a record, changes a role or navigates on the
 //     user's behalf. It explains the one correct next action and highlights the one
 //     control to use; the person always clicks it themselves.
@@ -18,7 +19,7 @@
 // always NAMED in text (never signalled by colour/animation alone), and the panel is
 // pinned to a viewport corner so it never covers the target, fields or primary actions.
 
-import { html, state, act, go, toast, announce, roleLabel, DEMO_BYPASS, dialog, confirmDialog, can } from "./core.js";
+import { html, state, go, toast, announce, roleLabel, DEMO_BYPASS, dialog, confirmDialog, can } from "./core.js";
 import { icon } from "./components.js";
 import { gloss, ctaFor, whyFor, MILESTONE_DONE } from "./guidance.js";
 import { switchUser } from "./main.js";
@@ -36,8 +37,9 @@ function setGuide(obj) {
 }
 function patchGuide(p) { setGuide({ ...(getGuide() || {}), ...p }); }
 
-// Is the guide currently switched on, and is this hash its demo case?
-export function guideActive() { const g = getGuide(); return !!(g && g.active && g.caseId); }
+// Is the guide currently switched on? (True through the create phase, before a demo case
+// exists, as well as once the person has created one.)
+export function guideActive() { const g = getGuide(); return !!(g && g.active); }
 function onGuideCase() {
   const g = getGuide();
   return g && g.caseId && pathOf(location.hash).startsWith(`/case/${g.caseId}`);
@@ -70,42 +72,6 @@ async function ensureCanStart() {
   return await switchUser(ADMIN_USER); // false if the user cancels an unsaved-changes prompt
 }
 
-// ---------------------------------------------------------------- fictional demo data
-// Deliberately obvious as a demo, and comfortably above the corporate minimum so the
-// case is never auto-routed to IFG. A short time suffix keeps repeat/restart companies
-// distinct without ever touching a real record.
-function demoPayload() {
-  let suffix = "";
-  try { suffix = " " + new Date().toISOString().slice(5, 16).replace(/[-T:]/g, ""); } catch (e) {}
-  return {
-    newCompany: {
-      registeredName: `Northwind Pacific Logistics Inc. (Guided demo${suffix})`,
-      tradeName: "Northwind Pacific",
-      tin: "009-888-777-000",
-      industry: "Transportation and logistics",
-      address: "128 Harbor Drive, Bonifacio Global City",
-      province: "Metro Manila",
-      city: "Taguig",
-    },
-    lead: {
-      channel: "Direct",
-      leadSource: "Referral",
-      estHeadcount: 180,
-      estPremium: 5400000,
-      probability: 70,
-      targetEffectiveDate: targetDate(),
-      contactName: "Dana Reyes",
-      contactEmail: "dana.reyes@northwind-demo.example",
-      contactPhone: "+63 2 8555 0101",
-      jumbo: false,
-      notes: "Fictional guided-demo prospect. Safe to edit, complete or delete.",
-    },
-  };
-}
-function targetDate() {
-  try { const d = new Date(); d.setMonth(d.getMonth() + 2); return d.toISOString().slice(0, 10); } catch (e) { return ""; }
-}
-
 // ---------------------------------------------------------------- entry dialog
 // Opened from the top-bar "Guide me" button. Offers the two choices the spec asks for
 // — "Explore freely" and "Guide me through New Business" — plus Resume / fresh-case
@@ -114,7 +80,7 @@ export async function openGuideMenu() {
   if (!DEMO_BYPASS) { go("#/new-business"); return; }
   const g = getGuide();
   const hasDemo = !!(g && g.caseId);
-  const body = html`<p class="muted">A guided walkthrough spins up its own <b>isolated, fictional</b> New Business case and, on every screen, points out the one thing to do next and why. It never fills in or submits anything for you, and it never touches your real cases.</p>
+  const body = html`<p class="muted">A guided walkthrough starts you at the <b>very beginning</b> of New Business — finding the company and creating an <b>isolated, fictional</b> demo case — then, on every screen, points out the one thing to do next and why. It never fills in or submits anything for you, and it never touches your real cases.</p>
     ${hasDemo ? html`<p class="note info mt">${icon("help", 16)} You already have a guided demo case in progress. Resume it, or start a fresh one — your other cases are untouched either way.</p>` : ""}
     <p class="tiny mt">You can exit, resume or return to free exploration at any time.</p>`;
   const actions = hasDemo
@@ -127,10 +93,13 @@ export async function openGuideMenu() {
   if (r.action === "start" || r.action === "fresh") return startGuide();
 }
 
-// Create a fresh isolated demo case and switch the guide on.
+// Switch the guide on and take the person to the start of New Business — the Create flow.
+// No case is created here; they create it themselves at the end of the Create steps, and the
+// guide adopts whatever case they land on as its demo case (see the hashchange listener).
 export async function startGuide() {
-  // Static preview (production): no backend to create a case, so attach to an existing
-  // fixture case. A full browser reload resets the fixture, which is honest for a mock.
+  // Static preview (production): no backend, so the Create flow can't search or persist a
+  // case. Attach to an existing early-stage fixture so the walkthrough still runs. A full
+  // browser reload resets the fixture, which is honest for a mock.
   if (isPreview()) {
     setGuide({ caseId: PREVIEW_DEMO_CASE, active: true, startedAt: nowStamp() });
     toast("Guided demo ready — follow the highlighted next step.", "ok");
@@ -138,16 +107,14 @@ export async function startGuide() {
     window.dispatchEvent(new Event("hms:changed"));
     return;
   }
-  // Only the AAT desk (Admin, in this demo) can open the case. If the current role can't,
+  // Only the AAT desk (Admin, in this demo) can create a new case. If the current role can't,
   // offer to switch — don't dead-end with a vague error.
   if (!(await ensureCanStart())) return;
-  announce("Preparing a guided demo case.");
-  toast("Preparing a guided demo case…");
-  const r = await act("case.create", demoPayload(), { quiet: true });
-  if (!r || !r.caseId) { toast("Could not start the guided demo. Please try again.", "err"); return; }
-  setGuide({ caseId: r.caseId, active: true, startedAt: nowStamp() });
-  toast("Guided demo ready — follow the highlighted next step.", "ok");
-  go(`#/case/${r.caseId}/franchise/franchise`);
+  // caseId is null until they create one: this is the "create phase". The guide panel mounts
+  // on the Create page and points at each step's control.
+  setGuide({ active: true, caseId: null, startedAt: nowStamp() });
+  toast("Guided demo ready — start by finding the company.", "ok");
+  go("#/new-business/create");
   window.dispatchEvent(new Event("hms:changed"));
 }
 
@@ -203,6 +170,7 @@ let collapsed = false;
 let announced = "";       // last next-task key we announced, so we don't repeat it
 let lastCtx = null;       // remembered so collapse/expand can repaint without a full render
 let lastArgs = {};
+let remount = null;       // the current mount fn (in-case or create-phase), for collapse/expand
 const PANEL_ID = "guide-panel";
 
 function pathOf(h) {
@@ -229,20 +197,16 @@ export function mountGuide(ctx, { n, mine } = {}) {
   // (and a reload). Re-rendering after an action therefore never auto-expands the card.
   collapsed = !!g.collapsed;
   lastCtx = ctx; lastArgs = { n, mine };
+  remount = () => mountGuide(ctx, { n, mine });
 
-  const panel = document.createElement("aside");
-  panel.id = PANEL_ID;
-  panel.className = "guide-panel";
-  panel.setAttribute("role", "complementary");
-  panel.setAttribute("aria-label", "Guided demo");
-  document.body.appendChild(panel);
+  const panel = makePanel();
 
   const paint = () => {
     panel.classList.toggle("is-collapsed", collapsed);
-    if (collapsed) { panel.innerHTML = collapsedHtml(areaInfo(s).n); wireCollapsed(panel, ctx, { n, mine }); return; }
+    if (collapsed) { panel.innerHTML = collapsedHtml(areaInfo(s).n); wireCollapsed(panel); return; }
     if (s.closed) { panel.innerHTML = donePanelHtml(ctx); clearHighlight(); }
     else { panel.innerHTML = stepPanelHtml(ctx, { n, mine }); applyHighlight(ctx, { n }); }
-    wirePanel(panel, ctx, { n, mine });
+    wirePanel(panel);
   };
   paint();
 
@@ -257,6 +221,109 @@ export function mountGuide(ctx, { n, mine } = {}) {
   // Announce the current next action once per task key (polite; never steals focus).
   if (!s.closed && n && announced !== n.key) { announced = n.key; announce(`Guided demo: ${n.title}`); }
   if (s.closed && announced !== "closed") { announced = "closed"; announce("Guided demo complete."); }
+}
+
+// The empty panel shell both mounts reuse.
+function makePanel() {
+  const panel = document.createElement("aside");
+  panel.id = PANEL_ID;
+  panel.className = "guide-panel";
+  panel.setAttribute("role", "complementary");
+  panel.setAttribute("aria-label", "Guided demo");
+  document.body.appendChild(panel);
+  return panel;
+}
+
+// ---------------------------------------------------------------- create-phase guide
+// Shown on #/new-business/create, BEFORE a demo case exists. It walks the three Create steps
+// — find the company, confirm it, enter the lead — pointing at (and blinking) the one control
+// to click on each. It never types or submits anything; the person performs each step, and the
+// case they create at the end is adopted as the demo case by the hashchange listener below.
+const CREATE_STEPS = {
+  find:    { what: "Find the company first.",        why: "Searching first makes sure you never create a duplicate company or case.",   cta: "Search" },
+  company: { what: "Confirm the company's details.", why: "Enter the new company's details. A quick duplicate check runs before you continue.", cta: "Check for duplicates and continue" },
+  lead:    { what: "Enter the lead details.",        why: "Add the business source and contact. Creating the case opens the franchise form next.", cta: "Create case" },
+};
+function createStep() {
+  if (document.getElementById("lf")) return "lead";
+  if (document.getElementById("cf")) return "company";
+  return "find";
+}
+
+// Called by create.js at the end of each render of the Create page.
+export function mountCreateGuide(main) {
+  teardown();
+  const g = getGuide();
+  if (!DEMO_BYPASS || !g || !g.active || g.caseId) return; // only during the pre-case create phase
+  collapsed = !!g.collapsed;
+  lastCtx = null; lastArgs = {};
+  remount = () => mountCreateGuide(main);
+
+  const panel = makePanel();
+  let lastTarget = null; // repaint the card text when the control to blink changes
+  const paint = () => {
+    const step = createStep();
+    panel.classList.toggle("is-collapsed", collapsed);
+    if (collapsed) { panel.innerHTML = collapsedHtml(1); wireCollapsed(panel); return; }
+    lastTarget = findCreateTarget(step);
+    panel.innerHTML = createStepHtml(step, lastTarget);
+    wirePanel(panel);
+    highlightCreate(lastTarget);
+  };
+  paint();
+
+  // The step changes in place (find → company → lead) via create.js's own re-render, which
+  // re-calls this function; but the search-results list also appears without a full re-render.
+  // Watch #body so the card text and blink always point at the right control (e.g. the
+  // "Create new company" button that only appears after a search).
+  const bodyEl = document.getElementById("body");
+  if (bodyEl) {
+    observer = new MutationObserver(debounce(() => {
+      const p = document.getElementById(PANEL_ID);
+      if (!p || collapsed || p.classList.contains("is-collapsed")) return;
+      const t = findCreateTarget(createStep());
+      if (t !== lastTarget) paint(); else highlightCreate(t);
+    }, 140));
+    observer.observe(bodyEl, { childList: true, subtree: true });
+  }
+
+  const key = "create:" + createStep();
+  if (announced !== key) { announced = key; announce(`Guided demo: ${CREATE_STEPS[createStep()].what}`); }
+}
+
+function createStepHtml(step, target) {
+  const info = CREATE_STEPS[step] || CREATE_STEPS.find;
+  const cta = ctaText(step, target);
+  const look = target ? `Use the highlighted “${esc(cta)}” to continue.` : `Look for “${esc(cta)}”.`;
+  const tip = step === "find" ? "Try a name like “Northwind”, or a TIN." : "Use “Fill sample” to try it with demo data.";
+  return `${headHtml("Work area 1 of 5 · Create the case")}
+    <div class="gp-body">
+      <b class="gp-what">${esc(info.what)}</b>
+      <p class="gp-why">${esc(info.why)}</p>
+      <p class="gp-look">${icon("arrowr", 14).s} ${esc(look)}</p>
+      <p class="gp-tip">${icon("sparkle", 13).s} ${esc(tip)}</p>
+    </div>${footBtns()}`;
+}
+
+// The one control to blink on the current Create step.
+function findCreateTarget(step) {
+  const body = document.getElementById("body");
+  if (!body) return null;
+  if (step === "find") return body.querySelector("#newco") || body.querySelector("#sf .btn.primary");
+  return body.querySelector(".savebar .btn.primary:not([disabled])") || body.querySelector("form .btn.primary:not([disabled])");
+}
+// Name the control from its own label so the card text can never drift from the blink.
+function ctaText(step, target) {
+  if (target) { const t = (target.textContent || "").replace(/\s+/g, " ").trim(); if (t) return t; }
+  return (CREATE_STEPS[step] || CREATE_STEPS.find).cta;
+}
+function highlightCreate(target) {
+  clearHighlight();
+  if (!target) return;
+  target.classList.add("guide-target", "guide-pulse");
+  const panel = document.getElementById(PANEL_ID);
+  const r = target.getBoundingClientRect();
+  if (panel) panel.classList.toggle("dock-right", (r.left + r.width / 2) < window.innerWidth * 0.55);
 }
 
 // ---------------------------------------------------------------- panel content
@@ -338,28 +405,28 @@ function footBtns() {
 // Toggle minimized state, persist the preference, repaint in place, and move focus to the
 // control the spec asks for (the pill when minimizing, the minimize button when restoring).
 // Minimizing only hides the card — it never exits, restarts or loses walkthrough progress.
-function setCollapsed(next, ctx, args) {
+function setCollapsed(next) {
   collapsed = next;
   patchGuide({ collapsed: next });
-  mountGuide(ctx, args);
+  remount?.();
   const panel = document.getElementById(PANEL_ID);
   const focusEl = next ? panel?.querySelector(".guide-pill") : panel?.querySelector('[data-g="collapse"]');
   focusEl?.focus();
 }
 
-function wirePanel(panel, ctx, args) {
-  panel.querySelector('[data-g="collapse"]')?.addEventListener("click", () => setCollapsed(true, ctx, args));
+function wirePanel(panel) {
+  panel.querySelector('[data-g="collapse"]')?.addEventListener("click", () => setCollapsed(true));
   panel.querySelector('[data-g="exitfree"]')?.addEventListener("click", () => exitGuide({ toFreeExploration: true }));
   panel.querySelector('[data-g="restart"]')?.addEventListener("click", async () => {
     const ok = await confirmDialog("Restart the guided demo?",
-      "This starts a brand-new, isolated demo case from the beginning. Your current demo case and all your real cases are left untouched.",
+      "This takes you back to the start of New Business to create a brand-new, isolated demo case. Your current demo case and all your real cases are left untouched.",
       { confirm: "Start fresh", kind: "primary" });
     if (ok) startGuide();
   });
   panel.querySelector('[data-g="fresh"]')?.addEventListener("click", () => startGuide());
 }
-function wireCollapsed(panel, ctx, args) {
-  panel.querySelector('[data-g="expand"]')?.addEventListener("click", () => setCollapsed(false, ctx, args));
+function wireCollapsed(panel) {
+  panel.querySelector('[data-g="expand"]')?.addEventListener("click", () => setCollapsed(false));
 }
 
 // ---------------------------------------------------------------- highlight
@@ -431,17 +498,28 @@ function debounce(fn, ms) {
 }
 
 // ---------------------------------------------------------------- global listeners
-// If the guide is on but the user navigates away from the demo case, retract the panel
-// (it re-mounts automatically when they return to the demo case). Registered once.
-window.addEventListener("hashchange", () => { if (!onGuideCase()) teardown(); });
+// While the guide is on but has no case yet (the create phase), adopt whatever case the
+// person lands on as the demo case — that is the one they created at the end of the Create
+// flow. From then on the in-case panel takes over. Then, if the guide is on but the user
+// navigated away from its demo case (and off the Create page), retract the panel — it
+// re-mounts automatically when they return. Registered once.
+window.addEventListener("hashchange", () => {
+  const g = getGuide();
+  if (g && g.active && !g.caseId) {
+    const m = pathOf(location.hash).match(/^\/case\/([^/]+)/);
+    if (m) patchGuide({ caseId: m[1] });
+  }
+  const onCreate = pathOf(location.hash).startsWith("/new-business/create");
+  if (!onGuideCase() && !onCreate) teardown();
+});
 // Escape minimizes the panel (dismissal without trapping focus), unless the user is
 // typing in a field or a modal dialog is open. Focus moves to the compact pill.
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   const panel = document.getElementById(PANEL_ID);
-  if (!panel || collapsed || !lastCtx) return;
+  if (!panel || collapsed || !remount) return;
   const a = document.activeElement;
   if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
   if (document.querySelector(".dialog-backdrop, .drawer")) return;
-  setCollapsed(true, lastCtx, lastArgs);
+  setCollapsed(true);
 });
