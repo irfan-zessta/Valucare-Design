@@ -31,6 +31,8 @@ const P = {
   lock: "M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4",
   collapse: "M15 6l-6 6 6 6",
   expand: "M9 6l6 6-6 6",
+  minus: "M5 12h14",
+  sparkle: "M12 3l1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6zM18 4l.7 2.3L21 7l-2.3.7L18 10l-.7-2.3L15 7l2.3-.7z",
   history: "M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5m4-1v5l3 2",
   ext: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
   filter: "M4 5h16l-6 8v6l-4-2v-4z",

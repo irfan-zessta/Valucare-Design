@@ -616,39 +616,70 @@ dl.kv.cols .wide{grid-column:1/-1}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ---------------------------------------------------------------- guided demo ("Guide me")
-   An optional, non-modal helper. Pinned to the bottom-left so it never covers the
-   target, fields or primary actions. The target control is highlighted with a static
-   outline plus an at-most-two-cycle pulse; the target is always NAMED in the panel text
-   so the cue never relies on colour or motion alone. The global reduced-motion rule
-   above already disables the pulse entirely. */
-.guide-panel{position:fixed;left:16px;bottom:16px;z-index:60;width:340px;max-width:calc(100vw - 32px);
-  background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r);
-  box-shadow:0 10px 30px rgba(0,0,0,.18);font-size:13px;overflow:hidden}
-/* Flipped to the right when the highlighted control sits on the left, so the panel
+   A polished, assistant-style helper card — NOT an AI chat window and never labelled as one.
+   It is an optional, non-modal region pinned to a viewport corner so it never covers the
+   highlighted control, required fields, errors or primary actions (it flips to the opposite
+   side via .dock-right when the target is on that side). The surface is a soft, STATIC
+   lavender→pale-blue→blush gradient with a luminous border and restrained shadow; there are
+   no particles, no flashing, no moving gradients. Text is dark and high-contrast against the
+   pastel. The target control is highlighted with a static outline plus an at-most-two-cycle
+   pulse, and is always NAMED in the card text so the cue never relies on colour/motion alone.
+   The global reduced-motion rule above disables the pulse and all transitions entirely. */
+.guide-panel{position:fixed;left:16px;bottom:16px;z-index:60;width:344px;max-width:calc(100vw - 32px);
+  color:#191a2e;font-size:13px;overflow:hidden;border-radius:18px;
+  background:linear-gradient(145deg,#EEF0FF 0%,#EDF4FF 44%,#FCEFF6 100%);
+  border:1px solid rgba(150,160,230,.5);
+  box-shadow:0 16px 36px rgba(72,82,150,.20),0 1px 0 rgba(255,255,255,.75) inset,0 0 0 1px rgba(255,255,255,.55) inset}
+/* Flipped to the right when the highlighted control sits on the left, so the card
    never covers the target or its primary action. */
 .guide-panel.dock-right{left:auto;right:16px}
-.guide-panel .gp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;
-  padding:9px 12px;border-bottom:1px solid var(--border);background:var(--surface-muted)}
-.guide-panel .gp-eyebrow{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-subtle)}
-.guide-panel .gp-head-btns{display:flex;gap:4px;flex:none}
-.guide-panel .iconbtn.sm{width:28px;height:28px}
-.guide-panel .gp-body{padding:11px 12px;line-height:1.5}
-.guide-panel .gp-what{display:block;font-size:14px;font-weight:600;margin-bottom:3px}
-.guide-panel .gp-why{color:var(--text-muted);margin:0 0 7px}
-.guide-panel .gp-look{display:flex;gap:6px;align-items:flex-start;margin:0 0 7px;font-weight:500}
-.guide-panel .gp-look .ico{flex:none;margin-top:2px;color:var(--accent)}
-.guide-panel .gp-actor{color:var(--text-muted);margin:0 0 7px;font-size:12.5px}
-.guide-panel .gp-tip{color:var(--text-subtle);margin:0;font-size:12px}
-.guide-panel .gp-foot{display:flex;gap:8px;justify-content:flex-end;padding:9px 12px;border-top:1px solid var(--border)}
-.guide-panel abbr[title]{text-decoration:underline dotted;text-underline-offset:2px;cursor:help}
-.guide-pill{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;
-  border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font-weight:500;font-size:13px;cursor:pointer;
-  box-shadow:0 6px 18px rgba(0,0,0,.14)}
-.guide-pill:hover{background:var(--surface-muted)}
+/* Minimized: shed the card chrome so only the compact pill shows. */
+.guide-panel.is-collapsed{background:none;border:0;box-shadow:none;border-radius:0;overflow:visible;width:auto}
 
-/* The one control to use next. Strong neutral outline (works in the monochrome palette)
-   plus a soft ring; the pulse runs twice then settles. */
+.guide-panel .gp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:15px 15px 9px}
+.guide-panel .gp-head-main{display:flex;flex-direction:column;gap:3px;min-width:0}
+.guide-panel .gp-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;letter-spacing:.01em;color:#272842}
+.guide-panel .gp-eyebrow .ico{flex:none;color:#7A68F0}
+.guide-panel .gp-where{font-size:11.5px;font-weight:500;color:#565a79}
+.guide-panel .gp-min{flex:none;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
+  border-radius:10px;border:1px solid rgba(120,130,200,.35);background:rgba(255,255,255,.55);color:#3a3c58;cursor:pointer;
+  transition:background-color var(--t-fast) var(--ease)}
+.guide-panel .gp-min:hover{background:rgba(255,255,255,.9)}
+
+.guide-panel .gp-body{padding:3px 15px 13px;line-height:1.5}
+.guide-panel .gp-what{display:block;font-size:15px;font-weight:700;color:#17182b;margin-bottom:5px}
+.guide-panel .gp-why{color:#41435f;margin:0 0 10px}
+.guide-panel .gp-look{display:flex;gap:7px;align-items:flex-start;margin:0 0 10px;font-weight:600;color:#232539}
+.guide-panel .gp-look .ico{flex:none;margin-top:2px;color:#2563EB}
+.guide-panel .gp-actor{color:#4a4c66;margin:0 0 10px;font-size:12.5px}
+.guide-panel .gp-tip{display:flex;gap:6px;align-items:flex-start;color:#4f5172;margin:0;font-size:12px}
+.guide-panel .gp-tip .ico{flex:none;margin-top:1px;color:#7A68F0}
+.guide-panel .gp-foot{display:flex;gap:8px;justify-content:flex-end;padding:11px 15px 14px;border-top:1px solid rgba(120,130,200,.22)}
+/* Secondary actions: subtle on the pastel surface, never competing with the page's own buttons. */
+.guide-panel .gp-foot .btn{background:rgba(255,255,255,.6);border:1px solid rgba(120,130,200,.4);color:#2a2b45;box-shadow:none}
+.guide-panel .gp-foot .btn:hover{background:rgba(255,255,255,.95)}
+.guide-panel .gp-foot .btn.primary{background:#2563EB;border-color:#2563EB;color:#fff}
+.guide-panel .gp-foot .btn.primary:hover{background:#1D4ED8}
+.guide-panel abbr[title]{text-decoration:underline dotted;text-underline-offset:2px;cursor:help}
+.guide-panel .gp-min:focus-visible,.guide-panel .gp-foot .btn:focus-visible{outline:2px solid #2563EB;outline-offset:2px}
+
+/* Minimized pill: "✦ Demo guide · N/5". Clicking it restores the card at the same task. */
+.guide-pill{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 15px;border-radius:999px;cursor:pointer;
+  color:#232539;font-weight:600;font-size:13px;
+  background:linear-gradient(145deg,#EEF0FF 0%,#EDF4FF 45%,#FCEFF6 100%);
+  border:1px solid rgba(150,160,230,.55);
+  box-shadow:0 10px 24px rgba(72,82,150,.18),0 1px 0 rgba(255,255,255,.7) inset;
+  transition:filter var(--t-fast) var(--ease)}
+.guide-pill:hover{filter:brightness(1.03)}
+.guide-pill .ico:first-child{flex:none;color:#7A68F0}
+.guide-pill .ico:last-child{flex:none;color:#565a79}
+.guide-pill:focus-visible{outline:2px solid #2563EB;outline-offset:2px}
+
+/* The one control to use next. Accent outline plus a soft ring; the pulse runs twice
+   then settles (and is disabled entirely under prefers-reduced-motion). */
 .guide-target{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--r-sm);box-shadow:var(--ring)}
 .guide-target.guide-pulse{animation:guidePulse 1.1s var(--ease,ease) 2}
-@keyframes guidePulse{0%,100%{box-shadow:var(--ring)}50%{box-shadow:0 0 0 6px rgba(24,24,27,.28)}}
-@media (max-width:720px){.guide-panel{left:8px;right:8px;bottom:8px;width:auto}}
+@keyframes guidePulse{0%,100%{box-shadow:var(--ring)}50%{box-shadow:0 0 0 6px rgba(37,99,235,.28)}}
+/* Smaller screens: a compact bottom panel that never spans tall enough to block page
+   controls; still fully collapsible to the pill. */
+@media (max-width:720px){.guide-panel{left:8px;right:8px;bottom:8px;width:auto;max-height:46vh;overflow:auto}}

@@ -201,6 +201,8 @@ function nowStamp() { try { return new Date().toISOString(); } catch (e) { retur
 let observer = null;
 let collapsed = false;
 let announced = "";       // last next-task key we announced, so we don't repeat it
+let lastCtx = null;       // remembered so collapse/expand can repaint without a full render
+let lastArgs = {};
 const PANEL_ID = "guide-panel";
 
 function pathOf(h) {
@@ -223,6 +225,10 @@ export function mountGuide(ctx, { n, mine } = {}) {
   const g = getGuide();
   if (!DEMO_BYPASS || !g || !g.active || !g.caseId || g.caseId !== ctx.id) return;
   const s = ctx.data.summary;
+  // Honour the persisted minimize preference so it survives screen-to-screen navigation
+  // (and a reload). Re-rendering after an action therefore never auto-expands the card.
+  collapsed = !!g.collapsed;
+  lastCtx = ctx; lastArgs = { n, mine };
 
   const panel = document.createElement("aside");
   panel.id = PANEL_ID;
@@ -232,7 +238,8 @@ export function mountGuide(ctx, { n, mine } = {}) {
   document.body.appendChild(panel);
 
   const paint = () => {
-    if (collapsed) { panel.innerHTML = collapsedHtml(); wireCollapsed(panel); return; }
+    panel.classList.toggle("is-collapsed", collapsed);
+    if (collapsed) { panel.innerHTML = collapsedHtml(areaInfo(s).n); wireCollapsed(panel, ctx, { n, mine }); return; }
     if (s.closed) { panel.innerHTML = donePanelHtml(ctx); clearHighlight(); }
     else { panel.innerHTML = stepPanelHtml(ctx, { n, mine }); applyHighlight(ctx, { n }); }
     wirePanel(panel, ctx, { n, mine });
@@ -253,13 +260,24 @@ export function mountGuide(ctx, { n, mine } = {}) {
 }
 
 // ---------------------------------------------------------------- panel content
+// The header: a sparkle + "Guided demo" label, the work-area line beneath it, and the
+// minimize control pinned top-right. `sub` is the small second line (work area / status).
+function headHtml(sub) {
+  return `<div class="gp-head">
+    <div class="gp-head-main">
+      <span class="gp-eyebrow">${icon("sparkle", 15).s} Guided demo</span>
+      ${sub ? `<span class="gp-where">${esc(sub)}</span>` : ""}
+    </div>
+    <button type="button" class="gp-min" data-g="collapse" aria-label="Minimize demo guide" aria-expanded="true" title="Minimize demo guide">${icon("minus", 16).s}</button>
+  </div>`;
+}
+
 function stepPanelHtml(ctx, { n, mine }) {
   const s = ctx.data.summary;
   if (!n) {
-    return `<div class="gp-head"><span class="gp-eyebrow">Guided demo</span>${headBtns()}</div>
-      <div class="gp-body"><b>Nothing waiting right now.</b><p>There is no open action on this case at the moment.</p></div>${footBtns()}`;
+    return `${headHtml("")}
+      <div class="gp-body"><b class="gp-what">Nothing waiting right now.</b><p class="gp-why">There is no open action on this case at the moment.</p></div>${footBtns()}`;
   }
-  const where = whereText(s);
   const cta = ctaFor(n, { mine });
   const why = whyFor(n);
   // Who acts: your task, the client, or another team. For another team under the demo,
@@ -270,17 +288,17 @@ function stepPanelHtml(ctx, { n, mine }) {
   } else if (!mine) {
     actorNote = `In the real process ${roleLabel(n.role)} does this. For the demo you can record their result yourself — open the account menu to act as ${roleLabel(n.role)} if a control is read-only.`;
   }
-  const onTarget = isOnTarget();
-  const lookFor = onTarget
-    ? `Use the highlighted control on this screen to continue.`
-    : `Select the highlighted “${esc(cta)}” button to go there.`;
-  return `<div class="gp-head"><span class="gp-eyebrow">Guided demo${where ? " · " + esc(where) : ""}</span>${headBtns()}</div>
+  // One short instruction that names the exact control to use.
+  const lookFor = isOnTarget()
+    ? `Use the highlighted “${esc(cta)}” on this screen to continue.`
+    : `Open “${esc(cta)}” to begin.`;
+  return `${headHtml(whereText(s))}
     <div class="gp-body">
       <b class="gp-what">${gloss(n.title).s}</b>
       ${why ? `<p class="gp-why">${gloss(why).s}</p>` : ""}
       <p class="gp-look">${icon("arrowr", 14).s} ${esc(lookFor)}</p>
       ${actorNote ? `<p class="gp-actor">${gloss(actorNote).s}</p>` : ""}
-      ${sampleHint() ? `<p class="gp-tip">${icon("help", 13).s} ${sampleHint()}</p>` : ""}
+      ${sampleHint() ? `<p class="gp-tip">${icon("sparkle", 13).s} ${sampleHint()}</p>` : ""}
     </div>${footBtns()}`;
 }
 
@@ -292,7 +310,7 @@ function donePanelHtml(ctx) {
     : c.status === "Active" || /active/i.test(s.status || "") ? MILESTONE_DONE.closed_active
     : (c.status === "Closed Lost" || c.status === "Routed to IFG") ? MILESTONE_DONE.closed_lost
     : MILESTONE_DONE.closed_generic;
-  return `<div class="gp-head"><span class="gp-eyebrow">Guided demo · Complete</span>${headBtns()}</div>
+  return `${headHtml("Complete")}
     <div class="gp-body">
       <b class="gp-what">${icon("check", 15).s} ${esc(m.title)}</b>
       <p class="gp-why">${gloss(m.note).s}</p>
@@ -304,15 +322,11 @@ function donePanelHtml(ctx) {
     </div>`;
 }
 
-function collapsedHtml() {
-  return `<button type="button" class="guide-pill" data-g="expand" aria-label="Resume the guided demo panel">${icon("help", 15).s} Resume guide</button>`;
+// Minimized: a compact pill that restores the card at the same task on click.
+function collapsedHtml(areaN) {
+  return `<button type="button" class="guide-pill" data-g="expand" aria-label="Expand demo guide" aria-expanded="false">${icon("sparkle", 14).s}<span class="gp-pill-label">Demo guide · ${areaN}/5</span>${icon("expand", 14).s}</button>`;
 }
 
-function headBtns() {
-  return `<div class="gp-head-btns">
-    <button type="button" class="iconbtn sm" data-g="collapse" title="Hide guide" aria-label="Hide the guided demo panel">${icon("collapse", 15).s}</button>
-  </div>`;
-}
 function footBtns() {
   return `<div class="gp-foot">
     <button type="button" class="btn sm ghost" data-g="restart" title="Start over on a brand-new demo case">Restart</button>
@@ -321,8 +335,20 @@ function footBtns() {
 }
 
 // ---------------------------------------------------------------- wiring
+// Toggle minimized state, persist the preference, repaint in place, and move focus to the
+// control the spec asks for (the pill when minimizing, the minimize button when restoring).
+// Minimizing only hides the card — it never exits, restarts or loses walkthrough progress.
+function setCollapsed(next, ctx, args) {
+  collapsed = next;
+  patchGuide({ collapsed: next });
+  mountGuide(ctx, args);
+  const panel = document.getElementById(PANEL_ID);
+  const focusEl = next ? panel?.querySelector(".guide-pill") : panel?.querySelector('[data-g="collapse"]');
+  focusEl?.focus();
+}
+
 function wirePanel(panel, ctx, args) {
-  panel.querySelector('[data-g="collapse"]')?.addEventListener("click", () => { collapsed = true; mountGuide(ctx, args); });
+  panel.querySelector('[data-g="collapse"]')?.addEventListener("click", () => setCollapsed(true, ctx, args));
   panel.querySelector('[data-g="exitfree"]')?.addEventListener("click", () => exitGuide({ toFreeExploration: true }));
   panel.querySelector('[data-g="restart"]')?.addEventListener("click", async () => {
     const ok = await confirmDialog("Restart the guided demo?",
@@ -332,13 +358,8 @@ function wirePanel(panel, ctx, args) {
   });
   panel.querySelector('[data-g="fresh"]')?.addEventListener("click", () => startGuide());
 }
-function wireCollapsed(panel) {
-  panel.querySelector('[data-g="expand"]')?.addEventListener("click", () => {
-    collapsed = false;
-    // Re-mount by re-reading state; the case view will repaint on its next render, but
-    // expand immediately for responsiveness by dispatching a soft reload.
-    window.dispatchEvent(new Event("hms:reload"));
-  });
+function wireCollapsed(panel, ctx, args) {
+  panel.querySelector('[data-g="expand"]')?.addEventListener("click", () => setCollapsed(false, ctx, args));
 }
 
 // ---------------------------------------------------------------- highlight
@@ -382,20 +403,24 @@ function applyHighlight(ctx, { n }) {
 }
 
 // ---------------------------------------------------------------- small helpers
-function whereText(s) {
-  // "Work area N of 5" — read from the server stage the same way the record header does.
+// "Work area N of 5" — read from the server stage the same way the record header does.
+function areaInfo(s) {
   const STEPS = [[1, 2], [3], [4], [5, 6, 7], [8, 9]];
-  const stage = s.stage || 1;
   const labels = ["Create Franchise", "Prepare Quotation", "Finalize Offer", "Set Up Account", "Activate & Handover"];
+  const stage = (s && s.stage) || 1;
   const idx = STEPS.findIndex((rng) => stage <= Math.max(...rng));
   const i = idx < 0 ? STEPS.length - 1 : idx;
-  return `Work area ${i + 1} of 5: ${labels[i]}`;
+  return { n: i + 1, label: labels[i] };
+}
+function whereText(s) {
+  const a = areaInfo(s);
+  return `Work area ${a.n} of 5 · ${a.label}`;
 }
 // Most forms carry a "Fill sample" button; mention it when one is on screen so a
 // first-time user can populate fields quickly (they still save/submit themselves).
 function sampleHint() {
   const has = [...document.querySelectorAll("#step button")].some((b) => /fill sample/i.test(b.textContent || ""));
-  return has ? "Tip: use this form's “Fill sample” button to populate the fields, then save or submit yourself." : "";
+  return has ? "Use “Fill sample” to try it with demo data." : "";
 }
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -409,16 +434,14 @@ function debounce(fn, ms) {
 // If the guide is on but the user navigates away from the demo case, retract the panel
 // (it re-mounts automatically when they return to the demo case). Registered once.
 window.addEventListener("hashchange", () => { if (!onGuideCase()) teardown(); });
-// Escape collapses the panel (dismissal without trapping focus), unless the user is
-// typing in a field or a modal dialog is open.
+// Escape minimizes the panel (dismissal without trapping focus), unless the user is
+// typing in a field or a modal dialog is open. Focus moves to the compact pill.
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   const panel = document.getElementById(PANEL_ID);
-  if (!panel || collapsed) return;
+  if (!panel || collapsed || !lastCtx) return;
   const a = document.activeElement;
   if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
   if (document.querySelector(".dialog-backdrop, .drawer")) return;
-  collapsed = true;
-  panel.innerHTML = collapsedHtml();
-  wireCollapsed(panel);
+  setCollapsed(true, lastCtx, lastArgs);
 });
