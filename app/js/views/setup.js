@@ -1,6 +1,6 @@
 import { html, raw, state, act, api, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, RecordForm, saveStateHtml, upload, showError, docUrl, errorSummaryHtml,
   wireErrorLinks, paintFieldErrors, toast, clone, money, int, daysUntil, confirmDialog, fileOrSample, DEMO_BYPASS, actsAs, isAdmin } from "../core.js";
-import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, simNote, gateList, setComboValue, sampleBtn, fillSampleData } from "../components.js";
+import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, simNote, gateList, setComboValue, sampleBtn, fillSampleData, successOverlay } from "../components.js";
 import { subnav, ownerBanner } from "./case.js";
 import { renderMemberData } from "./members.js";
 
@@ -130,7 +130,21 @@ function account(ctx, acc) {
       <div class="pb">${gateList(data.gates)}<p class="tiny mt">The MA Code is generated here - never at lead creation. Validated franchise information is reused; each affiliate gets its own account code. The server re-checks every gate when you create the account.</p></div></section>`.s;
     body.querySelector("#mk")?.addEventListener("click", async (e) => {
       if (!ok) return showError({ code: "gate", message: "Account creation is blocked", details: { gates: data.gates } });
-      if (await act("account.create", { caseId: id }, { button: e.currentTarget, success: "Account created. Complete the details and submit for approval." })) ctx.reload();
+      const r = await act("account.create", { caseId: id }, { button: e.currentTarget, quiet: true });
+      if (!r) return;
+      await ctx.reload();
+      // The account now exists but is only "created", not activated - say so
+      // plainly, show its real status and point at the next step. The MA Code is
+      // issued here, so surface it with a copy control.
+      successOverlay({
+        heading: "Account created successfully",
+        lead: `An account has been created for ${data.summary.company}.`,
+        statusPill: { label: "Pending Setup" },
+        note: "Next: complete the account details and submit them for approval.",
+        account: { number: r.accountId, label: "MA Code" },
+        primary: { label: "Complete account details", href: `#/case/${id}/setup/account` },
+        secondary: { label: "Back to New Business", href: "#/new-business" },
+      });
     });
     return;
   }
@@ -363,7 +377,22 @@ function activation(ctx, acc) {
       const ok = await confirmDialog(b.textContent, daysUntil(eff) > 0 ? `The effective date is ${fmtDate(eff)}. The account will be Scheduled now and become Active on that date.` : "All readiness items are met. The account and its affiliates become Active and downstream teams are notified (simulated).", { confirm: b.textContent });
       if (!ok) return;
       const r = await act("activation.activate", { caseId: id }, { button: b, quiet: true });
-      if (r) { toast(r.status === "Scheduled" ? `Scheduled for ${fmtDate(eff)}.` : "Account is active.", "ok"); ctx.reload(); }
+      if (!r) return; // activation failed - the page and all entered data are left untouched
+      // A future effective date means the system only SCHEDULED it; it is not
+      // active yet, so it gets a plain toast - not the activation confirmation.
+      const scheduled = daysUntil(eff) > 0 || r.status === "Scheduled";
+      if (scheduled) { toast(`Scheduled for ${fmtDate(eff)}.`, "ok"); ctx.reload(); return; }
+      // Activation is confirmed Active by the system. Celebrate quietly, then let
+      // the user choose where to go next - never navigate automatically.
+      await ctx.reload();
+      successOverlay({
+        tone: "ok",
+        heading: "Account activated successfully",
+        lead: `${data.summary.company} is now active.`,
+        account: { number: acc.maCode, label: "Account number" },
+        primary: { label: "View account", href: `#/case/${id}/setup/account` },
+        secondary: { label: "Back to New Business", href: "#/new-business" },
+      });
     };
     bar.appendChild(b);
   }

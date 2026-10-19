@@ -51,6 +51,10 @@
   --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
   /* motion */
   --t-fast:120ms; --t-panel:180ms; --ease:cubic-bezier(.2,.6,.2,1);
+  /* success confirmation — the one intentional splash of colour in the monochrome
+     wireframe: a soft green used ONLY for the "account activated" badge. Kept as
+     tokens so it reverts in one place if the mock must stay strictly greyscale. */
+  --sx-ok:#2E8B57; --sx-ok-soft:#E7F4EC;
   /* layout */
   --nav-w:232px; --nav-w-collapsed:56px; --top-h:56px;
 }
@@ -463,6 +467,29 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 .menu button.danger:hover,.menu a.danger:hover{background:var(--danger-soft)}
 .menu hr{border:0;border-top:1px solid var(--border);margin:4px 0}
 .popover{position:absolute;z-index:70;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow-md);padding:14px;width:min(420px,92vw)}
+/* success confirmation overlay */
+.sx-back{animation:sx-fade var(--t-panel) var(--ease)}
+.sx-dialog{width:min(440px,100%);position:relative;overflow:hidden}
+.sx-close{position:absolute;top:10px;right:10px;z-index:1}
+.sx-body{padding:34px 28px 26px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.sx-badge{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;margin-bottom:18px;background:var(--surface-muted);color:var(--text-muted);animation:sx-pop 340ms var(--ease) backwards}
+.sx-badge.ok{background:var(--sx-ok-soft);color:var(--sx-ok)}
+.sx-badge svg{width:40px;height:40px}
+.sx-tick{stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke-dasharray:22;stroke-dashoffset:0;animation:sx-draw 380ms var(--ease) 230ms backwards}
+.sx-reveal{width:100%;animation:sx-fade 300ms var(--ease) 380ms backwards}
+.sx-title{font-size:19px;font-weight:700;margin:0}
+.sx-lead{color:var(--text-muted);margin:6px 0 0}
+.sx-status{margin-top:12px}
+.sx-note{font-size:13px;color:var(--text-subtle);margin:12px 0 0}
+.sx-acct{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-muted);text-align:left}
+.sx-acct-label{display:block;font-size:12px;color:var(--text-subtle)}
+.sx-acct code{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--text);letter-spacing:.02em}
+.sx-copy{flex:none;white-space:nowrap}
+.sx-actions{display:flex;gap:10px;margin-top:24px}
+.sx-actions .btn{flex:1;justify-content:center}
+@keyframes sx-pop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+@keyframes sx-draw{from{stroke-dashoffset:22}to{stroke-dashoffset:0}}
+@keyframes sx-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 /* tooltip */
 .tip{position:relative}
 .tip[data-tip]:hover::after,.tip[data-tip]:focus-visible::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);background:var(--text);color:var(--bg);font-size:12px;font-weight:400;padding:5px 8px;border-radius:var(--r-sm);white-space:nowrap;z-index:120;box-shadow:var(--shadow-md);pointer-events:none}

@@ -1,5 +1,5 @@
 import { html, raw, esc, state, optLabel, industryName, interName, userName, fmtDate, fmtDateTime, money, int, daysUntil, getPath, upload, pickFile,
-  docUrl, toast, showError, api, act, dialog, DEMO_BYPASS, sampleFile, actsAs } from "./core.js";
+  docUrl, toast, showError, api, act, dialog, DEMO_BYPASS, sampleFile, actsAs, announce, uid, go } from "./core.js";
 
 // ---------------------------------------------------------------- icons
 // Lucide-style line icons: 16px default, 1.5px stroke, round caps/joins.
@@ -39,6 +39,7 @@ const P = {
   bell: "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0",
   trash: "M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6",
   help: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9a2.5 2.5 0 0 1 4.6 1.4c0 1.6-2.1 2-2.1 3.6M12 17h.01",
+  copy: "M10 8h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z M6 16a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2",
 };
 export const icon = (name, size = 16) => raw(`<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${P[name] || ""}"/></svg>`);
 
@@ -142,6 +143,81 @@ export function tone(status) {
 export const pill = (status, t) => html`<span class="pill ${t || tone(status)}">${status || "Not started"}</span>`;
 export const srcTag = (src) => (src ? html`<span class="tag ${src}" title="${{ legacy: "Verified HMS3 field", proposed: "Proposed in requirements v1.1", pending: "Rule awaiting business confirmation", demo: "Demo master data - replace from HMS3" }[src] || ""}">${{ legacy: "HMS3", proposed: "v1.1", pending: "Pending rule", demo: "Demo data" }[src] || src}</span>` : "");
 export const simNote = (text) => html`<div class="note sim"><b>Simulated integration.</b> ${text}</div>`;
+
+// A calm, focus-trapped success confirmation shown after a milestone completes
+// (e.g. an account is activated). It is deliberately understated: a soft badge
+// with a drawn checkmark, then a gentle fade-in of the message - no confetti, no
+// flashing, no auto-navigation. The entrance animations fall back to the final
+// (visible) state when the OS asks to reduce motion, courtesy of the global
+// prefers-reduced-motion rule. Returns the backdrop element.
+//   tone      - "ok" for the soft-green activated badge, "" for a neutral badge
+//   heading   - the confirmation title (announced to screen readers)
+//   lead      - supporting sentence under the heading
+//   statusPill - optional { label, tone } to show the record's actual status
+//   note      - optional "next action" line
+//   account   - optional { number, label } shown with a copy control
+//   primary / secondary - { label, href } buttons; href navigates on click
+export function successOverlay({ tone: t = "", heading, lead, statusPill, note, account, primary, secondary } = {}) {
+  const prev = document.activeElement;
+  const hid = "sx-h-" + uid().slice(0, 8);
+  const lid = "sx-l-" + uid().slice(0, 8);
+  const back = document.createElement("div");
+  back.className = "dialog-backdrop sx-back";
+  back.innerHTML = html`<div class="dialog sx-dialog" role="dialog" aria-modal="true" aria-labelledby="${hid}" aria-describedby="${lid}">
+    <button type="button" class="btn ghost sm sx-close" data-x aria-label="Dismiss">✕</button>
+    <div class="sx-body">
+      <div class="sx-badge ${t}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path class="sx-tick" d="M5 13l4 4L19 7"/></svg></div>
+      <div class="sx-reveal">
+        <h2 class="sx-title" id="${hid}">${heading}</h2>
+        <p class="sx-lead" id="${lid}">${lead}</p>
+        ${statusPill ? html`<div class="sx-status">${pill(statusPill.label, statusPill.tone)}</div>` : ""}
+        ${note ? html`<p class="sx-note">${note}</p>` : ""}
+        ${account ? html`<div class="sx-acct"><div><span class="sx-acct-label">${account.label || "Account number"}</span><code>${account.number}</code></div>
+          <button type="button" class="btn ghost sm sx-copy" data-copy>${icon("copy", 14)} Copy</button></div>` : ""}
+        <div class="sx-actions">
+          ${secondary ? html`<button type="button" class="btn" data-secondary>${secondary.label}</button>` : ""}
+          ${primary ? html`<button type="button" class="btn primary" data-primary>${primary.label}</button>` : ""}
+        </div>
+      </div>
+    </div></div>`.s;
+  document.body.appendChild(back);
+  const dlg = back.querySelector(".dialog");
+  const close = () => { back.remove(); if (prev && prev.focus) prev.focus(); };
+  const goTo = (href) => { close(); if (href) go(href); };
+  back.querySelector("[data-x]").onclick = () => close();
+  back.querySelector("[data-primary]")?.addEventListener("click", () => goTo(primary.href));
+  back.querySelector("[data-secondary]")?.addEventListener("click", () => goTo(secondary.href));
+  back.querySelector("[data-copy]")?.addEventListener("click", async (e) => {
+    const ok = await copyText(account.number);
+    const b = e.currentTarget;
+    if (ok) { b.innerHTML = html`${icon("check", 14)} Copied`.s; announce(`${account.number} copied to clipboard.`); setTimeout(() => (b.innerHTML = html`${icon("copy", 14)} Copy`.s), 2000); }
+    else toast("Could not copy - select the number to copy it.", "err");
+  });
+  back.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.stopPropagation(); close(); return; }
+    if (e.key !== "Tab") return;
+    const f = [...dlg.querySelectorAll('button,a[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled && x.offsetParent !== null);
+    if (!f.length) return;
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  });
+  announce(`${heading}. ${lead}`, true);
+  (dlg.querySelector("[data-primary]") || dlg.querySelector("button")).focus();
+  return back;
+}
+// Copy with a graceful fallback for non-secure contexts where the async
+// Clipboard API is unavailable.
+async function copyText(text) {
+  try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; } } catch (e) { /* fall through */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch (e) { return false; }
+}
 
 // ---------------------------------------------------------------- display values
 export function displayValue(def, v, ctx = {}) {
