@@ -619,17 +619,17 @@ dl.kv.cols .wide{grid-column:1/-1}
    A polished, assistant-style helper card — NOT an AI chat window and never labelled as one.
    It is an optional, non-modal region pinned to a viewport corner so it never covers the
    highlighted control, required fields, errors or primary actions (it flips to the opposite
-   side via .dock-right when the target is on that side). The surface is a soft, STATIC
-   lavender→pale-blue→blush gradient with a luminous border and restrained shadow; there are
-   no particles, no flashing, no moving gradients. Text is dark and high-contrast against the
-   pastel. The target control is highlighted with a static outline plus an at-most-two-cycle
-   pulse, and is always NAMED in the card text so the cue never relies on colour/motion alone.
-   The global reduced-motion rule above disables the pulse and all transitions entirely. */
+   side via .dock-right when the target is on that side). The surface is a deep, STATIC
+   emerald-green gradient with a glossy sheen, a luminous green border and restrained shadow;
+   there are no particles, no flashing, no moving gradients. Text is light and high-contrast
+   against the dark green. The target control is highlighted with a static outline plus an
+   at-most-two-cycle pulse, and is always NAMED in the card text so the cue never relies on
+   colour/motion alone. The global reduced-motion rule above disables the pulse entirely. */
 .guide-panel{position:fixed;left:16px;bottom:16px;z-index:60;width:344px;max-width:calc(100vw - 32px);
-  color:#191a2e;font-size:13px;overflow:hidden;border-radius:18px;
-  background:linear-gradient(145deg,#CDD3F2 0%,#CBDCF4 44%,#EEC9DE 100%);
-  border:1px solid rgba(132,144,214,.6);
-  box-shadow:0 16px 36px rgba(60,70,140,.24),0 1px 0 rgba(255,255,255,.6) inset,0 0 0 1px rgba(255,255,255,.4) inset}
+  color:#EAFFF5;font-size:13px;overflow:hidden;border-radius:18px;
+  background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(255,255,255,0) 42%),linear-gradient(145deg,#073127 0%,#0C5438 48%,#0A6E49 100%);
+  border:1px solid rgba(90,230,170,.5);
+  box-shadow:0 18px 40px rgba(4,30,20,.5),0 0 0 1px rgba(80,220,160,.18) inset,0 1px 0 rgba(255,255,255,.22) inset}
 /* Flipped to the right when the highlighted control sits on the left, so the card
    never covers the target or its primary action. */
 .guide-panel.dock-right{left:auto;right:16px}
@@ -638,42 +638,42 @@ dl.kv.cols .wide{grid-column:1/-1}
 
 .guide-panel .gp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:15px 15px 9px}
 .guide-panel .gp-head-main{display:flex;flex-direction:column;gap:3px;min-width:0}
-.guide-panel .gp-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;letter-spacing:.01em;color:#272842}
-.guide-panel .gp-eyebrow .ico{flex:none;color:#7A68F0}
-.guide-panel .gp-where{font-size:11.5px;font-weight:500;color:#565a79}
+.guide-panel .gp-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;letter-spacing:.01em;color:#F2FFF9}
+.guide-panel .gp-eyebrow .ico{flex:none;color:#6FEFB4}
+.guide-panel .gp-where{font-size:11.5px;font-weight:500;color:#9FD6BE}
 .guide-panel .gp-min{flex:none;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
-  border-radius:10px;border:1px solid rgba(120,130,200,.35);background:rgba(255,255,255,.55);color:#3a3c58;cursor:pointer;
+  border-radius:10px;border:1px solid rgba(160,240,200,.3);background:rgba(255,255,255,.12);color:#DFF7EC;cursor:pointer;
   transition:background-color var(--t-fast) var(--ease)}
-.guide-panel .gp-min:hover{background:rgba(255,255,255,.9)}
+.guide-panel .gp-min:hover{background:rgba(255,255,255,.22)}
 
 .guide-panel .gp-body{padding:3px 15px 13px;line-height:1.5}
-.guide-panel .gp-what{display:block;font-size:15px;font-weight:700;color:#17182b;margin-bottom:5px}
-.guide-panel .gp-why{color:#41435f;margin:0 0 10px}
-.guide-panel .gp-look{display:flex;gap:7px;align-items:flex-start;margin:0 0 10px;font-weight:600;color:#232539}
-.guide-panel .gp-look .ico{flex:none;margin-top:2px;color:#2563EB}
-.guide-panel .gp-actor{color:#4a4c66;margin:0 0 10px;font-size:12.5px}
-.guide-panel .gp-tip{display:flex;gap:6px;align-items:flex-start;color:#4f5172;margin:0;font-size:12px}
-.guide-panel .gp-tip .ico{flex:none;margin-top:1px;color:#7A68F0}
-.guide-panel .gp-foot{display:flex;gap:8px;justify-content:flex-end;padding:11px 15px 14px;border-top:1px solid rgba(120,130,200,.22)}
-/* Secondary actions: subtle on the pastel surface, never competing with the page's own buttons. */
-.guide-panel .gp-foot .btn{background:rgba(255,255,255,.6);border:1px solid rgba(120,130,200,.4);color:#2a2b45;box-shadow:none}
-.guide-panel .gp-foot .btn:hover{background:rgba(255,255,255,.95)}
-.guide-panel .gp-foot .btn.primary{background:#2563EB;border-color:#2563EB;color:#fff}
-.guide-panel .gp-foot .btn.primary:hover{background:#1D4ED8}
+.guide-panel .gp-what{display:block;font-size:15px;font-weight:700;color:#F6FFFB;margin-bottom:5px}
+.guide-panel .gp-why{color:#C4E8D7;margin:0 0 10px}
+.guide-panel .gp-look{display:flex;gap:7px;align-items:flex-start;margin:0 0 10px;font-weight:600;color:#EAFFF5}
+.guide-panel .gp-look .ico{flex:none;margin-top:2px;color:#6FEFB4}
+.guide-panel .gp-actor{color:#B3DEC9;margin:0 0 10px;font-size:12.5px}
+.guide-panel .gp-tip{display:flex;gap:6px;align-items:flex-start;color:#A6D8C2;margin:0;font-size:12px}
+.guide-panel .gp-tip .ico{flex:none;margin-top:1px;color:#6FEFB4}
+.guide-panel .gp-foot{display:flex;gap:8px;justify-content:flex-end;padding:11px 15px 14px;border-top:1px solid rgba(160,240,200,.18)}
+/* Secondary actions: subtle on the dark surface, never competing with the page's own buttons. */
+.guide-panel .gp-foot .btn{background:rgba(255,255,255,.12);border:1px solid rgba(160,240,200,.28);color:#EAFFF5;box-shadow:none}
+.guide-panel .gp-foot .btn:hover{background:rgba(255,255,255,.2)}
+.guide-panel .gp-foot .btn.primary{background:#10B981;border-color:#10B981;color:#04281B}
+.guide-panel .gp-foot .btn.primary:hover{background:#34D399}
 .guide-panel abbr[title]{text-decoration:underline dotted;text-underline-offset:2px;cursor:help}
-.guide-panel .gp-min:focus-visible,.guide-panel .gp-foot .btn:focus-visible{outline:2px solid #2563EB;outline-offset:2px}
+.guide-panel .gp-min:focus-visible,.guide-panel .gp-foot .btn:focus-visible{outline:2px solid #6FEFB4;outline-offset:2px}
 
 /* Minimized pill: "✦ Demo guide · N/5". Clicking it restores the card at the same task. */
 .guide-pill{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 15px;border-radius:999px;cursor:pointer;
-  color:#232539;font-weight:600;font-size:13px;
-  background:linear-gradient(145deg,#CDD3F2 0%,#CBDCF4 45%,#EEC9DE 100%);
-  border:1px solid rgba(132,144,214,.6);
-  box-shadow:0 10px 24px rgba(60,70,140,.2),0 1px 0 rgba(255,255,255,.55) inset;
+  color:#EAFFF5;font-weight:600;font-size:13px;
+  background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(255,255,255,0) 50%),linear-gradient(145deg,#073127 0%,#0C5438 48%,#0A6E49 100%);
+  border:1px solid rgba(90,230,170,.5);
+  box-shadow:0 10px 24px rgba(4,30,20,.4),0 1px 0 rgba(255,255,255,.2) inset;
   transition:filter var(--t-fast) var(--ease)}
-.guide-pill:hover{filter:brightness(1.03)}
-.guide-pill .ico:first-child{flex:none;color:#7A68F0}
-.guide-pill .ico:last-child{flex:none;color:#565a79}
-.guide-pill:focus-visible{outline:2px solid #2563EB;outline-offset:2px}
+.guide-pill:hover{filter:brightness(1.08)}
+.guide-pill .ico:first-child{flex:none;color:#6FEFB4}
+.guide-pill .ico:last-child{flex:none;color:#9FD6BE}
+.guide-pill:focus-visible{outline:2px solid #6FEFB4;outline-offset:2px}
 
 /* The one control to use next. Accent outline plus a soft ring; the pulse runs twice
    then settles (and is disabled entirely under prefers-reduced-motion). */
