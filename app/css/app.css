@@ -627,9 +627,9 @@ dl.kv.cols .wide{grid-column:1/-1}
    The global reduced-motion rule above disables the pulse and all transitions entirely. */
 .guide-panel{position:fixed;left:16px;bottom:16px;z-index:60;width:344px;max-width:calc(100vw - 32px);
   color:#191a2e;font-size:13px;overflow:hidden;border-radius:18px;
-  background:linear-gradient(145deg,#EEF0FF 0%,#EDF4FF 44%,#FCEFF6 100%);
-  border:1px solid rgba(150,160,230,.5);
-  box-shadow:0 16px 36px rgba(72,82,150,.20),0 1px 0 rgba(255,255,255,.75) inset,0 0 0 1px rgba(255,255,255,.55) inset}
+  background:linear-gradient(145deg,#CDD3F2 0%,#CBDCF4 44%,#EEC9DE 100%);
+  border:1px solid rgba(132,144,214,.6);
+  box-shadow:0 16px 36px rgba(60,70,140,.24),0 1px 0 rgba(255,255,255,.6) inset,0 0 0 1px rgba(255,255,255,.4) inset}
 /* Flipped to the right when the highlighted control sits on the left, so the card
    never covers the target or its primary action. */
 .guide-panel.dock-right{left:auto;right:16px}
@@ -666,9 +666,9 @@ dl.kv.cols .wide{grid-column:1/-1}
 /* Minimized pill: "✦ Demo guide · N/5". Clicking it restores the card at the same task. */
 .guide-pill{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 15px;border-radius:999px;cursor:pointer;
   color:#232539;font-weight:600;font-size:13px;
-  background:linear-gradient(145deg,#EEF0FF 0%,#EDF4FF 45%,#FCEFF6 100%);
-  border:1px solid rgba(150,160,230,.55);
-  box-shadow:0 10px 24px rgba(72,82,150,.18),0 1px 0 rgba(255,255,255,.7) inset;
+  background:linear-gradient(145deg,#CDD3F2 0%,#CBDCF4 45%,#EEC9DE 100%);
+  border:1px solid rgba(132,144,214,.6);
+  box-shadow:0 10px 24px rgba(60,70,140,.2),0 1px 0 rgba(255,255,255,.55) inset;
   transition:filter var(--t-fast) var(--ease)}
 .guide-pill:hover{filter:brightness(1.03)}
 .guide-pill .ico:first-child{flex:none;color:#7A68F0}
