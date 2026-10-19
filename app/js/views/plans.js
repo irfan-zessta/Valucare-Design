@@ -9,22 +9,23 @@ export async function render(ctx) {
   const accs = (data.records.account || []);
   const parent = accs.find((a) => !a.parentId);
   if (!parent || !["Approved", "Scheduled", "Active"].includes(parent.status)) {
-    body.innerHTML = html`<div class="note">Plan Codes are created by AMT after the account is approved (BR-12). Account is <b>${parent?.status || "not created"}</b>.</div>`.s;
+    body.innerHTML = html`<div class="note">Plan Codes are created by AMT after the account is approved (BR-12). The account is currently <b>${parent?.status || "not created"}</b>. <a href="#/case/${id}/setup/account">${parent ? "Go to Account details" : "Create the account"}</a> first, then come back to generate Plan Codes from the approved SOB.</div>`.s;
     return;
   }
   const isAS = actsAs("amt") && data.case.status === "Open";
   const accountOpts = accs.map((a) => ({ value: a.id, label: `${a.accountCode} · ${a.accountInfo.accountName}`, sub: a.parentId ? "Affiliate" : "Parent account" }));
-  const st = prefs.get(`plans:${id}`, { account: "", status: "", q: "", page: 0, size: 50, sort: "planCode", dir: "asc" });
+  const st = prefs.get(`plans:${id}`, { account: "", status: "", q: "", page: 0, size: 50, sort: "planCode", dir: "asc", allCols: false });
   let selected = new Set();
   let current = { items: [], total: 0, counts: {} };
   body.innerHTML = html`${ownerBanner(["amt"], "Plan Codes")}
     <section class="panel"><div class="ph"><div><h2>Plan Codes</h2><div class="tiny">AMT is the maker; a different AMT user is the checker. Approved versions are kept for date-of-service adjudication.
       Payment-mode decoupling: <b>${state.meta.config.decouplePaymentMode ? "on" : "off"}</b> <span class="tag pending">configurable (OQ-05)</span> · VAT model: <b>${state.meta.config.vatModel}</b> <span class="tag pending">no formula applied</span></div></div>
-      ${isAS ? html`<div class="row"><button class="btn primary" id="add">${icon("plus", 14)} Add Plan Code</button><button class="btn" id="gen">Generate from approved SOB</button>
+      ${isAS ? html`<div class="row"><button class="btn primary" id="gen">Generate from approved SOB</button><button class="btn" id="add">${icon("plus", 14)} Add one manually</button>
         <button class="btn" id="imp">${icon("upload", 14)} Bulk import</button><a class="btn" href="/api/templates/plan-codes.csv" download>Template</a>${DEMO_BYPASS ? html`<button class="btn ghost" id="impSample" title="Import a few generated demo plan codes">Add sample plan codes</button>` : ""}</div>` : ""}</div>
     <div class="views" role="tablist" aria-label="Status" id="stTabs"></div>
     <div class="toolbar"><div class="search">${icon("search", 16)}<label class="sr-only" for="pq">Search Plan Codes</label><input id="pq" type="search" value="${st.q}" placeholder="Plan Code, description, position, provider code"></div>
       <label class="sr-only" for="pa">Account</label><select id="pa" class="inp" style="width:auto"><option value="">All accounts</option>${accountOpts.map((o) => html`<option value="${o.value}" ${st.account === o.value ? "selected" : ""}>${o.label}</option>`)}</select>
+      <button class="btn sm" id="cols" aria-pressed="${st.allCols}">${st.allCols ? "Show key columns" : "Show all columns"}</button>
       <a class="btn sm" id="exp" href="/api/export/plancodes/${id}.csv" download>${icon("download", 14)} Export</a><span class="tiny" id="pinfo"></span></div>
     <div class="toolbar hidden" id="bulk" role="region" aria-label="Bulk actions"><b id="selc"></b>
       ${isAS ? html`<button class="btn sm" data-b="submit">Submit for approval</button><button class="btn sm" data-b="approve">Approve</button><button class="btn sm" data-b="return">Return with reason</button>
@@ -50,6 +51,10 @@ export async function render(ctx) {
     ["roomType", "Room Type"], ["roomLimit", "Room Limit"], ["modeOfPayment", "Mode of Payment"], ["memberType", "Member Type"], ["principalPosition", "Principal Position"], ["civilStatus", "Civil Status"],
     ["beforeVat", "Before VAT"], ["vatInclusive", "VAT Incl."], ["vatAmount", "VAT amount"], ["vatDesc", "VAT Desc."], ["premium", "Premium"], ["hospitalCodes", "Hospitals"], ["clinicCodes", "Clinics"],
     ["remarks", "Remarks"], ["dentalRemarks", "Dental Remarks"], ["contractYear", "Contract Year"], ["effectiveFrom", "Effective"], ["corporIfg", "CORPORIFG"], ["sobVersion", "SOB v"]];
+  // Essentials shown by default so the grid is scannable; the full set (and every
+  // field) stays available via "Show all columns" and the row's details dialog.
+  const ESSENTIAL = ["planCode", "accountCode", "status", "planType", "memberType", "mbl", "premium", "modeOfPayment", "effectiveFrom"];
+  const visibleCols = () => (st.allCols ? COLS : COLS.filter(([k]) => ESSENTIAL.includes(k)));
   const cell = (k, r) => {
     const v = r[k];
     if (["mbl", "roomLimit", "beforeVat", "vatAmount", "premium"].includes(k)) return money(v);
@@ -62,14 +67,15 @@ export async function render(ctx) {
   };
   const drawGrid = () => {
     const rows = current.items;
+    const cols = visibleCols();
     grid.innerHTML = html`<div class="tbl-wrap" style="max-height:62vh"><table class="tbl compact" style="--f1w:37px"><caption class="sr-only">Plan Codes</caption><thead><tr>
       ${isAS ? html`<th scope="col" class="frozen" style="width:36px"><input type="checkbox" id="selAll" aria-label="Select all on this page"></th>` : ""}
-      ${COLS.map(([k, l], i) => html`<th scope="col" class="${i === 0 ? (isAS ? "frozen2" : "frozen") : ""}" aria-sort="${st.sort === k ? (st.dir === "asc" ? "ascending" : "descending") : "none"}"><button class="sort" data-sort="${k}">${l}${st.sort === k ? (st.dir === "asc" ? " ▲" : " ▼") : ""}</button></th>`)}
+      ${cols.map(([k, l], i) => html`<th scope="col" class="${i === 0 ? (isAS ? "frozen2" : "frozen") : ""}" aria-sort="${st.sort === k ? (st.dir === "asc" ? "ascending" : "descending") : "none"}"><button class="sort" data-sort="${k}">${l}${st.sort === k ? (st.dir === "asc" ? " ▲" : " ▼") : ""}</button></th>`)}
       <th scope="col">Maker / checker</th></tr></thead><tbody>
       ${rows.length ? rows.map((r) => html`<tr class="${selected.has(r.id) ? "sel" : ""} ${r.status === "Returned" ? "exc" : ""}">${isAS ? html`<td class="frozen"><input type="checkbox" data-sel="${r.id}" ${selected.has(r.id) ? "checked" : ""} aria-label="Select ${r.planCode} v${r.pcVersion}"></td>` : ""}
-        ${COLS.map(([k], i) => html`<td class="${i === 0 ? (isAS ? "frozen2" : "frozen") : ""} ${["mbl", "roomLimit", "beforeVat", "vatAmount", "premium"].includes(k) ? "num" : ""}">${cell(k, r)}</td>`)}
+        ${cols.map(([k], i) => html`<td class="${i === 0 ? (isAS ? "frozen2" : "frozen") : ""} ${["mbl", "roomLimit", "beforeVat", "vatAmount", "premium"].includes(k) ? "num" : ""}">${cell(k, r)}</td>`)}
         <td class="tiny">${userName(r.makerId) || "-"} / ${userName(r.checkerId) || "-"}</td></tr>`)
-        : html`<tr><td colspan="${COLS.length + 2}"><div class="empty"><b>No Plan Codes${st.status ? ` with status ${st.status}` : ""}.</b>${isAS ? "Generate them from the approved SOB, add one, or bulk import." : ""}</div></td></tr>`}</tbody></table></div>
+        : html`<tr><td colspan="${cols.length + 2}"><div class="empty"><b>No Plan Codes${st.status ? ` with status ${st.status}` : ""}.</b>${isAS ? " Generate them from the approved SOB, add one manually, or bulk import." : ""}</div></td></tr>`}</tbody></table></div>
       <div class="pager"><span>${current.total ? `${st.page * st.size + 1}-${Math.min(current.total, (st.page + 1) * st.size)} of ${current.total}` : "0"}</span><div class="row tight">
         <label class="tiny" for="psz">Rows</label><select id="psz" class="inp" style="width:auto;height:30px">${[25, 50, 100, 200].map((n) => html`<option ${n === st.size ? "selected" : ""}>${n}</option>`)}</select>
         <button class="btn sm" id="pp" ${st.page ? "" : "disabled"}>Previous</button><button class="btn sm" id="pn" ${(st.page + 1) * st.size >= current.total ? "disabled" : ""}>Next</button></div></div>`.s;
@@ -85,6 +91,7 @@ export async function render(ctx) {
   let t;
   body.querySelector("#pq").oninput = (e) => { clearTimeout(t); t = setTimeout(() => { st.q = e.target.value; st.page = 0; load(); }, 250); };
   body.querySelector("#pa").onchange = (e) => { st.account = e.target.value; st.page = 0; load(); };
+  body.querySelector("#cols").onclick = (e) => { st.allCols = !st.allCols; prefs.set(`plans:${id}`, st); e.currentTarget.setAttribute("aria-pressed", String(st.allCols)); e.currentTarget.textContent = st.allCols ? "Show key columns" : "Show all columns"; drawGrid(); };
   load();
 
   // ---- grouped single-entry form

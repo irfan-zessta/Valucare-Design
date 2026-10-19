@@ -1841,8 +1841,11 @@ def doc_review(s, ctx, p):
         raise ApiError(400, "bad_request", "decision must be Accepted or Needs correction.")
     if dec == "Needs correction" and len((p.get("reason") or "").strip()) < 5:
         raise ApiError(422, "validation", "Explain what needs correcting.")
-    if d.get("uploaderId") == ctx.uid and not DEMO_SKIP_APPROVALS:
-        raise ApiError(403, "same_maker", "You uploaded this document; another person must review it. Switch to another authorized user to review.")
+    # Document review is maker-checker: the uploader cannot review their own upload.
+    # Use the shared helper so the single-identity Admin demo (and the switchable
+    # accusa/mda/bc personas) can complete the review in one session without switching
+    # users, exactly like every other review gate. Production (HMS_DEMO=0) stays strict.
+    require_not_maker(ctx, d.get("uploaderId"), "document")
     _set(s, ctx, d, {"validation": dec, "correctionReason": p.get("reason") if dec == "Needs correction" else None, "reviewedBy": ctx.uid,
                      "reviewedByName": ctx.user["name"], "reviewedAt": ctx.now_iso()}, "document.review", reason=p.get("reason"), doc_id=d["id"])
     if dec == "Needs correction" and d.get("slot", "").startswith("onb:"):

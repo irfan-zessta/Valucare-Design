@@ -40,15 +40,30 @@ function currentStepKey(data) {
   const st = data.summary.stage || 1;
   return (STEPS.find((s) => st <= Math.max(...s.stages)) || STEPS[0]).key;
 }
-// Resolve a URL (new step key, legacy tab/sub, or nothing) to {step, anchor}.
+// Resolve a URL (new step key, legacy tab/sub, or nothing) to {step, anchor, focus}.
 // A legacy sub takes priority because some old subs (proposal, sob) moved to a
 // different step than their old tab — e.g. quotation/proposal now lives in "offer".
+// Task and readiness links may also carry a within-section target as a second hash
+// (e.g. "contract#onboarding" or "setup/account#mk"). The browser keeps everything
+// after the first '#' as the fragment, so that trailing part rides along inside the
+// segment; we split it off here as `focus` so the router lands on the right section
+// AND scrolls to the exact panel — instead of failing to match and snapping to the
+// current stage's first tab (the "onboarding opens Member Data" defect).
+function splitHash(seg) {
+  if (!seg || !seg.includes("#")) return [seg, null];
+  const i = seg.indexOf("#");
+  return [seg.slice(0, i), seg.slice(i + 1) || null];
+}
 function resolveStep(parts, data) {
-  const seg = parts[2], sub = parts[3];
-  if (seg && LEGACY[seg] && sub && LEGACY[seg][sub]) return LEGACY[seg][sub];
-  if (STEP_KEYS.includes(seg)) return { step: seg, anchor: sub ? "sec-" + sub : null };
-  if (seg && LEGACY[seg] && LEGACY[seg]._) return LEGACY[seg]._;
-  return { step: currentStepKey(data), anchor: null };
+  let [seg, focus] = splitHash(parts[2]);
+  let sub = parts[3];
+  if (sub) { const [s, f] = splitHash(sub); sub = s; if (f) focus = f; }
+  let r;
+  if (seg && LEGACY[seg] && sub && LEGACY[seg][sub]) r = LEGACY[seg][sub];
+  else if (STEP_KEYS.includes(seg)) r = { step: seg, anchor: sub ? "sec-" + sub : null };
+  else if (seg && LEGACY[seg] && LEGACY[seg]._) r = LEGACY[seg]._;
+  else r = { step: currentStepKey(data), anchor: null };
+  return { ...r, focus };
 }
 // Which step does a task/deep link belong to (for the "task for you" marks)?
 function linkStep(link) {
@@ -71,7 +86,7 @@ export async function render(main, { parts, query, force }) {
     return;
   }
   const s = data.summary, c = data.case;
-  const { step: stepKey, anchor } = resolveStep(parts, data);
+  const { step: stepKey, anchor, focus } = resolveStep(parts, data);
   const stepDef = STEPS.find((x) => x.key === stepKey) || STEPS[0];
   document.title = `${s.company} · ${stepDef.label} · HMS3`;
   const ctx = {
@@ -83,7 +98,10 @@ export async function render(main, { parts, query, force }) {
   const n = primaryTask(s);
   // Admin acts in every internal role, so an internal next action counts as theirs
   // (unless it is waiting on the client, which no internal role can action).
-  const mine = n && (s.myTasks.some((t) => t.key === n.key) || (actsAs(n.role) && n.waiting !== "client"));
+  // A client wait is never "your task" even if the AAT collection task is assigned to
+  // you - no internal role can action it, so the strip reads "Waiting on client", not
+  // "Your task". You can still open it to record what the client provides.
+  const mine = n && n.waiting !== "client" && (s.myTasks.some((t) => t.key === n.key) || actsAs(n.role));
   // Suggest who should take the next step so the demo driver knows which user to switch to.
   const suggested = (() => {
     if (!DEMO_BYPASS || !n || mine || n.waiting === "client") return null;
@@ -127,7 +145,24 @@ export async function render(main, { parts, query, force }) {
   });
 
   ctx.el = main.querySelector("#step");
-  await renderStep(ctx, stepKey, anchor);
+  await renderStep(ctx, stepKey, anchor, focus);
+}
+
+// Scroll a within-section target into view and move focus to it accessibly, without
+// stealing focus from a field the user is typing in. Used for task/readiness deep
+// links like "contract#onboarding" that point at a specific panel inside a section.
+function focusTarget(el, focus) {
+  if (!focus) return;
+  const target = el.querySelector("#" + CSS.escape(focus));
+  if (!target) return;
+  const active = document.activeElement;
+  const typing = active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) && el.contains(active);
+  const heading = target.matches("h1,h2,h3,h4") ? target : target.querySelector("h1,h2,h3,h4") || target;
+  heading.scrollIntoView({ block: "start", behavior: "smooth" });
+  if (!typing) {
+    if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+    heading.focus({ preventScroll: true });
+  }
 }
 
 // ---------------------------------------------------------------- record header: next action
@@ -144,7 +179,7 @@ function nextStrip(ctx, { n, mine, suggested }) {
     <div class="rn-act"><a class="btn ${mine ? "primary" : ""}" href="${n.link}">${mine ? "Go to task" : "Open"} ›</a>
       ${suggested ? html`<button type="button" class="btn primary blink-switch" id="switchNext">Switch to ${suggested.name} (${roleLabel(suggested.role)})</button>` : ""}</div>
     ${s.blocker ? html`<div class="note warn rn-block">${icon("alert", 14)} <b>Blocker:</b> ${s.blocker}</div>` : ""}
-    ${others.length ? html`<details class="rn-par"><summary>${others.length} other task(s) can proceed in parallel</summary><ul class="rn-par-list">${others.map((t) => html`<li><a href="${t.link}">${t.title}</a> — ${t.waiting === "client" ? "Client" : ownerText(t)}${s.myTasks.some((m) => m.key === t.key) ? html` <span class="pill info plain">You</span>` : ""} · ${dueHtml(t.due)}</li>`)}</ul></details>` : ""}
+    ${others.length ? html`<details class="rn-par"><summary>${others.length} other task(s) can proceed in parallel</summary><ul class="rn-par-list">${others.map((t) => html`<li><a href="${t.link}">${t.title}</a> — ${t.waiting === "client" ? "Client" : ownerText(t)}${t.waiting !== "client" && s.myTasks.some((m) => m.key === t.key) ? html` <span class="pill info plain">You</span>` : ""} · ${dueHtml(t.due)}</li>`)}</ul></details>` : ""}
   </div>`;
 }
 
@@ -220,7 +255,7 @@ function stepSections(stepKey, data) {
   }
   return [];
 }
-async function renderStep(ctx, stepKey, anchor) {
+async function renderStep(ctx, stepKey, anchor, focus) {
   const el = ctx.el;
   const guard = stepGuard(stepKey, ctx.data);
   if (guard) { el.innerHTML = html`${guard}`.s; return; }
@@ -269,6 +304,8 @@ async function renderStep(ctx, stepKey, anchor) {
     const cc = { ...ctx, el: cont, body: cont };
     try { await x.load(cc); } catch (err) { console.error("Section", x.id, err); cont.innerHTML = html`<div class="note danger">The "${x.label}" section could not load: ${err.message || err}</div>`.s; }
   }
+  // After the active section has rendered, honour a within-section deep-link target.
+  if (focus) focusTarget(el.querySelector("#" + CSS.escape(active)) || el, focus);
 }
 
 function caseDetails(data) {

@@ -40,14 +40,18 @@ export function accountForm(ctx, a, box, { isAffiliate = false } = {}) {
   const schema = state.meta.accountSchema;
   const errs = ctx.accountErrors?.[a.id] || [];
   const em = Object.fromEntries(errs.map((e) => [e.field, e.message]));
+  const direct = ctx.data.summary.channel === "Direct";
   box.innerHTML = html`
     ${a.status === "Returned" ? html`<div class="note warn mb"><b>Returned by checker:</b> ${a.returnReason}</div>` : ""}
     <div data-errs>${raw(errorSummaryHtml(errs).s || "")}</div>
-    <nav class="secnav" aria-label="Account sections">${[...schema.map((s) => [s.key, s.label]), ["vc", "VC app access exclusions"], ["docs", "Supporting documents"]].map(([k, l]) => html`<a href="#acc-${a.id}-${k}" data-jump="acc-${a.id}-${k}">${l}</a>`)}</nav>
+    <div class="row between wrap">
+      <nav class="secnav" aria-label="Account sections">${[...schema.map((s) => [s.key, s.label]), ["vc", "VC app access exclusions"], ["docs", "Supporting documents"]].map(([k, l]) => html`<a href="#acc-${a.id}-${k}" data-jump="acc-${a.id}-${k}">${l}</a>`)}</nav>
+      <button type="button" class="btn ghost sm" data-prov aria-pressed="false" title="Show where each field came from (HMS3, requirements v1.1, pending rules, demo data)">Show data sources</button>
+    </div>
     <div data-form>
-    ${schema.map((sec) => html`<section class="panel form-sec" id="acc-${a.id}-${sec.key}"><div class="ph"><h2>${sec.label}</h2>${sec.key === "accountInfo" ? html`<span class="tiny">Reused from the validated franchise ${a.sources?.franchise || ""}</span>` : ""}</div><div class="pb"><div class="fgrid">
+    ${schema.map((sec) => { const deemph = sec.key === "agentInfo" && direct; return html`<section class="panel form-sec ${deemph ? "deemph" : ""}" id="acc-${a.id}-${sec.key}"><div class="ph"><h2>${sec.label}</h2>${sec.key === "accountInfo" ? html`<span class="tiny">Reused from the validated franchise ${a.sources?.franchise || ""}</span>` : deemph ? html`<span class="tiny">Not applicable for Direct business — leave blank unless an agent/broker is involved.</span>` : ""}</div><div class="pb"><div class="fgrid">
       ${sec.fields.map((f) => { const def = f.key === "city" ? { ...f, provinceField: `${sec.key}.province` } : f; return field(def, a[sec.key]?.[f.key], { name: `${sec.key}.${f.key}`, editable: editable && f.type !== "readonly", values: a.agentInfo || {}, errors: em }); })}
-      </div>${sec.key === "contractInfo" ? html`<p class="tiny mt">Special Account/Standard, legacy Account Type, Product, Business Source and Manner of Payment are kept as separate fields with their HMS3 values.</p>` : ""}</div></section>`)}
+      </div>${sec.key === "contractInfo" ? html`<p class="tiny mt">Special Account/Standard, legacy Account Type, Product, Business Source and Manner of Payment are kept as separate fields with their HMS3 values.</p>` : ""}</div></section>`; })}
     <section class="panel form-sec" id="acc-${a.id}-vc"><div class="ph"><div><h2>VC app access exclusions</h2><div class="tiny">Hides these VC Health App features for this account's members. These are app-access settings, <b>not</b> contractual benefit exclusions (those live in the SOB).</div></div>
       ${editable ? html`<button type="button" class="btn sm" data-clearvc>Clear selection</button>` : ""}</div><div class="pb"><div class="checks">
       ${state.meta.options.vcAppExclusions.map((o) => html`<label class="check"><input type="checkbox" data-vc value="${o.value}" ${(a.vcAppExclusions || []).includes(o.value) ? "checked" : ""} ${editable ? "" : "disabled"}> ${o.label}</label>`)}
@@ -60,6 +64,11 @@ export function accountForm(ctx, a, box, { isAffiliate = false } = {}) {
   wireErrorLinks(box);
   wireUploads(box, () => ctx.reload());
   box.querySelectorAll("[data-jump]").forEach((x) => (x.onclick = (e) => { e.preventDefault(); document.getElementById(x.dataset.jump).scrollIntoView({ block: "start" }); }));
+  // Provenance badges (HMS3 / v1.1 / pending / demo) are reference detail, not part
+  // of data entry - keep them out of the way by default and let the user reveal them.
+  box.classList.add("prov-hide");
+  const provBtn = box.querySelector("[data-prov]");
+  if (provBtn) provBtn.onclick = () => { const on = box.classList.toggle("prov-hide"); provBtn.setAttribute("aria-pressed", String(!on)); provBtn.textContent = on ? "Show data sources" : "Hide data sources"; };
   const formEl = box.querySelector("[data-form]");
   mountCombos(formEl);
   if (!editable) return;
@@ -360,7 +369,7 @@ function activation(ctx, acc) {
       <div class="pb"><ol class="steps-h">${steps.map((s, i) => html`<li class="${i < steps.indexOf(status) ? "done" : i === steps.indexOf(status) ? "cur" : ""}">${s}</li>`)}</ol>
       ${act0?.status === "Scheduled" ? html`<div class="note mt">Scheduled to become Active on <b>${fmtDate(act0.scheduledFor)}</b>. The scheduler activates it on that date; it is not reported as active before then.</div>` : ""}</div></section>
     <section class="panel"><div class="ph"><h2>Readiness</h2><span class="tiny">Validated again by the server when you activate</span></div><div class="pb">${acc ? gateList(data.readiness) : html`<p class="muted">The account has not been created.</p>`}</div></section>
-    ${act0 && ["Active", "Handover Complete"].includes(act0.status) ? html`<section class="panel"><div class="ph"><h2>Operational handover</h2><div class="row" id="hAct"></div></div><div class="pb">
+    ${act0 && ["Active", "Handover Complete"].includes(act0.status) ? html`<section class="panel" id="handover"><div class="ph"><h2>Operational handover</h2><div class="row" id="hAct"></div></div><div class="pb">
       <ul class="gate-list">${state.meta.handoverTeams.map((t) => { const a = act0.acks?.[t.key]; return html`<li><span class="${a?.status === "Acknowledged" ? "ok" : "no"}">${a?.status === "Acknowledged" ? "✓" : "●"}</span>
         <div><b>${t.label}</b><div class="tiny">${a ? `${a.status} by ${a.byName} ${fmtDateTime(a.at)}${a.note ? " - " + a.note : ""}` : "Waiting for acknowledgement"}</div></div><span class="tiny">Owner: ${roleLabel(t.role)}</span></li>`; })}</ul>
       ${act0.handoverAt ? html`<div class="note ok mt">Handover completed by ${userName(act0.handoverBy)} on ${fmtDateTime(act0.handoverAt)}.</div>` : ""}</div></section>` : ""}
@@ -389,9 +398,10 @@ function activation(ctx, acc) {
         tone: "ok",
         heading: "Account activated successfully",
         lead: `${data.summary.company} is now active.`,
+        note: "Next: downstream teams acknowledge the handover to close out New Business.",
         account: { number: acc.maCode, label: "Account number" },
-        primary: { label: "View account", href: `#/case/${id}/setup/account` },
-        secondary: { label: "Back to New Business", href: "#/new-business" },
+        primary: { label: "Continue to handover", href: `#/case/${id}/setup/activation#handover` },
+        secondary: { label: "View account", href: `#/case/${id}/setup/account` },
       });
     };
     bar.appendChild(b);

@@ -14,15 +14,17 @@ async function boot() {
 }
 
 // ---------------------------------------------------------------- sign in
-// A quiet centered card. Four identities cover the whole demo. Admin is the internal
-// New Business desk — one person who creates, reviews, approves and handles legal, so
-// you never switch to walk a case through. Actuarial, MDA and Billing are the three
-// departments that sit outside that desk; switch into them only when a case needs them.
+// A quiet centered card. Admin is the internal New Business desk — one person who
+// creates, reviews, approves and handles legal, so you never switch to walk a case
+// through. Actuarial, MDA and Billing are departments that sit outside that desk;
+// CCD is the downstream team that acknowledges the final handover. Switch into any of
+// them only when a case needs their result.
 const SIGNIN = [
   { user: "u-ad1", key: "admin", role: "Admin", desc: "The whole New Business desk: create, review, approve and legal" },
   { user: "u-ac1", key: "accusa", role: "Actuarial", desc: "Price quotations and release rates" },
   { user: "u-md1", key: "mda", role: "MDA", desc: "Record member data alignment results" },
   { user: "u-bc1", key: "bc", role: "Billing", desc: "Set up billing and collection" },
+  { user: "u-cc1", key: "ccd", role: "CCD", desc: "Acknowledge the downstream handover" },
 ];
 
 function renderLogin(reason) {
@@ -140,7 +142,7 @@ async function userMenu(btn) {
   const r = await dialog({
     title: "Account",
     body: html`<p class="muted">Signed in as <b>${cleanLabel(me.name)}</b> (${cleanLabel(roleLabel(me.role))}). Switching keeps your place; unsaved changes are saved first.</p>
-      <p class="tiny mt">Admin covers the whole internal desk: create, review, approve and legal. Switch only for Actuarial, MDA or Billing.</p>
+      <p class="tiny mt">Admin covers the whole internal desk: create, review, approve and legal. Switch only for Actuarial, MDA, Billing or CCD (downstream handover).</p>
       ${sug && sug.id && sug.id !== me.id ? html`<p class="note info mt">The next step needs <b>${cleanLabel(roleLabel(sug.role))}</b>. They are selected below.</p>` : ""}
       <div class="field mt"><label for="sw">Act as</label><select id="sw" name="user" class="inp">${SIGNIN.map((p) => {
         const pick = sug && sug.id ? p.user === sug.id || p.key === sug.role : p.key === me.role;
@@ -172,7 +174,7 @@ export async function guideDialog() {
         <li><b>Open a case</b> from the list, or start a fresh one with Create New Business.</li>
         <li><b>Follow the next action.</b> Each case shows what happens next; as Admin it is your task to create, review, approve and prepare legal.</li>
         <li><b>Fill forms fast</b> with the Fill sample button on each form, then save or submit to move the case on.</li>
-        <li><b>Switch only for a department.</b> Actuarial, MDA and Billing sit outside the desk; switch into them from the account menu when a case needs their result.</li>
+        <li><b>Switch only for a department.</b> Actuarial, MDA and Billing sit outside the desk, and CCD acknowledges the final handover; switch into them from the account menu when a case needs their result.</li>
         <li><b>Repeat</b> until the account is set up and handed over.</li>
       </ol>
       <p class="note info mt">${icon("help", 16)} Everything here is fictional demo data. Approvals and mandatory fields are relaxed so you never get stuck.</p>`,

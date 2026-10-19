@@ -90,8 +90,6 @@ html,body{margin:0;padding:0}
 html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;color-scheme:light}
 body{font-family:var(--font);font-size:14px;line-height:1.5;color:var(--text);
   background-color:var(--bg);
-  background-image:radial-gradient(var(--dot) 1.1px,transparent 1.3px);
-  background-size:20px 20px;background-position:-10px -10px;background-attachment:fixed;
   font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased}
 .tbl,.mono,.num,.due,time,.money,.ref,.ids{font-variant-numeric:tabular-nums}
 a{color:var(--text);text-decoration:none}
@@ -292,6 +290,12 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 /* ---------- forms ---------- */
 .form-sec{scroll-margin-top:120px}
 .form-sec+.form-sec{margin-top:16px}
+/* Provenance badges are reference-only; hidden until "Show data sources" is pressed. */
+.prov-hide .tag{display:none}
+/* A section that does not apply to this business (e.g. Agent/Broker on Direct) is kept
+   for completeness but visually quietened so it does not read as a primary entry step. */
+.form-sec.deemph{opacity:.72}
+.form-sec.deemph .ph h2{font-weight:400}
 .fgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .fgrid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
 .field{display:flex;flex-direction:column;gap:5px;min-width:0}
