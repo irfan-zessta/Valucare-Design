@@ -18,9 +18,10 @@
 // always NAMED in text (never signalled by colour/animation alone), and the panel is
 // pinned to a viewport corner so it never covers the target, fields or primary actions.
 
-import { html, state, act, go, toast, announce, roleLabel, DEMO_BYPASS, dialog, confirmDialog } from "./core.js";
+import { html, state, act, go, toast, announce, roleLabel, DEMO_BYPASS, dialog, confirmDialog, can } from "./core.js";
 import { icon } from "./components.js";
 import { gloss, ctaFor, whyFor, MILESTONE_DONE } from "./guidance.js";
+import { switchUser } from "./main.js";
 
 // ---------------------------------------------------------------- persisted state
 // Per user + per demo case, so two testers on one browser profile don't collide and
@@ -49,6 +50,25 @@ function onGuideCase() {
 // still in Draft (Work Area 1), so the guide can walk it forward from the start.
 const isPreview = () => !!window.__HMS3_PREVIEW__;
 const PREVIEW_DEMO_CASE = "NB-2026-0022";
+
+// ---------------------------------------------------------------- role for the walkthrough
+// Opening a brand-new case is an Account Acquisition Team (AAT) step. In this demo the Admin
+// identity is the only sign-in that covers it (the others — Actuarial, MDA, Billing, CCD —
+// are single-step departments that cannot create a case). Since the walkthrough covers the
+// WHOLE journey (create → review → approve → legal → …), it runs as Admin. We never switch
+// silently: if the current role can't start it, we explain and let the person switch on a
+// click of their own. "u-ad1" is the Admin sign-in (see SIGNIN in main.js).
+const ADMIN_USER = "u-ad1";
+async function ensureCanStart() {
+  if (can("aat")) return true;
+  const ok = await confirmDialog(
+    "Switch to the Admin desk to start the walkthrough?",
+    `The guided walkthrough takes you through the whole New Business journey — opening the case, reviewing, approving and legal. In this demo that desk is the Admin role. You're signed in as ${roleLabel(state.me?.role)}, which only handles one step, so it can't open a new case. Switch to Admin to begin? You can switch back any time from the account menu.`,
+    { confirm: "Switch to Admin & start", kind: "primary" }
+  );
+  if (!ok) return false;
+  return await switchUser(ADMIN_USER); // false if the user cancels an unsaved-changes prompt
+}
 
 // ---------------------------------------------------------------- fictional demo data
 // Deliberately obvious as a demo, and comfortably above the corporate minimum so the
@@ -118,6 +138,9 @@ export async function startGuide() {
     window.dispatchEvent(new Event("hms:changed"));
     return;
   }
+  // Only the AAT desk (Admin, in this demo) can open the case. If the current role can't,
+  // offer to switch — don't dead-end with a vague error.
+  if (!(await ensureCanStart())) return;
   announce("Preparing a guided demo case.");
   toast("Preparing a guided demo case…");
   const r = await act("case.create", demoPayload(), { quiet: true });
