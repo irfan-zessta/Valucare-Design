@@ -1,5 +1,6 @@
 import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, confirmDialog, toast, announce, DEMO_BYPASS, actsAs } from "./core.js";
 import { icon, cleanLabel } from "./components.js";
+import { maybeAutoStartGuide } from "./guide.js";
 
 const root = document.getElementById("root");
 let lastHash = location.hash;
@@ -11,6 +12,7 @@ async function boot() {
   if (!state.me) return renderLogin();
   renderShell();
   route();
+  maybeAutoStartGuide();
 }
 
 // ---------------------------------------------------------------- sign in
@@ -44,6 +46,7 @@ function renderLogin(reason) {
     if (!location.hash || location.hash === "#/") location.hash = "#/new-business";
     renderShell();
     route();
+    maybeAutoStartGuide();
   }));
   root.querySelector("[data-user]")?.focus();
 }

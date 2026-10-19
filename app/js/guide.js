@@ -42,6 +42,14 @@ function onGuideCase() {
   return g && g.caseId && pathOf(location.hash).startsWith(`/case/${g.caseId}`);
 }
 
+// ---------------------------------------------------------------- environment
+// The hosted/static build (production on Vercel) sets window.__HMS3_PREVIEW__ and has NO
+// backend, so `case.create` cannot run there. In that mode the walkthrough attaches to an
+// existing early-stage fixture case instead of spawning one. NB-2026-0022 is a franchise
+// still in Draft (Work Area 1), so the guide can walk it forward from the start.
+const isPreview = () => !!window.__HMS3_PREVIEW__;
+const PREVIEW_DEMO_CASE = "NB-2026-0022";
+
 // ---------------------------------------------------------------- fictional demo data
 // Deliberately obvious as a demo, and comfortably above the corporate minimum so the
 // case is never auto-routed to IFG. A short time suffix keeps repeat/restart companies
@@ -101,6 +109,15 @@ export async function openGuideMenu() {
 
 // Create a fresh isolated demo case and switch the guide on.
 export async function startGuide() {
+  // Static preview (production): no backend to create a case, so attach to an existing
+  // fixture case. A full browser reload resets the fixture, which is honest for a mock.
+  if (isPreview()) {
+    setGuide({ caseId: PREVIEW_DEMO_CASE, active: true, startedAt: nowStamp() });
+    toast("Guided demo ready — follow the highlighted next step.", "ok");
+    go(`#/case/${PREVIEW_DEMO_CASE}/franchise/franchise`);
+    window.dispatchEvent(new Event("hms:changed"));
+    return;
+  }
   announce("Preparing a guided demo case.");
   toast("Preparing a guided demo case…");
   const r = await act("case.create", demoPayload(), { quiet: true });
@@ -109,6 +126,18 @@ export async function startGuide() {
   toast("Guided demo ready — follow the highlighted next step.", "ok");
   go(`#/case/${r.caseId}/franchise/franchise`);
   window.dispatchEvent(new Event("hms:changed"));
+}
+
+// Production default-on: the first time a visitor arrives in the static preview, switch the
+// walkthrough on so they land directly in guided mode. It fires at most once — after the user
+// exits or starts anything (a stored guide state exists thereafter) it never re-triggers, so
+// it is not a nag. Real backends keep the guide opt-in; auto-creating a case on every load
+// would litter the database.
+export function maybeAutoStartGuide() {
+  if (!isPreview() || !DEMO_BYPASS) return;
+  if (!state.me) return;        // wait until a role is chosen
+  if (getGuide()) return;       // already started, resumed or dismissed before — respect it
+  startGuide();
 }
 
 function resumeGuide() {
