@@ -236,13 +236,15 @@ function makePanel() {
 
 // ---------------------------------------------------------------- create-phase guide
 // Shown on #/new-business/create, BEFORE a demo case exists. It walks the three Create steps
-// — find the company, confirm it, enter the lead — pointing at (and blinking) the one control
-// to click on each. It never types or submits anything; the person performs each step, and the
-// case they create at the end is adopted as the demo case by the hashchange listener below.
+// — find the company, confirm it, enter the lead — with a short text instruction naming the
+// control to use on each (NO on-screen blink/outline here: the highlight was removed because
+// it interfered with the Create New Business controls). It never types or submits anything;
+// the person performs each step, and the case they create at the end is adopted as the demo
+// case by the hashchange listener below.
 const CREATE_STEPS = {
-  find:    { what: "Find the company first.",        why: "Searching first makes sure you never create a duplicate company or case.",   cta: "Search" },
-  company: { what: "Confirm the company's details.", why: "Enter the new company's details. A quick duplicate check runs before you continue.", cta: "Check for duplicates and continue" },
-  lead:    { what: "Enter the lead details.",        why: "Add the business source and contact. Creating the case opens the franchise form next.", cta: "Create case" },
+  find:    { what: "Find the company first.",        why: "Searching first makes sure you never create a duplicate company or case.", look: "Search — then, if there’s no match, choose “Create new company”." },
+  company: { what: "Confirm the company's details.", why: "Enter the new company's details. A quick duplicate check runs before you continue.", look: "Choose “Check for duplicates and continue”." },
+  lead:    { what: "Enter the lead details.",        why: "Add the business source and contact. Creating the case opens the franchise form next.", look: "Choose “Create case”." },
 };
 function createStep() {
   if (document.getElementById("lf")) return "lead";
@@ -260,70 +262,24 @@ export function mountCreateGuide(main) {
   remount = () => mountCreateGuide(main);
 
   const panel = makePanel();
-  let lastTarget = null; // repaint the card text when the control to blink changes
-  const paint = () => {
-    const step = createStep();
-    panel.classList.toggle("is-collapsed", collapsed);
-    if (collapsed) { panel.innerHTML = collapsedHtml(1); wireCollapsed(panel); return; }
-    lastTarget = findCreateTarget(step);
-    panel.innerHTML = createStepHtml(step, lastTarget);
-    wirePanel(panel);
-    highlightCreate(lastTarget);
-  };
-  paint();
+  const step = createStep();
+  if (collapsed) { panel.innerHTML = collapsedHtml(1); wireCollapsed(panel); }
+  else { panel.innerHTML = createStepHtml(step); wirePanel(panel); }
 
-  // The step changes in place (find → company → lead) via create.js's own re-render, which
-  // re-calls this function; but the search-results list also appears without a full re-render.
-  // Watch #body so the card text and blink always point at the right control (e.g. the
-  // "Create new company" button that only appears after a search).
-  const bodyEl = document.getElementById("body");
-  if (bodyEl) {
-    observer = new MutationObserver(debounce(() => {
-      const p = document.getElementById(PANEL_ID);
-      if (!p || collapsed || p.classList.contains("is-collapsed")) return;
-      const t = findCreateTarget(createStep());
-      if (t !== lastTarget) paint(); else highlightCreate(t);
-    }, 140));
-    observer.observe(bodyEl, { childList: true, subtree: true });
-  }
-
-  const key = "create:" + createStep();
-  if (announced !== key) { announced = key; announce(`Guided demo: ${CREATE_STEPS[createStep()].what}`); }
+  const key = "create:" + step;
+  if (announced !== key) { announced = key; announce(`Guided demo: ${(CREATE_STEPS[step] || CREATE_STEPS.find).what}`); }
 }
 
-function createStepHtml(step, target) {
+function createStepHtml(step) {
   const info = CREATE_STEPS[step] || CREATE_STEPS.find;
-  const cta = ctaText(step, target);
-  const look = target ? `Use the highlighted “${esc(cta)}” to continue.` : `Look for “${esc(cta)}”.`;
   const tip = step === "find" ? "Try a name like “Northwind”, or a TIN." : "Use “Fill sample” to try it with demo data.";
   return `${headHtml("Work area 1 of 5 · Create the case")}
     <div class="gp-body">
       <b class="gp-what">${esc(info.what)}</b>
       <p class="gp-why">${esc(info.why)}</p>
-      <p class="gp-look">${icon("arrowr", 14).s} ${esc(look)}</p>
+      <p class="gp-look">${icon("arrowr", 14).s} ${esc(info.look)}</p>
       <p class="gp-tip">${icon("sparkle", 13).s} ${esc(tip)}</p>
     </div>${footBtns()}`;
-}
-
-// The one control to blink on the current Create step.
-function findCreateTarget(step) {
-  const body = document.getElementById("body");
-  if (!body) return null;
-  if (step === "find") return body.querySelector("#newco") || body.querySelector("#sf .btn.primary");
-  return body.querySelector(".savebar .btn.primary:not([disabled])") || body.querySelector("form .btn.primary:not([disabled])");
-}
-// Name the control from its own label so the card text can never drift from the blink.
-function ctaText(step, target) {
-  if (target) { const t = (target.textContent || "").replace(/\s+/g, " ").trim(); if (t) return t; }
-  return (CREATE_STEPS[step] || CREATE_STEPS.find).cta;
-}
-function highlightCreate(target) {
-  clearHighlight();
-  if (!target) return;
-  target.classList.add("guide-target", "guide-pulse");
-  const panel = document.getElementById(PANEL_ID);
-  const r = target.getBoundingClientRect();
-  if (panel) panel.classList.toggle("dock-right", (r.left + r.width / 2) < window.innerWidth * 0.55);
 }
 
 // ---------------------------------------------------------------- panel content

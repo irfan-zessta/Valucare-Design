@@ -676,13 +676,10 @@ dl.kv.cols .wide{grid-column:1/-1}
 .guide-pill .ico:last-child{flex:none;color:#9FD6BE}
 .guide-pill:focus-visible{outline:2px solid #6FEFB4;outline-offset:2px}
 
-/* The "demo blinker": the one control to use next. A shiny-green outline plus a soft green
-   ring that gently pulses to draw the eye to the next step — matching the guide card. The
-   control is always NAMED in the card text too, so the cue never relies on colour/motion
-   alone, and the global reduced-motion rule above disables the pulse entirely. */
+/* The one control to use next: a calm, STATIC shiny-green outline (no blinking). The pulse
+   animation was removed — the control is always NAMED in the card text, so the cue never
+   relies on colour/motion. */
 .guide-target{outline:2px solid #10B981;outline-offset:3px;border-radius:var(--r-sm);box-shadow:0 0 0 4px rgba(16,185,129,.22)}
-.guide-target.guide-pulse{animation:guidePulse 1.3s var(--ease,ease) infinite}
-@keyframes guidePulse{0%,100%{box-shadow:0 0 0 2px rgba(16,185,129,.28)}50%{box-shadow:0 0 0 7px rgba(110,239,180,.45)}}
 /* Smaller screens: a compact bottom panel that never spans tall enough to block page
    controls; still fully collapsible to the pill. */
 @media (max-width:720px){.guide-panel{left:8px;right:8px;bottom:8px;width:auto;max-height:46vh;overflow:auto}}
