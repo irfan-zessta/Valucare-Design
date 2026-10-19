@@ -16,13 +16,13 @@ async function boot() {
 }
 
 // ---------------------------------------------------------------- sign in
-// A quiet centered card. Admin is the internal New Business desk — one person who
+// A quiet centered card. Sales is the internal New Business desk — one person who
 // creates, reviews, approves and handles legal, so you never switch to walk a case
 // through. Actuarial, MDA and Billing are departments that sit outside that desk;
 // CCD is the downstream team that acknowledges the final handover. Switch into any of
-// them only when a case needs their result.
+// them only when a case needs their result. (The internal role key stays `admin`.)
 const SIGNIN = [
-  { user: "u-ad1", key: "admin", role: "Admin", desc: "The whole New Business desk: create, review, approve and legal" },
+  { user: "u-ad1", key: "admin", role: "Sales", desc: "The whole New Business desk: create, review, approve and legal" },
   { user: "u-ac1", key: "accusa", role: "Actuarial", desc: "Price quotations and release rates" },
   { user: "u-md1", key: "mda", role: "MDA", desc: "Record member data alignment results" },
   { user: "u-bc1", key: "bc", role: "Billing", desc: "Set up billing and collection" },
