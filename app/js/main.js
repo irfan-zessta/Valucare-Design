@@ -1,18 +1,31 @@
 import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, confirmDialog, toast, announce, DEMO_BYPASS, actsAs } from "./core.js";
 import { icon, cleanLabel } from "./components.js";
-import { maybeAutoStartGuide } from "./guide.js";
 
 const root = document.getElementById("root");
 let lastHash = location.hash;
 let navigating = false;
 
+// The demo opens on the department chooser, not a workspace — so prospects never land
+// on "whoever was signed in last". There is no sign-in step: we quietly adopt one
+// internal desk identity behind the scenes so existing server actions keep working,
+// and the prospect only ever sees a neutral "Demo workspace". The identity can still
+// be switched automatically when a case genuinely needs another department's result
+// (the case screens drive switchUser), and manually from the account menu for the
+// person running the demo.
+const DEFAULT_USER = "u-ad1";
+
 async function boot() {
   state.meta = await api("meta");
   try { state.me = (await api("me", { retryAuth: false })).user; } catch (e) { state.me = null; }
-  if (!state.me) return renderLogin();
-  renderShell();
+  if (!state.me) {
+    // No session yet — adopt the default desk identity silently. If even that fails
+    // (e.g. the backend is unreachable), fall back to the manual picker.
+    try {
+      await api("login", { method: "POST", body: { userId: DEFAULT_USER } });
+      state.me = (await api("me")).user;
+    } catch (e) { return renderLogin(); }
+  }
   route();
-  maybeAutoStartGuide();
 }
 
 // ---------------------------------------------------------------- sign in
@@ -43,47 +56,77 @@ function renderLogin(reason) {
   root.querySelectorAll("[data-user]").forEach((b) => (b.onclick = async () => {
     await api("login", { method: "POST", body: { userId: b.dataset.user } });
     state.me = (await api("me")).user;
-    if (!location.hash || location.hash === "#/") location.hash = "#/new-business";
-    renderShell();
-    route();
-    maybeAutoStartGuide();
+    go("#/explore");
+    route(true);
   }));
   root.querySelector("[data-user]")?.focus();
 }
 
-// ---------------------------------------------------------------- shell
-// Four program areas. New Business is the live workspace; the other three run
-// outside this application today, so they open a short placeholder that says so
-// rather than an empty list that could read as "no cases".
-const NAV = [
-  { key: "new-business", label: "New Business", icon: "folder", href: "#/new-business" },
-  { key: "renewal-business", label: "Renewal Business", icon: "history", href: "#/renewal-business" },
-  { key: "new-ifg", label: "New IFG", icon: "building", href: "#/new-ifg" },
-  { key: "renewal-ifg", label: "Renewal IFG", icon: "history", href: "#/renewal-ifg" },
-];
-const NAV_SETTINGS = { key: "settings", label: "Settings", icon: "settings", href: "#/settings" };
-const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon, 18)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 items">0</span>` : html`<span></span>`}</a>`;
+// ---------------------------------------------------------------- workspaces
+// Navigation is contextual: instead of one menu listing every program area at once,
+// each demo opens its own workspace with only the destinations that belong to it.
+// A workspace maps a set of routes to a breadcrumb (HMS / <dept> / <workspace>), a
+// scoped sidebar, an optional Create action, and where its search goes. Corporate
+// New Business is the broad internal desk, so it owns the shared utility routes
+// (tasks, accounts, reports, settings, …). The IFG workspaces are placeholders that
+// still carry correct context so the chrome reads honestly.
+const WORKSPACES = {
+  "corp-new": {
+    key: "corp-new", dept: "Sales", name: "Corporate New Business", home: "#/new-business",
+    routes: ["new-business", "case", "actuarial", "create", "tasks", "accounts", "reports", "more", "home", "settings"],
+    nav: [{ key: "new-business", label: "New Business", icon: "folder", href: "#/new-business" }],
+    create: { label: "Create New Business", href: "#/new-business/create" },
+    search: (q) => `#/new-business?q=${encodeURIComponent(q)}&view=all`,
+    searchPlaceholder: "Search companies and cases",
+  },
+  "corp-renewal": {
+    key: "corp-renewal", dept: "Sales", name: "Corporate Renewal Business", home: "#/renewal-business",
+    routes: ["renewal-business"],
+    nav: [{ key: "renewal-business", label: "Renewal Business", icon: "history", href: "#/renewal-business" }],
+    search: (q) => `#/renewal-business?q=${encodeURIComponent(q)}`,
+    searchPlaceholder: "Search renewals by name or code",
+  },
+  "ifg-new": {
+    key: "ifg-new", dept: "Sales", name: "IFG New Business", home: "#/new-ifg",
+    routes: ["new-ifg"],
+    nav: [{ key: "new-ifg", label: "IFG New Business", icon: "building", href: "#/new-ifg" }],
+  },
+  "ifg-renewal": {
+    key: "ifg-renewal", dept: "Sales", name: "IFG Renewal Business", home: "#/renewal-ifg",
+    routes: ["renewal-ifg"],
+    nav: [{ key: "renewal-ifg", label: "IFG Renewal Business", icon: "history", href: "#/renewal-ifg" }],
+  },
+};
 
-// Which primary item is active for the current route.
-function activeInfo(parts) {
+// Which workspace owns this route? Falls back to the New Business desk for shared
+// utility routes that aren't claimed elsewhere.
+function workspaceForRoute(parts) {
   const p = parts[0];
-  if (p === "new-business" || p === "case" || p === "actuarial") return { top: "new-business" };
-  if (p === "renewal-business") return { top: "renewal-business" };
-  if (p === "new-ifg") return { top: "new-ifg" };
-  if (p === "renewal-ifg") return { top: "renewal-ifg" };
-  if (p === "settings") return { top: "settings" };
-  return {};
+  for (const ws of Object.values(WORKSPACES)) if (ws.routes.includes(p)) return ws;
+  return WORKSPACES["corp-new"];
 }
 
-function renderShell() {
+const navLink = (n) => html`<a href="${n.href}" data-nav="${n.key}" title="${n.label}">${icon(n.icon, 18)}<span class="lbl">${n.label}</span>${n.count ? html`<span class="count zero" id="taskCount" aria-label="0 items">0</span>` : html`<span></span>`}</a>`;
+
+// Highlight the sidebar item for the current route. Sub-routes of New Business
+// (a case, the actuarial screen, create) all belong to the New Business item.
+function setActiveNav(parts) {
+  const p = parts[0];
+  let activeKey = p;
+  if (p === "case" || p === "actuarial" || p === "create" || p === "home") activeKey = "new-business";
+  document.querySelectorAll("[data-nav]").forEach((a) => {
+    if (a.dataset.nav === activeKey) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+}
+
+function renderShell(ws) {
   const collapsed = prefs.get("navCollapsed", false);
-  const me = state.me;
-  const initials = cleanLabel(me.name).split(" ").map((x) => x[0]).join("").slice(0, 2);
   root.innerHTML = html`<div class="app ${collapsed ? "collapsed" : ""}" id="app">
     <nav class="sidebar" aria-label="Main navigation" id="sidebar">
-      <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Corporate New Business</small></span></div>
-      ${actsAs("aat") ? html`<a class="btn create-btn" href="#/new-business/create" title="Create New Business">${icon("plus")}<span class="lbl">Create New Business</span></a>` : ""}
-      <div class="nav">${NAV.map(navLink)}</div>
+      <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>${ws.name}</small></span></div>
+      ${ws.create && actsAs("aat") ? html`<a class="btn create-btn" href="${ws.create.href}" title="${ws.create.label}">${icon("plus")}<span class="lbl">${ws.create.label}</span></a>` : ""}
+      <div class="nav">${ws.nav.map(navLink)}</div>
       <div class="spacer"></div>
       <div class="nav collapse"><button type="button" class="navbtn" id="collapseBtn" aria-pressed="${collapsed}" title="${collapsed ? "Expand sidebar" : "Collapse sidebar"}">${icon(collapsed ? "expand" : "collapse", 18)}<span class="lbl">Collapse</span><span></span></button></div>
     </nav>
@@ -91,23 +134,29 @@ function renderShell() {
     <div class="content">
       <header class="topbar">
         <button type="button" class="btn ghost menu-btn" id="menuBtn" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">${icon("menu")}</button>
-        <form class="qsearch" role="search" id="qsearch"><label class="sr-only" for="qs">Search</label>${icon("search", 16)}
-          <input id="qs" type="search" placeholder="Search companies and cases" autocomplete="off"><kbd>⌘K</kbd></form>
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="#/explore">HMS</a><span aria-hidden="true">/</span><span>${ws.dept}</span><span aria-hidden="true">/</span><b aria-current="page">${ws.name}</b></nav>
+        ${ws.search ? html`<form class="qsearch" role="search" id="qsearch"><label class="sr-only" for="qs">Search</label>${icon("search", 16)}
+          <input id="qs" type="search" placeholder="${ws.searchPlaceholder || "Search"}" autocomplete="off"><kbd>⌘K</kbd></form>` : html`<div class="qsearch-spacer"></div>`}
+        <button type="button" class="btn ghost sm switch-demo" id="switchDemo" title="Return to the department chooser">${icon("expand", 15)}<span class="lbl">Switch demo</span></button>
         <button type="button" class="iconbtn" id="bellBtn" title="Notifications" aria-label="Notifications"><span class="dot" id="bellDot" hidden></span>${icon("bell", 18)}</button>
-        <button type="button" class="whoami" id="whoBtn" aria-haspopup="dialog" aria-label="Signed in as ${cleanLabel(me.name)}, ${cleanLabel(roleLabel(me.role))}. Open account menu"><span class="avatar" aria-hidden="true">${initials}</span>
-          <span class="w"><b>${cleanLabel(me.name)}</b><span>${cleanLabel(roleLabel(me.role))}</span></span>${icon("chevd", 14)}</button>
+        <button type="button" class="whoami" id="whoBtn" aria-haspopup="dialog" aria-label="Demo workspace. Open account menu"><span class="avatar" aria-hidden="true">${icon("user", 16)}</span>
+          <span class="w"><b>Demo workspace</b><span>Sample data</span></span>${icon("chevd", 14)}</button>
       </header>
       <main id="main" tabindex="-1"></main>
     </div></div>`.s;
   const app = document.getElementById("app");
-  document.getElementById("collapseBtn").onclick = () => { prefs.set("navCollapsed", !app.classList.contains("collapsed")); renderShell(); route(true); };
+  document.getElementById("collapseBtn").onclick = () => { prefs.set("navCollapsed", !app.classList.contains("collapsed")); renderShell(ws); route(true); };
   const menuBtn = document.getElementById("menuBtn");
   const closeDrawer = () => { app.classList.remove("drawer-open"); menuBtn.setAttribute("aria-expanded", "false"); };
-  menuBtn.onclick = () => { app.classList.add("drawer-open"); menuBtn.setAttribute("aria-expanded", "true"); document.querySelector(".sidebar a").focus(); };
+  menuBtn.onclick = () => { app.classList.add("drawer-open"); menuBtn.setAttribute("aria-expanded", "true"); document.querySelector(".sidebar a")?.focus(); };
   document.getElementById("scrim").onclick = closeDrawer;
   document.getElementById("sidebar").addEventListener("click", (e) => { if (e.target.closest("a")) closeDrawer(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && app.classList.contains("drawer-open")) { closeDrawer(); menuBtn.focus(); } });
-  document.getElementById("qsearch").onsubmit = (e) => { e.preventDefault(); const q = document.getElementById("qs").value.trim(); go(`#/new-business?q=${encodeURIComponent(q)}&view=all`); };
+  const qform = document.getElementById("qsearch");
+  if (qform) qform.onsubmit = (e) => { e.preventDefault(); const q = document.getElementById("qs").value.trim(); go(ws.search(q)); };
+  // "Switch demo" returns to the chooser. It only navigates — nothing is reset or
+  // deleted, so renewal progress (held in localStorage) is preserved.
+  document.getElementById("switchDemo").onclick = () => go("#/explore");
   document.getElementById("whoBtn").onclick = (e) => userMenu(e.currentTarget);
   document.getElementById("bellBtn").onclick = () => go("#/tasks");
   refreshCounts();
@@ -134,7 +183,10 @@ export async function switchUser(userId) {
   state.me = (await api("me")).user;
   state.suggestedUser = null; // the cue is resolved once we've switched
   toast(`Signed in as ${state.me.name} (${roleLabel(state.me.role)}).`, "ok");
-  renderShell();
+  // The chrome is identity-neutral ("Demo workspace"), but the Create button is
+  // permission-gated — force the shell to re-mount for the current route so it reflects
+  // the switched identity, then re-render the view.
+  shellWs = null;
   route(true);
   return true;
 }
@@ -228,24 +280,42 @@ document.addEventListener("keydown", (e) => {
 });
 
 let renderSeq = 0;
+let shellWs = null; // key of the workspace whose shell is currently mounted (null on the chooser)
 async function route(force = false) {
   if (!state.me) return;
   const { parts, query } = parseHash();
-  if (!parts.length) { location.replace("#/new-business"); return; }
+  // Opening the bare root always lands on the department chooser, never the last
+  // workspace that happened to be used.
+  if (!parts.length) { location.replace("#/explore"); return; }
+
+  // The chooser lives outside the operational shell — render it straight into root.
+  if (parts[0] === "explore") {
+    shellWs = null;
+    const seq = ++renderSeq;
+    disposeForms();
+    const mod = await import("./views/explore.js");
+    if (seq !== renderSeq) return;
+    await mod.render(root, { parts, query });
+    return;
+  }
+
+  const ws = workspaceForRoute(parts);
   let key = parts[0];
   if (key === "new-business" && parts[1] === "create") key = "create";
   const loader = VIEWS[key];
+
+  // (Re)mount the shell only when the workspace changes or there is no shell yet —
+  // so navigating within a workspace never flashes the chrome.
+  if (shellWs !== ws.key || !document.getElementById("main")) {
+    renderShell(ws);
+    shellWs = ws.key;
+  }
   const main = document.getElementById("main");
   if (!main) return;
-  const info = activeInfo(parts);
-  document.querySelectorAll("[data-nav]").forEach((a) => {
-    const n = a.dataset.nav;
-    const active = n === info.top || n === info.item;
-    if (active) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
-  });
+  setActiveNav(parts);
   const seq = ++renderSeq;
   disposeForms();
-  if (!loader) { main.innerHTML = `<div class="empty"><b>Page not found</b><a href="#/new-business">Go to New Business</a></div>`; return; }
+  if (!loader) { main.innerHTML = `<div class="empty"><b>Page not found</b><a href="#/explore">Back to the demo chooser</a></div>`; return; }
   try {
     const mod = await loader();
     if (seq !== renderSeq) return;
@@ -271,7 +341,7 @@ window.addEventListener("hashchange", async () => {
   const nextParts = target.split("?")[0].split("/").slice(0, 4).join("/");
   if (prevParts !== nextParts) {
     navigating = true;
-    history.replaceState(null, "", lastHash || "#/new-business");
+    history.replaceState(null, "", lastHash || "#/explore");
     const ok = await flushForms();
     navigating = false;
     if (!ok) return;

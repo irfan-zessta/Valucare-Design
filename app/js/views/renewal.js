@@ -294,90 +294,88 @@ function sampleMemberData() {
 
 // ---------------------------------------------------------------- entry render
 export async function render(main, { parts, query }) {
+  ensureSeeded();
   const id = parts[1];
   if (!id) return renderList(main, query);
   return renderDetail(main, id, parts[2] || "review");
 }
 
-// ---------------------------------------------------------------- entry screen (list)
+// Pre-seed the baseline so the "In Progress" tab reads like a real book of work from
+// the first visit: every sample account that starts mid-journey (preset other than
+// "new") is seeded into the store once. The "new" accounts stay unstarted so they
+// populate "Upcoming Renewals" until someone clicks Start renewal. A reset clears the
+// store, which re-runs this on the next render — restoring every starting stage.
+const BASELINE = 1;
+function ensureSeeded() {
+  const store = loadStore();
+  if (store.seeded === BASELINE) return;
+  for (const a of ACCOUNTS) {
+    if (a.preset === "new") continue; // belongs in Upcoming until explicitly started
+    const id = renewalIdFor(a.code);
+    if (!store.cases[id]) store.cases[id] = seedRenewal(a);
+  }
+  store.seeded = BASELINE;
+  saveStore(store);
+}
+
+// Plain-language renewal status for the In Progress tab — consistent with the actual
+// sample state, and deliberately free of internal stage codes.
+function progressStatus(rn) {
+  if (rn.notRenewed) return { label: "Not renewed", tone: "danger" };
+  if (rn.completed) return { label: "Completed", tone: "success" };
+  if (rn.contract.started) return { label: "Contract in progress", tone: "info" };
+  if (rn.proposal.decision === "accepted") return { label: "Preparing renewal documents", tone: "info" };
+  if (rn.proposal.changeRequested) return { label: "Negotiating", tone: "warn" };
+  if (rn.proposal.versions.length) return { label: "Proposal sent", tone: "info" };
+  if (rn.rates.requested && !rn.rates.response) return { label: "Waiting for Actuarial", tone: "warn" };
+  return { label: "Reviewing data", tone: "neutral" };
+}
+const areaLabel = (k) => (AREAS.find((a) => a.key === k) || {}).label || "";
+
+// ---------------------------------------------------------------- dashboard (two tabs)
+// Exactly two tabs: "Upcoming Renewals" (accounts approaching renewal with no case
+// started) and "In Progress" (cases already underway). Tab membership follows whether
+// renewal WORK has started — not merely the expiry date — so a near-expiry account that
+// is already being worked sits in In Progress. Completed / Not-renewed cases drop out of
+// the active In Progress list but stay findable in a small history section below it.
 const LIST_KEY = "renewal:list";
 function renderList(main, query) {
-  document.title = "Renewal Business · HMS3";
-  const st = prefs.get(LIST_KEY, { q: "", month: "", status: "", owner: "" });
+  document.title = "Corporate Renewal Business · HMS3";
+  const st = prefs.get(LIST_KEY, { tab: "upcoming", q: "", month: "", owner: "", pstatus: "" });
+  if (query && query.tab) st.tab = query.tab;
   if (query && query.q !== undefined) st.q = query.q;
+  if (st.tab !== "upcoming" && st.tab !== "progress") st.tab = "upcoming";
 
-  // Pull any already-started working renewals so their live status shows in the list.
   const store = loadStore();
-  const rows = ACCOUNTS.map((a) => {
-    const live = store.cases[renewalIdFor(a.code)];
-    const info = live ? statusInfo(live) : presetStatus(a.preset);
-    const ns = live ? nextStep(live) : presetNext(a.preset);
-    return { a, info, next: ns.sentence, started: !!live };
-  });
-
-  const owners = [...new Set(ACCOUNTS.map((a) => a.owner))];
-  const statuses = [...new Set(rows.map((r) => r.info.label))];
+  const all = ACCOUNTS.map((a) => ({ a, rn: store.cases[renewalIdFor(a.code)] || null }));
+  const upcoming = all.filter((r) => !r.rn);
+  const progress = all.filter((r) => r.rn && !r.rn.completed && !r.rn.notRenewed);
+  const history = all.filter((r) => r.rn && (r.rn.completed || r.rn.notRenewed));
+  prefs.set(LIST_KEY, st);
 
   main.innerHTML = html`
-    <div class="page-head"><div><h1>Renewal Business</h1><p>Corporate accounts due for renewal — from reviewing current data to a completed contract. Everything here is fictional demo content.</p></div>
-      <div class="ph-actions"><button class="btn ghost" id="resetDemo" title="Reset every sample account to its starting state">${icon("history", 16)} Reset demo</button><button class="btn primary" id="startSample">${icon("sparkle")} Start sample renewal</button></div></div>
+    <div class="page-head"><div><h1>Corporate Renewal Business</h1><p>Find upcoming renewals and continue work already started. Everything here is fictional demo content.</p></div>
+      <div class="ph-actions"><button class="btn ghost" id="resetDemo" title="Reset every sample account to its starting state">${icon("history", 16)} Reset demo</button></div></div>
+    <div class="seg mb" role="tablist" aria-label="Renewal views">
+      <button type="button" role="tab" data-tab="upcoming" aria-selected="${st.tab === "upcoming"}">Upcoming Renewals <span class="cnt">${upcoming.length}</span></button>
+      <button type="button" role="tab" data-tab="progress" aria-selected="${st.tab === "progress"}">In Progress <span class="cnt">${progress.length}</span></button>
+    </div>
+    <div id="rpanel"></div>`.s;
 
-    <div class="panel">
-      <div class="toolbar">
-        <div class="search">${icon("search", 16)}<label class="sr-only" for="rq">Filter by account name or code</label>
-          <input id="rq" type="search" value="${st.q}" placeholder="Filter by account name or code"></div>
-        <label class="sr-only" for="fm">Expiry month</label>
-        <select id="fm" class="inp" style="width:auto"><option value="">Any expiry month</option>${monthOpts(st.month)}</select>
-        <label class="sr-only" for="fs">Status</label>
-        <select id="fs" class="inp" style="width:auto"><option value="">Any status</option>${statuses.map((s) => html`<option ${st.status === s ? "selected" : ""}>${s}</option>`)}</select>
-        <label class="sr-only" for="fo">Owner</label>
-        <select id="fo" class="inp" style="width:auto"><option value="">Any owner</option>${owners.map((o) => html`<option ${st.owner === o ? "selected" : ""}>${o}</option>`)}</select>
-        ${st.q || st.month || st.status || st.owner ? html`<button class="btn ghost sm" id="rclear">Clear</button>` : ""}
-      </div>
-      <div id="rlist"></div>
-    </div>`.s;
-
-  const listBox = main.querySelector("#rlist");
-  function draw() {
-    const ql = (st.q || "").toLowerCase().trim();
-    const shown = rows.filter((r) => {
-      if (ql && !`${r.a.name} ${r.a.code}`.toLowerCase().includes(ql)) return false;
-      if (st.month && r.a.expiry.slice(5, 7) !== st.month) return false;
-      if (st.status && r.info.label !== st.status) return false;
-      if (st.owner && r.a.owner !== st.owner) return false;
-      return true;
-    });
-    listBox.innerHTML = html`<div class="tbl-wrap"><table class="tbl rowlink cardify">
-      <caption class="sr-only">Accounts due for renewal</caption>
-      <thead><tr><th scope="col">Account</th><th scope="col">Contract expiry</th><th scope="col">Renewal status</th><th scope="col">Owner</th><th scope="col">Next action</th><th scope="col"><span class="sr-only">Open</span></th></tr></thead>
-      <tbody>${shown.length ? shown.map((r) => html`<tr data-code="${r.a.code}" tabindex="0" role="link" aria-label="Open renewal for ${r.a.name}">
-        <td data-label="Account"><span class="co"><a href="#/renewal-business/${renewalIdFor(r.a.code)}">${r.a.name}</a></span><span class="sub">${r.a.code} · ${r.a.industry}</span></td>
-        <td data-label="Contract expiry">${fmtDate(r.a.expiry)}<span class="sub">${expiryHint(r.a.expiry)}</span></td>
-        <td data-label="Renewal status">${pill(r.info.label, r.info.tone)}</td>
-        <td data-label="Owner">${r.a.owner}<span class="sub">${r.a.ownerRole}</span></td>
-        <td data-label="Next action"><span class="truncate" style="max-width:200px;display:inline-block" title="${r.next}">${r.next}</span></td>
-        <td class="num" style="white-space:nowrap"><span class="btn sm">${r.started ? "Open" : "Start"}</span></td></tr>`)
-        : html`<tr><td colspan="6">${emptyState({ icon: "search", title: "No accounts match", body: "Try clearing the search or filters." })}</td></tr>`}</tbody></table></div>
-      <div class="pager"><span>${plural(shown.length, "account")}</span></div>`.s;
-    listBox.querySelectorAll("tr[data-code]").forEach((tr) => {
-      const open = () => openAccount(tr.dataset.code);
-      tr.onclick = (e) => { if (e.target.closest("a")) return; open(); };
-      tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
-    });
-  }
-  draw();
-
+  const panel = main.querySelector("#rpanel");
   const save = () => prefs.set(LIST_KEY, st);
-  const rq = main.querySelector("#rq");
-  let t; rq.oninput = () => { clearTimeout(t); t = setTimeout(() => { st.q = rq.value; save(); draw(); const n = main.querySelector("#rq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 180); };
-  main.querySelector("#fm").onchange = (e) => { st.month = e.target.value; save(); draw(); };
-  main.querySelector("#fs").onchange = (e) => { st.status = e.target.value; save(); draw(); };
-  main.querySelector("#fo").onchange = (e) => { st.owner = e.target.value; save(); draw(); };
-  main.querySelector("#rclear")?.addEventListener("click", () => { st.q = ""; st.month = ""; st.status = ""; st.owner = ""; save(); draw(); });
-  main.querySelector("#startSample").onclick = () => {
-    const flagship = ACCOUNTS.find((a) => a.preset === "new") || ACCOUNTS[0];
-    openAccount(flagship.code, true);
+  const draw = () => {
+    if (st.tab === "progress") drawProgress(panel, st, save, progress, history);
+    else drawUpcoming(panel, st, save, upcoming);
   };
+  main.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => {
+    st.tab = b.dataset.tab; save();
+    // Keep the URL in step so a refresh (and a shared link) lands on the same tab,
+    // without forcing a full re-route (only the query changes, not the path).
+    history.replaceState(null, "", "#/renewal-business" + (st.tab === "progress" ? "?tab=progress" : ""));
+    main.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x.dataset.tab === st.tab));
+    draw();
+  });
   main.querySelector("#resetDemo").onclick = async () => {
     const ok = await confirmDialog("Reset demo data?",
       "This clears every sample renewal and the guide state, returning all accounts to their starting stages. Nothing outside this prototype is affected.",
@@ -385,40 +383,165 @@ function renderList(main, query) {
     if (!ok) return;
     try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(GUIDE_KEY); } catch (e) { /* storage unavailable */ }
     toast("Demo data reset.", "ok");
-    go("#/renewal-business");
+    ensureSeeded();
     renderList(main, {});
   };
+  draw();
 }
-function presetStatus(preset) {
-  return { new: { label: "Data under review", tone: "neutral" }, rates: { label: "Rates received", tone: "info" },
-    sent: { label: "Proposal sent (v1)", tone: "info" }, accepted: { label: "Accepted — in setup", tone: "success" },
-    completed: { label: "Renewal completed — demo", tone: "success" } }[preset] || { label: "Data under review", tone: "neutral" };
+
+// Tab 1 — Upcoming Renewals: existing accounts approaching renewal with no case started.
+function drawUpcoming(panel, st, save, upcoming) {
+  const owners = [...new Set(upcoming.map((r) => r.a.owner))];
+  panel.innerHTML = html`<div class="panel">
+    <div class="toolbar">
+      <div class="search">${icon("search", 16)}<label class="sr-only" for="rq">Filter by account name or code</label>
+        <input id="rq" type="search" value="${st.q}" placeholder="Filter by account name or code"></div>
+      <label class="sr-only" for="fm">Expiry month</label>
+      <select id="fm" class="inp" style="width:auto"><option value="">Any expiry month</option>${monthOpts(st.month)}</select>
+      <label class="sr-only" for="fo">Account Manager</label>
+      <select id="fo" class="inp" style="width:auto"><option value="">Any Account Manager</option>${owners.map((o) => html`<option ${st.owner === o ? "selected" : ""}>${o}</option>`)}</select>
+      ${st.q || st.month || st.owner ? html`<button class="btn ghost sm" id="rclear">Clear</button>` : ""}
+    </div>
+    <div id="ulist"></div></div>`.s;
+
+  const box = panel.querySelector("#ulist");
+  const drawRows = () => {
+    const ql = (st.q || "").toLowerCase().trim();
+    const shown = upcoming.filter((r) => {
+      if (ql && !`${r.a.name} ${r.a.code}`.toLowerCase().includes(ql)) return false;
+      if (st.month && r.a.expiry.slice(5, 7) !== st.month) return false;
+      if (st.owner && r.a.owner !== st.owner) return false;
+      return true;
+    }).sort((x, y) => x.a.expiry.localeCompare(y.a.expiry));
+    box.innerHTML = html`<div class="tbl-wrap"><table class="tbl cardify">
+      <caption class="sr-only">Accounts approaching renewal with no renewal started</caption>
+      <thead><tr><th scope="col">Account</th><th scope="col">Contract expiry</th><th scope="col">Time until expiry</th><th scope="col">Account Manager</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead>
+      <tbody>${shown.length ? shown.map((r) => html`<tr>
+        <td data-label="Account"><span class="co"><b>${r.a.name}</b></span><span class="sub">${r.a.code} · ${r.a.industry}</span></td>
+        <td data-label="Contract expiry">${fmtDate(r.a.expiry)}</td>
+        <td data-label="Time until expiry">${timeUntil(r.a.expiry)}</td>
+        <td data-label="Account Manager">${r.a.owner}<span class="sub">${r.a.ownerRole}</span></td>
+        <td class="num" style="white-space:nowrap"><button class="btn sm primary" data-start="${r.a.code}">Start renewal</button></td></tr>`)
+        : html`<tr><td colspan="5">${emptyState({ icon: "check", title: "No upcoming renewals match", body: "Every approaching account has work started — see the In Progress tab — or try clearing the filters." })}</td></tr>`}</tbody></table></div>
+      <div class="pager"><span>${plural(shown.length, "account")}</span></div>`.s;
+    box.querySelectorAll("[data-start]").forEach((b) => b.onclick = () => startRenewalFlow(b.dataset.start));
+  };
+  drawRows();
+
+  const rq = panel.querySelector("#rq");
+  let t; rq.oninput = () => { clearTimeout(t); t = setTimeout(() => { st.q = rq.value; save(); drawRows(); }, 180); };
+  panel.querySelector("#fm").onchange = (e) => { st.month = e.target.value; save(); drawRows(); };
+  panel.querySelector("#fo").onchange = (e) => { st.owner = e.target.value; save(); drawRows(); };
+  panel.querySelector("#rclear")?.addEventListener("click", () => { st.q = ""; st.month = ""; st.owner = ""; save(); drawUpcoming(panel, st, save, upcoming); });
 }
-function presetNext(preset) {
-  return { new: { sentence: "Start by preparing the renewal reports." }, rates: { sentence: "Prepare and send the renewal proposal." },
-    sent: { sentence: "Record the client's decision." }, accepted: { sentence: "Prepare the renewal-year SOB and member handoff." },
-    completed: { sentence: "Review the renewal summary." } }[preset] || { sentence: "Start the renewal." };
+
+// Tab 2 — In Progress: renewal cases already started with work remaining. Completed /
+// not-renewed cases are shown in a collapsible history below, never deleted.
+function drawProgress(panel, st, save, progress, history) {
+  const statuses = [...new Set(progress.map((r) => progressStatus(r.rn).label))];
+  panel.innerHTML = html`<div class="panel">
+    <div class="toolbar">
+      <div class="search">${icon("search", 16)}<label class="sr-only" for="rq">Filter by account name or code</label>
+        <input id="rq" type="search" value="${st.q}" placeholder="Filter by account name or code"></div>
+      <label class="sr-only" for="fp">Status</label>
+      <select id="fp" class="inp" style="width:auto"><option value="">Any status</option>${statuses.map((s) => html`<option ${st.pstatus === s ? "selected" : ""}>${s}</option>`)}</select>
+      ${st.q || st.pstatus ? html`<button class="btn ghost sm" id="rclear">Clear</button>` : ""}
+    </div>
+    <div id="plist"></div></div>
+    ${history.length ? html`<details class="mt"><summary>Recently completed and not renewed (${history.length})</summary><div id="hlist" class="mt"></div></details>` : ""}`.s;
+
+  const box = panel.querySelector("#plist");
+  const drawRows = () => {
+    const ql = (st.q || "").toLowerCase().trim();
+    const shown = progress.filter((r) => {
+      if (ql && !`${r.a.name} ${r.a.code}`.toLowerCase().includes(ql)) return false;
+      if (st.pstatus && progressStatus(r.rn).label !== st.pstatus) return false;
+      return true;
+    });
+    box.innerHTML = html`<div class="tbl-wrap"><table class="tbl rowlink cardify">
+      <caption class="sr-only">Renewals already started</caption>
+      <thead><tr><th scope="col">Account</th><th scope="col">Renewal period</th><th scope="col">Current work area</th><th scope="col">Status</th><th scope="col">Next action</th><th scope="col">Owner</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead>
+      <tbody>${shown.length ? shown.map((r) => { const ns = nextStep(r.rn); const ps = progressStatus(r.rn); return html`<tr data-go="${r.rn.id}/${ns.area}" tabindex="0" role="link" aria-label="Continue renewal for ${r.a.name}">
+        <td data-label="Account"><span class="co"><a href="#/renewal-business/${r.rn.id}/${ns.area}">${r.a.name}</a></span><span class="sub">${r.a.code}</span></td>
+        <td data-label="Renewal period">${fmtDate(r.rn.renewal.from)} – ${fmtDate(r.rn.renewal.to)}</td>
+        <td data-label="Current work area">${areaLabel(ns.area)}</td>
+        <td data-label="Status">${pill(ps.label, ps.tone)}</td>
+        <td data-label="Next action"><span class="truncate" style="max-width:200px;display:inline-block" title="${ns.sentence}">${ns.sentence}</span></td>
+        <td data-label="Owner">${r.a.owner}<span class="sub">${r.a.ownerRole}</span></td>
+        <td class="num" style="white-space:nowrap"><button class="btn sm primary" data-go="${r.rn.id}/${ns.area}">Continue</button></td></tr>`; })
+        : html`<tr><td colspan="7">${emptyState({ icon: "folder", title: "Nothing in progress", body: "Start a renewal from the Upcoming Renewals tab to see it here." })}</td></tr>`}</tbody></table></div>
+      <div class="pager"><span>${plural(shown.length, "renewal")}</span></div>`.s;
+    box.querySelectorAll("tr[data-go]").forEach((tr) => {
+      const open = () => go(`#/renewal-business/${tr.dataset.go}`);
+      tr.onclick = (e) => { if (e.target.closest("a")) return; open(); };
+      tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+    });
+    box.querySelectorAll("button[data-go]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); go(`#/renewal-business/${b.dataset.go}`); });
+  };
+  drawRows();
+
+  const hlist = panel.querySelector("#hlist");
+  if (hlist) {
+    hlist.innerHTML = html`<div class="tbl-wrap"><table class="tbl rowlink cardify">
+      <caption class="sr-only">Completed and not-renewed renewals</caption>
+      <thead><tr><th scope="col">Account</th><th scope="col">Renewal period</th><th scope="col">Outcome</th><th scope="col"><span class="sr-only">Open</span></th></tr></thead>
+      <tbody>${history.map((r) => { const ns = nextStep(r.rn); const ps = progressStatus(r.rn); return html`<tr data-go="${r.rn.id}/${ns.area}" tabindex="0" role="link" aria-label="Open ${r.a.name}">
+        <td data-label="Account"><span class="co"><a href="#/renewal-business/${r.rn.id}/${ns.area}">${r.a.name}</a></span><span class="sub">${r.a.code}</span></td>
+        <td data-label="Renewal period">${fmtDate(r.rn.renewal.from)} – ${fmtDate(r.rn.renewal.to)}</td>
+        <td data-label="Outcome">${pill(ps.label, ps.tone)}</td>
+        <td class="num" style="white-space:nowrap"><span class="btn sm">Open</span></td></tr>`; })}</tbody></table></div>`.s;
+    hlist.querySelectorAll("tr[data-go]").forEach((tr) => {
+      const open = () => go(`#/renewal-business/${tr.dataset.go}`);
+      tr.onclick = (e) => { if (e.target.closest("a")) return; open(); };
+      tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+    });
+  }
+
+  const rq = panel.querySelector("#rq");
+  let t; rq.oninput = () => { clearTimeout(t); t = setTimeout(() => { st.q = rq.value; save(); drawRows(); }, 180); };
+  panel.querySelector("#fp").onchange = (e) => { st.pstatus = e.target.value; save(); drawRows(); };
+  panel.querySelector("#rclear")?.addEventListener("click", () => { st.q = ""; st.pstatus = ""; save(); drawProgress(panel, st, save, progress, history); });
 }
+
 function monthOpts(sel) {
   const names = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
   const lbl = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const present = [...new Set(ACCOUNTS.map((a) => a.expiry.slice(5, 7)))].sort();
   return present.map((m) => html`<option value="${m}" ${sel === m ? "selected" : ""}>${lbl[names.indexOf(m)]}</option>`);
 }
-function expiryHint(expiry) {
+function timeUntil(expiry) {
   const days = Math.round((new Date(expiry + "T00:00:00") - new Date(new Date().toDateString())) / 86400000);
-  if (days < 0) return `expired ${-days}d ago`;
-  if (days === 0) return "expires today";
-  if (days <= 90) return `in ${days} days`;
-  return "";
+  if (days < 0) return `Expired ${-days} days ago`;
+  if (days === 0) return "Expires today";
+  if (days < 45) return `${days} days`;
+  const months = Math.round(days / 30);
+  return `about ${months} month${months === 1 ? "" : "s"}`;
 }
-// Start (or open) a working renewal seeded from the account, then navigate into it.
-function openAccount(code, fromSample) {
+
+// Start renewal — short confirmation showing the account and proposed renewal period,
+// then seed ONE sample case (reusing the account's contacts, affiliates, intermediary,
+// SOB and plan codes) and open the first work area. No new corporate account is created.
+// If a case is already underway for this account, offer to continue it instead.
+async function startRenewalFlow(code) {
   const acct = acctByCode(code);
   if (!acct) return;
   const id = renewalIdFor(code);
-  let rn = getCase(id);
-  if (!rn) { rn = seedRenewal(acct); putCase(rn); if (fromSample) toast("Sample renewal ready — walk it from Review Data & Rates.", "ok"); }
+  const rp = renewalPeriod(acct.expiry);
+  const existing = getCase(id);
+  if (existing && !existing.completed && !existing.notRenewed) {
+    const cont = await confirmDialog("Renewal already in progress",
+      `A renewal for ${acct.name} covering ${fmtDate(rp.from)} – ${fmtDate(rp.to)} has already been started. Continue that one instead of starting a new case?`,
+      { confirm: "Continue renewal" });
+    if (cont) go(`#/renewal-business/${id}/${nextStep(existing).area}`);
+    return;
+  }
+  const ok = await confirmDialog("Start this renewal?",
+    `Start a sample renewal for ${acct.name} (${acct.code}). Proposed renewal period ${fmtDate(rp.from)} – ${fmtDate(rp.to)}. Existing contacts, affiliates, intermediary, Schedule of Benefits and plan codes are carried forward — no new account is created.`,
+    { confirm: "Start renewal" });
+  if (!ok) return;
+  const rn = seedRenewal(acct);
+  putCase(rn);
+  toast("Renewal started — opening Review Data & Rates.", "ok");
   go(`#/renewal-business/${id}/review`);
 }
 
@@ -453,7 +576,7 @@ function renderDetail(main, id, areaKey) {
   };
 
   main.innerHTML = html`
-    <nav class="tiny mb" aria-label="Breadcrumb"><a href="#/renewal-business">Renewal Business</a> › ${rn.name}</nav>
+    <nav class="tiny mb" aria-label="Breadcrumb"><a href="#/renewal-business?tab=progress">${icon("collapse", 12)} Back to renewals</a> › ${rn.name}</nav>
     <div class="rec-head">
       <div class="rec-title"><h1>${rn.name} ${pill(info.label, info.tone)}</h1>
         <div class="refs"><span>Account <b>${rn.code}</b></span><span>Expiry <b>${fmtDate(rn.currentContract.to)}</b></span><span>Renewal <b>${fmtDate(rn.renewal.from)} – ${fmtDate(rn.renewal.to)}</b></span><span>Owner <b>${rn.owner}</b> (${rn.ownerRole})</span></div></div>
