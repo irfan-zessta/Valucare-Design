@@ -374,7 +374,9 @@ function renderList(main, query) {
     // without forcing a full re-route (only the query changes, not the path).
     // NB: a local `history` array (completed/not-renewed cases) shadows window.history
     // here, so reach for the global explicitly — otherwise this throws and the tab never switches.
-    window.history.replaceState(null, "", "#/renewal-business" + (st.tab === "progress" ? "?tab=progress" : ""));
+    // replaceState can also throw in the sandboxed preview; swallow it so the redraw below
+    // always runs and the tab still switches even when the URL can't be updated.
+    try { window.history.replaceState(null, "", "#/renewal-business" + (st.tab === "progress" ? "?tab=progress" : "")); } catch (e) {}
     main.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x.dataset.tab === st.tab));
     draw();
   });

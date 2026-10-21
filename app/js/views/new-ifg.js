@@ -456,7 +456,9 @@ function renderList(main, query) {
     st.tab = b.dataset.tab; save();
     // Keep the URL in step without forcing a full re-route (only the query changes).
     // `history` is the window global here — no local shadowing in this module.
-    window.history.replaceState(null, "", "#/new-ifg" + (st.tab === "progress" ? "?tab=progress" : ""));
+    // replaceState can throw in the sandboxed preview; swallow it so the tab still
+    // switches (the redraw below must run regardless of whether the URL updated).
+    try { window.history.replaceState(null, "", "#/new-ifg" + (st.tab === "progress" ? "?tab=progress" : "")); } catch (e) {}
     main.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x.dataset.tab === st.tab));
     draw();
   });
