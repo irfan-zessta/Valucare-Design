@@ -445,6 +445,7 @@ abbr[title]{text-decoration:underline dotted;text-underline-offset:2px;cursor:he
 .doclist{list-style:none;margin:0;padding:0}
 .doclist li{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .doclist li:last-child{border-bottom:0}
+.doclist .sub{display:block;width:100%;font-size:12px;color:var(--text-subtle);margin-top:2px}
 .doclist.plain li{border-bottom:0;padding:5px 0}
 .slot{border:1px dashed var(--border-strong);border-radius:var(--r-sm);padding:10px 12px;background:var(--surface-muted)}
 .slot+.slot{margin-top:8px}
@@ -683,3 +684,36 @@ dl.kv.cols .wide{grid-column:1/-1}
 /* Smaller screens: a compact bottom panel that never spans tall enough to block page
    controls; still fully collapsible to the pill. */
 @media (max-width:720px){.guide-panel{left:8px;right:8px;bottom:8px;width:auto;max-height:46vh;overflow:auto}}
+
+/* ---------------------------------------------------------------- Renewal Business
+   Scoped helpers for the Corporate Renewal prototype (app/js/views/renewal.js). All
+   colour comes from existing tokens so the module follows the active skin. */
+.rnw-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.rnw-card{border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-muted);padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.rnw-card-l{font-size:12px;color:var(--text-muted)}
+.rnw-card-v{font-size:18px;font-weight:600;color:var(--text)}
+/* Horizontal utilization bars */
+.rnw-util{display:flex;flex-direction:column;gap:8px}
+.rnw-util-row{display:grid;grid-template-columns:72px 1fr 40px;gap:8px;align-items:center;font-size:12px;color:var(--text-muted)}
+.rnw-bar{height:8px;border-radius:999px;background:var(--surface-muted);overflow:hidden}
+.rnw-bar-fill{display:block;height:100%;background:var(--accent);border-radius:999px}
+/* Mini monthly bar chart */
+.rnw-chart{display:flex;align-items:flex-end;gap:4px;height:72px;margin-top:6px;padding:6px 2px;border-bottom:1px solid var(--border)}
+.rnw-chart-bar{flex:1;min-width:4px;background:var(--accent);border-radius:3px 3px 0 0;opacity:.85}
+/* KYC steps */
+.rnw-kyc{display:flex;gap:6px;flex-wrap:wrap}
+.rnw-kyc-step{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:12px;border:1px solid var(--border);color:var(--text-muted);background:var(--surface)}
+.rnw-kyc-step.on{border-color:var(--success);color:var(--success)}
+/* Contract progress list */
+.rnw-progress{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.rnw-progress li{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;font-size:12.5px;border:1px solid var(--border);color:var(--text-muted);background:var(--surface)}
+.rnw-progress li.cur{border-color:var(--accent);color:var(--text);font-weight:600}
+.rnw-progress li.done{border-color:var(--success);color:var(--success)}
+.rnw-progress-dot{display:grid;place-items:center;width:18px;height:18px;border-radius:999px;background:var(--surface-muted);font-size:11px;font-weight:600}
+.rnw-progress li.done .rnw-progress-dot{background:var(--success);color:var(--on-accent)}
+.rnw-progress li.cur .rnw-progress-dot{background:var(--accent);color:var(--on-accent)}
+/* Sample-document preview */
+.rnw-doc{border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden}
+.rnw-doc-ribbon{background:var(--surface-muted);color:var(--text-muted);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:6px 12px;border-bottom:1px solid var(--border)}
+.rnw-doc h3{margin:12px 14px 0;font-size:15px}
+.rnw-doc-body{margin:8px 14px 14px;font-size:13px;line-height:1.6;white-space:pre-wrap;color:var(--text-muted);font-family:inherit}

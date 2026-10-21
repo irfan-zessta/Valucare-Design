@@ -206,7 +206,7 @@ window.addEventListener("hms:changed", refreshCounts);
 const VIEWS = {
   home: () => import("./views/home.js"),
   "new-business": () => import("./views/queue.js"),
-  "renewal-business": () => import("./views/section.js"),
+  "renewal-business": () => import("./views/renewal.js"),
   "new-ifg": () => import("./views/section.js"),
   "renewal-ifg": () => import("./views/section.js"),
   create: () => import("./views/create.js"),
