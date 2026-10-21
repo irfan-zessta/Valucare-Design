@@ -372,7 +372,9 @@ function renderList(main, query) {
     st.tab = b.dataset.tab; save();
     // Keep the URL in step so a refresh (and a shared link) lands on the same tab,
     // without forcing a full re-route (only the query changes, not the path).
-    history.replaceState(null, "", "#/renewal-business" + (st.tab === "progress" ? "?tab=progress" : ""));
+    // NB: a local `history` array (completed/not-renewed cases) shadows window.history
+    // here, so reach for the global explicitly — otherwise this throws and the tab never switches.
+    window.history.replaceState(null, "", "#/renewal-business" + (st.tab === "progress" ? "?tab=progress" : ""));
     main.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x.dataset.tab === st.tab));
     draw();
   });
