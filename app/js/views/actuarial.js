@@ -421,7 +421,7 @@ function areaPricing(box, ctx) {
 
     <section class="panel"><div class="ph"><h2>Input summary</h2><span class="tiny">Sources used for this quotation</span></div>
       <div class="pb"><dl class="kv cols">
-        <div><dt>Member Data (quotation)</dt><dd>${mb ? html`${pill(mb.status)} <span class="tiny">v${mb.version ?? 1}</span>` : html`<span class="empty">Not uploaded — Skipped for demo.</span>`}</dd></div>
+        <div><dt>Member Data (quotation)</dt><dd>${mb ? html`${pill(mb.status)} <span class="tiny">v${mb.version ?? 1}</span>` : html`<span class="empty">Skipped for demo — not verified.</span>`}</dd></div>
         <div><dt>Request version</dt><dd>${rr.code} · v${rr.v}</dd></div>
         ${covRow("Requested plans", rr.requestedPlans)}
         ${covRow("Room and board", rr.roomBoard)}
@@ -512,7 +512,7 @@ async function sampleRateFile(withErrors) {
 // Mirror of quotation.js issueSheet, scoped to this journey (reuses rateSheet.issue).
 async function issueSheet(ctx, rr, imp) {
   if (imp.errorCount && !DEMO_BYPASS) { toast("Correct the rate sheet errors and import again.", "err"); return; }
-  const r = await dialog({ title: "Import rate sheet", wide: true, body: html`<p>${imp.valid} rate rows from ${imp.filename}. Record the pricing assumptions used (NB-QTE-06).${imp.errorCount ? html` <span class="tiny">${imp.errorCount} row(s) with errors will be dropped.</span>` : ""}</p>
+  const r = await dialog({ title: "Import rate sheet", wide: true, body: html`<p>${imp.valid} rate rows from ${imp.filename}. Record the pricing assumptions used.${imp.errorCount ? html` <span class="tiny">${imp.errorCount} row(s) with errors will be dropped.</span>` : ""}</p>
     <div class="fgrid mt">${ASSUMPTIONS.map(([k, l, u, h, req]) => html`<div class="field"><label for="as-${k}">${l} (${u})${req ? " *" : ""}</label><input id="as-${k}" class="inp" name="${k}" inputmode="decimal" value="${req ? (k === "ibnr" ? 20 : "") : 0}"><div class="help">${h}</div></div>`)}</div>
     <div class="field mt"><label for="pdf">Rate sheet PDF (optional)</label><input id="pdf" type="file" name="pdf" accept=".pdf"></div>
     <div class="field mt"><label for="nt">Notes</label><textarea id="nt" name="notes" class="inp"></textarea></div>`,
@@ -625,8 +625,8 @@ function areaRelease(box, ctx) {
       <h3 class="h mt">Outputs</h3>
       <ul class="doclist plain">
         <li>${latest.sourceDocId ? html`<a href="${docUrl(latest.sourceDocId)}">${icon("file", 14)} Rate sheet (imported file)</a>` : html`<span class="tiny empty">Rate sheet file: not attached</span>`} <span class="tiny">· ${(latest.rows || []).length} rate rows</span></li>
-        <li>${latest.pdfDocId ? html`<a href="${docUrl(latest.pdfDocId)}">${icon("file", 14)} Rate sheet PDF</a>` : html`<span class="tiny empty">Rate sheet PDF: not attached — Skipped for demo.</span>`}</li>
-        <li>${marked ? html`<a href="${docUrl(marked.id)}">${icon("file", 14)} Marked SOB (quotation)</a>` : html`<span class="tiny empty">Marked SOB: not attached — Skipped for demo.</span>`}</li>
+        <li>${latest.pdfDocId ? html`<a href="${docUrl(latest.pdfDocId)}">${icon("file", 14)} Rate sheet PDF</a>` : html`<span class="tiny empty">Rate sheet PDF: Skipped for demo — not verified.</span>`}</li>
+        <li>${marked ? html`<a href="${docUrl(marked.id)}">${icon("file", 14)} Marked SOB (quotation)</a>` : html`<span class="tiny empty">Marked SOB: Skipped for demo — not verified.</span>`}</li>
       </ul>
       <h3 class="h mt">Pricing assumptions</h3>${assumptionsView(latest.assumptions)}
       ${log.length ? html`<h3 class="h mt">Approval history</h3><ul class="timeline">${log.map((e) => html`<li><span class="when">${fmtDateTime(e.at)}</span><div><b>Level ${e.level} — ${e.decision === "approve" ? "approved" : "returned"} by ${e.byName}</b>${e.comments ? html` · ${e.comments}` : ""} <span class="tiny">reviewed v${e.reviewedVersion}</span></div></li>`)}</ul>` : ""}

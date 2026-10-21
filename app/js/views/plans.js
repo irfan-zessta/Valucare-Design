@@ -9,7 +9,7 @@ export async function render(ctx) {
   const accs = (data.records.account || []);
   const parent = accs.find((a) => !a.parentId);
   if (!parent || !["Approved", "Scheduled", "Active"].includes(parent.status)) {
-    body.innerHTML = html`<div class="note">Plan Codes are created by AMT after the account is approved (BR-12). The account is currently <b>${parent?.status || "not created"}</b>. <a href="#/case/${id}/setup/account">${parent ? "Go to Account details" : "Create the account"}</a> first, then come back to generate Plan Codes from the approved SOB.</div>`.s;
+    body.innerHTML = html`<div class="note">Plan Codes are created by AMT after the account is approved. The account is currently <b>${parent?.status || "not created"}</b>. <a href="#/case/${id}/setup/account">${parent ? "Go to Account details" : "Create the account"}</a> first, then come back to generate Plan Codes from the approved SOB.</div>`.s;
     return;
   }
   const isAS = actsAs("amt") && data.case.status === "Open";
@@ -18,8 +18,7 @@ export async function render(ctx) {
   let selected = new Set();
   let current = { items: [], total: 0, counts: {} };
   body.innerHTML = html`${ownerBanner(["amt"], "Plan Codes")}
-    <section class="panel"><div class="ph"><div><h2>Plan Codes</h2><div class="tiny">AMT is the maker; a different AMT user is the checker. Approved versions are kept for date-of-service adjudication.
-      Payment-mode decoupling: <b>${state.meta.config.decouplePaymentMode ? "on" : "off"}</b> <span class="tag pending">configurable (OQ-05)</span> · VAT model: <b>${state.meta.config.vatModel}</b> <span class="tag pending">no formula applied</span></div></div>
+    <section class="panel"><div class="ph"><div><h2>Plan Codes</h2><div class="tiny">AMT is the maker; a different AMT user is the checker. Approved versions are kept for date-of-service adjudication.</div></div>
       ${isAS ? html`<div class="row"><button class="btn primary" id="gen">Generate from approved SOB</button><button class="btn" id="add">${icon("plus", 14)} Add one manually</button>
         <button class="btn" id="imp">${icon("upload", 14)} Bulk import</button><a class="btn" href="/api/templates/plan-codes.csv" download>Template</a>${DEMO_BYPASS ? html`<button class="btn ghost" id="impSample" title="Import a few generated demo plan codes">Add sample plan codes</button>` : ""}</div>` : ""}</div>
     <div class="views" role="tablist" aria-label="Status" id="stTabs"></div>
@@ -109,7 +108,7 @@ export async function render(ctx) {
           if (f.key === "accountId" && rec?.id) v = `${rec.accountCode} · ${rec.accountName}`;
           return field(def, v, { name: f.key, editable: editable && f.type !== "readonly" });
         })}</div></fieldset>`)}</div>
-        ${state.meta.config.vatModel === "manual" ? html`<p class="tiny">Before VAT, VAT Inclusive and VAT amount are entered as provided - their exact HMS3 calculation is not yet verified, so no formula is applied.</p>` : ""}`,
+        ${state.meta.config.vatModel === "manual" ? html`<p class="tiny">Before VAT, VAT Inclusive and VAT amount are entered as provided - no formula is applied.</p>` : ""}`,
       actions: editable ? [{ label: "Cancel" }, { label: rec?.id ? "Save changes" : "Create draft", kind: "primary", value: "ok" }] : [{ label: "Close" }],
       onOpen: (dlg) => { mountCombos(dlg); mountProviders(dlg); } });
     if (r?.action !== "ok") return null;

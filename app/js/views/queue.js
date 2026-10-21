@@ -1,222 +1,242 @@
-import { html, api, state, prefs, fmtDate, daysUntil, go, actsAs, isAdmin, DEMO_BYPASS } from "../core.js";
+import { html, api, state, act, prefs, fmtDate, daysUntil, go, actsAs, toast, dialog, confirmDialog, DEMO_BYPASS } from "../core.js";
 import { icon, statusPill, caseStatus, ownerCell, primaryTask, relDue, flags, area, AREA_TOTAL, cleanLabel, emptyState, plural } from "../components.js";
 import { openGuideMenu, guideActive } from "../guide.js";
 
-// Bumped from "queue:nb": the redesigned table uses new column keys (step, handler)
-// so any pref saved by the old table would hide the Step column and stale filters.
-const KEY = "queue:nb2";
-// Curated columns. The first four tell the whole story at a glance; the rest are
-// opt-in through the View menu for power users who want more context.
-const COLS = [
-  { key: "company", label: "Company", always: true, sort: (c) => c.company.toLowerCase() },
-  { key: "step", label: "Step", sort: (c) => c.stage },
-  { key: "status", label: "Status", sort: (c) => caseStatus(c).label },
-  { key: "next", label: "Next action", sort: (c) => cleanLabel(primaryTask(c)?.title || "") },
-  { key: "owner", label: "Owner", sort: (c) => cleanLabel(primaryTask(c)?.assigneeName || primaryTask(c)?.roleLabel || "") },
-  { key: "due", label: "Due", sort: (c) => primaryTask(c)?.due || c.nextDue || "9999" },
-  { key: "effectivity", label: "Effectivity", sort: (c) => c.effectivity || "9999", def: false },
-  { key: "handler", label: "Handler", sort: (c) => c.ownerName || "", def: false },
-];
-const VIEWS = [
-  { key: "mine", label: "My cases" },
-  { key: "action", label: "Needs action" },
-  { key: "waiting", label: "Waiting" },
-  { key: "all", label: "All" },
-];
+// Corporate New Business dashboard — one clear entry point into the journey.
+//
+// Two tabs tell the whole story: Prospects (a lead whose franchise is still being
+// created) and In Progress (a case that has moved past the franchise into quotation,
+// offer, setup or activation). Finished work — handed-over accounts, closed-lost leads,
+// leads routed to IFG — drops out of the active lists and lives in a lightweight history
+// section, never deleted. This mirrors the Corporate Renewal and IFG demos so the three
+// Sales journeys feel the same, while the data here stays the real backend-driven case.
+const KEY = "queue:nb3";
 
-function load() {
-  return prefs.get(KEY, { view: "mine", q: "", filters: {}, sort: { key: "due", dir: "asc" },
-    density: "comfortable", cols: COLS.filter((c) => c.def !== false).map((c) => c.key), scrollY: 0 });
-}
+// 5 work areas. A bare #/case/{id} resolves to the live work area, so "Continue" always
+// opens the correct unfinished section without us having to compute a sub-route.
+const AREA_LABELS = ["Create Franchise", "Prepare Quotation", "Finalize Offer", "Set Up Account", "Activate & Handover"];
+
+// How a case is bucketed, using only honest server-derived fields.
+const isDone = (c) => c.activationStatus === "Handover Complete";
+const isClosed = (c) => c.closed || c.caseStatus === "Closed Lost" || c.caseStatus === "Routed to IFG";
+const isHistory = (c) => isDone(c) || isClosed(c);
+const isProspect = (c) => !isHistory(c) && area(c.stage).n === 1;
+const isInProgress = (c) => !isHistory(c) && area(c.stage).n >= 2;
+
+function load() { return prefs.get(KEY, { tab: "prospects", q: "", histOpen: false }); }
 const save = (s) => prefs.set(KEY, s);
 
 export async function render(main, { query }) {
-  document.title = "Cases · HMS3";
+  document.title = "Corporate New Business · HMS3";
   const st = load();
   if (query.q !== undefined) st.q = query.q;
-  st.view = "all"; // one unified list; the My cases / Needs action / Waiting tabs were removed
+  if (query.tab === "prospects" || query.tab === "progress") st.tab = query.tab;
+  if (st.tab !== "prospects" && st.tab !== "progress") st.tab = "prospects";
   save(st);
-  main.innerHTML = html`<div class="page-head"><div><h1>Cases</h1><p>Every Corporate New Business case you can see, from lead to handover.</p></div>
-    <div class="ph-actions">${DEMO_BYPASS ? html`<button class="btn" id="guideBtn" title="New here? Walk the whole journey with step-by-step guidance">${icon("help")} Guide me${guideActive() ? html` <span class="pill info plain">On</span>` : ""}</button>` : ""}${actsAs("aat") ? html`<a class="btn primary" href="#/new-business/create">${icon("plus")} New Business</a>` : ""}</div></div>
+
+  main.innerHTML = html`<div class="page-head"><div><h1>Corporate New Business</h1><p>Start a prospect and follow it through to account activation.</p></div>
+    <div class="ph-actions">
+      ${DEMO_BYPASS ? html`<button class="btn" id="sampleBtn" title="Create a ready-made sample case (Harborlight Services Corporation) and walk the whole journey">${icon("plus")} Start sample New Business</button>` : ""}
+      ${DEMO_BYPASS ? html`<button class="btn" id="guideBtn" title="New here? Walk the whole journey with step-by-step guidance">${icon("help")} Guide me${guideActive() ? html` <span class="pill info plain">On</span>` : ""}</button>` : ""}
+      ${actsAs("aat") ? html`<a class="btn primary" href="#/new-business/create">${icon("plus")} New Business</a>` : ""}
+    </div></div>
     <div class="panel" id="q"><div class="state-box" aria-busy="true"><div class="skeleton"></div><div class="skeleton mt"></div><div class="skeleton mt"></div><p class="tiny mt">Loading cases…</p></div></div>`.s;
+
   main.querySelector("#guideBtn")?.addEventListener("click", () => openGuideMenu());
+  main.querySelector("#sampleBtn")?.addEventListener("click", (e) => startSample(e.currentTarget));
+
   const box = main.querySelector("#q");
-  let items, recent;
+  let items;
   try {
-    [items, recent] = await Promise.all([api("cases").then((r) => r.items), api("recent").then((r) => r.items)]);
+    items = (await api("cases")).items || [];
   } catch (e) {
     box.innerHTML = html`<div class="state-box" role="alert"><b>Cases could not load.</b><p class="mt">${e.message}</p><button class="btn mt" id="retry">Retry</button></div>`.s;
     box.querySelector("#retry").onclick = () => render(main, { query: {} });
     return;
   }
-  const involved = new Set(recent.map((r) => r.caseId));
+
+  // "Start sample New Business" — create the consistent Harborlight sample case and open
+  // its first work area. If a Harborlight case already exists it is continued, never
+  // duplicated, and no existing record is touched.
+  async function startSample(btn) {
+    const existing = items.find((c) => /harborlight/i.test(c.company || ""));
+    if (existing) {
+      const cont = await confirmDialog("Sample case already started",
+        `A sample case for ${existing.company} (${existing.id}) is already open. Continue that one instead of creating another?`,
+        { confirm: "Continue sample case" });
+      if (cont) go(`#/case/${existing.id}`);
+      return;
+    }
+    const ok = await confirmDialog("Start sample New Business?",
+      "Creates a ready-made sample prospect — Harborlight Services Corporation (100 Sample Avenue, Makati City; Direct business). Fictional demo content; sample commercial terms, not an official quotation. Nothing existing is changed.",
+      { confirm: "Start sample" });
+    if (!ok) return;
+    // Visual preview has no backend to persist a new case, so open an existing early-stage
+    // sample instead of dead-ending. The message stays honest: nothing was saved.
+    if (window.__HMS3_PREVIEW__) {
+      const sample = items.find((c) => isProspect(c)) || items.find((c) => !isHistory(c)) || items[0];
+      toast("Visual preview: new cases are not saved. Opening a sample case so you can continue.");
+      if (sample) go(`#/case/${sample.id}`);
+      return;
+    }
+    btn?.setAttribute("aria-busy", "true");
+    const r = await act("case.create", harborlightPayload(), { button: btn, success: "Sample New Business created." });
+    btn?.removeAttribute("aria-busy");
+    if (!r) return;
+    window.dispatchEvent(new Event("hms:changed"));
+    go(`#/case/${r.caseId}/franchise/franchise`);
+  }
+
   draw();
 
-  // Which view a case belongs to. Closed cases live only in All (or when the
-  // Closed filter explicitly includes them).
-  function viewMatch(c, view) {
-    const me = state.me;
-    const f = st.filters || {};
-    const includeClosed = f.closed === "include" || view === "all";
-    if (c.closed && !includeClosed) return false;
-    if (f.closed === "exclude" && c.closed) return false;
-    const mine = c.myTasks || [];
-    if (view === "mine") return c.ownerId === me.id || c.salesManagerId === me.id || involved.has(c.id) || mine.length > 0;
-    if (view === "action") return mine.length > 0;
-    if (view === "waiting") return !c.closed && !mine.length && c.next && (isAdmin() || (actsAs("aat") ? (c.ownerId === me.id || c.salesManagerId === me.id) : involved.has(c.id)));
-    return true;
-  }
-  // Search + filters, applied the same way to the rows and to every tab count, so
-  // the number on the active tab always equals the number of rows shown.
   function matches(c) {
-    const f = st.filters || {};
     const q = (st.q || "").toLowerCase().trim();
-    if (q && ![c.company, c.tradeName, c.id, c.leadRef].some((x) => (x || "").toLowerCase().includes(q))) return false;
-    if (f.status && caseStatus(c).label !== f.status) return false;
-    if (f.area && area(c.stage).n !== +f.area) return false;
-    if (f.handler && c.ownerId !== f.handler) return false;
-    if (f.vip && !c.vip) return false;
-    if (f.overdue && !(c.nextDue && daysUntil(c.nextDue) < 0)) return false;
-    return true;
+    if (!q) return true;
+    return [c.company, c.tradeName, c.id, c.leadRef].some((x) => (x || "").toLowerCase().includes(q));
   }
-  function countFor(view) { return items.filter((c) => matches(c) && viewMatch(c, view)).length; }
 
   function draw() {
-    const all = items.filter((c) => matches(c) && viewMatch(c, st.view));
-    const col = COLS.find((c) => c.key === st.sort.key) || COLS[5];
-    all.sort((a, b) => { const x = col.sort(a), y = col.sort(b); return (x > y ? 1 : x < y ? -1 : 0) * (st.sort.dir === "asc" ? 1 : -1); });
-    const nf = Object.values(st.filters || {}).filter(Boolean).length;
-    const vis = COLS.filter((c) => c.always || st.cols.includes(c.key));
+    const prospects = items.filter((c) => isProspect(c) && matches(c));
+    const progress = items.filter((c) => isInProgress(c) && matches(c));
+    const history = items.filter((c) => isHistory(c) && matches(c));
+
     box.innerHTML = html`
-      <div class="toolbar">
-        <div class="search">${icon("search", 16)}<label class="sr-only" for="qq">Filter by company or case ID</label>
-          <input id="qq" type="search" value="${st.q}" placeholder="Filter by company or case ID"></div>
-        <button class="btn" id="fbtn" aria-expanded="false" aria-haspopup="dialog">${icon("filter", 16)} Filters${nf ? html` <span class="pill info plain">${nf}</span>` : ""}</button>
-        <button class="btn" id="vbtn" aria-expanded="false" aria-haspopup="dialog">${icon("cols", 16)} View</button>
-        ${nf || st.q ? html`<button class="btn ghost sm" id="clear">Clear</button>` : ""}
+      ${pipelineSummary(items)}
+      <div class="seg mb" role="tablist" aria-label="Corporate New Business views">
+        <button type="button" role="tab" data-tab="prospects" aria-selected="${st.tab === "prospects"}">Prospects <span class="cnt">${items.filter((c) => isProspect(c)).length}</span></button>
+        <button type="button" role="tab" data-tab="progress" aria-selected="${st.tab === "progress"}">In Progress <span class="cnt">${items.filter((c) => isInProgress(c)).length}</span></button>
       </div>
-      <div class="tbl-wrap"><table class="tbl rowlink cardify ${st.density === "compact" ? "compact" : ""}">
-        <caption class="sr-only">Cases, ${VIEWS.find((v) => v.key === st.view).label}</caption>
-        <thead><tr>${vis.map((c) => html`<th scope="col" aria-sort="${st.sort.key === c.key ? (st.sort.dir === "asc" ? "ascending" : "descending") : "none"}"><button class="sort" data-sort="${c.key}">${c.label}${st.sort.key === c.key ? (st.sort.dir === "asc" ? " ↑" : " ↓") : ""}</button></th>`)}</tr></thead>
-        <tbody>${all.length ? all.map((c) => html`<tr data-id="${c.id}" tabindex="0" role="link" aria-label="Open ${c.company}">${vis.map((col) => html`<td class="${col.key === "company" ? "co" : ""}" data-label="${col.label}">${cell(col.key, c)}</td>`)}</tr>`)
-          : html`<tr><td colspan="${vis.length}">${emptyFor()}</td></tr>`}</tbody></table></div>
-      ${all.length ? html`<div class="pager"><span>${plural(all.length, "case")}</span></div>` : ""}`.s;
+      <div class="panel">
+        <div class="toolbar">
+          <div class="search">${icon("search", 16)}<label class="sr-only" for="qq">Filter by company or case ID</label>
+            <input id="qq" type="search" value="${st.q}" placeholder="Filter by company or case ID"></div>
+          ${st.q ? html`<button class="btn ghost sm" id="clear">Clear</button>` : ""}
+          <span class="grow"></span>
+          <button class="btn ghost sm" id="exportBtn" title="Preview the pipeline as it would export">${icon("file", 16)} Export preview</button>
+        </div>
+        <div id="list">${st.tab === "progress" ? progressTable(progress) : prospectsTable(prospects)}</div>
+      </div>
+      ${history.length ? html`<details class="mt" ${st.histOpen ? "open" : ""} id="hist"><summary>Completed, closed and routed to IFG (${history.length})</summary><div class="mt">${historyTable(history)}</div></details>` : ""}`.s;
+
     save(st);
-    wire();
-    requestAnimationFrame(() => { if (st.scrollY) window.scrollTo(0, st.scrollY); });
+    wire(items);
   }
-  function emptyFor() {
-    if (st.q || Object.values(st.filters || {}).filter(Boolean).length)
-      return emptyState({ icon: "search", title: "No cases match", body: "Try clearing the search or filters." });
-    const byView = {
-      mine: { title: "No cases yet", body: "Cases you own or take part in will show here." },
-      action: { title: "Nothing needs you", body: "You are all caught up." },
-      waiting: { title: "Nothing waiting", body: "No cases are waiting on someone else right now." },
-      all: { title: "No cases", body: "No cases in this workspace yet." },
-    }[st.view];
-    return emptyState({ title: byView.title, body: byView.body });
-  }
-  function cell(k, c) {
-    switch (k) {
-      case "company": return html`<span class="co"><a href="#/case/${c.id}">${c.company}</a></span> ${flags(c)}<span class="sub">${c.id}</span>`;
-      case "step": { const a = area(c.stage); return html`${a.label}<span class="sub">${a.n}/${AREA_TOTAL}</span>`; }
-      case "status": return statusPill(c);
-      case "next": { const t = primaryTask(c); return t ? html`<span class="truncate" title="${cleanLabel(t.title)}" style="max-width:260px;display:inline-block">${cleanLabel(t.title)}</span>` : html`<span class="tiny">No open work</span>`; }
-      case "owner": return ownerCell(c);
-      case "due": { const t = primaryTask(c); return t ? relDue(t.due || c.nextDue) : html`<span class="tiny">—</span>`; }
-      case "effectivity": return c.effectivity ? fmtDate(c.effectivity) : html`<span class="tiny">—</span>`;
-      case "handler": return c.ownerName || html`<span class="tiny">—</span>`;
-    }
-    return "";
-  }
-  function wire() {
-    box.querySelectorAll("[data-view]").forEach((b) => (b.onclick = () => { st.view = b.dataset.view; st.scrollY = 0; draw(); box.querySelector(`[data-view="${st.view}"]`)?.focus(); }));
-    box.querySelectorAll("[data-sort]").forEach((b) => (b.onclick = (e) => {
-      e.stopPropagation();
-      st.sort = { key: b.dataset.sort, dir: st.sort.key === b.dataset.sort && st.sort.dir === "asc" ? "desc" : "asc" }; draw(); box.querySelector(`[data-sort="${st.sort.key}"]`)?.focus();
-    }));
-    const open = (c) => { st.scrollY = window.scrollY; save(st); go(`#/case/${c}`); };
-    box.querySelectorAll("tr[data-id]").forEach((tr) => {
-      tr.onclick = (e) => { if (e.target.closest("a")) return; open(tr.dataset.id); };
-      tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(tr.dataset.id); } };
+
+  function wire(all) {
+    box.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => {
+      st.tab = b.dataset.tab; save(st);
+      // Keep the URL in step so a refresh / shared link lands on the same tab. replaceState
+      // can throw in the sandboxed preview; swallow it so the redraw below always runs.
+      try { window.history.replaceState(null, "", "#/new-business" + (st.tab === "progress" ? "?tab=progress" : "")); } catch (e) { /* preview */ }
+      draw();
     });
     const qq = box.querySelector("#qq");
     let t;
-    qq.oninput = () => { clearTimeout(t); t = setTimeout(() => { st.q = qq.value; draw(); const n = box.querySelector("#qq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 200); };
-    box.querySelector("#clear")?.addEventListener("click", () => { st.q = ""; st.filters = {}; draw(); });
-    box.querySelector("#fbtn").onclick = (e) => filtersPopover(e.currentTarget);
-    box.querySelector("#vbtn").onclick = (e) => viewPopover(e.currentTarget);
-  }
-  function popover(anchor, inner, onApply) {
-    document.querySelectorAll(".popover").forEach((p) => p.remove());
-    const p = document.createElement("div");
-    p.className = "popover";
-    p.setAttribute("role", "dialog");
-    p.setAttribute("aria-label", anchor.textContent.trim());
-    p.innerHTML = inner.s;
-    const r = anchor.getBoundingClientRect();
-    p.style.top = `${r.bottom + window.scrollY + 6}px`;
-    p.style.left = `${Math.max(8, Math.min(r.left + window.scrollX, window.innerWidth - 440))}px`;
-    document.body.appendChild(p);
-    anchor.setAttribute("aria-expanded", "true");
-    const close = () => { p.remove(); anchor.setAttribute("aria-expanded", "false"); document.removeEventListener("mousedown", out); anchor.isConnected && anchor.focus(); };
-    const out = (e) => { if (!p.contains(e.target) && e.target !== anchor) close(); };
-    setTimeout(() => document.addEventListener("mousedown", out), 0);
-    p.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
-    p.querySelector("[data-apply]")?.addEventListener("click", () => { onApply(p); close(); });
-    p.querySelector("[data-reset]")?.addEventListener("click", () => { onApply(p, true); close(); });
-    p.querySelector("input,select,button")?.focus();
-  }
-  function filtersPopover(anchor) {
-    const f = st.filters || {};
-    const statuses = [...new Set(items.map((c) => caseStatus(c).label))];
-    const order = ["Draft", "Your turn", "Waiting", "Returned", "Done", "Closed"];
-    statuses.sort((a, b) => order.indexOf(a) - order.indexOf(b));
-    const handlers = state.meta.users.filter((u) => u.role === "aat");
-    popover(anchor, html`<div class="stack sm"><h2 class="h">Filters</h2>
-      <div class="field"><label for="f-s">Status</label><select id="f-s" class="inp" name="status"><option value="">Any</option>${statuses.map((s) => html`<option ${f.status === s ? "selected" : ""}>${s}</option>`)}</select></div>
-      <div class="field"><label for="f-a">Step</label><select id="f-a" class="inp" name="area"><option value="">Any</option>${[1, 2, 3, 4, 5].map((n) => html`<option value="${n}" ${String(f.area) === String(n) ? "selected" : ""}>${n}/${AREA_TOTAL} ${area({ stage: n * 2 - 1 } && [1, 1, 3, 4, 8][n - 1]).label}</option>`)}</select></div>
-      <div class="field"><label for="f-h">Handler</label><select id="f-h" class="inp" name="handler"><option value="">Any</option>${handlers.map((u) => html`<option value="${u.id}" ${f.handler === u.id ? "selected" : ""}>${u.name}</option>`)}</select></div>
-      <label class="check"><input type="checkbox" name="overdue" ${f.overdue ? "checked" : ""}> Overdue only</label>
-      <label class="check"><input type="checkbox" name="vip" ${f.vip ? "checked" : ""}> VIP accounts only</label>
-      <label class="check"><input type="checkbox" name="closed" value="include" ${f.closed === "include" ? "checked" : ""}> Include closed cases</label>
-      <div class="row between mt"><button class="btn ghost" data-reset>Reset</button><button class="btn primary" data-apply>Apply</button></div></div>`,
-    (p, reset) => {
-      if (reset) st.filters = {};
-      else {
-        const nf = {};
-        p.querySelectorAll("[name]").forEach((el) => {
-          if (el.type === "checkbox") nf[el.name] = el.checked ? (el.value || true) : "";
-          else nf[el.name] = el.value;
-        });
-        st.filters = nf;
-      }
-      draw();
+    qq.oninput = () => { clearTimeout(t); t = setTimeout(() => { st.q = qq.value; draw(); const n = box.querySelector("#qq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 180); };
+    box.querySelector("#clear")?.addEventListener("click", () => { st.q = ""; draw(); });
+    box.querySelector("#exportBtn")?.addEventListener("click", () => exportPreview(all));
+    box.querySelector("#hist")?.addEventListener("toggle", (e) => { st.histOpen = e.target.open; save(st); });
+    box.querySelectorAll("tr[data-id]").forEach((tr) => {
+      const open = () => go(`#/case/${tr.dataset.id}`);
+      tr.onclick = (e) => { if (e.target.closest("a") || e.target.closest("button")) return; open(); };
+      tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
     });
+    box.querySelectorAll("button[data-go]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); go(`#/case/${b.dataset.go}`); });
   }
-  function viewPopover(anchor) {
-    popover(anchor, html`<div class="stack sm"><h2 class="h">View</h2>
-      <div class="field"><span class="lbl">Row height</span>
-        <div class="seg" role="group" aria-label="Row height">
-          <button type="button" data-density="comfortable" aria-selected="${st.density === "comfortable"}">Comfortable</button>
-          <button type="button" data-density="compact" aria-selected="${st.density === "compact"}">Compact</button></div></div>
-      <div class="field"><span class="lbl">Extra columns</span>
-        ${COLS.filter((c) => c.def === false).map((c) => html`<label class="check"><input type="checkbox" name="${c.key}" ${st.cols.includes(c.key) ? "checked" : ""}> ${c.label}</label>`)}</div>
-      <div class="row between mt"><button class="btn ghost" data-reset>Reset</button><button class="btn primary" data-apply>Done</button></div></div>`,
-    (p, reset) => {
-      if (reset) { st.cols = COLS.filter((c) => c.def !== false).map((c) => c.key); }
-      else { const extra = [...p.querySelectorAll("input:checked")].map((i) => i.name); st.cols = [...COLS.filter((c) => c.def !== false && c.key !== "company").map((c) => c.key), ...extra]; }
-      draw();
-    });
-    // density buttons act immediately (no Apply needed)
-    document.querySelector(".popover")?.querySelectorAll("[data-density]").forEach((b) => (b.onclick = () => {
-      st.density = b.dataset.density; save(st);
-      b.parentElement.querySelectorAll("[data-density]").forEach((x) => x.setAttribute("aria-selected", x === b ? "true" : "false"));
-    }));
-  }
-  let sy;
-  const onScroll = () => { clearTimeout(sy); sy = setTimeout(() => { if (location.hash.startsWith("#/new-business") && !location.hash.includes("create")) { st.scrollY = window.scrollY; save(st); } }, 150); };
-  window.removeEventListener("scroll", window.__qScroll || (() => {}));
-  window.__qScroll = onScroll;
-  window.addEventListener("scroll", onScroll, { passive: true });
+}
+
+// ---------------------------------------------------------------- tables
+function prospectsTable(rows) {
+  if (!rows.length) return emptyState({ icon: "folder", title: "No prospects", body: "Start a sample New Business, or create one, to see it here. Prospects are cases whose franchise is still being created." });
+  return html`<div class="tbl-wrap"><table class="tbl rowlink cardify">
+    <caption class="sr-only">Prospects — franchise still being created</caption>
+    <thead><tr><th scope="col">Company</th><th scope="col">Business source</th><th scope="col">Estimated size</th><th scope="col">Status</th><th scope="col">Owner</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead>
+    <tbody>${rows.map((c) => html`<tr data-id="${c.id}" tabindex="0" role="link" aria-label="Open ${c.company}">
+      <td class="co" data-label="Company"><span class="co"><a href="#/case/${c.id}">${c.company}</a></span> ${flags(c)}<span class="sub">${c.id}</span></td>
+      <td data-label="Business source">${c.channel || "—"}</td>
+      <td data-label="Estimated size">${c.estHeadcount != null ? plural(c.estHeadcount, "principal") : html`<span class="tiny">—</span>`}</td>
+      <td data-label="Status">${statusPill(c)}</td>
+      <td data-label="Owner">${ownerCell(c)}</td>
+      <td class="num" style="white-space:nowrap"><button class="btn sm primary" data-go="${c.id}">Continue</button></td></tr>`)}</tbody></table></div>
+    <div class="pager"><span>${plural(rows.length, "prospect")}</span></div>`.s;
+}
+
+function progressTable(rows) {
+  if (!rows.length) return emptyState({ icon: "folder", title: "Nothing in progress", body: "Cases move here once the franchise is approved and quotation begins." });
+  return html`<div class="tbl-wrap"><table class="tbl rowlink cardify">
+    <caption class="sr-only">Cases in progress</caption>
+    <thead><tr><th scope="col">Company</th><th scope="col">Work area</th><th scope="col">Status</th><th scope="col">Next action</th><th scope="col">Owner</th><th scope="col">Due</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead>
+    <tbody>${rows.map((c) => { const a = area(c.stage); const t = primaryTask(c); return html`<tr data-id="${c.id}" tabindex="0" role="link" aria-label="Open ${c.company}">
+      <td class="co" data-label="Company"><span class="co"><a href="#/case/${c.id}">${c.company}</a></span> ${flags(c)}<span class="sub">${c.id}</span></td>
+      <td data-label="Work area">${a.label}<span class="sub">${a.n}/${AREA_TOTAL}</span></td>
+      <td data-label="Status">${statusPill(c)}</td>
+      <td data-label="Next action">${t ? html`<span class="truncate" title="${cleanLabel(t.title)}" style="max-width:240px;display:inline-block">${cleanLabel(t.title)}</span>` : html`<span class="tiny">No open work</span>`}</td>
+      <td data-label="Owner">${ownerCell(c)}</td>
+      <td data-label="Due">${t ? relDue(t.due || c.nextDue) : html`<span class="tiny">—</span>`}</td>
+      <td class="num" style="white-space:nowrap"><button class="btn sm primary" data-go="${c.id}">Continue</button></td></tr>`; })}</tbody></table></div>
+    <div class="pager"><span>${plural(rows.length, "case")}</span></div>`.s;
+}
+
+function historyTable(rows) {
+  const outcome = (c) => c.activationStatus === "Handover Complete" ? { label: "Completed", tone: "success" }
+    : c.caseStatus === "Routed to IFG" ? { label: "Routed to IFG", tone: "neutral" }
+    : { label: "Closed lost", tone: "closed" };
+  return html`<div class="tbl-wrap"><table class="tbl rowlink cardify">
+    <caption class="sr-only">Completed, closed and routed cases</caption>
+    <thead><tr><th scope="col">Company</th><th scope="col">Last work area</th><th scope="col">Outcome</th><th scope="col"><span class="sr-only">Open</span></th></tr></thead>
+    <tbody>${rows.map((c) => { const a = area(c.stage); const o = outcome(c); return html`<tr data-id="${c.id}" tabindex="0" role="link" aria-label="Open ${c.company}">
+      <td class="co" data-label="Company"><span class="co"><a href="#/case/${c.id}">${c.company}</a></span><span class="sub">${c.id}</span></td>
+      <td data-label="Last work area">${a.label}</td>
+      <td data-label="Outcome"><span class="pill ${o.tone}">${o.label}</span></td>
+      <td class="num" style="white-space:nowrap"><button class="btn sm" data-go="${c.id}">Open</button></td></tr>`; })}</tbody></table></div>`.s;
+}
+
+// ---------------------------------------------------------------- pipeline summary
+// A compact, one-line read of where the active book of work sits, work area by work area.
+function pipelineSummary(items) {
+  const active = items.filter((c) => !isHistory(c));
+  const counts = AREA_LABELS.map((label, i) => ({ label, n: active.filter((c) => area(c.stage).n === i + 1).length }));
+  return html`<div class="pipe-summary mb" role="group" aria-label="Pipeline summary">
+    <span class="pipe-total">${plural(active.length, "active case")}</span>
+    <span class="pipe-areas">${counts.map((c) => html`<span class="pipe-area"><b>${c.n}</b> ${c.label}</span>`)}</span>
+  </div>`;
+}
+
+// A plain-text preview of the pipeline as it would export. The export / reporting
+// integration itself is simulated for this demo — labelled honestly, nothing leaves the browser.
+function exportPreview(items) {
+  const active = items.filter((c) => !isHistory(c));
+  const rows = active.map((c) => { const a = area(c.stage); const t = primaryTask(c); const s = caseStatus(c);
+    return { company: c.company, id: c.id, area: a.label, status: s.label, owner: cleanLabel(t?.assigneeName || t?.roleLabel || (t?.waiting === "client" ? "Client" : "")), next: cleanLabel(t?.title || "") }; });
+  dialog({
+    title: "Pipeline export preview",
+    wide: true,
+    body: html`<p class="tiny">${plural(rows.length, "active case")} across the pipeline. This is a preview — the actual export / reporting integration is simulated for this demo and nothing leaves the browser.</p>
+      <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Company</th><th>Case</th><th>Work area</th><th>Status</th><th>Owner</th><th>Next action</th></tr></thead>
+      <tbody>${rows.length ? rows.map((r) => html`<tr><td>${r.company}</td><td>${r.id}</td><td>${r.area}</td><td>${r.status}</td><td>${r.owner || "—"}</td><td>${r.next || "—"}</td></tr>`)
+        : html`<tr><td colspan="6"><span class="tiny">No active cases to export.</span></td></tr>`}</tbody></table></div>`,
+    actions: [{ label: "Close", value: true, kind: "primary" }],
+  });
+}
+
+// ---------------------------------------------------------------- sample case
+// The consistent fictional sample. Codes/terms are DEMO-prefixed; downstream work areas
+// carry the rest (SOB, plan, fees) via their own "Fill sample" affordances. Industry,
+// province and lead source are resolved from live metadata so the payload is always valid.
+function harborlightPayload() {
+  const inds = state.meta.industries || [];
+  const industry = (inds.find((i) => /business services/i.test(i.name)) || inds.find((i) => /service/i.test(i.name)) || inds[0] || {}).code || "";
+  const geo = state.meta.geo || {};
+  let province = "", region = "", city = "Makati City";
+  for (const [p, g] of Object.entries(geo)) { if ((g.cities || []).includes("Makati City")) { province = p; region = g.region; break; } }
+  if (!province) { province = Object.keys(geo)[0] || ""; region = geo[province]?.region || ""; city = (geo[province]?.cities || [])[0] || "Makati City"; }
+  const leadSource = (state.meta.options?.leadSource?.[0]?.value) || "";
+  const target = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+  return {
+    newCompany: { registeredName: "Harborlight Services Corporation", tradeName: "Harborlight Services", tin: "DEMO-000-000-000",
+      industry, address: "100 Sample Avenue", province, city, region },
+    lead: { channel: "Direct", intermediaryId: "", leadSource, estHeadcount: 120, estPremium: 2510000, probability: 75,
+      targetEffectiveDate: target, contactName: "HR Department", contactEmail: "hr@harborlight.example.com", contactPhone: "+63 2 8000 0000",
+      ownerId: state.me.id, jumbo: false },
+  };
 }

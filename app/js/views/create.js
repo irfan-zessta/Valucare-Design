@@ -179,12 +179,12 @@ export async function render(main) {
     body.innerHTML = html`<form class="panel" data-form id="lf" novalidate><div class="ph"><h2>Lead details</h2><button type="button" class="btn ghost sm" id="back">‹ Back</button></div><div class="pb">
       <div class="note"><b>${co.registeredName}</b> · ${s.company ? html`Existing company record ${s.company.id}. The case will be linked to it.` : html`New company${s.override ? " (separate-company override recorded)" : ""}. A company record will be created with the case.`}
         <div class="tiny">No account number is generated at lead creation; it is issued by AMT after the contract and pricing gates.</div></div>
-      <fieldset class="mt" style="border:0;padding:0"><legend class="lbl" style="font-weight:600;font-size:12.5px;color:var(--text-muted)">Business source <span class="req">*</span> <span class="tag legacy">HMS3</span></legend>
+      <fieldset class="mt" style="border:0;padding:0"><legend class="lbl" style="font-weight:600;font-size:12.5px;color:var(--text-muted)">Business source <span class="req">*</span></legend>
         <div class="row">${["Direct", "Agent", "Broker"].map((c) => html`<label class="check"><input type="radio" name="channel" value="${c}" ${L.channel === c ? "checked" : ""}> ${c}</label>`)}</div></fieldset>
       <div class="fgrid mt">
         <div id="interBox" class="${L.channel && L.channel !== "Direct" ? "" : "hidden"}">${field({ key: "intermediaryId", label: "Agent / broker (AOR/BOR)", type: "intermediary", required: true, src: "legacy", help: "Only Active intermediaries with a verified agreement." }, L.intermediaryId, { values: { businessSource: L.channel } })}</div>
         ${field({ key: "leadSource", label: "Lead source", type: "select", options: "leadSource", required: true, src: "proposed" }, L.leadSource)}
-        ${field({ key: "estHeadcount", label: "Estimated principals", type: "int", src: "proposed", help: `Corporate minimum: ${min} principals (BR-01).` }, L.estHeadcount)}
+        ${field({ key: "estHeadcount", label: "Estimated principals", type: "int", src: "proposed", help: `Corporate minimum: ${min} principals.` }, L.estHeadcount)}
         ${field({ key: "estPremium", label: "Estimated annual premium (PHP)", type: "money", src: "proposed" }, L.estPremium)}
         ${field({ key: "probability", label: "Probability (%)", type: "int", src: "proposed" }, L.probability)}
         ${field({ key: "targetEffectiveDate", label: "Target effective date", type: "date", src: "proposed" }, L.targetEffectiveDate)}
@@ -193,7 +193,7 @@ export async function render(main) {
         ${field({ key: "contactPhone", label: "Contact number", type: "tel", src: "legacy", help: "Kept exactly as typed, including + and leading zeros." }, L.contactPhone)}
       </div>
       <div id="minWarn"></div>
-      ${L.channel && L.channel !== "Direct" ? html`<div class="note mt">Intermediary account: client-facing communication will go only through the authorized agent/broker (BR-03).</div>` : ""}
+      ${L.channel && L.channel !== "Direct" ? html`<div class="note mt">Intermediary account: client-facing communication will go only through the authorized agent/broker.</div>` : ""}
       </div><div class="savebar"><span class="tiny">Creates the lead and case; you continue to the franchise form next.</span><div class="row">${sampleBtn("fillSampleLead")}<div class="row" id="btns"></div></div></div></form>`.s;
     const form = body.querySelector("#lf");
     mountCombos(form);
@@ -202,7 +202,7 @@ export async function render(main) {
       const n = Number(L.estHeadcount);
       const below = !DEMO_BYPASS && L.estHeadcount !== "" && L.estHeadcount !== null && !isNaN(n) && n < min;
       form.querySelector("#minWarn").innerHTML = below ? html`<div class="note warn mt" role="status"><b>Below the corporate minimum.</b> ${n} principal(s) is fewer than ${min}.
-        Corporate New Business needs at least ${min} principals (BR-01). This prospect must be routed to the IFG team, whose application is outside this system.
+        Corporate New Business needs at least ${min} principals. This prospect must be routed to the IFG team, whose application is outside this system.
         You can record the lead and route it to IFG (the lead is closed here with the reason), or correct the headcount.</div>`.s : "";
       form.querySelector("#btns").innerHTML = below ? html`<button type="button" class="btn" id="ifg">Record lead and route to IFG</button><button class="btn primary" disabled title="Below the corporate minimum">Create case</button>`.s
         : html`<button class="btn primary" id="go">Create case</button>`.s;

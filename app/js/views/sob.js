@@ -44,7 +44,7 @@ export async function render(ctx) {
       <section class="panel"><div class="ph"><h2>Exclusions</h2></div><div class="pb"><p class="tiny">Standard exclusions (template)</p><ul>${(sob.exclusions || []).map((e) => html`<li>${e}</li>`)}</ul>
         <p class="tiny mt">Client-specific exclusions</p><div id="cex"></div></div></section>
       <section class="panel"><div class="ph"><h2>Special instructions and add-ons</h2></div><div class="pb" id="spec"></div></section></div>
-    <section class="panel"><div class="ph"><h2>Legacy partner data</h2></div><div class="pb"><p>Legacy HMS3 "If Grepa" value: <b>${sob.legacy?.ifGrepa ?? "not set"}</b> <span class="tag legacy">HMS3</span> <span class="tag pending">mapping pending</span></p>
+    <section class="panel"><div class="ph"><h2>Legacy partner data</h2></div><div class="pb"><p>"If Grepa" value: <b>${sob.legacy?.ifGrepa ?? "not set"}</b></p>
       <p class="tiny">${sob.legacy?.mappingNote || ""} The value is never overwritten by the new life-insurance add-on.</p></div></section>
     ${(sob.scope || "parent") === "parent" ? html`<section class="panel"><div class="ph"><h2>TOR vs SOB comparison</h2><a class="tiny" href="#/case/${id}/quotation/tor">Edit TOR</a></div><div class="pb">${comparisonTable(cmp)}</div></section>` : ""}
     <section class="panel"><div class="ph"><h2>Documents and versions</h2></div><div class="pb">
@@ -80,8 +80,8 @@ export async function render(ctx) {
     const ao = form ? form.draft.addOns : sob.addOns;
     spec.innerHTML = html`${si.length ? html`<ul class="doclist">${si.map((x, i) => html`<li><span><b>${x.dept}</b>: ${x.text}</span>${editable ? html`<button class="btn ghost sm" data-rms="${i}">Remove</button>` : ""}</li>`)}</ul>` : html`<p class="tiny">No special instructions.</p>`}
       ${editable ? html`<div class="row mt"><label class="sr-only" for="sd">Department</label><select id="sd" class="inp" style="width:auto">${state.meta.options.targetDepartment.map((o) => html`<option>${o.value}</option>`)}</select><label class="sr-only" for="stx">Instruction</label><input id="stx" class="inp grow" placeholder="Instruction for the department"><button class="btn sm" id="addS">Add</button></div>` : ""}
-      <h3 class="h mt">Optional add-ons (BR-20)</h3>
-      <label class="check"><input type="checkbox" id="ao-life" ${ao?.lifeInsurance?.enabled ? "checked" : ""} ${editable ? "" : "disabled"}> Life insurance - partner ${ao?.lifeInsurance?.partner} <span class="tag pending">partner integration pending</span></label>
+      <h3 class="h mt">Optional add-ons</h3>
+      <label class="check"><input type="checkbox" id="ao-life" ${ao?.lifeInsurance?.enabled ? "checked" : ""} ${editable ? "" : "disabled"}> Life insurance - partner ${ao?.lifeInsurance?.partner} <span class="tiny">(simulated partner integration)</span></label>
       ${editable ? html`<div class="field"><label for="ao-cov">Life coverage amount / terms</label><input id="ao-cov" class="inp" value="${ao?.lifeInsurance?.coverage || ""}"></div>` : html`<p class="tiny">${ao?.lifeInsurance?.coverage || ""}</p>`}
       <label class="check mt"><input type="checkbox" id="ao-tele" ${ao?.teleconsultation?.enabled ? "checked" : ""} ${editable ? "" : "disabled"}> Teleconsultation - ${ao?.teleconsultation?.partner}</label>`.s;
     spec.querySelector("#addS")?.addEventListener("click", () => { const t = spec.querySelector("#stx").value.trim(); if (!t) return; form.set("specialInstructions", [...(form.draft.specialInstructions || []), { dept: spec.querySelector("#sd").value, text: t }]); drawSpec(); });

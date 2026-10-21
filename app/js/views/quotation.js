@@ -46,7 +46,7 @@ function requirements(ctx) {
   const { data, body, id } = ctx;
   const fr = data.records.franchise.slice(-1)[0];
   const can = isAM(ctx) && data.case.status === "Open";
-  body.innerHTML = html`<section class="panel"><div class="ph"><h2>Requirements checklist</h2><span class="tiny">Owner: AAT handler · request from ${data.summary.channel !== "Direct" ? "the agent/broker (BR-03)" : "the client"}</span></div>
+  body.innerHTML = html`<section class="panel"><div class="ph"><h2>Requirements checklist</h2><span class="tiny">Owner: AAT handler · request from ${data.summary.channel !== "Direct" ? "the agent/broker" : "the client"}</span></div>
     <div class="pb"><div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Requirements</caption><thead><tr><th scope="col">Requirement</th><th scope="col">Status</th><th scope="col">Files and notes</th>${can ? html`<th scope="col">Update</th>` : ""}</tr></thead><tbody>
     ${state.meta.requirements.map((r) => {
       const st = fr.requirements?.[r.key] || { status: "Requested" };
@@ -145,7 +145,7 @@ function rates(ctx) {
       ${F("mblOptions", "MBL options", "text", { required: true })}
       ${F("dependentCoverage", "Dependent coverage", "text", { required: true })}
       ${F("targetRates", "Target rates")}${F("currentRates", "Current rates")}
-      <div class="field"><span class="lbl">Payment modes * <span class="tag proposed">v1.1</span></span>${editable ? html`<div class="checks">${state.meta.options.paymentMode.map((o) => html`<label class="check"><input type="checkbox" data-pm value="${o.value}" ${(rr.paymentModes || []).includes(o.value) ? "checked" : ""}> ${o.label}</label>`)}</div>` : html`<div class="ro">${(rr.paymentModes || []).join(", ") || "-"}</div>`}</div>
+      <div class="field"><span class="lbl">Payment modes *</span>${editable ? html`<div class="checks">${state.meta.options.paymentMode.map((o) => html`<label class="check"><input type="checkbox" data-pm value="${o.value}" ${(rr.paymentModes || []).includes(o.value) ? "checked" : ""}> ${o.label}</label>`)}</div>` : html`<div class="ro">${(rr.paymentModes || []).join(", ") || "-"}</div>`}</div>
       ${F("jumbo", "Jumbo indicator", "checkbox")}
       ${F("specialRequirements", "Special requirements", "textarea")}
     </div>
@@ -223,7 +223,7 @@ async function issueSheet(ctx, rr, imp) {
   if (imp.errorCount) { toast("Correct the rate sheet errors and import again - a rate sheet must be complete.", "err"); return; }
   const A = [["ibnr", "IBNR %", 20], ["medicalInflation", "Medical inflation %", ""], ["commission", "Commission %", ""], ["brokerMargin", "Broker margin %", ""], ["adminLoading", "Admin / cost loading %", ""],
     ["jumboSatellite", "Jumbo: satellite office %", 0], ["jumboOnsite", "Jumbo: onsite manpower %", 0], ["jumboOther", "Jumbo: other %", 0]];
-  const r = await dialog({ title: "Issue rate sheet", wide: true, body: html`<p>${imp.valid} rate rows from ${imp.filename}. Record the pricing assumptions used (NB-QTE-06).</p>
+  const r = await dialog({ title: "Issue rate sheet", wide: true, body: html`<p>${imp.valid} rate rows from ${imp.filename}. Record the pricing assumptions used.</p>
     <div class="fgrid mt">${A.map(([k, l, d]) => html`<div class="field"><label for="as-${k}">${l}${k.startsWith("jumbo") ? "" : " *"}</label><input id="as-${k}" class="inp" name="${k}" inputmode="decimal" value="${d}"></div>`)}</div>
     <div class="field mt"><label for="pdf">Rate sheet PDF (optional, kept as attachment)</label><input id="pdf" type="file" name="pdf" accept=".pdf"></div>
     <div class="field mt"><label for="nt">Notes</label><textarea id="nt" name="notes" class="inp"></textarea></div>`,
@@ -269,7 +269,7 @@ function proposal(ctx) {
       ${staleSob ? html`<div class="note danger mb">The SOB changed (now v${sob.version}) after this proposal was submitted with v${prop.sobVersion}. Approvals are no longer valid for the current benefits - revise the proposal.</div>` : ""}
       <div class="stack sm">${["sm", "senior"].map((st) => { const a = approvalsThis.filter((x) => x.stage === st).slice(-1)[0];
         return html`<div class="row"><b style="min-width:220px">${st === "sm" ? "1. First-level pricing review" : "2. Second-level pricing approval"}</b>${a ? html`${pill(a.decision === "approve" ? "Approved" : "Returned")} <span class="tiny">${a.byName} · ${fmtDateTime(a.at)} · reviewed v${a.version}${a.remarks ? " · " + a.remarks : ""}</span>` : html`<span class="pill neutral">Not yet decided</span>`}</div>`; })}
-        <p class="tiny">Approvals are bound to the reviewed version. A material change to rates, commission or benefits creates a new version and these approvals no longer apply (NB-NEG-02).</p></div>
+        <p class="tiny">Approvals are bound to the reviewed version. A material change to rates, commission or benefits creates a new version and these approvals no longer apply.</p></div>
     </div></section>
     <section class="panel" data-form id="pForm"><div class="ph"><h2>Rates and recommendation</h2><span id="st"></span></div><div class="pb">
       <div class="tbl-wrap"><table class="tbl compact"><caption class="sr-only">Proposed rates</caption><thead><tr><th>Plan</th><th>Room and board</th><th class="num">MBL</th><th>Member type</th><th>Age band</th><th>Payment mode</th><th class="num">Actuarial rate</th><th class="num">Proposed rate</th><th class="num">Discount</th></tr></thead>
@@ -282,7 +282,7 @@ function proposal(ctx) {
       </div></div>
       ${editable ? html`<div class="savebar"><span class="tiny">Submitting binds the current rate-sheet and SOB versions for review.</span><div class="row">${sampleBtn("fillSampleProp")}<button class="btn primary" id="submit">Submit for internal review</button></div></div>` : ""}</section>
     <section class="panel"><div class="ph"><div><h2>TOR vs SOB comparison</h2><div class="tiny">${sob ? html`SOB v${sob.version} (${sob.status}) · <a href="#/case/${id}/setup/sob">Edit SOB draft</a>` : html`<a href="#/case/${id}/setup/sob">Create the SOB draft</a>`} · <a href="#/case/${id}/quotation/tor">Edit TOR</a></div></div></div>
-      <div class="pb">${reduced.length ? html`<div class="note warn mb"><b>${reduced.length} benefit(s) are missing or lower than the TOR.</b> Each needs a documented justification (on the SOB line or below) and the first-level pricing approver must confirm the override (BR-10).</div>
+      <div class="pb">${reduced.length ? html`<div class="note warn mb"><b>${reduced.length} benefit(s) are missing or lower than the TOR.</b> Each needs a documented justification (on the SOB line or below) and the first-level pricing approver must confirm the override.</div>
         <div class="fgrid two mb" id="justBox">${reduced.map((r) => html`<div class="field"><label for="rj-${r.code}">Justification - ${r.benefit} (${r.flags.join(", ")})</label>
           ${editable ? html`<textarea id="rj-${r.code}" class="inp" data-just="${r.code}">${prop.reducedJustifications?.[r.code] || r.sob?.justification || ""}</textarea>` : html`<div class="ro">${prop.reducedJustifications?.[r.code] || r.sob?.justification || "Not provided"}</div>`}</div>`)}</div>` : ""}
         ${comparisonTable(cmp)}</div></section>
@@ -351,7 +351,7 @@ function proposal(ctx) {
   }
   if (am && ["Approved", "Sent", "Under Negotiation"].includes(prop.status)) btn(prop.docVersion === prop.version ? "Regenerate proposal PDF" : "Generate proposal PDF", prop.docVersion === prop.version ? "" : "primary", async (b) => { const r = await act("proposal.generate", { id: prop.id }, { button: b, success: "Proposal generated." }); if (r) ctx.reload(); });
   if (am && prop.status === "Approved") btn(inter ? `Send via ${interName(data.summary.intermediaryId)}` : "Send to client", prop.docVersion === prop.version ? "primary" : "", async (b) => {
-    const ok = await confirmDialog("Send proposal", inter ? `For this intermediary account the proposal goes only to ${interName(data.summary.intermediaryId)} (BR-03). No email service is connected, so sending is recorded as simulated.` : "The proposal goes to the proposal addressee. No email service is connected, so sending is recorded as simulated.", { confirm: "Send" });
+    const ok = await confirmDialog("Send proposal", inter ? `For this intermediary account the proposal goes only to ${interName(data.summary.intermediaryId)}. No email service is connected, so sending is recorded as simulated.` : "The proposal goes to the proposal addressee. No email service is connected, so sending is recorded as simulated.", { confirm: "Send" });
     if (ok && (await act("proposal.send", { id: prop.id, recipient: inter ? "intermediary" : "client" }, { button: b, success: "Proposal marked as sent (simulated email)." }))) ctx.reload();
   });
   if (am && ["For Internal Review", "Sales Manager Approved", "Approved", "Sent", "Under Negotiation", "Rejected", "Expired"].includes(prop.status)) btn("Revise (new version)", "", async (b) => {
@@ -375,13 +375,13 @@ function negotiation(ctx) {
   const inter = data.summary.channel !== "Direct";
   if (!prop) { body.innerHTML = `<div class="note">Negotiation starts once the proposal is sent.</div>`; return; }
   const acc = prop.acceptance;
-  body.innerHTML = html`${inter ? html`<div class="note mb">Intermediary account: all client-facing communication goes through <b>${interName(data.summary.intermediaryId)}</b> (BR-03).</div>` : ""}
+  body.innerHTML = html`${inter ? html`<div class="note mb">Intermediary account: all client-facing communication goes through <b>${interName(data.summary.intermediaryId)}</b>.</div>` : ""}
     <section class="panel"><div class="ph"><h2>Negotiation rounds (${(prop.rounds || []).length}) · proposal v${prop.version} ${pill(prop.status)}</h2><div class="row" id="nAct"></div></div><div class="pb">
       ${(prop.rounds || []).length ? html`<ul class="timeline">${prop.rounds.slice().reverse().map((r) => html`<li><span class="when">${fmtDate(r.date)}<br>${r.channel}</span><div><b>Round ${r.n}</b> (proposal v${r.proposalVersion}) - ${r.summary}
         <div class="tiny">${r.participants ? `Participants: ${r.participants}. ` : ""}${r.counterOffer ? `Counter-offer: ${r.counterOffer}. ` : ""}${r.commissionChange ? `Commission: ${r.commissionChange}. ` : ""}${r.benefitChanges ? `Benefits: ${r.benefitChanges}. ` : ""}${r.outcome ? `Outcome: ${r.outcome}.` : ""} Logged by ${r.byName}.</div>
         ${r.attachmentDocId ? html`<a class="tiny" href="${docUrl(r.attachmentDocId)}">Attachment</a>` : ""}</div></li>`)}</ul>` : html`<p class="tiny">No rounds logged.</p>`}
       ${prop.status === "Rejected" ? html`<div class="note danger mt"><b>Client declined:</b> ${prop.declineReason}. Revise the offer (new version) or close the lead as lost from Overview.</div>` : ""}
-      ${acc ? html`<div class="note ok mt"><b>Accepted</b> on ${fmtDate(acc.date)} (version ${acc.version}) · recorded by ${userName(acc.recordedBy)} · ${acc.docId ? html`<a href="${docUrl(acc.docId)}">acceptance evidence</a>` : "evidence skipped for demo"}${acc.notes ? ` · ${acc.notes}` : ""}</div>` : ""}
+      ${acc ? html`<div class="note ok mt"><b>Accepted</b> on ${fmtDate(acc.date)} (version ${acc.version}) · recorded by ${userName(acc.recordedBy)} · ${acc.docId ? html`<a href="${docUrl(acc.docId)}">acceptance evidence</a>` : "acceptance evidence skipped for demo — not verified"}${acc.notes ? ` · ${acc.notes}` : ""}</div>` : ""}
     </div></section>`.s;
   const bar = body.querySelector("#nAct");
   const btn = (label, cls, fn) => { const b = document.createElement("button"); b.className = `btn ${cls}`; b.textContent = label; b.onclick = () => fn(b); bar.appendChild(b); };
@@ -397,7 +397,7 @@ function negotiation(ctx) {
       <div class="field wide"><label for="ns">Summary *</label><textarea id="ns" name="summary" class="inp"></textarea></div>
       <div class="field"><label for="nu">Outcome</label><input id="nu" name="outcome" class="inp"></div>
       <div class="field"><label for="nf">Attachment (e.g. PDF email)</label><input id="nf" type="file" name="file"></div></div>
-      ${inter ? html`<label class="check mt"><input type="checkbox" name="viaIntermediary" checked> Conducted through ${interName(data.summary.intermediaryId)} (BR-03)</label>` : ""}
+      ${inter ? html`<label class="check mt"><input type="checkbox" name="viaIntermediary" checked> Conducted through ${interName(data.summary.intermediaryId)}</label>` : ""}
       <p class="tiny mt">If rates, commission or benefits change, use "Revise (new version)" on the Proposal step so it is re-approved.</p>`,
       actions: [{ label: "Cancel" }, { label: "Log round", kind: "primary", value: "ok", validate: (v) => (!v.summary.trim() ? "Summary is required." : inter && !v.viaIntermediary ? "Intermediary accounts are negotiated through the agent/broker." : null) }] });
     if (r?.action !== "ok") return;
@@ -434,7 +434,7 @@ function alignment(ctx) {
   const am = isAM(ctx) && data.case.status === "Open";
   const me = state.me;
   const F = { registeredName: "Registered company name", effectiveDate: "Effective date", expiryDate: "Expiration date", paymentMode: "Payment mode", billingAddress: "Billing address", billingContact: "Billing contact", vatStatus: "VAT status" };
-  body.innerHTML = html`<section class="panel"><div class="ph"><div><h2>Internal alignment with B&C and MDA</h2><div class="tiny">Confirms name, dates, payment mode and billing details so downstream teams are ready (NB-NEG-05).</div></div><div class="row" id="aAct"></div></div><div class="pb">
+  body.innerHTML = html`<section class="panel"><div class="ph"><div><h2>Internal alignment with B&C and MDA</h2><div class="tiny">Confirms name, dates, payment mode and billing details so downstream teams are ready.</div></div><div class="row" id="aAct"></div></div><div class="pb">
     ${!al ? html`<p class="muted">${prop?.status === "Accepted" ? "Not started." : "Starts after the client accepts the proposal."}</p>` : html`
       <dl class="dl">${Object.entries(F).map(([k, l]) => html`<div><dt>${l}</dt><dd>${k.endsWith("Date") ? fmtDate(al.fields[k]) : al.fields[k] || "-"}</dd></div>`)}</dl>
       <ul class="gate-list mt">${["bc", "mda"].map((t) => { const a = al.acks?.[t]; return html`<li><span class="${a?.status === "Confirmed" ? "ok" : "no"}">${a?.status === "Confirmed" ? "✓" : "●"}</span>

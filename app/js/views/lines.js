@@ -39,7 +39,7 @@ export function linesTable({ lines, editable, kind = "sob", comparison = null, p
           ${txt(l, i, "deptInstruction", "Department-specific instruction", editable, true)}
           ${txt(l, i, "plans", `Plan applicability${plans.length ? " (e.g. " + plans.slice(0, 3).join(", ") + ")" : ""}`, editable)}
           ${txt(l, i, "affiliates", `Affiliate applicability${affiliates.length ? " (All or names)" : ""}`, editable)}
-          ${needJust || l.justification ? txt(l, i, "justification", "Justification for coverage below TOR (required, BR-10)", editable, true) : ""}` : ""}
+          ${needJust || l.justification ? txt(l, i, "justification", "Justification for coverage below TOR (required)", editable, true) : ""}` : ""}
       </div></td></tr>`;
   });
   return html`<div class="tbl-wrap"><table class="tbl compact"><caption class="sr-only">${kind === "tor" ? "TOR benefit lines" : "SOB benefit lines"}</caption><thead>${head}</thead>

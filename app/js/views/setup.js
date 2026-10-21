@@ -46,12 +46,11 @@ export function accountForm(ctx, a, box, { isAffiliate = false } = {}) {
     <div data-errs>${raw(errorSummaryHtml(errs).s || "")}</div>
     <div class="row between wrap">
       <nav class="secnav" aria-label="Account sections">${[...schema.map((s) => [s.key, s.label]), ["vc", "VC app access exclusions"], ["docs", "Supporting documents"]].map(([k, l]) => html`<a href="#acc-${a.id}-${k}" data-jump="acc-${a.id}-${k}">${l}</a>`)}</nav>
-      <button type="button" class="btn ghost sm" data-prov aria-pressed="false" title="Show where each field came from (HMS3, requirements v1.1, pending rules, demo data)">Show data sources</button>
     </div>
     <div data-form>
     ${schema.map((sec) => { const deemph = sec.key === "agentInfo" && direct; return html`<section class="panel form-sec ${deemph ? "deemph" : ""}" id="acc-${a.id}-${sec.key}"><div class="ph"><h2>${sec.label}</h2>${sec.key === "accountInfo" ? html`<span class="tiny">Reused from the validated franchise ${a.sources?.franchise || ""}</span>` : deemph ? html`<span class="tiny">Not applicable for Direct business — leave blank unless an agent/broker is involved.</span>` : ""}</div><div class="pb"><div class="fgrid">
       ${sec.fields.map((f) => { const def = f.key === "city" ? { ...f, provinceField: `${sec.key}.province` } : f; return field(def, a[sec.key]?.[f.key], { name: `${sec.key}.${f.key}`, editable: editable && f.type !== "readonly", values: a.agentInfo || {}, errors: em }); })}
-      </div>${sec.key === "contractInfo" ? html`<p class="tiny mt">Special Account/Standard, legacy Account Type, Product, Business Source and Manner of Payment are kept as separate fields with their HMS3 values.</p>` : ""}</div></section>`; })}
+      </div>${sec.key === "contractInfo" ? html`<p class="tiny mt">Special Account/Standard, Account Type, Product, Business Source and Manner of Payment are kept as separate fields.</p>` : ""}</div></section>`; })}
     <section class="panel form-sec" id="acc-${a.id}-vc"><div class="ph"><div><h2>VC app access exclusions</h2><div class="tiny">Hides these VC Health App features for this account's members. These are app-access settings, <b>not</b> contractual benefit exclusions (those live in the SOB).</div></div>
       ${editable ? html`<button type="button" class="btn sm" data-clearvc>Clear selection</button>` : ""}</div><div class="pb"><div class="checks">
       ${state.meta.options.vcAppExclusions.map((o) => html`<label class="check"><input type="checkbox" data-vc value="${o.value}" ${(a.vcAppExclusions || []).includes(o.value) ? "checked" : ""} ${editable ? "" : "disabled"}> ${o.label}</label>`)}
@@ -64,11 +63,6 @@ export function accountForm(ctx, a, box, { isAffiliate = false } = {}) {
   wireErrorLinks(box);
   wireUploads(box, () => ctx.reload());
   box.querySelectorAll("[data-jump]").forEach((x) => (x.onclick = (e) => { e.preventDefault(); document.getElementById(x.dataset.jump).scrollIntoView({ block: "start" }); }));
-  // Provenance badges (HMS3 / v1.1 / pending / demo) are reference detail, not part
-  // of data entry - keep them out of the way by default and let the user reveal them.
-  box.classList.add("prov-hide");
-  const provBtn = box.querySelector("[data-prov]");
-  if (provBtn) provBtn.onclick = () => { const on = box.classList.toggle("prov-hide"); provBtn.setAttribute("aria-pressed", String(!on)); provBtn.textContent = on ? "Show data sources" : "Hide data sources"; };
   const formEl = box.querySelector("[data-form]");
   mountCombos(formEl);
   if (!editable) return;
@@ -278,7 +272,7 @@ function billing(ctx, acc, { hideOrientation = false } = {}) {
         <div class="field"><span class="lbl">Commission linkage</span><div class="ro">${cm ? html`Commission Rate Form ${pill(cm.status)} ${cm.percentage}% ${cm.basis || ""}` : data.summary.channel === "Direct" ? "Not applicable (Direct)" : "Not created yet"}</div></div>
         ${F("notes", "Notes", "textarea")}</div>
       ${editable ? html`<span class="tiny" data-st></span>` : ""}
-      <div class="grid2 mt">${docSlot({ label: "VAT documents (e.g. BIR / exemption certificate)", slot: "vat_doc", docs: data.documents, linkedType: "billing", linkedId: bl.id, caseId: id, canUpload: me.role === "bc", required: ["VAT exempt", "Zero Rated"].includes(bl.vatTreatment), hint: "Documentary requirements per VAT status are pending confirmation (OQ-03)." })}
+      <div class="grid2 mt">${docSlot({ label: "VAT documents (e.g. BIR / exemption certificate)", slot: "vat_doc", docs: data.documents, linkedType: "billing", linkedId: bl.id, caseId: id, canUpload: me.role === "bc", required: ["VAT exempt", "Zero Rated"].includes(bl.vatTreatment), hint: "Documentary requirements per VAT status are pending confirmation." })}
         ${docSlot({ label: "Other billing documents", slot: "billing", docs: data.documents, linkedType: "billing", linkedId: bl.id, caseId: id, canUpload: me.role === "bc" })}</div></div></section>
     <section class="panel"><div class="ph"><h2>Billing exceptions (${(bl.exceptions || []).length})</h2>${me.role === "bc" && ["Draft", "Returned"].includes(bl.status) ? html`<button class="btn sm" id="addX">${icon("plus", 14)} Record exception</button>` : ""}</div><div class="pb">
       ${(bl.exceptions || []).length ? html`<ul class="timeline">${bl.exceptions.map((x) => html`<li><span class="when">${fmtDateTime(x.raisedAt)}</span><div>${pill(x.status)} <b>${x.kind}</b> - ${x.description} <span class="tiny">raised by ${x.raisedByName}</span>

@@ -96,13 +96,13 @@ export async function render(main, { parts, query, force }) {
     reload: async () => { const y = window.scrollY; if (!(await flushForms())) return; disposeForms(); await render(main, { parts: location.hash.replace(/^#\/?/, "").split("?")[0].split("/"), query: Object.fromEntries(new URLSearchParams(location.hash.split("?")[1] || "")), force: true }); window.scrollTo(0, y); window.dispatchEvent(new Event("hms:changed")); },
   };
   // Headline the task the viewer can actually act on when they have one (so the record
-  // reads "Your task" and points at Admin's own work), else the case's global next.
+  // reads "Your action" and points at Admin's own work), else the case's global next.
   const n = primaryTask(s);
   // Admin acts in every internal role, so an internal next action counts as theirs
   // (unless it is waiting on the client, which no internal role can action).
-  // A client wait is never "your task" even if the AAT collection task is assigned to
-  // you - no internal role can action it, so the strip reads "Waiting on client", not
-  // "Your task". You can still open it to record what the client provides.
+  // A client wait is never "your action" even if the AAT collection task is assigned to
+  // you - no internal role can action it, so the strip reads "Waiting for client", not
+  // "Your action". You can still open it to record what the client provides.
   const mine = n && n.waiting !== "client" && (s.myTasks.some((t) => t.key === n.key) || actsAs(n.role));
   // Suggest who should take the next step so the demo driver knows which user to switch to.
   const suggested = (() => {
@@ -117,7 +117,7 @@ export async function render(main, { parts, query, force }) {
   main.innerHTML = html`
     <nav class="tiny mb" aria-label="Breadcrumb"><a href="#/new-business">New Business</a> › ${s.company}</nav>
     <div class="rec-head">
-      <div class="rec-title"><h1>${s.company} ${pill(s.status, s.statusTone)}${s.vip ? html` <span class="badge-vip">VIP</span>` : ""}${s.jumbo ? html` <span class="badge-jumbo">JUMBO</span>` : ""}${s.signedUnpaid ? html` <span class="pill warn plain" title="Contract signed; first payment not yet posted (BR-21)">Signed - unpaid</span>` : ""}</h1>
+      <div class="rec-title"><h1>${s.company} ${pill(s.status, s.statusTone)}${s.vip ? html` <span class="badge-vip">VIP</span>` : ""}${s.jumbo ? html` <span class="badge-jumbo">JUMBO</span>` : ""}${s.signedUnpaid ? html` <span class="pill warn plain" title="Contract signed; first payment not yet posted">Signed - unpaid</span>` : ""}</h1>
         <div class="refs"><span>Case <b>${s.id}</b></span>${s.franchiseCode ? html`<span>Franchise ${s.franchiseCode}</span>` : ""}${s.maCode ? html`<span>MA Code ${s.maCode}</span>` : ""}<span>Responsible: <b>${s.closed ? "Complete" : n ? (n.waiting === "client" ? "Client" : ownerText(n)) : s.ownerName}</b></span></div></div>
       <div class="row">${DEMO_BYPASS ? html`<button class="btn" id="guideBtn" title="Walk this journey with step-by-step guidance">${icon("help", 16)} Guide me${guideActive() ? html` <span class="pill info plain">On</span>` : ""}</button>` : ""}
         <button class="btn" id="docsBtn">${icon("file", 16)} Documents <span class="pill neutral plain">${data.documents.filter((d) => !d.supersededBy).length}</span></button>
@@ -126,7 +126,7 @@ export async function render(main, { parts, query, force }) {
     </div>
     ${nextStrip(ctx, { n, mine, suggested })}
     <nav class="steps-nav" aria-label="Work areas and progress">${STEPS.map((step) => stepTab(ctx, step, stepKey))}</nav>
-    <details class="case-details" ${raw(localStorage.getItem("hms-pref:caseDetailsOpen") === "true" ? "open" : "")}><summary>Record details and provenance (reference)</summary>${caseDetails(data)}</details>
+    <details class="case-details" ${raw(localStorage.getItem("hms-pref:caseDetailsOpen") === "true" ? "open" : "")}><summary>Record details (reference)</summary>${caseDetails(data)}</details>
     <div id="step"></div>`.s;
   main.querySelector(".case-details").addEventListener("toggle", (e) => localStorage.setItem("hms-pref:caseDetailsOpen", e.target.open));
   main.querySelector("#docsBtn").onclick = () => documentsDrawer(ctx);
@@ -215,10 +215,10 @@ function nextStrip(ctx, { n, mine, suggested }) {
   // Category chip so the user can tell their own work apart from a client wait or
   // another team's turn — the three states the spec asks us to distinguish.
   const cat = n.waiting === "client"
-    ? { label: "Waiting on client", tone: "warn" }
+    ? { label: "Waiting for client", tone: "warn" }
     : mine
-      ? { label: "Your task", tone: "info" }
-      : { label: `With ${roleLabel(n.role)}`, tone: "neutral" };
+      ? { label: "Your action", tone: "info" }
+      : { label: `Waiting for ${roleLabel(n.role)}`, tone: "neutral" };
   const cta = ctaFor(n, { mine, stepLabel: step ? step.label : "" });
   return html`<div class="rec-next">
     <div class="rn-main"><span class="eyebrow">Next action · ${where}</span><b>${gloss(n.title)}</b>
@@ -377,7 +377,7 @@ function leadPanel(ctx, below) {
   const stages = state.meta.config.pipelineStages.filter((x) => !x.startsWith("Closed"));
   return html`<section class="panel" data-form id="leadForm"><div class="ph"><h2>Lead and pipeline</h2>${canEdit ? html`<div class="row tight">${sampleBtn("fillSampleLeadC")}<span class="tiny" id="leadState"></span></div>` : html`<span class="tiny">${icon("lock", 12)} View only</span>`}</div>
     <div class="pb"><div class="fgrid two">
-      ${canEdit ? html`<div class="field"><label for="pst">Pipeline stage <span class="tag proposed">v1.1</span></label><select id="pst" name="pipelineStage" class="inp">${stages.map((x) => html`<option ${c.pipelineStage === x ? "selected" : ""}>${x}</option>`)}${c.pipelineStage === "Closed Won" ? html`<option selected disabled>Closed Won</option>` : ""}</select></div>`
+      ${canEdit ? html`<div class="field"><label for="pst">Pipeline stage</label><select id="pst" name="pipelineStage" class="inp">${stages.map((x) => html`<option ${c.pipelineStage === x ? "selected" : ""}>${x}</option>`)}${c.pipelineStage === "Closed Won" ? html`<option selected disabled>Closed Won</option>` : ""}</select></div>`
         : field({ key: "pipelineStage", label: "Pipeline stage", src: "proposed" }, c.pipelineStage, { editable: false })}
       ${field({ key: "leadSource", label: "Lead source", type: "select", options: "leadSource", src: "proposed" }, c.leadSource, { editable: canEdit })}
       ${field({ key: "estHeadcount", label: "Est. principals", type: "int", src: "proposed" }, c.estHeadcount, { editable: canEdit })}
@@ -426,7 +426,7 @@ function wireLead(ctx) {
     const r = await dialog({ title: "Close as lost", body: html`<p>The case is closed and leaves active queues. An authorized approver can reopen it.</p>
       <div class="field mt"><label for="lr">Reason <span class="req">*</span></label><select id="lr" name="reason" class="inp"><option value="">Select…</option>${state.meta.options.lostReason.map((o) => html`<option>${o.value}</option>`)}</select></div>
       <div class="field mt"><label for="ln">Note</label><textarea id="ln" name="note" class="inp"></textarea></div>`,
-      actions: [{ label: "Cancel" }, { label: "Close as lost", kind: "primary", value: "ok", validate: (v) => (!v.reason ? "Choose a reason (NB-LEAD-04)." : null) }] });
+      actions: [{ label: "Cancel" }, { label: "Close as lost", kind: "primary", value: "ok", validate: (v) => (!v.reason ? "Choose a reason." : null) }] });
     if (r?.action === "ok" && (await act("case.closeLost", { caseId: c.id, ...r.values }, { success: "Case closed as lost." }))) ctx.reload();
   });
   box.querySelector("#ifg")?.addEventListener("click", async (e) => {

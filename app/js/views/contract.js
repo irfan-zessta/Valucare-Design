@@ -27,10 +27,10 @@ export async function render(ctx) {
   }
   const bill = (R.billing || [])[0];
   el.innerHTML = html`
-    ${data.summary.signedUnpaid ? html`<div class="note warn mb"><b>Signed - unpaid.</b> The client signed but the first payment is not posted. The client can still switch providers until payment (BR-21). Payment status is recorded by B&C (billing integration simulated).</div>` : ""}
+    ${data.summary.signedUnpaid ? html`<div class="note warn mb"><b>Signed - unpaid.</b> The client signed but the first payment is not posted. The client can still switch providers until payment. Payment status is recorded by B&C (billing integration simulated).</div>` : ""}
     <div id="c-Contract"></div><div id="c-DSA"></div>
     <section class="panel" id="kyc"><div class="ph"><div><h2>KYC ${pill(kyc?.status)}</h2><div class="tiny">Form, evidence and KYC/SOLYTICS check result recorded by the AAT handler.</div></div><div class="row" id="kAct"></div></div><div class="pb" id="kBody"></div></section>
-    <section class="panel" id="onboarding"><div class="ph"><div><h2>Onboarding documents</h2><div class="tiny">${DEMO_BYPASS ? "Demo: all onboarding documents are optional and do not block account creation." : "Mandatory items block account creation unless an authorized waiver is recorded (configurable - OQ-02)."}</div></div></div><div class="pb" id="oBody"></div></section>
+    <section class="panel" id="onboarding"><div class="ph"><div><h2>Onboarding documents</h2><div class="tiny">${DEMO_BYPASS ? "Demo: all onboarding documents are optional and do not block account creation." : "Mandatory items block account creation unless an authorized waiver is recorded."}</div></div></div><div class="pb" id="oBody"></div></section>
     <section class="panel"><div class="ph"><h2>Agent / broker on record</h2><div class="row" id="aorAct"></div></div><div class="pb">${aorBlock(data)}</div></section>`.s;
   contractBlock(ctx, con, el.querySelector("#c-Contract"));
   if (dsa) contractBlock(ctx, dsa, el.querySelector("#c-DSA"));
@@ -92,7 +92,7 @@ function kycBlock(ctx, k, am) {
   const me = state.me;
   const box = ctx.el.querySelector("#kBody");
   if (!k) { box.innerHTML = `<p class="tiny">KYC starts with the contract request.</p>`; return; }
-  box.innerHTML = html`${simNote("SOLYTICS is not connected. The AAT handler runs the KYC check in SOLYTICS and records the reference, date and result here (manual entry plus upload, per NB-ONB-06).")}
+  box.innerHTML = html`${simNote("SOLYTICS is not connected. The AAT handler runs the KYC check in SOLYTICS and records the reference, date and result here (manual entry plus upload).")}
     <div class="grid2 mt">${docSlot({ label: "KYC form (signed)", slot: "kyc_form", docs: ctx.data.documents, linkedType: "kyc", linkedId: k.id, caseId: ctx.id, canUpload: am && ctx.data.case.status === "Open", required: true })}
       ${docSlot({ label: "Supporting evidence", slot: "kyc_evidence", docs: ctx.data.documents, linkedType: "kyc", linkedId: k.id, caseId: ctx.id, canUpload: actsAs("aat") && ctx.data.case.status === "Open" })}</div>
     <dl class="dl mt"><div><dt>Status</dt><dd>${pill(k.status)}</dd></div><div><dt>External reference</dt><dd>${k.externalRef || "-"}</dd></div><div><dt>Check date</dt><dd>${fmtDate(k.checkDate) || "-"}</dd></div><div><dt>Checker</dt><dd>${k.checkerName || "-"}</dd></div></dl>
@@ -136,7 +136,7 @@ function onbBlock(ctx, o, am) {
   const cfg = state.meta.config;
   const canWaive = cfg.waiverRoles.some(actsAs);
   box.innerHTML = html`<div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Onboarding checklist</caption><thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Files</th><th scope="col">Waiver</th></tr></thead><tbody>
-    ${ctx.data.onboarding.map((it) => html`<tr><td><b>${it.label}</b></td><td>${it.mandatory ? html`<span class="pill warn plain">Mandatory</span>` : html`<span class="pill neutral plain">Optional</span>`} <span class="tag pending">configurable</span></td>
+    ${ctx.data.onboarding.map((it) => html`<tr><td><b>${it.label}</b></td><td>${it.mandatory ? html`<span class="pill warn plain">Mandatory</span>` : html`<span class="pill neutral plain">Optional</span>`}</td>
       <td>${pill(it.status)}</td>
       <td style="min-width:320px">${docSlot({ label: it.label, slot: `onb:${it.key}`, docs: ctx.data.documents, linkedType: "onboarding", linkedId: o.id, caseId: ctx.id, canUpload: (am || actsAs("amt")) && ctx.data.case.status === "Open" })}</td>
       <td>${it.waiver ? html`<div class="tiny">Waived by ${it.waiver.approvedByName}: ${it.waiver.reason}</div>${actsAs("amt") ? html`<button class="btn sm mt" data-revoke="${it.key}">Revoke</button>` : ""}`
@@ -152,14 +152,14 @@ function onbBlock(ctx, o, am) {
 }
 
 function aorBlock(data) {
-  if (data.summary.channel === "Direct") return html`<p class="muted">Direct account - no AOR/BOR is required (BR-04).</p>`;
+  if (data.summary.channel === "Direct") return html`<p class="muted">Direct account - no AOR/BOR is required.</p>`;
   const rows = data.aor || [];
-  return html`<p>Current: <b>${interName(data.summary.intermediaryId)}</b>. Only one active AOR/BOR may represent the account (BR-02).</p>
+  return html`<p>Current: <b>${interName(data.summary.intermediaryId)}</b>. Only one active AOR/BOR may represent the account.</p>
     ${rows.length ? html`<div class="tbl-wrap mt"><table class="tbl compact"><caption class="sr-only">AOR/BOR history</caption><thead><tr><th>Intermediary</th><th>Status</th><th>From</th><th>To</th><th>Letter</th><th>Signatory</th></tr></thead><tbody>
       ${rows.map((a) => html`<tr><td>${interName(a.intermediaryId)}</td><td>${pill(a.status)}</td><td>${fmtDate(a.effectiveFrom)}</td><td>${fmtDate(a.effectiveTo) || "-"}</td><td>${a.letterDocId ? html`<a href="${docUrl(a.letterDocId)}">Letter</a>` : "-"}</td><td>${a.signatory || "-"}</td></tr>`)}</tbody></table></div>` : ""}`;
 }
 async function borChange(ctx, b) {
-  const r = await dialog({ title: "Record BOR change", body: html`<p>The current AOR/BOR is end-dated and notified (simulated). Conflicts are resolved by the most recent BOR letter or the highest-ranking client signatory (BR-02).</p>
+  const r = await dialog({ title: "Record BOR change", body: html`<p>The current AOR/BOR is end-dated and notified (simulated). Conflicts are resolved by the most recent BOR letter or the highest-ranking client signatory.</p>
     <div class="field mt"><label for="bi">New intermediary *</label><select id="bi" name="intermediaryId" class="inp"><option value="">Select…</option>${state.meta.intermediaries.filter((i) => i.status === "Active").map((i) => html`<option value="${i.id}">${i.name} (${i.intermediaryType})</option>`)}</select></div>
     <div class="field mt"><label for="bs">Client signatory *</label><input id="bs" name="signatory" class="inp"></div>
     <div class="field mt"><label for="be">Effective date *</label><input id="be" type="date" name="effectiveDate" class="inp"></div>

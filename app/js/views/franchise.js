@@ -32,11 +32,11 @@ export async function render(ctx) {
     <section class="panel"><div class="ph"><div><h2>Franchise ${fr.code} ${pill(fr.status === "Approved" && fr.extended ? "Approved (extended)" : fr.status)}</h2>
       <div class="tiny">${fr.validUntil ? html`Valid ${fmtDate(fr.validFrom)} to <b>${fmtDate(fr.validUntil)}</b>${vu !== null && fr.status === "Approved" ? (vu < 0 ? " - expired" : ` - ${vu} day(s) left`) : ""} · ` : ""}
         ${fr.submittedBy ? `Submitted by ${userName(fr.submittedBy)}` : `Created by ${fr.otherInfo?.createdBy || ""}`}${fr.approvedBy ? ` · Approved by ${userName(fr.approvedBy)}` : ""}
-        · Validity rule: ${inter ? `${state.meta.config.franchiseValidityIntermediaryDays} days (intermediary)` : `direct = ${state.meta.config.franchiseValidityDirectRule === "calendar_year" ? "calendar year" : "12 months"}`} <span class="tag pending">configurable</span></div></div>
+        · Validity rule: ${inter ? `${state.meta.config.franchiseValidityIntermediaryDays} days (intermediary)` : `direct = ${state.meta.config.franchiseValidityDirectRule === "calendar_year" ? "calendar year" : "12 months"}`}</div></div>
       <div class="row" id="frActions"></div></div>
       ${fr.status === "Returned" ? html`<div class="pb"><div class="note warn"><b>Returned by AMT:</b> ${fr.returnReason}</div></div>` : ""}
       ${fr.status === "Rejected" ? html`<div class="pb"><div class="note danger"><b>Rejected:</b> ${fr.rejectReason}</div>${isOwner ? html`<a class="btn mt" href="#/case/${id}/franchise?new=1" id="newReq">Start a corrected franchise request</a>` : ""}</div>` : ""}
-      ${fr.status === "Expired" ? html`<div class="pb"><div class="note danger"><b>Expired and auto-cancelled</b> on ${fmtDate(fr.validUntil)} (BR-06). The account is available to others.</div>${isOwner ? html`<a class="btn mt" href="#/case/${id}/franchise?new=1">Request a new franchise</a>` : ""}</div>` : ""}
+      ${fr.status === "Expired" ? html`<div class="pb"><div class="note danger"><b>Expired and auto-cancelled</b> on ${fmtDate(fr.validUntil)}. The account is available to others.</div>${isOwner ? html`<a class="btn mt" href="#/case/${id}/franchise?new=1">Request a new franchise</a>` : ""}</div>` : ""}
       ${pendingExt ? html`<div class="pb"><div class="note"><b>Extension requested</b> by ${pendingExt.requestedByName} to ${fmtDate(pendingExt.requestedUntil)}: ${pendingExt.reason}. Waiting for AMT.</div></div>` : ""}
       ${(canReview || (fr.status !== "Draft" && (fr.conflicts?.length || fr.highRisk))) ? reviewPanel(fr, data) : ""}
     </section>
@@ -53,8 +53,8 @@ export async function render(ctx) {
           const def = f.key === "companyCity" ? { ...f, provinceField: "accountInfo.companyProvince" } : f.key === "billingCity" ? { ...f, provinceField: "accountInfo.billingProvince" } : f;
           return field(def, v, { name: `${sec.key}.${f.key}`, editable: ed, values: fr.otherInfo || {}, errors: Object.fromEntries(errors.map((e) => [e.field, e.message])) });
         })}</div>
-        ${sec.key === "otherInfo" ? html`<div class="note mt tiny">Product (Account Type), Business Source, Current Coverage, Manner of Payment (contribution) and payment frequency are kept as <b>separate fields</b> with their original HMS3 values and codes.</div>` : ""}
-        ${sec.key === "otherInfo" && acusaEditable ? html`<div class="mt" data-acusa><div class="field"><label for="acusa">Actuarial Remarks (Actuarial / AMT) <span class="tag legacy">HMS3</span></label>
+        ${sec.key === "otherInfo" ? html`<div class="note mt tiny">Product (Account Type), Business Source, Current Coverage, Manner of Payment (contribution) and payment frequency are kept as <b>separate fields</b>.</div>` : ""}
+        ${sec.key === "otherInfo" && acusaEditable ? html`<div class="mt" data-acusa><div class="field"><label for="acusa">Actuarial Remarks (Actuarial / AMT)</label>
           <textarea id="acusa" class="inp">${fr.otherInfo?.acusaRemarks || ""}</textarea></div><button class="btn sm mt" id="saveAcusa">Save Actuarial remarks</button></div>` : ""}
         </div></section>`)}
       <section class="panel form-sec" id="sec-documents"><div class="ph"><h2>Documents</h2><span class="tiny">Each slot keeps versions; AMT can mark a file as needing correction.</span></div><div class="pb">
@@ -219,7 +219,7 @@ function reviewPanel(fr, data) {
           <tbody>${fr.conflicts.map((x) => html`<tr><td><a href="#/case/${x.caseId}/franchise">${x.franchiseCode}</a></td><td>${x.name}</td><td>${pill(x.status)}</td><td>${x.ownerName}</td><td>${x.intermediary || "Direct"}</td><td>${fmtDate(x.validFrom)} - ${fmtDate(x.validUntil)}</td><td>${x.reasons.join(", ")}</td></tr>`)}</tbody></table></div>`
           : html`<div class="tiny">No other franchise for this company, TIN or affiliate group.</div>`}</div><span></span></li>
       <li><span class="${fr.otherInfo?.businessSource === "Direct" || inter?.status === "Active" ? "ok" : "no"}">${fr.otherInfo?.businessSource === "Direct" || inter?.status === "Active" ? "✓" : "●"}</span><div><b>Intermediary and agreement</b>
-        <div class="tiny">${fr.otherInfo?.businessSource === "Direct" ? "Direct account - no AOR/BOR required (BR-04)." : `${inter?.name || "Not selected"} · ${inter?.intermediaryType || ""} · ${inter?.status || ""}${inter?.agreementVerified ? " · agreement verified" : ""}`}</div></div><span></span></li>
+        <div class="tiny">${fr.otherInfo?.businessSource === "Direct" ? "Direct account - no AOR/BOR required." : `${inter?.name || "Not selected"} · ${inter?.intermediaryType || ""} · ${inter?.status || ""}${inter?.agreementVerified ? " · agreement verified" : ""}`}</div></div><span></span></li>
       ${fr.otherInfo?.businessSource !== "Direct" ? html`<li><span class="${!aor || aor.intermediaryId === fr.otherInfo?.businessSourceName ? "ok" : "no"}">${!aor || aor.intermediaryId === fr.otherInfo?.businessSourceName ? "✓" : "●"}</span><div><b>One active AOR/BOR</b>
         <div class="tiny">${aor ? `Active AOR/BOR: ${interName(aor.intermediaryId)} since ${fmtDate(aor.effectiveFrom)}` : "No active AOR/BOR on record yet - created on approval."}</div></div><span></span></li>` : ""}
       <li><span class="${fr.highRisk ? "no" : "ok"}">${fr.highRisk ? "●" : "✓"}</span><div><b>High-risk industry</b><div class="tiny">${fr.highRisk ? "Flagged (government, construction or mining - configurable). Approval needs a remark." : "Not flagged."}${fr.highRiskRemark ? ` Remark: ${fr.highRiskRemark}` : ""}</div></div><span></span></li>

@@ -143,7 +143,10 @@ export function tone(status) {
   return "neutral";
 }
 export const pill = (status, t) => html`<span class="pill ${t || tone(status)}">${status || "Not started"}</span>`;
-export const srcTag = (src) => (src ? html`<span class="tag ${src}" title="${{ legacy: "Verified HMS3 field", proposed: "Proposed in requirements v1.1", pending: "Rule awaiting business confirmation", demo: "Demo master data - replace from HMS3" }[src] || ""}">${{ legacy: "HMS3", proposed: "v1.1", pending: "Pending rule", demo: "Demo data" }[src] || src}</span>` : "");
+// Provenance badges (HMS3 / v1.1 / pending rule / demo data) were developer-facing
+// reference marks. The simplified New Business demo hides them so the fields read as
+// plain labels. Kept as a no-op (callers still pass `src`) so nothing else breaks.
+export const srcTag = (_src) => "";
 export const simNote = (text) => html`<div class="note sim"><b>Simulated integration.</b> ${text}</div>`;
 
 // A calm, focus-trapped success confirmation shown after a milestone completes
@@ -633,7 +636,7 @@ export function gateList(items) {
     return html`<li>
     <span class="${cls}" aria-hidden="true">${mark}</span>
     <div><b>${g.label}</b> <span class="sr-only">${sr}</span>
-      ${g.demoSkipped ? html`<div class="tiny skip-tag">Skipped for demo - not verified</div>` : ""}
+      ${g.demoSkipped ? html`<div class="tiny skip-tag">Skipped for demo — not verified</div>` : ""}
       ${!g.ok && g.detail ? html`<div class="tiny">${g.detail}</div>` : ""}
       ${g.evidence ? html`<div class="tiny">Evidence: ${String(g.evidence).startsWith("DOC-") ? html`<a href="${docUrl(g.evidence)}">${g.evidence}</a>` : g.evidence}</div>` : ""}</div>
     <div class="right"><div class="tiny">Owner: ${g.ownerLabel}</div><a href="${g.link}" class="tiny">Open source record</a></div></li>`;

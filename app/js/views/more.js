@@ -15,7 +15,7 @@ async function intermediaries(main) {
   const items = (await api("intermediaries")).items;
   state.meta.intermediaries = items;
   const me = state.me;
-  main.innerHTML = html`<div class="page-head"><div><h1>Agents and Brokers</h1><p>Only Active intermediaries with a verified agreement can be tagged to franchises (NB-AGT-05). One active AOR/BOR per account (BR-02).</p></div>
+  main.innerHTML = html`<div class="page-head"><div><h1>Agents and Brokers</h1><p>Only Active intermediaries with a verified agreement can be tagged to franchises. One active AOR/BOR per account.</p></div>
     ${["aat", "amt"].some(actsAs) ? html`<button class="btn primary" id="reg">${icon("plus")} Register intermediary</button>` : ""}</div>
     <div class="panel"><div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Intermediaries</caption><thead><tr><th>Name</th><th>Type</th><th>Code</th><th>Contact email</th><th>Status</th><th>Validity</th><th>Agreement</th><th>Accounts (AOR/BOR)</th><th>Action</th></tr></thead><tbody>
     ${items.map((i) => html`<tr><td><b>${i.name}</b><span class="sub">${i.contactPerson || ""} · ${i.mobile || ""}</span></td><td>${i.intermediaryType}</td><td class="mono">${i.code}</td><td>${i.email}</td><td>${pill(i.status)}</td>
@@ -51,7 +51,7 @@ async function template(main) {
   document.title = "SOB template · HMS3";
   const t = (await api("records/SOB-TEMPLATE")).record;
   const editable = state.me.role === "accusa";
-  main.innerHTML = html`<div class="page-head"><div><h1>SOB template</h1><p>Actuarial owns the standard SOB template (US-SOB-01). Sales starts every SOB draft from the approved template. Version ${t.v}.</p></div><span id="st"></span></div>
+  main.innerHTML = html`<div class="page-head"><div><h1>SOB template</h1><p>Actuarial owns the standard SOB template. Sales starts every SOB draft from the approved template. Version ${t.v}.</p></div><span id="st"></span></div>
     ${editable ? "" : html`<div class="note mb">${icon("lock", 14)} Maintained by Actuarial. Read-only for ${roleLabel(state.me.role)}.</div>`}
     <section class="panel"><div class="ph"><h2>${t.name} ${pill(t.status)}</h2><div class="row">${editable ? html`<button class="btn sm" id="add">${icon("plus", 14)} Add benefit</button>${DEMO_BYPASS ? html`<button class="btn sm ghost" id="fillSampleTpl" type="button" title="Add a filled sample benefit line">Fill sample</button>` : ""}` : ""}</div></div><div class="pb flush" id="lines"></div></section>`.s;
   let form = null;
@@ -74,7 +74,7 @@ async function providers(main) {
   const run = async () => {
     const t0 = performance.now();
     const r = await api(`providers?q=${encodeURIComponent(main.querySelector("#pq").value)}&type=${main.querySelector("#pt").value}&region=${encodeURIComponent(main.querySelector("#pr").value)}&limit=100`);
-    main.querySelector("#pi").textContent = `${r.total} match(es) · ${Math.round(performance.now() - t0)} ms (target ≤ 2,000 ms, NFR-04)`;
+    main.querySelector("#pi").textContent = `${r.total} match(es) · ${Math.round(performance.now() - t0)} ms (target ≤ 2,000 ms)`;
     main.querySelector("#pl").innerHTML = html`<div class="tbl-wrap"><table class="tbl compact"><thead><tr><th>Code</th><th>Name</th><th>City</th><th>Region</th><th>Tier</th><th>Accreditation</th></tr></thead><tbody>
       ${r.items.map((p) => html`<tr><td class="mono">${p.code}</td><td>${p.name}</td><td>${p.city}</td><td>${p.region}</td><td>${p.tier}</td><td>${pill(p.accreditation)}</td></tr>`)}</tbody></table></div>`.s;
   };
@@ -92,10 +92,10 @@ async function config(main) {
   state.meta.config = meta.config;
   const admin = state.me.role === "admin";
   const items = meta.configItems;
-  main.innerHTML = html`<div class="page-head"><div><h1>Configuration</h1><p>Rules that are proposed in v1.1 or still awaiting a business decision are configurable here instead of hard-coded. ${admin ? "" : "Only the System Administrator can change them."}</p></div></div>
-    <div class="panel"><div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Configuration</caption><thead><tr><th>Setting</th><th>Current value</th><th>Source</th><th>Note</th>${admin ? html`<th>Change</th>` : ""}</tr></thead><tbody>
+  main.innerHTML = html`<div class="page-head"><div><h1>Configuration</h1><p>Business rules that can be adjusted here instead of hard-coded. ${admin ? "" : "Only the System Administrator can change them."}</p></div></div>
+    <div class="panel"><div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Configuration</caption><thead><tr><th>Setting</th><th>Current value</th><th>Note</th>${admin ? html`<th>Change</th>` : ""}</tr></thead><tbody>
     ${items.map((c) => html`<tr><td class="mono">${c.key}</td><td style="max-width:360px"><code style="white-space:pre-wrap;font-size:12px">${short(c.value)}</code>${c.overridden ? html`<span class="sub">Changed from default</span>` : ""}</td>
-      <td>${srcTag(c.src)}</td><td class="tiny">${c.note}</td>${admin ? html`<td><button class="btn sm" data-k="${c.key}">Edit</button></td>` : ""}</tr>`)}</tbody></table></div></div>`.s;
+      <td class="tiny">${c.note}</td>${admin ? html`<td><button class="btn sm" data-k="${c.key}">Edit</button></td>` : ""}</tr>`)}</tbody></table></div></div>`.s;
   main.querySelectorAll("[data-k]").forEach((b) => (b.onclick = async () => {
     const c = items.find((x) => x.key === b.dataset.k);
     const isScalar = typeof c.value !== "object";
@@ -130,7 +130,7 @@ async function testing(main) {
         <li><span>Rate sheet - valid</span><a class="btn sm" href="/api/samples/rate-sheet.csv" download>Download</a></li>
         <li><span>Rate sheet - with errors</span><a class="btn sm" href="/api/samples/rate-sheet-errors.csv" download>Download</a></li>
         <li><span>Structured TOR</span><a class="btn sm" href="/api/samples/tor.csv" download>Download</a></li></ul></div></section>
-      <section class="panel"><div class="ph"><h2>Performance check (NFR-04)</h2></div><div class="pb"><p class="muted">Measures search response times from this browser against the 2-second target.</p><button class="btn mt" id="perf">Run measurements</button><div id="perfOut" class="mt"></div></div></section>
+      <section class="panel"><div class="ph"><h2>Performance check</h2></div><div class="pb"><p class="muted">Measures search response times from this browser against the 2-second target.</p><button class="btn mt" id="perf">Run measurements</button><div id="perfOut" class="mt"></div></div></section>
       <section class="panel"><div class="ph"><h2>Reset demo data</h2></div><div class="pb"><p class="muted">Deletes all records and rebuilds the 32 fictional demo cases by replaying the workflow. Affects every user of this server.</p><button class="btn danger mt" id="reset">Reset demo data</button></div></section>
     </div>`.s;
   main.querySelector("#fail").onclick = async (e) => { if (await act("test.failNextSave", {}, { button: e.currentTarget, quiet: true })) toast("Your next save will fail once.", "ok"); };
