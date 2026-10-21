@@ -247,7 +247,7 @@ function doPrepareReports(rn, silent) {
 }
 function doRequestRates(rn, silent) {
   rn.rates.requested = true; rn.rates.requestedAt = stamp();
-  if (!silent) log(rn, "Requested renewal rates. Sent to Actuarial / ACCUSA — simulated.");
+  if (!silent) log(rn, "Requested renewal rates. Sent to Actuarial — simulated.");
 }
 function doUseRateResponse(rn, silent) {
   const cur = rn.currentPremium;
@@ -652,7 +652,7 @@ function renderReview(ctx) {
       <div class="pb">
         ${!rn.rates.requested ? html`<p>Actuarial pricing stays specialist work. Send the prepared reports to Actuarial and track the request in-system instead of chasing email.</p>
           <div class="row mt"><button class="btn primary" id="reqRates">Request renewal rates</button></div>`
-        : !rr ? html`${simNote(html`Sent to Actuarial / ACCUSA — no rating engine runs here. Load a representative response to continue the demo.`)}
+        : !rr ? html`${simNote(html`Sent to Actuarial — no rating engine runs here. Load a representative response to continue the demo.`)}
           <div class="row mt"><button class="btn primary" id="useRates">Use sample Actuarial response</button></div>`
         : ratesHtml(rn)}
       </div></section>` : ""}`.s;

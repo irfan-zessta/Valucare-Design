@@ -29,7 +29,7 @@ export const DEPARTMENTS = [
         desc: "Individual and family group renewals." },
     ],
   },
-  { key: "actuarial", name: "Actuarial / ACCUSA", icon: "chart", status: "soon",
+  { key: "actuarial", name: "Actuarial", icon: "chart", status: "soon",
     desc: "Price quotations and release renewal rates." },
   { key: "mda", name: "MDA", icon: "users", status: "soon",
     desc: "Member data alignment and handoff." },
