@@ -121,17 +121,42 @@ async function advance(name, body = {}) {
     const hit = findFranchise(body.franchiseId);
     if (!hit) return;
     const fr = hit.fr;
+    const s = hit.data.summary;
     const dec = { decision: body.decision, by: who.id, byName: who.name, at: iso, remarks: body.remarks || "", version: fr.v };
     fr.decisions = (fr.decisions || []).concat(dec);
     if (body.decision === "approve") {
       fr.status = "Approved";
       fr.approvedBy = who.id; fr.approvedAt = iso;
       fr.validFrom = today; fr.validUntil = today.slice(0, 4) + "-12-31";
-      hit.data.summary.status = "For Rates Creation";
+      // Re-derive the summary the way the Python backend's derive() does. Flipping only
+      // fr.status is enough on local (the server recomputes the summary on the next read),
+      // but a static host has no server, so without rebuilding summary.stage / next / tasks
+      // here the NEXT ACTION banner and the work-area stepper stay frozen on "Create
+      // Franchise" even though the franchise is approved — the production-only "won't go to
+      // the next step" symptom. Advance the case into stage 3 (Prepare Quotation) with the
+      // same two tasks the server produces: collect requirements (waiting on client) and the
+      // rate request to Actuarial.
+      if (s) {
+        const plusDays = (n) => new Date(now.getTime() + n * 86400000).toISOString().slice(0, 10);
+        const outstanding = "Member Data (Master List), TOR / current SOB, Utilization report, Target rates, GIS";
+        const base = { role: "aat", roleLabel: "AAT", assigneeId: s.ownerId, assigneeName: s.ownerName,
+          since: iso, kind: "action", excludeUserId: null, caseId: s.id, stage: 3 };
+        const reqTask = { ...base, key: "requirements", title: "Collect outstanding requirements from client",
+          due: plusDays(1), link: `#/case/${s.id}/quotation/requirements`, waiting: "client", blocker: "Outstanding: " + outstanding };
+        const rrTask = { ...base, key: "rate_request", title: "Submit the rate request to Actuarial",
+          due: plusDays(2), link: `#/case/${s.id}/quotation/rates`, waiting: null, blocker: null };
+        s.stage = 3; s.stageLabel = "Quotation";
+        s.status = "Waiting on client"; s.statusTone = "warn";
+        s.pipelineStage = "For Rates Creation";
+        s.franchiseStatus = "Approved"; s.franchiseValidUntil = fr.validUntil;
+        s.blocker = "Outstanding: " + outstanding;
+        s.next = reqTask; s.tasks = [reqTask, rrTask]; s.myTasks = [reqTask, rrTask];
+        s.nextDue = reqTask.due;
+      }
       if (hit.data.case) hit.data.case.pipelineStage = "For Rates Creation";
     } else {
       fr.status = body.decision === "return" ? "Returned" : "Rejected";
-      hit.data.summary.status = body.decision === "return" ? "Returned for Correction" : "Rejected";
+      if (s) s.status = body.decision === "return" ? "Returned for Correction" : "Rejected";
     }
     return;
   }
