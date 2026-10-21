@@ -23,7 +23,7 @@ export const DEPARTMENTS = [
         desc: "Take a corporate lead from first enquiry to an active, handed-over account." },
       { key: "corp-renewal", name: "Corporate Renewal Business", status: "live", href: "#/renewal-business",
         desc: "Review current data, agree terms and complete a corporate renewal." },
-      { key: "ifg-new", name: "IFG New Business", status: "soon", href: "#/new-ifg",
+      { key: "ifg-new", name: "IFG New Business", status: "live", href: "#/new-ifg",
         desc: "Individual and family group new business." },
       { key: "ifg-renewal", name: "IFG Renewal Business", status: "soon", href: "#/renewal-ifg",
         desc: "Individual and family group renewals." },

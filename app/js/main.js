@@ -259,7 +259,7 @@ const VIEWS = {
   home: () => import("./views/home.js"),
   "new-business": () => import("./views/queue.js"),
   "renewal-business": () => import("./views/renewal.js"),
-  "new-ifg": () => import("./views/section.js"),
+  "new-ifg": () => import("./views/new-ifg.js"),
   "renewal-ifg": () => import("./views/section.js"),
   create: () => import("./views/create.js"),
   tasks: () => import("./views/tasks.js"),
@@ -341,11 +341,20 @@ window.addEventListener("hashchange", async () => {
   const nextParts = target.split("?")[0].split("/").slice(0, 4).join("/");
   if (prevParts !== nextParts) {
     navigating = true;
-    history.replaceState(null, "", lastHash || "#/explore");
-    const ok = await flushForms();
-    navigating = false;
-    if (!ok) return;
-    history.pushState(null, "", target);
+    try {
+      // Revert the URL, flush any dirty form, then commit the new URL. History
+      // manipulation can throw in sandboxed previews; if it does, fall through to a
+      // plain navigation rather than leaving `navigating` stuck true forever — which
+      // would silently swallow every later hashchange until a full page reload.
+      history.replaceState(null, "", lastHash || "#/explore");
+      const ok = await flushForms();
+      if (!ok) { navigating = false; return; }
+      history.pushState(null, "", target);
+    } catch (e) {
+      console.warn("History update skipped:", e && e.message);
+    } finally {
+      navigating = false;
+    }
   }
   lastHash = target;
   route();

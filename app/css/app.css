@@ -751,3 +751,23 @@ dl.kv.cols .wide{grid-column:1/-1}
 .rnw-doc-ribbon{background:var(--surface-muted);color:var(--text-muted);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:6px 12px;border-bottom:1px solid var(--border)}
 .rnw-doc h3{margin:12px 14px 0;font-size:15px}
 .rnw-doc-body{margin:8px 14px 14px;font-size:13px;line-height:1.6;white-space:pre-wrap;color:var(--text-muted);font-family:inherit}
+
+/* IFG New Business — a few additions on top of the shared .rnw-* / .panel vocabulary */
+.ticks{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--text-muted)}
+.ticks li{line-height:1.5}
+.ticks li b{color:var(--text);font-weight:600}
+.rnw-card.ifg-plan{cursor:pointer;text-align:left;font:inherit;transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
+.rnw-card.ifg-plan:hover:not(:disabled){border-color:var(--border-input-hover)}
+.rnw-card.ifg-plan:disabled{cursor:default;opacity:.8}
+.rnw-card.ifg-plan.sel{border-color:var(--accent);background:var(--info-soft)}
+.rnw-card.ifg-plan.sel .rnw-card-l{color:var(--text);font-weight:600;display:inline-flex;gap:6px;align-items:center}
+.doclist .ok{color:var(--success);font-weight:500;display:inline-flex;gap:4px;align-items:center}
+.doclist .skip-tag{color:var(--warning);font-weight:500}
+.ifg-id{display:flex;flex-direction:column;gap:3px;justify-content:center;min-height:120px;padding:14px 16px;border:1px dashed var(--border-input);border-radius:var(--r-sm);background:var(--surface-muted);color:var(--text-muted)}
+.ifg-id span:first-child{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-subtle)}
+.ifg-id b{font-size:17px;color:var(--text)}
+.ifg-phone{max-width:300px;margin:0 auto;border:1px solid var(--border);border-radius:22px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm,0 6px 24px rgba(0,0,0,.08))}
+.ifg-phone-top{background:var(--text);color:var(--on-accent,#fff);font-size:12px;font-weight:600;text-align:center;padding:10px 12px}
+.ifg-phone-body{padding:16px;display:flex;flex-direction:column;gap:10px}
+.ifg-phone-body h3{font-size:16px;font-weight:600}
+.ifg-phone-body .note{font-size:12.5px}
