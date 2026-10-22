@@ -72,6 +72,18 @@ function sampleMembers(d,purpose) {
     counts:{total,valid:total,errors:0,duplicates:0,exceptions:0},simulated:true,mda:purpose==='enrollment'?{status:'Completed',byName:'Sample MDA',at:stamp(),notes:'Sample acknowledgement—no policies or cards issued',enrolled:total}:null});
   batch.docId=doc(d,batch,'member-data','Member-Data-sample.csv').id;return batch;
 }
+// Captures a ready structured TOR and quotation Member Data from the uploaded
+// requirements, so neither has to be built by hand before the rate request (#6).
+function captureQuotationData(d) {
+  if(!one(d,'tor')) record(d,'tor',{lines:copy(d.template.lines.filter(l=>['IP-RB','OP-CONS','ER-ACC','DEN-PREV','APE-STD'].includes(l.code)).map((l,i)=>({...l,id:'B'+(i+1)})))});
+  sampleMembers(d,'quotation');
+}
+// Attaches the already-captured Member Data and TOR to the rate request by default,
+// so the user does not re-upload data the case already holds (#7).
+function attachQuotationData(d,rr) {
+  if(d.documents.some(x=>x.linked?.id===rr.id&&x.slot==='rr_attach'&&!x.supersededBy)) return;
+  if((d.records.memberBatch||[]).some(b=>b.purpose==='quotation')||one(d,'tor')) doc(d,rr,'rr_attach','Quotation-package (Member Data + Structured TOR)-sample.pdf');
+}
 function makeRates(d) {
   const rr=one(d,'rateRequest'); need(rr,'Request rates first.');
   if(one(d,'rateSheet')&&rr.status==='Rate Sheet Issued') return one(d,'rateSheet');
@@ -83,7 +95,7 @@ function makeRates(d) {
 function makeOffer(d) {
   const rs=one(d,'rateSheet'); need(rs,'Load the rate sheet first.');
   let sob=one(d,'sob');
-  if(!sob) sob=record(d,'sob',{name:'Main SOB',scope:'parent',version:1,status:'Draft',source:'tor',preparedBy:actor,lines:copy(one(d,'tor')?.lines||d.template.lines.slice(0,5)),
+  if(!sob) sob=record(d,'sob',{name:'Main SOB',scope:'parent',version:1,status:'Draft',source:'template',templateVersion:d.template.v,preparedBy:actor,lines:copy(d.template.lines),
     exclusions:[],customExclusions:[],specialInstructions:[],approvals:[],history:[],addOns:{lifeInsurance:{enabled:false,partner:'Full Life',coverage:''},teleconsultation:{enabled:false,partner:'Consulta MD',terms:''}},legacy:{}});
   if(!one(d,'proposal')) record(d,'proposal',{code:uid('PR'),version:1,status:'Draft',rateSheetId:rs.id,rateSheetVersion:rs.version,sobId:sob.id,sobVersion:sob.version,
     items:rs.rows.map(({rate,...r})=>({...r,actuarialRate:rate,proposedRate:rate})),commissionPct:0,commissionNote:'',justification:'',recommendation:'',approvals:[],rounds:[],history:[]});
@@ -190,9 +202,8 @@ async function advance(d,key,meta) {
     case 'franchise_approve':change(fr,{status:'Approved',approvedAt:stamp(),approvedBy:'demo-review',validFrom:today(),validUntil:d.case.channel==='Direct'?today().slice(0,4)+'-12-31':days(today(),60)});fr.decisions.push({decision:'approve',byName:'Sample Account Services',at:stamp(),remarks:'Simulated',version:fr.v});break;
     case 'requirements':
       for(const x of meta.requirements) { const f=doc(d,fr,'req:'+x.key);fr.requirements[x.key]={status:'Received',simulated:true,note:'Sample document—not verified',docId:f.id,at:stamp(),by:actor}; }
-      if(!one(d,'tor')) record(d,'tor',{lines:copy(d.template.lines.filter(l=>['IP-RB','OP-CONS','ER-ACC','DEN-PREV','APE-STD'].includes(l.code)).map((l,i)=>({...l,id:'B'+(i+1)})))});
-      sampleMembers(d,'quotation');d.demo.requirementsReady=true;break;
-    case 'rate_request': { const rr=one(d,'rateRequest')||record(d,'rateRequest',{code:uid('RR'),franchiseCode:fr.code,franchiseId:fr.id,requestedPlans:'Corporate Standard',roomBoard:'Semi-private',mblOptions:'150000',targetRates:'Sample only',paymentModes:['Annual'],dependentCoverage:'Yes',clarifications:[]});change(rr,{status:'Submitted'});break; }
+      captureQuotationData(d);d.demo.requirementsReady=true;break;
+    case 'rate_request': { const rr=one(d,'rateRequest')||record(d,'rateRequest',{code:uid('RR'),franchiseCode:fr.code,franchiseId:fr.id,requestedPlans:'Corporate Standard',roomBoard:'Semi-private',mblOptions:'150000',targetRates:'Sample only',paymentModes:['Annual'],dependentCoverage:'Yes',clarifications:[]});attachQuotationData(d,rr);change(rr,{status:'Submitted'});break; }
     case 'rates_receive':makeRates(d);break;
     case 'offer_build':makeOffer(d);break;
     case 'offer_review':change(p,{status:'Approved',sobVersion:sob.version});change(sob,{status:'Approved'});review(p,'Sales');review(p,'Senior Management pricing');review(sob,'Independent SOB');break;
@@ -237,7 +248,7 @@ async function action(name,b,meta) {
   else if(name==='franchise.decide') { if(b.decision==='approve')await advance(d,'franchise_approve',meta);else change(r,{status:b.decision==='return'?'Returned':'Rejected',returnReason:b.remarks}); }
   else if(name==='franchise.setRequirement')r.requirements[b.key]={status:b.status,note:b.note,at:stamp(),by:actor};
   else if(name==='tor.create')out.id=(one(d,'tor')||record(d,'tor',{lines:[]})).id;
-  else if(name==='rateRequest.create')out.id=(one(d,'rateRequest')||record(d,'rateRequest',{code:uid('RR'),status:'Draft',requestedPlans:'',paymentModes:[],clarifications:[],franchiseCode:one(d,'franchise').code})).id;
+  else if(name==='rateRequest.create'){const rr=one(d,'rateRequest')||record(d,'rateRequest',{code:uid('RR'),status:'Draft',requestedPlans:'',paymentModes:[],clarifications:[],franchiseCode:one(d,'franchise').code});attachQuotationData(d,rr);out.id=rr.id;}
   else if(name==='rateSheet.issue')out.id=makeRates(d).id;
   else if(name==='proposal.create'||name==='sob.create') {makeOffer(d);out.id=one(d,name.split('.')[0]).id;}
   else if(['proposal.smDecision','proposal.seniorDecision','sob.salesReview','sob.validate'].includes(name)) {change(r,{status:b.decision==='approve'?(name==='proposal.smDecision'?'Senior Review':name==='sob.salesReview'?'Independent Validation':'Approved'):'Draft'});review(r,name);}
@@ -289,7 +300,13 @@ async function mutate(p,b,q,raw) {
   try {
     let out;const meta=await fixture('meta');
     if(p.startsWith('action/'))out=await action(p.slice(7),b||{},meta);
-    else if(p==='upload'){const d=await getCase(q.get('caseId')),r=records(d).find(x=>x.id===q.get('linkedId'));need(r,'Document record not found.');out={document:doc(d,r,q.get('slot'),raw?.name)};log(d,'Sample document recorded','No real file stored in the demo.');}
+    else if(p==='upload'){const d=await getCase(q.get('caseId')),r=records(d).find(x=>x.id===q.get('linkedId'));need(r,'Document record not found.');out={document:doc(d,r,q.get('slot'),raw?.name)};
+      // #6 — uploading a quotation requirement (or the TOR file) auto-captures a ready
+      // structured TOR and Member Data so the rate request can be created without the
+      // user building either by hand.
+      const slot=q.get('slot')||'';
+      if((r.type==='franchise'&&slot.startsWith('req:'))||(r.type==='tor'&&slot==='tor_original')) captureQuotationData(d);
+      log(d,'Sample document recorded','No real file stored in the demo.');}
     else if(p==='import/members'){const d=await getCase(q.get('caseId'));out={batch:sampleMembers(d,q.get('purpose')||'quotation'),autoMapped:true,elapsedMs:0};}
     else throw new DemoError('Use the sample package action in this hosted demo. Nothing was changed.');
     if(key){db.receipts[key]=copy(out);const ks=Object.keys(db.receipts);if(ks.length>150)delete db.receipts[ks[0]];}

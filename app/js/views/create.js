@@ -13,15 +13,18 @@ export async function render(main) {
   // sessionStorage on every change and restored here. It is cleared only on a
   // confirmed create or a deliberate discard — never silently.
   const DRAFT_KEY = "hms3:nb-create-draft";
-  const defaults = () => ({ step: "find", q: "", results: null, company: null, newCompany: null, lead: null, dups: null, override: null });
+  const defaults = () => ({ step: "company", q: "", results: null, company: null, newCompany: null, lead: null, dups: null, override: null });
   const loadDraft = () => { try { return JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null"); } catch (e) { return null; } };
   const saveDraft = () => { try { const { results, ...rest } = s; sessionStorage.setItem(DRAFT_KEY, JSON.stringify(rest)); } catch (e) { /* storage full / disabled */ } };
   const clearDraft = () => { try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ } };
   const saved = loadDraft();
   const s = Object.assign(defaults(), saved || {});
+  // Migrate drafts saved by the old three-step wizard: the former "find" and
+  // "company" steps are now one combined first step.
+  if (!["company", "lead"].includes(s.step)) s.step = "company";
   // A restored draft is only worth announcing if the tester had moved past the
   // empty search step or typed something.
-  let restored = !!saved && (s.step !== "find" || !!s.q || !!s.newCompany || !!s.lead);
+  let restored = !!saved && (s.step !== "company" || !!s.q || !!s.newCompany || !!s.lead);
   const min = state.meta.config.corporateMinPrincipals;
 
   function discardDraft() {
@@ -34,15 +37,14 @@ export async function render(main) {
 
   function draw() {
     main.innerHTML = html`<div class="page-head"><div><h1>Create New Business</h1>
-      <p>Find the company first so nothing is duplicated. Then continue its existing case, or start a new case for an existing or genuinely new company.</p></div></div>
+      <p>Find the company first so nothing is duplicated — continue its existing case, or create a new company right here. Then enter the lead details.</p></div></div>
       ${restored ? html`<div class="note info mb" role="status" id="draftNote"><b>Unfinished draft restored.</b> We kept what you had entered. <button type="button" class="btn ghost sm" id="discardDraft">Discard and start over</button></div>` : ""}
-      <ol class="steps-h mb" aria-label="Steps">${[["find", "1. Find company"], ["company", "2. Confirm company"], ["lead", "3. Lead details"]].map(([k, l]) =>
-        html`<li class="${s.step === k ? "cur" : ["find", "company", "lead"].indexOf(k) < ["find", "company", "lead"].indexOf(s.step) ? "done" : ""}" ${s.step === k ? 'aria-current="step"' : ""}>${l}</li>`)}</ol>
+      <ol class="steps-h mb" aria-label="Steps">${[["company", "1. Find company"], ["lead", "2. Lead details"]].map(([k, l]) =>
+        html`<li class="${s.step === k ? "cur" : ["company", "lead"].indexOf(k) < ["company", "lead"].indexOf(s.step) ? "done" : ""}" ${s.step === k ? 'aria-current="step"' : ""}>${l}</li>`)}</ol>
       <div id="body"></div>`.s;
     main.querySelector("#discardDraft")?.addEventListener("click", discardDraft);
     const body = main.querySelector("#body");
-    if (s.step === "find") drawFind(body);
-    if (s.step === "company") drawCompany(body);
+    if (s.step === "company") drawCompanyStep(body);
     if (s.step === "lead") drawLead(body);
     saveDraft();
     // If the guided demo is on and still in its pre-case phase, point out the control to
@@ -50,13 +52,16 @@ export async function render(main) {
     mountCreateGuide(main);
   }
 
-  // ---- step 1: search
-  function drawFind(body) {
+  // ---- step 1: find the company AND, if it is genuinely new, confirm its details
+  // on the same screen (search at the top, the new-company form appears below once
+  // "Create new company" is chosen). A duplicate check still runs before continuing.
+  function drawCompanyStep(body) {
     body.innerHTML = html`<div class="panel"><div class="pb">
       <form id="sf" class="row" role="search"><div class="field grow" style="max-width:560px"><label for="sq">Company name, TIN, address, case, franchise or account code</label>
         <input id="sq" type="search" class="inp" value="${s.q}" placeholder="e.g. Northwind, 123-456-789, FR-2026-0004, MA-2026-00002" autocomplete="off"></div>
         <button class="btn primary" style="align-self:flex-end">${icon("search", 16)} Search</button></form>
-      <div id="res" class="mt" aria-live="polite"></div></div></div>`.s;
+      <div id="res" class="mt" aria-live="polite"></div></div></div>
+      <div id="newco-area"></div>`.s;
     const res = body.querySelector("#res");
     const run = async () => {
       s.q = body.querySelector("#sq").value.trim();
@@ -67,8 +72,9 @@ export async function render(main) {
       drawResults(res);
     };
     body.querySelector("#sf").onsubmit = (e) => { e.preventDefault(); run(); };
-    body.querySelector("#sq").focus();
+    if (!s.newCompany) body.querySelector("#sq").focus();
     if (s.results) drawResults(res);
+    if (s.newCompany) drawNewCompany(body.querySelector("#newco-area"));
   }
   function drawResults(res) {
     const r = s.results;
@@ -93,14 +99,15 @@ export async function render(main) {
     res.querySelector("#newco").onclick = () => {
       s.company = null;
       s.newCompany ||= { registeredName: /^[\d-]+$/.test(s.q) || /^(NB|LD|FR|MA)-/i.test(s.q) ? "" : s.q, tradeName: "", tin: /^[\d-]{9,}$/.test(s.q) ? s.q : "", industry: "", address: "", province: "", city: "" };
-      s.dups = null; s.override = null; s.step = "company"; draw();
+      s.dups = null; s.override = null; draw();
+      main.querySelector("#newco-area")?.scrollIntoView({ block: "start", behavior: "smooth" });
     };
   }
 
-  // ---- step 2: new company + duplicate check
-  function drawCompany(body) {
+  // ---- inline new-company form + duplicate check (part of step 1)
+  function drawNewCompany(body) {
     const c = s.newCompany;
-    body.innerHTML = html`<form class="panel" data-form id="cf" novalidate><div class="ph"><h2>New company</h2><button type="button" class="btn ghost sm" id="back">‹ Back to search</button></div>
+    body.innerHTML = html`<form class="panel mt" data-form id="cf" novalidate><div class="ph"><h2>New company</h2><button type="button" class="btn ghost sm" id="back">‹ Cancel</button></div>
       <div class="pb"><div class="fgrid">
         ${field({ key: "registeredName", label: "Registered company name", required: true, src: "legacy", wide: true }, c.registeredName)}
         ${field({ key: "tradeName", label: "Trade / short name", src: "legacy" }, c.tradeName)}
@@ -112,7 +119,7 @@ export async function render(main) {
         ${field({ key: "region", label: "Region", type: "region", src: "legacy" }, state.meta.geo[c.province]?.region || "")}
       </div>
       <div id="dups"></div></div>
-      <div class="savebar"><span class="tiny">Nothing is saved until the case is created in step 3.</span><div class="row">${sampleBtn("fillSampleCo")}<button class="btn primary" id="chk">Check for duplicates and continue</button></div></div></form>`.s;
+      <div class="savebar"><span class="tiny">Nothing is saved until the case is created in the next step.</span><div class="row">${sampleBtn("fillSampleCo")}<button class="btn primary" id="chk">Check for duplicates and continue</button></div></div></form>`.s;
     const form = body.querySelector("#cf");
     mountCombos(form);
     form.querySelector("#fillSampleCo")?.addEventListener("click", () => fillSampleData(form));
@@ -130,7 +137,8 @@ export async function render(main) {
       saveDraft();
     });
     form.addEventListener("input", (e) => { if (e.target.name && e.target.type !== "hidden") { c[e.target.name] = e.target.value; saveDraft(); } });
-    body.querySelector("#back").onclick = () => { s.step = "find"; draw(); };
+    // Cancel hides the new-company form and returns to the plain search on the same step.
+    body.querySelector("#back").onclick = () => { s.newCompany = null; s.dups = null; s.override = null; draw(); };
     // Only show the duplicate panel when real matches exist. An empty matches
     // array (zero duplicates found) must never read as "Possible duplicate found".
     if (s.dups && s.dups.length) drawDups(body.querySelector("#dups"));
@@ -216,7 +224,7 @@ export async function render(main) {
       saveDraft();
       if (e.target.name === "channel") { L.intermediaryId = ""; drawLead(body); body.querySelector(`input[name="channel"][value="${L.channel}"]`).focus(); }
     });
-    body.querySelector("#back").onclick = () => { s.step = s.company ? "find" : "company"; draw(); };
+    body.querySelector("#back").onclick = () => { s.step = "company"; draw(); };
     form.onsubmit = (e) => { e.preventDefault(); create(form.querySelector("#go"), false); };
   }
   async function create(btn, ifg) {

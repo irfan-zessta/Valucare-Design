@@ -1,5 +1,5 @@
 import { html, raw, state, act, api, roleLabel, userName, interName, fmtDate, fmtDateTime, dialog, toast, RecordForm, saveStateHtml, errorSummaryHtml,
-  wireErrorLinks, paintFieldErrors, showError, daysUntil, clone, confirmDialog } from "../core.js";
+  wireErrorLinks, paintFieldErrors, showError, daysUntil, clone, confirmDialog, pickFile } from "../core.js";
 import { icon, pill, field, mountCombos, controlValue, docSlot, wireUploads, setComboValue, srcTag, fillSampleData } from "../components.js";
 import { DEMO_BYPASS, actsAs, isAdmin, ownsCase } from "../core.js";
 
@@ -40,6 +40,8 @@ export async function render(ctx) {
       ${pendingExt ? html`<div class="pb"><div class="note"><b>Extension requested</b> by ${pendingExt.requestedByName} to ${fmtDate(pendingExt.requestedUntil)}: ${pendingExt.reason}. Waiting for AMT.</div></div>` : ""}
       ${(canReview || (fr.status !== "Draft" && (fr.conflicts?.length || fr.highRisk))) ? reviewPanel(fr, data) : ""}
     </section>
+    ${editable ? html`<div class="note mt" id="uploadFormBanner"><div class="row between"><div><b>Have a completed franchise form?</b> <span class="tiny">Upload it to auto-capture the details below — sample, not verified. You can still edit anything afterwards.</span></div>
+      <button class="btn sm" id="uploadFranchiseForm" type="button">${icon("upload", 14)} Upload franchise form</button></div></div>` : ""}
     <div id="errs">${raw(errorSummaryHtml(errors).s || "")}</div>
     <nav class="secnav" aria-label="Franchise form sections">${[...schema.map((s) => [s.key, s.label]), ["documents", "Documents"], ["affiliates", "Affiliates"], ["decisions", "Decisions and extensions"]].map(([k, l]) =>
       html`<a href="#sec-${k}" data-jump="sec-${k}">${l}${errors.some((e) => (e.section || e.field.split(".")[0]) === k) ? html`<span class="e" aria-label="has errors">●</span>` : ""}</a>`)}</nav>
@@ -177,6 +179,21 @@ export async function render(ctx) {
     affBox.querySelector(`#af-${arr.length - 1}-name`)?.focus();
   });
   el.querySelector("#fillSample")?.addEventListener("click", () => { fillSampleData(formEl); });
+  // #2 — "Upload franchise form" reads a completed form and auto-captures the details.
+  // In this demo there is no OCR, so the uploaded file is kept as the franchise form
+  // document and the fields are filled from the captured sample for the walkthrough.
+  el.querySelector("#uploadFranchiseForm")?.addEventListener("click", async (e) => {
+    const f = await pickFile(".pdf,.docx,.jpg,.jpeg,.png,.xlsx,.xls");
+    if (!f) return;
+    const b = e.currentTarget; b.setAttribute("aria-busy", "true"); b.disabled = true;
+    try {
+      await import("../core.js").then((c) => c.upload(f, { caseId: id, linkedType: "franchise", linkedId: fr.id, slot: "franchise_form" }));
+      fillSampleData(formEl);
+      await form.save();
+      toast(`Captured details from ${f.name} — sample, not verified. Review and submit.`, "ok");
+      ctx.reload();
+    } catch (err) { b.removeAttribute("aria-busy"); b.disabled = false; await showError(err); }
+  });
   el.querySelector("#saveBtn").onclick = async (e) => { const b = e.currentTarget; b.setAttribute("aria-busy", "true"); const ok = await form.save(); b.removeAttribute("aria-busy"); if (ok) toast("Draft saved.", "ok"); };
   el.querySelector("#submitBtn").onclick = async (e) => {
     const b = e.currentTarget;

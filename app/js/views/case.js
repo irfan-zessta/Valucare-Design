@@ -128,9 +128,7 @@ export async function render(main, { parts, query, force }) {
     </div>
     ${nextStrip(ctx, { n, mine, suggested })}
     <nav class="steps-nav" aria-label="Work areas and progress">${STEPS.map((step) => stepTab(ctx, step, stepKey))}</nav>
-    <details class="case-details" ${raw(localStorage.getItem("hms-pref:caseDetailsOpen") === "true" ? "open" : "")}><summary>Record details (reference)</summary>${caseDetails(data)}</details>
     <div id="step"></div>`.s;
-  main.querySelector(".case-details").addEventListener("toggle", (e) => localStorage.setItem("hms-pref:caseDetailsOpen", e.target.open));
   main.querySelector("#docsBtn").onclick = () => documentsDrawer(ctx);
   main.querySelector("#histBtn").onclick = () => historyDrawer(ctx);
   main.querySelector("#delCaseBtn")?.addEventListener("click", async (e) => {

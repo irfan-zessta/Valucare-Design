@@ -149,7 +149,7 @@ function rates(ctx) {
       ${F("jumbo", "Jumbo indicator", "checkbox")}
       ${F("specialRequirements", "Special requirements", "textarea")}
     </div>
-    <div class="mt">${docSlot({ label: "Attachments", slot: "rr_attach", docs: data.documents, linkedType: "rateRequest", linkedId: rr.id, caseId: id, canUpload: am && !["Rate Sheet Issued"].includes(rr.status), hint: "Member Data, utilization and TOR files are already on the franchise checklist." })}</div></div>
+    <div class="mt">${docSlot({ label: "Attachments", slot: "rr_attach", docs: data.documents, linkedType: "rateRequest", linkedId: rr.id, caseId: id, canUpload: am && !["Rate Sheet Issued"].includes(rr.status), hint: "The captured Member Data and structured TOR are attached by default; upload more only if needed." })}</div></div>
     ${editable ? html`<div class="savebar"><span id="st"></span><div class="row">${sampleBtn("fillSampleRr")}<button class="btn primary" id="sub">Submit to Actuarial</button></div></div>` : ""}</section>
     <section class="panel"><div class="ph"><h2>Clarifications</h2></div><div class="pb">${(rr.clarifications || []).length ? html`<ul class="timeline">${rr.clarifications.map((c) => html`<li><span class="when">${fmtDateTime(c.askedAt)}</span><div><b>${c.askedByName} (Actuarial) asked:</b> ${c.question}
       ${c.answer ? html`<div class="mt"><b>${c.answeredByName} answered:</b> ${c.answer} <span class="tiny">${fmtDateTime(c.answeredAt)}</span></div>` : html`<div class="tiny mt">Awaiting the AAT handler's answer.</div>`}</div></li>`)}</ul>` : html`<p class="tiny">No clarifications.</p>`}</div></section>
