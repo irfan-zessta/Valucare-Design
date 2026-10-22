@@ -72,12 +72,18 @@ function sampleMembers(d,purpose) {
     counts:{total,valid:total,errors:0,duplicates:0,exceptions:0},simulated:true,mda:purpose==='enrollment'?{status:'Completed',byName:'Sample MDA',at:stamp(),notes:'Sample acknowledgement—no policies or cards issued',enrolled:total}:null});
   batch.docId=doc(d,batch,'member-data','Member-Data-sample.csv').id;return batch;
 }
-// Captures a ready structured TOR and quotation Member Data from the uploaded
-// requirements, so neither has to be built by hand before the rate request (#6).
-function captureQuotationData(d) {
+// Captures a ready structured TOR from an uploaded TOR / current-SOB file, so the
+// baseline benefit lines are not keyed in by hand (#6). The 5 baseline benefits
+// mirror a typical current SOB; the SOB itself still starts from the full standard
+// template (#9), which is why most lines read "New benefit" in the comparison.
+function captureTor(d) {
   if(!one(d,'tor')) record(d,'tor',{lines:copy(d.template.lines.filter(l=>['IP-RB','OP-CONS','ER-ACC','DEN-PREV','APE-STD'].includes(l.code)).map((l,i)=>({...l,id:'B'+(i+1)})))});
-  sampleMembers(d,'quotation');
 }
+// Captures a ready quotation Member Data batch from an uploaded Master List, so the
+// headcount is validated and ready for the rate request without a manual import (#6).
+function captureMemberData(d) { sampleMembers(d,'quotation'); }
+// Both together — used by the one-click "Use sample quotation package" step.
+function captureQuotationData(d) { captureTor(d); captureMemberData(d); }
 // Attaches the already-captured Member Data and TOR to the rate request by default,
 // so the user does not re-upload data the case already holds (#7).
 function attachQuotationData(d,rr) {
@@ -301,11 +307,15 @@ async function mutate(p,b,q,raw) {
     let out;const meta=await fixture('meta');
     if(p.startsWith('action/'))out=await action(p.slice(7),b||{},meta);
     else if(p==='upload'){const d=await getCase(q.get('caseId')),r=records(d).find(x=>x.id===q.get('linkedId'));need(r,'Document record not found.');out={document:doc(d,r,q.get('slot'),raw?.name)};
-      // #6 — uploading a quotation requirement (or the TOR file) auto-captures a ready
-      // structured TOR and Member Data so the rate request can be created without the
-      // user building either by hand.
+      // #6 — a sample/real upload on a quotation requirement auto-captures the matching
+      // record so the rate request can be created without building it by hand: the
+      // Master List populates Member Data, and the TOR / current-SOB file populates the
+      // structured TOR. Other requirement files (utilization, target rates, GIS) are
+      // just stored as attachments.
       const slot=q.get('slot')||'';
-      if((r.type==='franchise'&&slot.startsWith('req:'))||(r.type==='tor'&&slot==='tor_original')) captureQuotationData(d);
+      if(r.type==='tor'&&slot==='tor_original') captureTor(d);
+      else if(r.type==='franchise'&&slot==='req:tor') captureTor(d);
+      else if(r.type==='franchise'&&slot==='req:masterlist') captureMemberData(d);
       log(d,'Sample document recorded','No real file stored in the demo.');}
     else if(p==='import/members'){const d=await getCase(q.get('caseId'));out={batch:sampleMembers(d,q.get('purpose')||'quotation'),autoMapped:true,elapsedMs:0};}
     else throw new DemoError('Use the sample package action in this hosted demo. Nothing was changed.');
