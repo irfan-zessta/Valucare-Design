@@ -14,11 +14,19 @@ import { renderCase } from "./actdesk-corp.js";
 import { renderBatch } from "./actdesk-ifg.js";
 import { highlightNav } from "./actdesk-ui.js";
 
+// Temporarily disabled journeys/screens ("for now"). To re-enable, remove the entry
+// here, flip the two explore.js cards back to status:"live", and restore the
+// "reports" nav item in main.js. Everything else stays intact.
+const DISABLED = { ifg: true, reports: true };
+const isDisabled = (rec) => DISABLED.ifg && rec.kind === "ifg";
+
 export async function render(main, { parts, query }) {
   ensureSeeded();
   document.getElementById("act-guide")?.remove();
   document.querySelectorAll(".sx-back").forEach((o) => o.remove());
   const sub = parts[1];
+  if (sub === "batch" && DISABLED.ifg) return go("#/actuarial-desk");
+  if (sub === "reports" && DISABLED.reports) return go("#/actuarial-desk");
   if (sub === "case") return renderCase(main, parts[2], parts[3] || "request");
   if (sub === "batch") return renderBatch(main, parts[2], parts[3] || "batch");
   if (sub === "released") return renderReleased(main);
@@ -37,7 +45,7 @@ function bucket(rec) {
 function renderHome(main, tab, query) {
   const q = (query.q || "").toLowerCase();
   const jf = prefs.get("actdesk:filter", "all");
-  const all = allRecords();
+  const all = allRecords().filter((r) => !isDisabled(r));
   const inTab = all.filter((r) => bucket(r) === tab);
   const rows = inTab.filter((r) => (jf === "all" || journeyKey(r) === jf) && (!q || recName(r).toLowerCase().includes(q) || r.id.toLowerCase().includes(q)));
   const counts = { new: all.filter((r) => bucket(r) === "new").length, progress: all.filter((r) => bucket(r) === "progress").length };
@@ -59,7 +67,7 @@ function renderHome(main, tab, query) {
         <option value="all" ${jf === "all" ? "selected" : ""}>All journeys</option>
         <option value="nb" ${jf === "nb" ? "selected" : ""}>Corporate New Business</option>
         <option value="renewal" ${jf === "renewal" ? "selected" : ""}>Corporate Renewal</option>
-        <option value="ifg" ${jf === "ifg" ? "selected" : ""}>IFG Renewal</option>
+        ${DISABLED.ifg ? "" : html`<option value="ifg" ${jf === "ifg" ? "selected" : ""}>IFG Renewal</option>`}
       </select>
     </div>
 
@@ -69,7 +77,7 @@ function renderHome(main, tab, query) {
       : html`<div class="panel mt"><div class="pb"><div class="state-box"><b>Nothing in ${tab === "new" ? "New requests" : "In progress"}.</b>
         <p class="tiny">${tab === "new" ? "New requests from Sales and the renewal worklist appear here." : "Cases you have started appear here until released."}</p></div></div></div>`}
 
-    <p class="tiny mt"><a href="#/explore/actuarial">${icon("collapse", 13)} Back to demo selection</a> · Four preloaded samples, each starting at its first step: a complete Corporate New Business request, a large Corporate Renewal (routes to Senior Approver / FA), an IFG monthly batch, and an incomplete request that will need clarification.</p>`.s;
+    <p class="tiny mt"><a href="#/explore/actuarial">${icon("collapse", 13)} Back to demo selection</a> · Preloaded samples, each starting at its first step: a complete Corporate New Business request, a large Corporate Renewal (routes to Senior Approver / FA), and an incomplete request that will need clarification.</p>`.s;
 
   highlightNav(tab === "progress" && window.location.hash.includes("/queue/") ? "queue-progress" : (tab === "new" && window.location.hash.includes("/queue/") ? "queue-new" : "home"));
   document.title = "Actuarial Home · Demo";
@@ -100,7 +108,7 @@ function rowFor(r) {
 
 // -------------------------------------------------------------- released quotations
 function renderReleased(main) {
-  const released = allRecords().filter((r) => (r.versions || []).length > 0);
+  const released = allRecords().filter((r) => !isDisabled(r) && (r.versions || []).length > 0);
   main.innerHTML = html`
     <div class="page-head"><div><h1>Released quotations</h1>
       <p class="muted">Immutable released versions, each linked to its approved Schedule of Benefits. A later change becomes a new revision, never a silent edit.</p></div></div>

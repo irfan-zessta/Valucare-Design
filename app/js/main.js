@@ -104,7 +104,7 @@ const WORKSPACES = {
       { key: "queue-new", label: "New requests", icon: "inbox", href: "#/actuarial-desk/queue/new" },
       { key: "queue-progress", label: "In progress", icon: "tasks", href: "#/actuarial-desk/queue/progress" },
       { key: "released", label: "Released quotations", icon: "check", href: "#/actuarial-desk/released" },
-      { key: "reports", label: "Reports & assumptions", icon: "chart", href: "#/actuarial-desk/reports" },
+      // "Reports & assumptions" nav item temporarily disabled — see DISABLED in actuarial-desk.js
     ],
     search: (q) => `#/actuarial-desk/queue/new?q=${encodeURIComponent(q)}`,
     searchPlaceholder: "Search cases and batches",
