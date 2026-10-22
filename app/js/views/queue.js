@@ -158,7 +158,7 @@ function prospectsTable(rows) {
       <td data-label="Status">${statusPill(c)}</td>
       <td data-label="Owner">${ownerCell(c)}</td>
       <td class="num" style="white-space:nowrap"><button class="btn sm primary" data-go="${c.id}">Continue</button></td></tr>`)}</tbody></table></div>
-    <div class="pager"><span>${plural(rows.length, "prospect")}</span></div>`.s;
+    <div class="pager"><span>${plural(rows.length, "prospect")}</span></div>`;
 }
 
 function progressTable(rows) {
@@ -174,7 +174,7 @@ function progressTable(rows) {
       <td data-label="Owner">${ownerCell(c)}</td>
       <td data-label="Due">${t ? relDue(t.due || c.nextDue) : html`<span class="tiny">—</span>`}</td>
       <td class="num" style="white-space:nowrap"><button class="btn sm primary" data-go="${c.id}">Continue</button></td></tr>`; })}</tbody></table></div>
-    <div class="pager"><span>${plural(rows.length, "case")}</span></div>`.s;
+    <div class="pager"><span>${plural(rows.length, "case")}</span></div>`;
 }
 
 function historyTable(rows) {
@@ -188,7 +188,7 @@ function historyTable(rows) {
       <td class="co" data-label="Company"><span class="co"><a href="#/case/${c.id}">${c.company}</a></span><span class="sub">${c.id}</span></td>
       <td data-label="Last work area">${a.label}</td>
       <td data-label="Outcome"><span class="pill ${o.tone}">${o.label}</span></td>
-      <td class="num" style="white-space:nowrap"><button class="btn sm" data-go="${c.id}">Open</button></td></tr>`; })}</tbody></table></div>`.s;
+      <td class="num" style="white-space:nowrap"><button class="btn sm" data-go="${c.id}">Open</button></td></tr>`; })}</tbody></table></div>`;
 }
 
 // ---------------------------------------------------------------- pipeline summary
