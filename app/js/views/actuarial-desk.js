@@ -8,7 +8,7 @@ import { html, raw, go, fmtDate, int, prefs, toast } from "../core.js";
 import { icon, pill } from "../components.js";
 import {
   ensureSeeded, resetDemo, allRecords, nextStep, statusOf, journeyLabel, recName, recHref,
-  assumptions, peso, plural, config,
+  assumptions, peso, plural, config, rateSheetIdFor,
 } from "./actdesk-core.js";
 import { renderCase, renderCreate } from "./actdesk-corp.js";
 import { renderBatch } from "./actdesk-ifg.js";
@@ -32,8 +32,8 @@ export async function render(main, { parts, query }) {
   if (sub === "batch") return renderBatch(main, parts[2], parts[3] || "batch");
   if (sub === "released") return renderReleased(main);
   if (sub === "reports") return renderReports(main);
-  if (sub === "queue") return renderHome(main, parts[2] === "progress" ? "progress" : "new", query);
-  return renderHome(main, query.tab === "progress" ? "progress" : "new", query);
+  if (sub === "queue") return renderHome(main, oneOfTab(parts[2]), query);
+  return renderHome(main, oneOfTab(query.tab), query);
 }
 
 // -------------------------------------------------------------- dashboard
@@ -42,14 +42,23 @@ function bucket(rec) {
   const started = rec.kind === "ifg" ? rec.reviewed : rec.reviewed;
   return started ? "progress" : "new";
 }
+// Dashboard tabs. The "Completed" tab shows released records (bucket "released").
+const TABS = ["new", "progress", "completed"];
+const oneOfTab = (t) => (TABS.includes(t) ? t : "new");
+const bucketForTab = (t) => (t === "completed" ? "released" : t);
 
 function renderHome(main, tab, query) {
   const q = (query.q || "").toLowerCase();
   const jf = prefs.get("actdesk:filter", "all");
   const all = allRecords().filter((r) => !isDisabled(r));
-  const inTab = all.filter((r) => bucket(r) === tab);
+  const inTab = all.filter((r) => bucket(r) === bucketForTab(tab));
   const rows = inTab.filter((r) => (jf === "all" || journeyKey(r) === jf) && (!q || recName(r).toLowerCase().includes(q) || r.id.toLowerCase().includes(q)));
-  const counts = { new: all.filter((r) => bucket(r) === "new").length, progress: all.filter((r) => bucket(r) === "progress").length };
+  const counts = {
+    new: all.filter((r) => bucket(r) === "new").length,
+    progress: all.filter((r) => bucket(r) === "progress").length,
+    completed: all.filter((r) => bucket(r) === "released").length,
+  };
+  const isCompleted = tab === "completed";
 
   main.innerHTML = html`
     <div class="page-head"><div><h1>Actuarial Home</h1>
@@ -60,6 +69,7 @@ function renderHome(main, tab, query) {
     <div class="seg mt" role="tablist" aria-label="Dashboard">
       <button role="tab" class="${tab === "new" ? "on" : ""}" aria-selected="${tab === "new"}" data-tab="new">New requests <span class="cnt">${counts.new}</span></button>
       <button role="tab" class="${tab === "progress" ? "on" : ""}" aria-selected="${tab === "progress"}" data-tab="progress">In progress <span class="cnt">${counts.progress}</span></button>
+      <button role="tab" class="${isCompleted ? "on" : ""}" aria-selected="${isCompleted}" data-tab="completed">Completed <span class="cnt">${counts.completed}</span></button>
     </div>
 
     <div class="toolbar mt">
@@ -73,11 +83,16 @@ function renderHome(main, tab, query) {
       </select>
     </div>
 
-    ${rows.length ? html`<div class="tbl-wrap mt"><table class="tbl rowlink cardify"><thead><tr>
-      <th>Request</th><th>Journey</th><th>Owner of next action</th><th>Status</th><th>Next action</th></tr></thead>
-      <tbody>${rows.map((r) => rowFor(r))}</tbody></table></div>`
-      : html`<div class="panel mt"><div class="pb"><div class="state-box"><b>Nothing in ${tab === "new" ? "New requests" : "In progress"}.</b>
-        <p class="tiny">${tab === "new" ? "New requests from Sales and the renewal worklist appear here." : "Cases you have started appear here until released."}</p></div></div></div>`}
+    ${rows.length
+      ? (isCompleted
+        ? html`<div class="tbl-wrap mt"><table class="tbl rowlink cardify"><thead><tr>
+            <th>Request</th><th>Franchise status</th><th>Rate-sheet versions</th><th>Final approved rate sheet</th><th>Released</th></tr></thead>
+            <tbody>${rows.map((r) => completedRowFor(r))}</tbody></table></div>`
+        : html`<div class="tbl-wrap mt"><table class="tbl rowlink cardify"><thead><tr>
+            <th>Request</th><th>Journey</th><th>Owner of next action</th><th>Status</th><th>Next action</th></tr></thead>
+            <tbody>${rows.map((r) => rowFor(r))}</tbody></table></div>`)
+      : html`<div class="panel mt"><div class="pb"><div class="state-box"><b>Nothing in ${tab === "new" ? "New requests" : isCompleted ? "Completed" : "In progress"}.</b>
+        <p class="tiny">${tab === "new" ? "New requests from Sales and the renewal worklist appear here." : isCompleted ? "Released quotations appear here with their rate-sheet versions and final approved rate sheet." : "Cases you have started appear here until released."}</p></div></div></div>`}
 
     <p class="tiny mt"><a href="#/explore/actuarial">${icon("collapse", 13)} Back to demo selection</a> · Preloaded samples, each starting at its first step: a complete Corporate New Business request, a large Corporate Renewal (routes to Senior Approver / FA), and an incomplete request that will need clarification.</p>`.s;
 
@@ -106,6 +121,31 @@ function rowFor(r) {
     <td>${ns ? ns.owner : "—"}</td>
     <td>${pill(st.label, st.tone)}</td>
     <td>${ns ? html`<span class="linklike">${ns.label} ›</span>` : html`<span class="tiny">Released</span>`}</td></tr>`;
+}
+
+// Completed-tab row — a released quotation at a glance: franchise status, every
+// rate-sheet version prepared, and the final approved rate sheet handed to Sales.
+function completedRowFor(r) {
+  const vs = r.versions || [];
+  const v = vs[vs.length - 1]; // the current (latest) released version
+  const franchise = r.franchiseApproved
+    ? html`${pill("Approved", "ok")}${r.franchiseRef ? html`<div class="tiny">${r.franchiseRef}</div>` : ""}`
+    : html`${pill("Pending", "warn")}${r.franchiseRef ? html`<div class="tiny">${r.franchiseRef}</div>` : ""}`;
+  const versionsCell = vs.length
+    ? html`<b>${vs.length} version${vs.length === 1 ? "" : "s"}</b>
+        <div class="tiny">${vs.map((x) => `v${x.v}${x.supersedes ? ` (supersedes v${x.supersedes})` : ""}`).join(" · ")}</div>`
+    : html`<span class="tiny">—</span>`;
+  const finalCell = v
+    ? html`<b>${v.rsId || rateSheetIdFor(r)} · v${v.v}</b>
+        <div class="tiny">Approved by ${v.approvedBy}</div>
+        ${v.summary ? html`<div class="tiny">${v.summary}</div>` : ""}`
+    : html`<span class="tiny">—</span>`;
+  return html`<tr data-href="${recHref(r)}" tabindex="0">
+    <td><b>${recName(r)}</b><div class="tiny">${r.id} · ${journeyLabel(r)}</div></td>
+    <td>${franchise}</td>
+    <td>${versionsCell}</td>
+    <td>${finalCell}</td>
+    <td>${v ? fmtDate(v.at) : "—"}</td></tr>`;
 }
 
 // -------------------------------------------------------------- released quotations

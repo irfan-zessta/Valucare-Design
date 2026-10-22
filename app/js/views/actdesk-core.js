@@ -14,7 +14,7 @@ import { money, int } from "../core.js";
 
 export const STORE_KEY = "hms-actuarial:v1";
 export const GUIDE_KEY = "hms-actuarial-guide";
-const BASELINE = 4; // bump to force a reseed when the sample data shape changes
+const BASELINE = 5; // bump to force a reseed when the sample data shape changes
 
 // -------------------------------------------------------------- store plumbing
 export function loadStore() {
@@ -649,6 +649,255 @@ function SAMPLE_CASES() {
       negotiation: [],
       activity: [{ at: "2026-10-12T08:30:00Z", text: "Renewal opened from the renewal worklist (expiry 2026-12-31)." }],
     },
+    // 4+ — a realistic spread of additional Corporate New Business requests so the
+    // dashboard's New / In progress / Completed tabs are all populated (see MORE_NB_CASES).
+    ...MORE_NB_CASES(),
+  ];
+}
+
+// -------------------------------------------------------------- additional NB samples
+// A small factory that builds extra Corporate New Business requests at different points
+// in the 9-step journey, reusing the SAME deterministic pricing + approval machinery as
+// the hand-written cases above. Every figure remains FICTIONAL / ILLUSTRATIVE.
+//
+// Stages:
+//   new       — fresh request, not yet reviewed                          → "New requests"
+//   pricing    — assigned, approach + data done, building the rate        → "In progress"
+//   approval   — rate sheet v1 submitted, waiting on the approver         → "In progress"
+//   returned   — approver returned v1 with a comment, analyst revising    → "In progress"
+//   released   — approved + rate sheet v1 released to Sales               → "Completed"
+//   revised    — released, then a post-release revision released as v2    → "Completed"
+function addDaysCore(dateStr, offsetDays = 0, extraDays = 0) {
+  const d = new Date(dateStr || "2026-01-01");
+  d.setDate(d.getDate() + offsetDays + extraDays);
+  return d.toISOString().slice(0, 10);
+}
+
+// A released rate-sheet version, mirroring releaseVersion() in the journey view.
+function mkVersion(c, v, supersedes, at) {
+  const rows = (c.rateSheet?.rows && c.rateSheet.rows.length) ? c.rateSheet.rows : rateRows(c);
+  const rid = (c.rateSheet && c.rateSheet.id) ? c.rateSheet.id : rateSheetIdFor(c);
+  return {
+    v, rsId: rid, at,
+    preparedBy: c.assignedTo || "Actuarial Analyst",
+    approvedBy: (c.approval && c.approval.by) || approverFor(c).label,
+    validUntil: addDaysCore(c.effectiveDate, -1, 90),
+    sobVersion: supersedes ? `SOB v1 · revision ${v} (released)` : "SOB v1 (released)",
+    rows: JSON.parse(JSON.stringify(rows)),
+    supersedes: supersedes || null,
+    summary: `Principal ${peso(rows[0].proposedRate)}/mo, dependent ${peso(rows[1].proposedRate)}/mo`,
+  };
+}
+
+function nbDocuments(o) {
+  const fr = o.franchiseApproved !== false;
+  const existing = o.pricingPath === "existing-hmo";
+  return [
+    { key: "members", name: "Member data file (principals + dependents)", source: "Sales endorsement · spreadsheet", kind: "Member Data", supplied: true },
+    { key: "benefits", name: "Requested benefit document / Terms of Reference", source: o.hasBenefits === false ? "—" : "Client proposal · PDF", kind: "Requested SOB", supplied: o.hasBenefits !== false },
+    existing
+      ? { key: "util", name: "Utilization history (prior carrier, 24 months)", source: "Broker email attachment", kind: "Utilization", supplied: true }
+      : { key: "util", name: "Utilization history", source: "—", kind: "Utilization", supplied: false, note: "New/virgin account — no prior utilization" },
+    { key: "franchise", name: "Approved franchise reference", kind: "Franchise",
+      source: fr ? `HMS3 franchise record ${o.franchiseRef}` : `Franchise ${o.franchiseRef} — approval pending`, supplied: fr },
+  ];
+}
+
+function mkNB(o) {
+  const existing = o.pricingPath === "existing-hmo";
+  const c = {
+    id: o.id, kind: "nb",
+    company: o.company, franchiseRef: o.franchiseRef,
+    requestType: "Corporate New Business quotation",
+    channel: o.channel, businessType: o.businessType, agentBroker: o.agentBroker || null,
+    natureOfBusiness: o.natureOfBusiness,
+    requester: o.requester, requesterContact: o.requesterContact,
+    effectiveDate: o.effectiveDate, targetQuoteDate: o.targetQuoteDate,
+    principals: o.principals, dependents: o.dependents,
+    priority: o.priority || "standard", franchiseApproved: o.franchiseApproved !== false,
+    salesNote: o.salesNote,
+    assignedTo: null, reviewed: false, ready: true, assigned: false,
+    pathConfirmed: false, dataReviewed: false, calcReady: false,
+    pricingPath: o.pricingPath,
+    receivedAt: o.receivedAt,
+    memberData: sampleMemberData(o.principals),
+    utilization: existing
+      ? { required: true, period: "Prior 24 months", source: "Prior carrier, via broker email", lossRatio: 0.90, claims: "Client-supplied", accepted: true,
+          acceptedNote: "Client / prior-carrier supplied — accepted by the analyst for pricing. Not validated Valucare claims data.", adjustments: [] }
+      : { required: false, note: "New / virgin account — no prior utilization; priced from standard cost tables." },
+    documents: nbDocuments(o),
+    missing: [],
+    sob: JSON.parse(JSON.stringify(STANDARD_SOB)),
+    calc: nbCalc(`${o.company.split(" ")[0]} Standard`, { path: o.pricingPath }),
+    rateSheet: { prepared: false, rows: [] },
+    approval: { status: "Not started", history: [] },
+    versions: [], changeRequests: [], clarifications: [],
+    activity: [{ at: o.receivedAt, text: "Request received from Sales (single thread)." }],
+  };
+  applyStage(c, o.stage, o);
+  return c;
+}
+
+function applyStage(c, stage, o) {
+  if (stage === "new") return; // a fresh request, untouched
+
+  // Past "new": intake passed and pricing is underway.
+  c.reviewed = true; c.ready = true; c.assigned = true;
+  c.assignedTo = o.assignedTo || "Actuarial Analyst";
+  c.pathConfirmed = true; c.dataReviewed = true;
+  c.activity.push({ at: o.startedAt || o.receivedAt, text: `Assigned to ${c.assignedTo}; pricing started.` });
+  if (stage === "pricing") return; // calcReady stays false → next action is "Build proposed rate"
+
+  // Calculation complete and a Draft rate sheet exists.
+  c.calcReady = true;
+  const rows = rateRows(c);
+  c.rateSheet = { id: rateSheetIdFor(c), version: 1, status: "Draft", prepared: true, uploaded: false,
+    source: "Generated from the reviewed calculation", at: o.ratedAt || o.receivedAt, rows };
+  const appr = approverFor(c);
+  const submittedAt = o.submittedAt || o.ratedAt || o.receivedAt;
+
+  if (stage === "approval") {
+    c.approval = { status: `Pending ${appr.label}`, submittedVersion: 1,
+      history: [{ at: submittedAt, action: `Submitted v1 to ${appr.label}`, by: c.assignedTo }] };
+    c.activity.push({ at: submittedAt, text: `Rate sheet v1 submitted to ${appr.label} for approval.` });
+    return;
+  }
+  if (stage === "returned") {
+    const decidedAt = o.decidedAt || submittedAt;
+    c.approval = { status: "Returned", by: appr.label,
+      comment: o.returnComment || "Please re-check the dependent loading and confirm the room-upgrade cost before I can approve.",
+      history: [
+        { at: submittedAt, action: `Submitted v1 to ${appr.label}`, by: c.assignedTo },
+        { at: decidedAt, action: "Returned with a comment", by: appr.label },
+      ] };
+    c.activity.push({ at: decidedAt, text: `${appr.label} returned v1 for revision.` });
+    return;
+  }
+
+  // released / revised — approved with at least one released version.
+  const decidedAt = o.decidedAt || submittedAt;
+  const releasedAt = o.releasedAt || decidedAt;
+  c.approval = { status: "Approved", by: appr.label, decidedAt,
+    history: [
+      { at: submittedAt, action: `Submitted v1 to ${appr.label}`, by: c.assignedTo },
+      { at: decidedAt, action: "Approved v1", by: appr.label },
+    ] };
+  c.rateSheet.status = "Released";
+  c.versions = [mkVersion(c, 1, null, releasedAt)];
+  c.activity.push({ at: releasedAt, text: "Rate sheet v1 released to Sales with its approved Schedule of Benefits." });
+
+  if (stage === "revised") {
+    const revisedAt = o.revisedAt || releasedAt;
+    c.changeRequests = [{
+      id: "CR-1", at: o.crAt || releasedAt, by: "Sales",
+      reason: o.crReason || "Client negotiated a lower dependent rate after seeing the quotation.",
+      draftReady: true, approval: "Approved", released: true,
+    }];
+    const v2rows = JSON.parse(JSON.stringify(c.versions[0].rows));
+    v2rows[1].proposedRate = Math.round(v2rows[1].proposedRate * 0.95); // negotiated dependent reduction
+    const v2 = mkVersion(c, 2, 1, revisedAt);
+    v2.rows = v2rows;
+    v2.summary = `Principal ${peso(v2rows[0].proposedRate)}/mo, dependent ${peso(v2rows[1].proposedRate)}/mo`;
+    c.versions.push(v2);
+    c.activity.push({ at: revisedAt, text: "Superseding rate sheet v2 released (v1 marked Superseded)." });
+  }
+}
+
+function MORE_NB_CASES() {
+  return [
+    // --- New requests -------------------------------------------------------------
+    mkNB({
+      id: "ACT-NB-2221", stage: "new", pricingPath: "existing-hmo",
+      company: "Cebu Harbor Freight Inc", franchiseRef: "MA-2026-0214",
+      channel: "Direct", businessType: "Direct",
+      natureOfBusiness: "Sea freight & customs brokerage",
+      requester: "Marco Reyes (Sales)", requesterContact: "marco.reyes@valucare.example · +63 2 8555 0101",
+      effectiveDate: "2026-12-15", targetQuoteDate: "2026-11-20", principals: 210, dependents: 264,
+      receivedAt: "2026-10-20T10:25:00Z",
+      salesNote: "Existing-HMO account switching carrier at renewal. 24-month utilization attached.",
+    }),
+    mkNB({
+      id: "ACT-NB-2223", stage: "new", pricingPath: "virgin-ge100",
+      company: "Golden Harvest Agri Corp", franchiseRef: "MA-2026-0219",
+      channel: "Intermediary — Keystone Insurance Brokers", businessType: "Intermediary", agentBroker: "Keystone Insurance Brokers",
+      natureOfBusiness: "Agribusiness & food processing",
+      requester: "Lea Santos (Sales)", requesterContact: "lea.santos@valucare.example · +63 2 8555 0133",
+      effectiveDate: "2027-01-01", targetQuoteDate: "2026-11-25", principals: 128, dependents: 96,
+      receivedAt: "2026-10-21T08:40:00Z",
+      salesNote: "New / virgin account (no prior HMO). First-time group cover for field and plant staff.",
+    }),
+
+    // --- In progress --------------------------------------------------------------
+    mkNB({
+      id: "ACT-NB-2217", stage: "pricing", pricingPath: "existing-hmo",
+      company: "Pacific Blue Shipping Lines", franchiseRef: "MA-2026-0203",
+      channel: "Direct", businessType: "Direct",
+      natureOfBusiness: "Inter-island passenger & cargo shipping",
+      requester: "Marco Reyes (Sales)", requesterContact: "marco.reyes@valucare.example · +63 2 8555 0101",
+      effectiveDate: "2026-12-01", targetQuoteDate: "2026-11-08", principals: 342, dependents: 410,
+      receivedAt: "2026-10-14T09:00:00Z", assignedTo: "Grace Lim (Analyst)", startedAt: "2026-10-16T09:30:00Z",
+      salesNote: "Existing-HMO account. Utilization accepted; analyst is building the proposed rate.",
+    }),
+    mkNB({
+      id: "ACT-NB-2216", stage: "approval", pricingPath: "existing-hmo",
+      company: "Metrocity Property Holdings", franchiseRef: "MA-2026-0198",
+      channel: "Intermediary — Vanguard Brokers", businessType: "Intermediary", agentBroker: "Vanguard Brokers",
+      natureOfBusiness: "Commercial real estate & property management",
+      requester: "Lea Santos (Sales)", requesterContact: "lea.santos@valucare.example · +63 2 8555 0133",
+      effectiveDate: "2026-12-01", targetQuoteDate: "2026-11-05", principals: 158, dependents: 190,
+      receivedAt: "2026-10-12T11:15:00Z", assignedTo: "Grace Lim (Analyst)", startedAt: "2026-10-14T10:00:00Z",
+      ratedAt: "2026-10-18T15:20:00Z", submittedAt: "2026-10-19T09:10:00Z",
+      salesNote: "Existing-HMO account. Rate sheet v1 submitted; awaiting the approver's decision.",
+    }),
+    mkNB({
+      id: "ACT-NB-2215", stage: "returned", pricingPath: "virgin-ge100",
+      company: "Summit BPO Solutions", franchiseRef: "MA-2026-0189",
+      channel: "Direct", businessType: "Direct",
+      natureOfBusiness: "Business process outsourcing",
+      requester: "Marco Reyes (Sales)", requesterContact: "marco.reyes@valucare.example · +63 2 8555 0101",
+      effectiveDate: "2026-11-15", targetQuoteDate: "2026-10-30", principals: 265, dependents: 120,
+      receivedAt: "2026-10-08T13:45:00Z", assignedTo: "Noel Cruz (Analyst)", startedAt: "2026-10-10T09:00:00Z",
+      ratedAt: "2026-10-15T16:00:00Z", submittedAt: "2026-10-16T09:00:00Z", decidedAt: "2026-10-17T14:30:00Z",
+      returnComment: "The young-skew member profile should pull the base down — please recheck the utilization factor before resubmitting.",
+      salesNote: "New / virgin account, young workforce. Returned once for a revised base; analyst preparing v2.",
+    }),
+
+    // --- Completed ----------------------------------------------------------------
+    mkNB({
+      id: "ACT-NB-2210", stage: "released", pricingPath: "existing-hmo",
+      company: "Evergreen Food Manufacturing", franchiseRef: "MA-2026-0176",
+      channel: "Intermediary — Keystone Insurance Brokers", businessType: "Intermediary", agentBroker: "Keystone Insurance Brokers",
+      natureOfBusiness: "Food & beverage manufacturing",
+      requester: "Lea Santos (Sales)", requesterContact: "lea.santos@valucare.example · +63 2 8555 0133",
+      effectiveDate: "2026-11-01", targetQuoteDate: "2026-10-15", principals: 176, dependents: 205,
+      receivedAt: "2026-09-28T09:20:00Z", assignedTo: "Grace Lim (Analyst)", startedAt: "2026-09-30T09:00:00Z",
+      ratedAt: "2026-10-05T15:00:00Z", submittedAt: "2026-10-06T09:00:00Z", decidedAt: "2026-10-07T11:00:00Z", releasedAt: "2026-10-07T16:30:00Z",
+      salesNote: "Existing-HMO account. Released to Sales as a single approved rate sheet (v1).",
+    }),
+    mkNB({
+      id: "ACT-NB-2208", stage: "revised", pricingPath: "existing-hmo",
+      company: "Titan Steel Industries", franchiseRef: "MA-2026-0168",
+      channel: "Direct", businessType: "Direct",
+      natureOfBusiness: "Steel fabrication & heavy manufacturing",
+      requester: "Marco Reyes (Sales)", requesterContact: "marco.reyes@valucare.example · +63 2 8555 0101",
+      effectiveDate: "2026-11-01", targetQuoteDate: "2026-10-10", principals: 230, dependents: 300,
+      receivedAt: "2026-09-22T10:00:00Z", assignedTo: "Noel Cruz (Analyst)", startedAt: "2026-09-24T09:00:00Z",
+      ratedAt: "2026-09-29T14:00:00Z", submittedAt: "2026-09-30T09:00:00Z", decidedAt: "2026-10-01T10:30:00Z", releasedAt: "2026-10-01T15:00:00Z",
+      crAt: "2026-10-06T09:00:00Z", revisedAt: "2026-10-09T15:30:00Z",
+      crReason: "Client negotiated a lower dependent rate after reviewing the quotation; approved revision released as v2.",
+      salesNote: "Existing-HMO account. Released v1, then a negotiated revision released as v2 (v1 superseded).",
+    }),
+    mkNB({
+      id: "ACT-NB-2205", stage: "released", pricingPath: "existing-hmo",
+      company: "Nationwide Freight Group", franchiseRef: "MA-2026-0151",
+      channel: "Intermediary — Vanguard Brokers", businessType: "Intermediary", agentBroker: "Vanguard Brokers",
+      natureOfBusiness: "Nationwide trucking & logistics",
+      requester: "Lea Santos (Sales)", requesterContact: "lea.santos@valucare.example · +63 2 8555 0133",
+      effectiveDate: "2026-11-01", targetQuoteDate: "2026-10-08", principals: 720, dependents: 910,
+      receivedAt: "2026-09-18T09:00:00Z", assignedTo: "Grace Lim (Analyst)", startedAt: "2026-09-21T09:00:00Z",
+      ratedAt: "2026-09-26T14:00:00Z", submittedAt: "2026-09-27T09:00:00Z", decidedAt: "2026-09-29T11:00:00Z", releasedAt: "2026-09-29T16:00:00Z",
+      salesNote: "Large existing-HMO account (above the ₱20M threshold → Senior Approver / FA). Released v1 to Sales.",
+    }),
   ];
 }
 
