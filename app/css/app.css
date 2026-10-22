@@ -842,3 +842,51 @@ tr[data-href]:hover{background:var(--row-hover)}
 
 /* High-utilisation bar emphasis */
 .rnw-bar-fill.hot{background:var(--danger)}
+
+/* ===== Actuarial Corporate New Business: role bar, finalized banner, traceability ===== */
+/* "ok" pill alias (same as success tone) */
+.pill.ok{color:var(--success);background:var(--success-soft)}
+
+/* View-as role control — never a re-login, just a viewpoint */
+.role-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:12px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface-muted)}
+.role-bar .rb-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.role-bar .rb-label{font-size:12.5px;font-weight:600;color:var(--text-muted)}
+.rb-seg{display:inline-flex;flex-wrap:wrap;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:3px}
+.rb-btn{border:0;background:none;color:var(--text-muted);font:inherit;font-size:12.5px;font-weight:500;padding:5px 11px;border-radius:var(--r-sm);cursor:pointer;white-space:nowrap;transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease)}
+.rb-btn:hover{color:var(--text)}
+.rb-btn.on{background:var(--accent);color:var(--on-accent)}
+.role-bar .rb-hint{color:var(--text-muted);max-width:52ch;line-height:1.45}
+
+/* Finalized rate-sheet banner — always states exactly what is finalized, or that none is */
+.fin-banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin-bottom:12px;padding:11px 14px;border:1px solid var(--border);border-radius:var(--r)}
+.fin-banner.ok{border-color:var(--success);background:var(--success-soft)}
+.fin-banner.none{border-style:dashed;background:var(--surface-muted)}
+.fin-banner .fb-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fin-banner .fb-main b{color:var(--text)}
+.fin-banner .fb-main .tiny{color:var(--text-muted)}
+.fin-banner .fb-acts{display:flex;flex-wrap:wrap;gap:6px}
+
+/* Sub-heading inside panels and dialogs */
+.sub-h{font-size:13px;font-weight:600;color:var(--text);margin:0 0 4px;text-transform:none}
+
+/* Provenance trail (calculation & source) */
+.trail{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.trail li{padding:8px 11px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);font-size:13px}
+.trail li b{font-weight:600;color:var(--text)}
+.trail li .tiny{color:var(--text-muted);margin-top:1px}
+
+/* Per-line "View calculation" action cell in the build-up table */
+.calc-tbl td.tr-act{text-align:right;white-space:nowrap}
+.tr-act .linklike{font-size:12px}
+
+/* Create form: "what Sales supplied" checklist */
+.supplied-set{border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px}
+.supplied-set legend{font-size:12px;font-weight:600;color:var(--text-subtle);padding:0 6px}
+.chk-line{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13.5px;cursor:pointer}
+.chk-line input{width:auto;height:auto;margin:0}
+
+/* Intake checklist markers */
+.demo-checks .chk{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:700;flex:none}
+.demo-checks .chk.yes{background:var(--success-soft);color:var(--success)}
+.demo-checks .chk.no{background:var(--warning-soft);color:var(--warning)}
+.demo-checks .chk.na{background:var(--surface-muted);color:var(--text-subtle)}

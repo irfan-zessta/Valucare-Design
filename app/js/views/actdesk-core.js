@@ -14,7 +14,7 @@ import { money, int } from "../core.js";
 
 export const STORE_KEY = "hms-actuarial:v1";
 export const GUIDE_KEY = "hms-actuarial-guide";
-const BASELINE = 3; // bump to force a reseed when the sample data shape changes
+const BASELINE = 4; // bump to force a reseed when the sample data shape changes
 
 // -------------------------------------------------------------- store plumbing
 export function loadStore() {
@@ -56,6 +56,26 @@ export const stamp = () => new Date().toISOString();
 export function log(rec, text) { (rec.activity = rec.activity || []).unshift({ at: stamp(), text }); }
 export const peso = (v) => "₱" + money(v);
 export const plural = (n, one, many) => `${int(n)} ${n === 1 ? one : many || one + "s"}`;
+
+// -------------------------------------------------------------- roles ("View as")
+// The demo is role-aware but never forces re-login. A small "View as" control lets
+// the visitor stand in for each participant; each step is OWNED by one role and the
+// handoff between them is shown explicitly. Keeping it one store field means the
+// chosen viewpoint persists across navigation and refresh.
+export const NB_ROLES = [
+  { key: "sales", label: "Sales", gloss: "Submits the request and receives the released quotation." },
+  { key: "analyst", label: "Actuarial Analyst", gloss: "Reviews, prices, prepares and releases the rate sheet." },
+  { key: "supervisor", label: "Actuarial Supervisor", gloss: "Assigns the analyst and approves within authority." },
+  { key: "senior", label: "Senior Approver / FA", gloss: "Approves large or out-of-parameter quotations." },
+];
+const ROLE_BY_LABEL = {
+  "Sales": "sales",
+  "Actuarial Analyst": "analyst",
+  "Actuarial Supervisor": "supervisor",
+  "Senior Approver / FA": "senior",
+};
+export function roleKeyForOwner(label) { return ROLE_BY_LABEL[label] || "analyst"; }
+export function roleLabelFor(key) { return (NB_ROLES.find((r) => r.key === key) || NB_ROLES[1]).label; }
 
 // -------------------------------------------------------------- assumptions library
 // Named, versioned assumption entries referenced by the quotation journeys. "usedBy"
@@ -111,6 +131,32 @@ export function rateRows(c) {
     { plan: c.calc?.planName || "Standard plan", memberType: "Dependent", prevRate: c.prior?.dependentRate ?? null, proposedRate: dependent },
   ];
 }
+// Base-cost derivation — the "how was this number produced" trail for the base
+// benefit cost, so Corporate New Business never starts from a mysterious prefilled
+// peso figure. It is an ILLUSTRATIVE DEMONSTRATION FORMULA (requires Actuarial
+// validation), kept deterministic so base × riders × loadings always reconcile:
+//   base = standard-plan expected annual benefit cost  ×  utilization factor
+// For an existing-HMO account the utilization factor reflects the account's own
+// accepted loss ratio; a virgin account uses a factor of 1.00 (manual cost tables).
+export function deriveBase(c) {
+  const t = c.calc?.baseTrace;
+  if (!t) return { amount: c.calc?.base ?? 0, steps: [], demo: true };
+  const amount = Math.round(t.basis * t.utilFactor);
+  return {
+    demo: true,
+    amount,
+    basis: t.basis,
+    utilFactor: t.utilFactor,
+    method: `Base = standard-plan expected annual benefit cost (${peso(t.basis)}) × utilization factor (${t.utilFactor.toFixed(2)})`,
+    steps: [
+      { label: "Standard-plan expected annual benefit cost / principal", value: peso(t.basis), source: t.basisSource },
+      { label: t.utilLabel, value: "×" + t.utilFactor.toFixed(2), source: t.utilSource },
+      { label: "Base benefit cost / principal / year", value: peso(amount), source: "Calculated result" },
+    ],
+    note: t.note || "Illustrative demonstration formula — requires Actuarial validation.",
+  };
+}
+
 // Illustrative total annual contract value — drives the approval route.
 export function contractValue(c) {
   const rows = (c.rateSheet?.rows && c.rateSheet.rows.length) ? c.rateSheet.rows : rateRows(c);
@@ -131,6 +177,24 @@ export function approverFor(c) {
   return { level: "supervisor", label: "Actuarial Supervisor", why: `Contract value ${peso(cv)} is within the Supervisor's authority (below ${peso(cfg.seniorThreshold)}).` };
 }
 
+// A stable rate-sheet identifier for a case, e.g. "RS-NB-2026-0042". Derived from
+// the case id so it is deterministic and reconciles across refreshes.
+export function rateSheetIdFor(c) {
+  const n = (String(c.id).match(/(\d+)/) || [])[1] || "0000";
+  return `RS-NB-2026-${String(Number(n)).padStart(4, "0")}`;
+}
+
+// Next unused Corporate New Business case id (for the "Start a new request" flow).
+export function nextCaseId() {
+  const s = loadStore();
+  const used = Object.keys(s.cases)
+    .map((id) => (id.match(/^ACT-NB-(\d+)$/) || [])[1])
+    .filter(Boolean)
+    .map(Number);
+  const next = (used.length ? Math.max(...used) : 2219) + 1;
+  return `ACT-NB-${next}`;
+}
+
 // -------------------------------------------------------------- journey step machines
 // Each returns { area, label, sentence, owner } — the single next action, used by the
 // dashboard "next action" column, the detail next-action strip, and the guide card.
@@ -140,29 +204,59 @@ export function nextStep(rec) {
   return nbNext(rec);
 }
 
+export const rsVerLabel = (c) => "v" + (c.rateSheet?.version || 1);
+
+// The Corporate New Business linear flow, one owned step at a time:
+// Request → Intake → Assignment → Pricing approach → Data & benefits →
+// Calculation → Rate sheet → Approval → Release (→ optional post-release revision).
 function nbNext(c) {
-  if (!c.reviewed) return { area: "request", label: "Review request", owner: "Actuarial Analyst",
+  // 1 — Analyst opens the single Sales submission thread.
+  if (!c.reviewed) return { area: "request", label: "Review submission", owner: "Actuarial Analyst",
     sentence: "Open the single request thread from Sales and review what was submitted." };
+  // 2 — Intake: franchise check, completeness, clarification loop.
   if (!c.ready) {
     const open = (c.clarifications || []).some(q => !q.resolved);
-    if (open) return { area: "completeness", label: "Record Sales' response", owner: "Actuarial Analyst",
+    if (open) return { area: "intake", label: "Record Sales' response", owner: "Sales",
       sentence: "A clarification is open with Sales — record their corrected file or answer to continue." };
-    return { area: "completeness", label: "Send clarification to Sales", owner: "Actuarial Analyst",
+    return { area: "intake", label: "Send clarification to Sales", owner: "Actuarial Analyst",
       sentence: "Something is missing or unclear. Send one clarification to Sales within this request." };
   }
-  if (!c.assigned) return { area: "completeness", label: "Assign & start quotation", owner: "Actuarial Supervisor",
-    sentence: "The franchise is approved and inputs are complete. Assign an analyst and start the quotation." };
-  if (!c.rateSheet?.prepared) return { area: "quotation", label: "Prepare rate sheet", owner: "Actuarial Analyst",
-    sentence: c.pricingPath ? "Review the transparent calculation, then prepare the rate sheet." : "Choose the pricing path, then review the calculation and prepare the rate sheet." };
+  // 3 — Supervisor assignment.
+  if (!c.assigned) return { area: "assign", label: "Assign & start pricing", owner: "Actuarial Supervisor",
+    sentence: "The franchise is approved and inputs are complete. Assign an analyst and start pricing." };
+  // 4 — Pricing approach.
+  if (!c.pathConfirmed) return { area: "approach", label: "Confirm pricing approach", owner: "Actuarial Analyst",
+    sentence: "Confirm the documented Corporate New Business pricing approach for this account." };
+  // 5 — Review source data (member, utilization, requested vs standard SOB).
+  if (!c.dataReviewed) return { area: "data", label: "Review source data", owner: "Actuarial Analyst",
+    sentence: "Review member data, utilization and the requested vs standard Schedule of Benefits." };
+  // 6 — Build the proposed rate with full traceability.
+  if (!c.calcReady) return { area: "build", label: "Build proposed rate", owner: "Actuarial Analyst",
+    sentence: "Build the proposed rate from a transparent, traceable calculation — every amount shows its source." };
+  // 7 — Prepare and submit a specific rate-sheet version.
   const a = c.approval || {};
-  if (a.status === "Returned") return { area: "quotation", label: "Revise & resubmit", owner: "Actuarial Analyst",
-    sentence: "The approver returned this with a comment. Revise the quotation and resubmit." };
-  if (!a.status || a.status === "Not started") return { area: "approval", label: "Submit for approval", owner: "Actuarial Analyst",
-    sentence: "Submit the rate sheet to the correct approver based on the contract value." };
+  if (a.status === "Returned") return { area: "ratesheet", label: "Revise & resubmit", owner: "Actuarial Analyst",
+    sentence: "The approver returned this with a comment. Revise and submit a new rate-sheet version — v1 is retained." };
+  if (!c.rateSheet?.prepared) return { area: "ratesheet", label: "Prepare rate sheet", owner: "Actuarial Analyst",
+    sentence: "Generate the working (Draft) rate sheet from the reviewed calculation." };
+  if (!a.status || a.status === "Not started") return { area: "ratesheet", label: `Submit ${rsVerLabel(c)} for approval`, owner: "Actuarial Analyst",
+    sentence: "Submit this specific rate-sheet version to the correct approver based on the contract value." };
+  // 8 — Approval (or return).
   if (a.status.startsWith("Pending")) return { area: "approval", label: "Record approval decision", owner: approverFor(c).label,
-    sentence: `This is with ${approverFor(c).label}. Approve it, or return it with one comment.` };
-  if (a.status === "Approved" && !(c.versions || []).length) return { area: "release", label: "Release quotation", owner: "Actuarial Analyst",
-    sentence: "Approved. Release an immutable version with its approved Schedule of Benefits to Sales." };
+    sentence: `This is with ${approverFor(c).label}. Approve the submitted version, or return it with one comment.` };
+  // 9 — Release the finalized rate sheet + approved SOB.
+  if (a.status === "Approved" && !(c.versions || []).length) return { area: "release", label: "Release finalized rate sheet", owner: "Actuarial Analyst",
+    sentence: "Approved. Release a locked rate sheet with its approved Schedule of Benefits to Sales." };
+  // 10 — Optional post-release change request / superseding version.
+  const cr = (c.changeRequests || []).find(r => !r.released);
+  if (cr) {
+    if (!cr.draftReady) return { area: "release", label: "Draft the revised rate sheet", owner: "Actuarial Analyst",
+      sentence: "Sales requested a change. Draft a new rate-sheet version — the released version stays intact." };
+    if (cr.approval !== "Approved") return { area: "release", label: "Approve the revision", owner: approverFor(c).label,
+      sentence: "Route the revised version through the appropriate approval before it can be released." };
+    return { area: "release", label: "Release the superseding version", owner: "Actuarial Analyst",
+      sentence: "Release the approved revision. The former release becomes Superseded, with its history kept." };
+  }
   return null; // released / handover complete
 }
 
@@ -207,6 +301,7 @@ function ifgNext(b) {
 
 // -------------------------------------------------------------- status language
 export function statusOf(rec) {
+  if (rec.kind === "nb") return nbStatus(rec);
   const ns = nextStep(rec);
   if (!ns) {
     if (rec.kind === "ifg") return { label: "Released to Sales", tone: "ok" };
@@ -225,6 +320,22 @@ export function statusOf(rec) {
   if (!started && rec.kind !== "ifg") return { label: "New request", tone: "info" };
   if (rec.kind === "ifg" && !rec.reviewed) return { label: "New batch", tone: "info" };
   return { label: "In progress", tone: "neutral" };
+}
+
+// Plain-language Corporate New Business status — one word for every point in the
+// flow, distinguishing a proposed rate, an approved draft, and a released sheet.
+function nbStatus(c) {
+  const ns = nextStep(c);
+  const a = c.approval || {};
+  if (!ns) return { label: "Released to Sales", tone: "ok" };
+  if (!c.reviewed) return { label: "New request", tone: "info" };
+  if (!c.ready) return { label: "Waiting for information", tone: "warn" };
+  if (!c.assigned) return { label: "Ready for pricing", tone: "info" };
+  if (a.status === "Returned") return { label: "Returned for revision", tone: "warn" };
+  if (a.status && a.status.startsWith("Pending")) return { label: "For approval", tone: "info" };
+  if (a.status === "Approved" && !(c.versions || []).length) return { label: "Approved", tone: "ok" };
+  if ((c.versions || []).length && (c.changeRequests || []).some(r => !r.released)) return { label: "Revision in progress", tone: "neutral" };
+  return { label: "In pricing", tone: "neutral" };
 }
 
 // Rows for the dashboard — a flat, uniform list across journeys.
@@ -269,20 +380,156 @@ export const STANDARD_SOB = [
   { code: "WELL", service: "Wellness programme", standard: "Not included", requested: "Rider 2 — added", changed: true },
 ];
 
-function nbCalc(planName) {
+// Assumption label for Corporate New Business — the loadings it actually uses.
+// Deliberately excludes medical inflation and IBNR: IBNR belongs to the documented
+// Corporate Renewal analysis, not New Business.
+export function nbAssumptionLabel() {
+  const keys = ["loading", "margin", "commission"];
+  return assumptions().filter(x => keys.includes(x.key)).map(x => `${x.name} ${x.version}`).join(", ");
+}
+
+// The documented pricing templates, with version / owner / effective date.
+export const NB_TEMPLATES = {
+  "virgin-lt100": { name: "Virgin account · under 100 members", version: "CNB-V1-2026.1", owner: "Actuarial", effective: "2026-01-15" },
+  "virgin-ge100": { name: "Virgin account · 100 or more members", version: "CNB-V2-2026.1", owner: "Actuarial", effective: "2026-01-15" },
+  "existing-hmo": { name: "Existing-HMO account · with utilization history", version: "CNB-EH-2026.1", owner: "Actuarial", effective: "2026-01-15" },
+};
+
+// A Corporate New Business calculation, built with full provenance. Every rider line
+// records its source document and method; every loading links to a named assumption.
+// The base cost is DERIVED (never a mysterious prefilled figure): standard-plan
+// expected cost × a utilization factor. No IBNR is applied to New Business.
+function nbCalc(planName, { path = "existing-hmo" } = {}) {
+  const existing = path === "existing-hmo";
+  const basis = 12000;
+  const utilFactor = existing ? 0.90 : 1.00;
+  const base = Math.round(basis * utilFactor);
   return {
     planName,
-    base: 10800,
-    rider1: [{ label: "Private room upgrade", amount: 900 }, { label: "Preventive dental (Rider 1)", amount: 650 }],
-    rider2: [{ label: "Wellness programme (Rider 2)", amount: 420 }, { label: "Financial assistance desk (Rider 2)", amount: 180 }],
-    loadings: [
-      { label: "Admin & cost loading", pct: 7.5 },
-      { label: "Risk & profit margin", pct: 8.0 },
-      { label: "Intermediary commission", pct: 10.0 },
+    demoFormula: true,
+    pricingPath: path,
+    template: NB_TEMPLATES[path] || NB_TEMPLATES["existing-hmo"],
+    base,
+    baseTrace: {
+      basis,
+      basisSource: "Standard-plan cost table (illustrative)",
+      utilFactor,
+      utilLabel: existing ? "Existing-HMO utilization factor" : "Virgin-account factor (no utilization history)",
+      utilSource: existing
+        ? "Prior-carrier utilization history, 24 months — loss ratio accepted for pricing"
+        : "No prior utilization — manual standard cost table used (factor 1.00)",
+      note: "Illustrative demonstration formula — requires Actuarial validation.",
+    },
+    rider1: [
+      { label: "Private room upgrade", amount: 900, source: "Requested SOB — Room & board → Private room", method: "Incremental annual cost of the higher room tier vs semi-private", note: "Non-standard benefit (Rider 1)" },
+      { label: "Higher Maximum Benefit Limit (₱250,000)", amount: 520, source: "Requested SOB — MBL ₱200,000 → ₱250,000", method: "Expected annual cost of the +₱50,000 limit at this group's profile", note: "Non-standard benefit (Rider 1)" },
+      { label: "Preventive dental (added)", amount: 650, source: "Requested SOB — Preventive dental (added)", method: "Packaged dental rider annual cost / principal", note: "Non-standard benefit (Rider 1)" },
     ],
-    assumptionVersion: assumptionVersionLabel(),
+    rider2: [
+      { label: "Wellness programme", amount: 420, source: "Requested SOB — Wellness programme (added)", method: "Annual per-principal cost of the wellness vendor package", note: "Direct expense (Rider 2)" },
+      { label: "Financial-assistance desk", amount: 180, source: "Sales note — client-requested financial-assistance support", method: "Allocated annual cost of the assistance desk", note: "Direct expense (Rider 2)" },
+    ],
+    loadings: [
+      { label: "Admin & cost loading", pct: 7.5, assumptionKey: "loading" },
+      { label: "Risk & profit margin", pct: 8.0, assumptionKey: "margin" },
+      { label: "Intermediary commission", pct: 10.0, assumptionKey: "commission" },
+    ],
+    assumptionVersion: nbAssumptionLabel(),
     overrides: [],
   };
+}
+
+// Deterministic age-band distribution for a principal count (summing exactly).
+function sampleMemberData(principals, version = "v1") {
+  const p = Number(principals) || 0;
+  const bands = ["18–29", "30–39", "40–49", "50–59", "60+"];
+  const pct = [0.25, 0.42, 0.22, 0.08, 0.03];
+  let acc = 0;
+  const ageBands = bands.map((band, i) => {
+    const count = i === bands.length - 1 ? p - acc : Math.round(p * pct[i]);
+    acc += count;
+    return { band, count };
+  });
+  return { source: "Sales endorsement · member master list", version, ageBands, flags: [] };
+}
+
+// The fictional intake used by the create screen's "Load sample data" button.
+export function SAMPLE_INTAKE() {
+  return {
+    company: "Brightlane Hospitality Group",
+    franchiseRef: "MA-2026-0231",
+    requester: "Paolo Mendoza (Sales)",
+    requesterContact: "paolo.mendoza@valucare.example · +63 2 8555 0147",
+    businessType: "Intermediary",
+    agentBroker: "Keystone Insurance Brokers",
+    natureOfBusiness: "Hotels & restaurants",
+    effectiveDate: "2027-01-01",
+    targetQuoteDate: "2026-12-05",
+    principals: 142, dependents: 168,
+    priority: "standard",
+    existingHmo: true, franchiseApproved: true,
+    hasMembers: true, hasBenefits: true, hasUtil: true,
+    salesNote: "Moving from an existing HMO; 24-month utilization attached. Client wants a private-room upgrade, higher MBL and a wellness programme.",
+  };
+}
+
+// Build a brand-new Corporate New Business case from exactly the submitted data.
+// The newly created case contains only what was entered — it never opens a
+// pre-existing sample company, and supplied documents never raise a false blocker.
+export function createCase(data) {
+  const id = nextCaseId();
+  const existing = !!data.existingHmo;
+  const principals = Number(data.principals) || 0;
+  const dependents = Number(data.dependents) || 0;
+  const intermediary = data.businessType === "Intermediary";
+  const documents = [
+    { key: "members", name: "Member data file (principals + dependents)", source: "Sales endorsement · uploaded", kind: "Member Data", supplied: data.hasMembers !== false },
+    { key: "benefits", name: "Requested benefit document / Terms of Reference", source: "Client proposal · uploaded", kind: "Requested SOB", supplied: data.hasBenefits !== false },
+    { key: "util", name: existing ? "Existing-HMO utilization history (24 months)" : "Utilization history", kind: "Utilization",
+      source: existing ? "Prior carrier via broker" : "—", supplied: existing ? (data.hasUtil !== false) : false,
+      note: existing ? null : "New/virgin account — no prior utilization" },
+    { key: "franchise", name: "Approved franchise reference", kind: "Franchise",
+      source: data.franchiseApproved ? `HMS3 franchise record ${data.franchiseRef}` : `Franchise ${data.franchiseRef} — approval pending`,
+      supplied: !!data.franchiseApproved },
+  ];
+  const missing = [];
+  if (!documents.find(d => d.key === "benefits").supplied) missing.push("Requested benefit document not attached");
+  if (existing && !documents.find(d => d.key === "util").supplied) missing.push("Utilization history not attached (existing-HMO account)");
+  if (!data.franchiseApproved) missing.push("Franchise approval still pending in HMS3");
+  const ready = missing.length === 0;
+  const path = existing ? "existing-hmo" : (principals >= 100 ? "virgin-ge100" : "virgin-lt100");
+  const c = {
+    id, kind: "nb",
+    company: data.company, franchiseRef: data.franchiseRef,
+    requestType: "Corporate New Business quotation",
+    channel: intermediary ? `Intermediary — ${data.agentBroker || "Broker"}` : "Direct",
+    businessType: data.businessType || "Direct",
+    agentBroker: intermediary ? (data.agentBroker || "Broker") : null,
+    natureOfBusiness: data.natureOfBusiness || "—",
+    requester: data.requester, requesterContact: data.requesterContact || "—",
+    effectiveDate: data.effectiveDate, targetQuoteDate: data.targetQuoteDate || null,
+    principals, dependents,
+    priority: data.priority || "standard",
+    franchiseApproved: !!data.franchiseApproved,
+    salesNote: data.salesNote || "",
+    assignedTo: null,
+    reviewed: false, ready, assigned: false, pathConfirmed: false, dataReviewed: false, calcReady: false,
+    pricingPath: null,
+    memberData: sampleMemberData(principals),
+    utilization: existing
+      ? { required: true, period: "last 24 months (client-supplied)", source: "Prior carrier via broker", lossRatio: 0.90, claims: "Client-supplied figures", accepted: false, acceptedNote: "Client / prior-carrier supplied — the analyst must accept it for pricing. Not validated Valucare claims data.", adjustments: [] }
+      : { required: false, note: "New/virgin account — no prior utilization; priced from standard cost tables." },
+    documents, missing,
+    sob: JSON.parse(JSON.stringify(STANDARD_SOB)),
+    calc: nbCalc(`${data.company} Standard`, { path }),
+    rateSheet: { prepared: false, rows: [] },
+    approval: { status: "Not started", history: [] },
+    versions: [], changeRequests: [], clarifications: [],
+    receivedAt: stamp(),
+    activity: [{ at: stamp(), text: `Request submitted to Actuarial by ${data.requester}.` }],
+  };
+  putCase(c);
+  return c;
 }
 
 function SAMPLE_CASES() {
@@ -292,23 +539,38 @@ function SAMPLE_CASES() {
       id: "ACT-NB-2214", kind: "nb",
       company: "Northwind Logistics Corp", franchiseRef: "MA-2026-0192",
       requestType: "Corporate New Business quotation",
-      channel: "Direct", requester: "Marco Reyes (Sales)",
-      effectiveDate: "2026-12-01", principals: 184, dependents: 221,
+      channel: "Direct", businessType: "Direct", agentBroker: null,
+      natureOfBusiness: "Third-party logistics & warehousing",
+      requester: "Marco Reyes (Sales)", requesterContact: "marco.reyes@valucare.example · +63 2 8555 0101",
+      effectiveDate: "2026-12-01", targetQuoteDate: "2026-11-10", principals: 184, dependents: 221,
       priority: "standard", franchiseApproved: true,
+      salesNote: "Existing-HMO account switching carrier. 24-month utilization attached. Client wants private room, higher MBL, preventive dental and a wellness programme.",
       assignedTo: null, reviewed: false, ready: true, assigned: false,
+      pathConfirmed: false, dataReviewed: false, calcReady: false,
       pricingPath: null,
+      receivedAt: "2026-10-18T09:10:00Z",
+      memberData: {
+        source: "Sales endorsement · member master list", version: "v1", flags: [],
+        ageBands: [{ band: "18–29", count: 46 }, { band: "30–39", count: 78 }, { band: "40–49", count: 41 }, { band: "50–59", count: 16 }, { band: "60+", count: 3 }],
+      },
+      utilization: {
+        required: true, period: "Nov 2024 – Oct 2026 (24 months)", source: "Prior carrier, via Vanguard broker email",
+        lossRatio: 0.90, claims: "₱18.9M incurred", accepted: false,
+        acceptedNote: "Client / prior-carrier supplied — the analyst must accept it for pricing. This is not validated Valucare claims data.",
+        adjustments: ["Two catastrophic claims capped to a credible level", "Partial final 3 months annualised"],
+      },
       documents: [
         { key: "members", name: "Member data file (principals + dependents)", source: "Sales endorsement · spreadsheet", kind: "Member Data", supplied: true },
-        { key: "benefits", name: "Requested benefit document", source: "Client proposal · PDF", kind: "Requested SOB", supplied: true },
+        { key: "benefits", name: "Requested benefit document / Terms of Reference", source: "Client proposal · PDF", kind: "Requested SOB", supplied: true },
         { key: "util", name: "Utilization history (prior carrier, 24 months)", source: "Broker email attachment", kind: "Utilization", supplied: true },
         { key: "franchise", name: "Approved franchise reference", source: "HMS3 franchise record MA-2026-0192", kind: "Franchise", supplied: true },
       ],
       missing: [],
       sob: JSON.parse(JSON.stringify(STANDARD_SOB)),
-      calc: nbCalc("Northwind Standard"),
+      calc: nbCalc("Northwind Standard", { path: "existing-hmo" }),
       rateSheet: { prepared: false, rows: [] },
       approval: { status: "Not started", history: [] },
-      versions: [],
+      versions: [], changeRequests: [],
       clarifications: [],
       activity: [{ at: "2026-10-18T09:10:00Z", text: "Request received from Sales (single thread)." }],
     },
@@ -317,23 +579,33 @@ function SAMPLE_CASES() {
       id: "ACT-NB-2219", kind: "nb",
       company: "Sunrise Retail Group", franchiseRef: "MA-2026-0207",
       requestType: "Corporate New Business quotation",
-      channel: "Intermediary — Vanguard Brokers", requester: "Lea Santos (Sales)",
-      effectiveDate: "2026-12-15", principals: 96, dependents: 74,
+      channel: "Intermediary — Vanguard Brokers", businessType: "Intermediary", agentBroker: "Vanguard Brokers",
+      natureOfBusiness: "Specialty retail chain",
+      requester: "Lea Santos (Sales)", requesterContact: "lea.santos@valucare.example · +63 2 8555 0133",
+      effectiveDate: "2026-12-15", targetQuoteDate: "2026-11-05", principals: 96, dependents: 74,
       priority: "rush", franchiseApproved: false,
+      salesNote: "New / virgin account (no prior HMO). Rush — client decision meeting mid-November.",
       assignedTo: null, reviewed: false, ready: false, assigned: false,
+      pathConfirmed: false, dataReviewed: false, calcReady: false,
       pricingPath: null,
+      receivedAt: "2026-10-19T14:02:00Z",
+      memberData: {
+        source: "Sales endorsement · member master list", version: "v1", flags: ["3 records missing date of birth — flagged for Sales"],
+        ageBands: [{ band: "18–29", count: 31 }, { band: "30–39", count: 38 }, { band: "40–49", count: 19 }, { band: "50–59", count: 6 }, { band: "60+", count: 2 }],
+      },
+      utilization: { required: false, note: "New / virgin account — no prior utilization; priced from standard cost tables." },
       documents: [
         { key: "members", name: "Member data file", source: "Sales endorsement · spreadsheet", kind: "Member Data", supplied: true },
-        { key: "benefits", name: "Requested benefit document", source: "—", kind: "Requested SOB", supplied: false },
+        { key: "benefits", name: "Requested benefit document / Terms of Reference", source: "—", kind: "Requested SOB", supplied: false },
         { key: "util", name: "Utilization history", source: "—", kind: "Utilization", supplied: false, note: "New/virgin account — no prior utilization" },
         { key: "franchise", name: "Approved franchise reference", source: "Franchise MA-2026-0207 — approval pending", kind: "Franchise", supplied: false },
       ],
       missing: ["Requested benefit document not attached", "Franchise approval still pending in HMS3"],
       sob: JSON.parse(JSON.stringify(STANDARD_SOB)),
-      calc: nbCalc("Sunrise Standard"),
+      calc: nbCalc("Sunrise Standard", { path: "virgin-lt100" }),
       rateSheet: { prepared: false, rows: [] },
       approval: { status: "Not started", history: [] },
-      versions: [],
+      versions: [], changeRequests: [],
       clarifications: [],
       activity: [{ at: "2026-10-19T14:02:00Z", text: "Request received from Sales (rush priority)." }],
     },

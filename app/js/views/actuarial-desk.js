@@ -10,7 +10,7 @@ import {
   ensureSeeded, resetDemo, allRecords, nextStep, statusOf, journeyLabel, recName, recHref,
   assumptions, peso, plural, config,
 } from "./actdesk-core.js";
-import { renderCase } from "./actdesk-corp.js";
+import { renderCase, renderCreate } from "./actdesk-corp.js";
 import { renderBatch } from "./actdesk-ifg.js";
 import { highlightNav } from "./actdesk-ui.js";
 
@@ -27,6 +27,7 @@ export async function render(main, { parts, query }) {
   const sub = parts[1];
   if (sub === "batch" && DISABLED.ifg) return go("#/actuarial-desk");
   if (sub === "reports" && DISABLED.reports) return go("#/actuarial-desk");
+  if (sub === "new") return renderCreate(main);
   if (sub === "case") return renderCase(main, parts[2], parts[3] || "request");
   if (sub === "batch") return renderBatch(main, parts[2], parts[3] || "batch");
   if (sub === "released") return renderReleased(main);
@@ -53,7 +54,8 @@ function renderHome(main, tab, query) {
   main.innerHTML = html`
     <div class="page-head"><div><h1>Actuarial Home</h1>
       <p class="muted">Price quotations and release renewal rates. Every case shows its owner and the next action — no separate tracker needed.</p></div>
-      <div class="ph-actions"><button type="button" class="btn ghost sm" id="resetDemo">${icon("history", 15)} Reset this demo</button></div></div>
+      <div class="ph-actions"><a class="btn primary sm" href="#/actuarial-desk/new">${icon("plus", 15)} Start a new request</a>
+        <button type="button" class="btn ghost sm" id="resetDemo">${icon("history", 15)} Reset this demo</button></div></div>
 
     <div class="seg mt" role="tablist" aria-label="Dashboard">
       <button role="tab" class="${tab === "new" ? "on" : ""}" aria-selected="${tab === "new"}" data-tab="new">New requests <span class="cnt">${counts.new}</span></button>
