@@ -182,7 +182,9 @@ const NB_RENDER = {
           <tbody>${c.sob.map((l) => html`<tr class="${l.changed ? "row-changed" : ""}"><td>${l.service}</td><td>${l.standard}</td><td>${l.requested}</td>
             <td>${l.changed ? html`<span class="pill warn">Changed</span>` : html`<span class="tiny">—</span>`}</td></tr>`)}</tbody></table></div>`)}
       ${calcPanel(ctx)}
-      <div class="pb-foot"><button class="btn primary" id="pPrep" ${c.pricingPath ? "" : "disabled"}>Prepare rate sheet ›</button></div>`.s;
+      <div class="pb-foot"><button class="btn primary" id="pPrep" ${c.pricingPath ? "" : "disabled"}>Prepare rate sheet ›</button>
+        <button type="button" class="btn ghost" id="pUpload">${icon("upload", 15)} Upload rate sheet (sample)</button>
+        <span class="tiny">Already priced outside this screen? Load a sample rate sheet instead of building it here.</span></div>`.s;
 
     body.querySelectorAll('input[name="path"]').forEach((r) => (r.onchange = () => {
       ctx.patch((x) => { x.pricingPath = r.value; });
@@ -196,6 +198,7 @@ const NB_RENDER = {
       toast("Rate sheet prepared.", "ok"); ctx.goArea("approval");
     };
     body.querySelector("#pPrep").onclick = prep;
+    body.querySelector("#pUpload").onclick = () => uploadRateSheet(ctx, { defaultName: `${slug(c.company)}_rate_sheet_v1.xlsx`, nextArea: "approval" });
     return prep;
   },
 
@@ -211,6 +214,7 @@ const NB_RENDER = {
         ${rateTable(c)}
         <dl class="dl mt"><div><dt>Illustrative contract value (annual)</dt><dd>${peso(contractValue(c))}</dd></div>
           <div><dt>Pricing path</dt><dd>${PATHS.find((p) => p.key === c.pricingPath)?.label || "—"}</dd></div>
+          <div><dt>Rate sheet source</dt><dd>${c.rateSheet?.uploaded ? html`Uploaded sample file · <span class="tiny">${c.rateSheet.fileName}</span>` : "Built from the transparent calculation"}</dd></div>
           <div><dt>Assumptions used</dt><dd class="tiny">${c.calc.assumptionVersion}</dd></div></dl>
         <details class="mt"><summary>Benefit differences & source documents</summary>
           <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Benefit</th><th>Standard</th><th>Requested</th></tr></thead>
@@ -370,13 +374,16 @@ const RN_RENDER = {
       ${section("Benefits: previous → changed", html`
         <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Benefit</th><th>Previous</th><th>Proposed</th><th>Change</th></tr></thead>
           <tbody>${c.sob.map((l) => html`<tr class="${l.changed ? "row-changed" : ""}"><td>${l.service}</td><td>${l.standard}</td><td>${l.requested}</td><td>${l.changed ? html`<span class="pill warn">Changed</span>` : "—"}</td></tr>`)}</tbody></table></div>`)}
-      <div class="pb-foot"><button class="btn primary" id="pRate">Produce rate & submit for approval ›</button></div>`.s;
+      <div class="pb-foot"><button class="btn primary" id="pRate">Produce rate & submit for approval ›</button>
+        <button type="button" class="btn ghost" id="pUpload">${icon("upload", 15)} Upload rate sheet (sample)</button>
+        <span class="tiny">Rate agreed outside this screen? Load a sample rate sheet instead of producing it here.</span></div>`.s;
     wireCalc(ctx, body);
     const act = () => {
       ctx.patch((x) => { x.rateSheet = { prepared: true, at: new Date().toISOString(), rows: rateRows(x) }; if (x.approval.status === "Returned") x.approval.status = "Not started"; log(x, "Proposed renewal rate produced."); });
       toast("Proposed rate produced.", "ok"); ctx.goArea("approval");
     };
     body.querySelector("#pRate").onclick = act;
+    body.querySelector("#pUpload").onclick = () => uploadRateSheet(ctx, { defaultName: `${slug(c.company)}_renewal_rate_sheet.xlsx`, nextArea: "approval" });
     return act;
   },
 
@@ -442,6 +449,29 @@ const RN_RENDER = {
 };
 
 // =================================================================== shared bits
+// Simulated "upload a pre-made rate sheet" — for when pricing was done in an
+// external workbook. Nothing is really uploaded; it loads the same illustrative
+// sample figures and marks the source so the approver can see it was uploaded.
+async function uploadRateSheet(ctx, { defaultName, nextArea }) {
+  const r = await dialog({
+    title: "Upload rate sheet (sample)",
+    body: html`<p class="tiny">Loads a pre-made rate sheet as if it were uploaded from an external pricing workbook — useful when the numbers were produced outside this screen. The figures are the same illustrative sample; nothing is really uploaded or verified.</p>
+      <div class="field"><label for="rf">Sample file</label><input id="rf" name="file" class="inp" value="${defaultName}"></div>`,
+    actions: [{ label: "Cancel" }, { label: "Upload sample rate sheet", kind: "primary", value: "ok" }],
+  });
+  if (r?.action !== "ok") return;
+  const fileName = (r.values.file || defaultName).trim() || defaultName;
+  ctx.patch((x) => {
+    x.rateSheet = { prepared: true, uploaded: true, fileName, source: "Uploaded sample · external pricing workbook", at: new Date().toISOString(), rows: rateRows(x) };
+    if (x.approval?.status === "Returned") x.approval.status = "Not started";
+    log(x, `Rate sheet uploaded (sample file: ${fileName}).`);
+  });
+  toast("Sample rate sheet uploaded.", "ok");
+  ctx.goArea(nextArea);
+}
+
+const slug = (s) => String(s || "rate").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+
 function gate(ctx, body, msg, backArea) {
   body.innerHTML = html`<div class="panel"><div class="state-box"><b>${msg}</b>
     <button class="btn mt" id="gBack">Go to that step</button></div></div>`.s;
