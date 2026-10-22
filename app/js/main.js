@@ -96,6 +96,19 @@ const WORKSPACES = {
     routes: ["renewal-ifg"],
     nav: [{ key: "renewal-ifg", label: "IFG Renewal Business", icon: "history", href: "#/renewal-ifg" }],
   },
+  "actuarial-desk": {
+    key: "actuarial-desk", dept: "Actuarial", name: "Actuarial", home: "#/actuarial-desk",
+    routes: ["actuarial-desk"],
+    nav: [
+      { key: "home", label: "Actuarial Home", icon: "home", href: "#/actuarial-desk" },
+      { key: "queue-new", label: "New requests", icon: "inbox", href: "#/actuarial-desk/queue/new" },
+      { key: "queue-progress", label: "In progress", icon: "tasks", href: "#/actuarial-desk/queue/progress" },
+      { key: "released", label: "Released quotations", icon: "check", href: "#/actuarial-desk/released" },
+      { key: "reports", label: "Reports & assumptions", icon: "chart", href: "#/actuarial-desk/reports" },
+    ],
+    search: (q) => `#/actuarial-desk/queue/new?q=${encodeURIComponent(q)}`,
+    searchPlaceholder: "Search cases and batches",
+  },
 };
 
 // Which workspace owns this route? Falls back to the New Business desk for shared
@@ -262,6 +275,7 @@ const VIEWS = {
   "new-ifg": () => import("./views/new-ifg.js"),
   "renewal-ifg": () => import("./views/section.js"),
   create: () => import("./views/create.js"),
+  "actuarial-desk": () => import("./views/actuarial-desk.js"),
   tasks: () => import("./views/tasks.js"),
   accounts: () => import("./views/accounts.js"),
   reports: () => import("./views/reports.js"),

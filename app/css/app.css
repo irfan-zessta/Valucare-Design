@@ -786,3 +786,59 @@ dl.kv.cols .wide{grid-column:1/-1}
 .demo-success { margin:16px auto; border-radius:50%; background:#e1f4e8; color:#17643c; width:64px; height:64px; display:grid; place-items:center; font-size:32px; animation:demo-check .3s ease-out; }
 @keyframes demo-check { from { transform:scale(.8); opacity:0; } to { transform:scale(1); opacity:1; } }
 @media (prefers-reduced-motion:reduce) { .demo-success { animation:none; } }
+
+/* ------------------------------------------------------------------ *
+   Actuarial desk — small additions on top of the shared vocabulary.
+   (panel/rnw-*/rec-*/steps-nav/drawer/guide-* already exist above.)
+ * ------------------------------------------------------------------ */
+
+/* Breadcrumb-style "Back to demo selection" trail */
+.crumbs-sm{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:12.5px;color:var(--text-subtle);margin-bottom:12px}
+.crumbs-sm a{display:inline-flex;align-items:center;gap:4px;color:var(--text-muted);font-weight:500}
+.crumbs-sm a:hover{color:var(--accent)}
+.linklike{background:none;border:0;padding:0;font:inherit;color:var(--accent);font-weight:600;cursor:pointer}
+.linklike:hover{text-decoration:underline}
+
+/* Drawer scrim — the existing .drawer is fixed to the right; we dim behind it */
+.drawer-scrim{position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:149;animation:scrim-in var(--t-fast,.15s) var(--ease,ease)}
+.drawer-scrim .drawer{z-index:150}
+@keyframes scrim-in{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.drawer-scrim{animation:none}}
+
+/* Clickable table rows (dashboard queues) */
+tr[data-href]{cursor:pointer}
+tr[data-href]:hover{background:var(--row-hover)}
+
+/* Pricing path / option chooser */
+.choice-list{display:flex;flex-direction:column;gap:8px;margin:4px 0}
+.choice{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;text-align:left;font:inherit;background:var(--surface);transition:border-color var(--t-fast,.15s) var(--ease,ease),background var(--t-fast,.15s) var(--ease,ease)}
+.choice:hover{border-color:var(--border-input-hover)}
+.choice.on{border-color:var(--accent);background:var(--info-soft)}
+.choice input{margin-top:2px}
+.choice .ch-body{display:flex;flex-direction:column;gap:2px}
+.choice .ch-body b{color:var(--text);font-weight:600}
+.choice .ch-body span{font-size:12.5px;color:var(--text-muted)}
+
+/* Transparent calculation table (base → riders → loadings → total) */
+.calc-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.calc-tbl td{padding:7px 10px;border-bottom:1px solid var(--border)}
+.calc-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);white-space:nowrap}
+.calc-tbl td.indent,.calc-tbl tr.indent td:first-child{padding-left:26px;color:var(--text-muted)}
+.calc-tbl tr.sub td{border-top:1px solid var(--border-strong);font-weight:600;color:var(--text)}
+.calc-tbl tr.tot td{border-top:2px solid var(--text);border-bottom:0;font-weight:700;color:var(--text)}
+.row-changed td{background:var(--info-soft)}
+.row-muted{opacity:.55}
+
+/* Document / activity list rows inside drawers */
+.doclist{display:flex;flex-direction:column;gap:8px;margin:0}
+.doc-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-sm)}
+.doc-item .doc-ic{display:inline-flex;color:var(--text-subtle)}
+.doc-item .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.doc-item.miss{border-style:dashed;color:var(--text-subtle)}
+.doc-item.miss .doc-ic{color:var(--warning)}
+
+/* Panel footer action row */
+.pb-foot{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* High-utilisation bar emphasis */
+.rnw-bar-fill.hot{background:var(--danger)}
