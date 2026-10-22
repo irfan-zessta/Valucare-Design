@@ -71,17 +71,8 @@ export async function render(main, { query }) {
       "Creates a ready-made sample prospect — Harborlight Services Corporation (100 Sample Avenue, Makati City; Direct business). Fictional demo content; sample commercial terms, not an official quotation. Nothing existing is changed.",
       { confirm: "Start sample" });
     if (!ok) return;
-    // Visual preview has no backend to persist a new case, so open an existing early-stage
-    // sample instead of dead-ending. The message stays honest: nothing was saved.
-    if (window.__HMS3_PREVIEW__) {
-      const sample = items.find((c) => isProspect(c)) || items.find((c) => !isHistory(c)) || items[0];
-      toast("Visual preview: new cases are not saved. Opening a sample case so you can continue.");
-      if (sample) go(`#/case/${sample.id}`);
-      return;
-    }
-    btn?.setAttribute("aria-busy", "true");
+    // act() owns the busy state; pre-setting it causes it to skip the create.
     const r = await act("case.create", harborlightPayload(), { button: btn, success: "Sample New Business created." });
-    btn?.removeAttribute("aria-busy");
     if (!r) return;
     window.dispatchEvent(new Event("hms:changed"));
     go(`#/case/${r.caseId}/franchise/franchise`);
@@ -228,7 +219,7 @@ function harborlightPayload() {
   const industry = (inds.find((i) => /business services/i.test(i.name)) || inds.find((i) => /service/i.test(i.name)) || inds[0] || {}).code || "";
   const geo = state.meta.geo || {};
   let province = "", region = "", city = "Makati City";
-  for (const [p, g] of Object.entries(geo)) { if ((g.cities || []).includes("Makati City")) { province = p; region = g.region; break; } }
+  for (const [p, g] of Object.entries(geo)) { const match = (g.cities || []).find(c => /^Makati(?: City)?$/i.test(c)); if (match) { province = p; region = g.region; city = match; break; } }
   if (!province) { province = Object.keys(geo)[0] || ""; region = geo[province]?.region || ""; city = (geo[province]?.cities || [])[0] || "Makati City"; }
   const leadSource = (state.meta.options?.leadSource?.[0]?.value) || "";
   const target = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);

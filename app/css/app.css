@@ -778,3 +778,11 @@ dl.kv.cols .wide{grid-column:1/-1}
 .ifg-phone-body{padding:16px;display:flex;flex-direction:column;gap:10px}
 .ifg-phone-body h3{font-size:16px;font-weight:600}
 .ifg-phone-body .note{font-size:12.5px}
+/* Compact browser-demo journey. Detailed HMS forms remain expandable. */
+.demo-detail-list { display:grid; gap:12px; margin:20px 0; }
+.demo-detail summary { padding:16px 20px; cursor:pointer; font-weight:500; }
+.demo-detail[open] summary { border-bottom:1px solid var(--border); }
+.demo-checks { list-style:none; padding:0; display:grid; gap:12px; margin:20px 0; }
+.demo-success { margin:16px auto; border-radius:50%; background:#e1f4e8; color:#17643c; width:64px; height:64px; display:grid; place-items:center; font-size:32px; animation:demo-check .3s ease-out; }
+@keyframes demo-check { from { transform:scale(.8); opacity:0; } to { transform:scale(1); opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .demo-success { animation:none; } }

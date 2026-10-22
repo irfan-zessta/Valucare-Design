@@ -2,7 +2,7 @@
 
 // Static visual-preview backend. Only used when window.__HMS3_PREVIEW__ is set by a
 // hosted/static root index.html; local dev (served from app/) never touches it.
-import { previewApi } from "./preview.js";
+import { demoApi as previewApi } from "./demo-store.js";
 
 // DEMO MOCK MODE — mirrors server/domain.py DEMO_BYPASS. When true, client-side
 // required-field validation never blocks submit/advance, so a user can walk any
@@ -210,7 +210,7 @@ async function reauth() {
   return reauthPromise;
 }
 export async function api(path, { method = "GET", body, raw: rawBody, headers = {}, retryAuth = true } = {}) {
-  if (window.__HMS3_PREVIEW__) return previewApi(path, method, body);
+  if (window.__HMS3_PREVIEW__) return previewApi(path, method, body, rawBody);
   let res;
   try {
     res = await fetch("/api/" + path, {
@@ -337,7 +337,22 @@ export function pickFile(accept = "") {
     inp.click();
   });
 }
-export const docUrl = (id, inline = false) => `/api/documents/${id}/download${inline ? "?inline=1" : ""}`;
+export const docUrl = (id, inline = false) => window.__HMS3_PREVIEW__
+  ? `#demo-document/${encodeURIComponent(id||'sample')}`
+  : `/api/documents/${id}/download${inline ? "?inline=1" : ""}`;
+// Static demos contain sample document metadata, not signed files or real PDFs.
+// Intercept these links before routing so they never download a 404 HTML page.
+document.addEventListener('click', async e => {
+  const link=e.target.closest?.('a[href^="#demo-document/"],a[href^="/api/documents/"]');
+  if(!window.__HMS3_PREVIEW__||!link)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  try {
+    const href=link.getAttribute('href');
+    const out=await api('documents/'+(href.startsWith('#')?href.split('/')[1]:href.split('/')[3]));
+    const d=out.document;
+    await messageDialog('Sample document—not verified',html`<p><b>${d.filename}</b></p><dl class="dl mt"><div><dt>Company</dt><dd>${out.company}</dd></div><div><dt>Case</dt><dd>${out.caseId}</dd></div><div><dt>Version</dt><dd>${d.version}</dd></div></dl><p class="mt">This is a sample document record for the walkthrough. No actual signed file or uploaded file content is stored in this browser demo. Review the related case details for the sample terms.</p>`);
+  } catch(e) {showError(e);}
+},true);
 
 // DEMO MOCK MODE — generate a format-appropriate dummy file so every upload point
 // can be exercised without a real document on hand. Mirrors DEMO_BYPASS.
@@ -417,18 +432,6 @@ export class RecordForm {
     const changes = {};
     keys.forEach((k) => (changes[k] = clone(this.draft[k])));
     this.setStatus("saving");
-    // Visual preview: there is no server, so keep edits locally for the session and
-    // report them as saved. Nothing persists across reload, which is honest for a mock.
-    if (window.__HMS3_PREVIEW__) {
-      keys.forEach((k) => (this.base[k] = clone(this.draft[k])));
-      this.base.v = (this.base.v || 0) + 1;
-      this.orig = clone(this.base);
-      this.lastSaved = new Date();
-      this.setStatus("saved");
-      this.clearBackup();
-      this.onSaved && this.onSaved(this.base, this);
-      return true;
-    }
     this.saving = (async () => {
       try {
         const res = await api("action/record.save", { method: "POST", body: { recordId: this.id, baseVersion: this.base.v, changes } });

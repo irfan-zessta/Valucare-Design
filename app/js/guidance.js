@@ -23,8 +23,8 @@ export const ABBR = {
   "TOR": "Terms of Reference",
   "AOR": "Agent of Record",
   "BOR": "Broker of Record",
-  "DSA": "Distribution / Sales Agreement",
-  "IFG": "Intermediary Facultative Group arrangement",
+  "DSA": "Data Sharing Agreement",
+  "IFG": "Individual, Family and Group",
   "MA Code": "Master Account code",
   "B&C": "Billing & Collection team",
   "AMT": "Account Management Team",
@@ -152,6 +152,7 @@ export function ctaFor(task, { mine = false, stepLabel = "" } = {}) {
 
 // One-sentence rationale for a task (what + why / who it waits on).
 export function whyFor(task) {
+  if (task?.why) return task.why;
   const g = TASK_GUIDE[guideKey(task && task.key)];
   if (g && g.why) return g.why;
   // Fall back to a sensible sentence derived from the task itself.

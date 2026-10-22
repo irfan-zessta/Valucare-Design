@@ -143,10 +143,16 @@ export function tone(status) {
   return "neutral";
 }
 export const pill = (status, t) => html`<span class="pill ${t || tone(status)}">${status || "Not started"}</span>`;
-// Provenance badges (HMS3 / v1.1 / pending rule / demo data) were developer-facing
-// reference marks. The simplified New Business demo hides them so the fields read as
-// plain labels. Kept as a no-op (callers still pass `src`) so nothing else breaks.
-export const srcTag = (_src) => "";
+// Provenance badge next to a field label so the team can tell, at a glance, which
+// fields already exist in HMS3 (carried over) and which are new to this New Business
+// flow. Only Corporate NB forms pass `src`, so the badge appears there and nowhere
+// else; any other value (or none) stays invisible. Token-driven via the `.tag` styles.
+export const srcTag = (src) =>
+  src === "legacy"
+    ? html`<span class="tag legacy" title="Existing field — carried over from HMS3">HMS3</span>`
+    : src === "proposed"
+    ? html`<span class="tag proposed" title="New field — added for this New Business flow">New</span>`
+    : "";
 export const simNote = (text) => html`<div class="note sim"><b>Simulated integration.</b> ${text}</div>`;
 
 // A calm, focus-trapped success confirmation shown after a milestone completes

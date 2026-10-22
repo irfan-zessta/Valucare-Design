@@ -12,6 +12,10 @@ export async function renderMemberData(ctx, box, purpose) {
   const acc = (data.records.account || []).find((a) => !a.parentId);
   const enrollmentBlocked = purpose === "enrollment" && (!acc || !["Approved", "Scheduled", "Active"].includes(acc.status));
   const locked = batch && ["Submitted to MDA", "MDA Completed"].includes(batch.status);
+  if(data.demo?.browserLocal&&batch?.simulated) {
+    box.innerHTML=html`<section class="panel"><div class="ph"><h2>Sample Member Data · ${purpose==='enrollment'?'enrollment':'quotation'}</h2></div><div class="pb"><p><b>${int(batch.counts.total)} sample members</b> carried from the franchise totals.</p><p class="mt">${batch.status==='MDA Completed'?'Sample MDA acknowledgement recorded. No policies or cards were issued.':'Sample Member Data is ready for the quotation walkthrough.'}</p><p class="tiny mt">No personal member rows have been uploaded or checked. Counts and outcomes are simulated, not verified.</p></div></section>`.s;
+    return;
+  }
   let filter = "problems", page = 0, q = "";
   const size = 25;
 

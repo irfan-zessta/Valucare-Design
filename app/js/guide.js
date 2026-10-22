@@ -46,12 +46,7 @@ function onGuideCase() {
 }
 
 // ---------------------------------------------------------------- environment
-// The hosted/static build (production on Vercel) sets window.__HMS3_PREVIEW__ and has NO
-// backend, so `case.create` cannot run there. In that mode the walkthrough attaches to an
-// existing early-stage fixture case instead of spawning one. NB-2026-0022 is a franchise
-// still in Draft (Work Area 1), so the guide can walk it forward from the start.
-const isPreview = () => !!window.__HMS3_PREVIEW__;
-const PREVIEW_DEMO_CASE = "NB-2026-0022";
+// Both hosted and local demos create an isolated case through the same intake.
 
 // ---------------------------------------------------------------- role for the walkthrough
 // Opening a brand-new case is an Account Acquisition Team (AAT) step. In this demo the Admin
@@ -76,8 +71,14 @@ async function ensureCanStart() {
 // Opened from the top-bar "Guide me" button. Offers the two choices the spec asks for
 // — "Explore freely" and "Guide me through New Business" — plus Resume / fresh-case
 // options once a demo is already under way.
-export async function openGuideMenu() {
+export async function openGuideMenu(ctx) {
   if (!DEMO_BYPASS) { go("#/new-business"); return; }
+  if(ctx?.data.demo?.browserLocal) {
+    const r=await dialog({title:'Guide this case',body:html`<p>Continue <b>${ctx.data.summary.company}</b> from its saved step. The guide only explains and highlights the next control. It does not create another case or submit anything for you.</p>`,actions:[{label:'Explore freely',value:'free'},{label:'Guide this case',kind:'primary',value:'current'}]});
+    if(r?.action==='free')return exitGuide();
+    if(r?.action==='current'){setGuide({active:true,caseId:ctx.id,startedAt:nowStamp()});await ctx.reload();}
+    return;
+  }
   const g = getGuide();
   const hasDemo = !!(g && g.caseId);
   const body = html`<p class="muted">A guided walkthrough starts you at the <b>very beginning</b> of New Business — finding the company and creating an <b>isolated, fictional</b> demo case — then, on every screen, points out the one thing to do next and why. It never fills in or submits anything for you, and it never touches your real cases.</p>
@@ -97,16 +98,6 @@ export async function openGuideMenu() {
 // No case is created here; they create it themselves at the end of the Create steps, and the
 // guide adopts whatever case they land on as its demo case (see the hashchange listener).
 export async function startGuide() {
-  // Static preview (production): no backend, so the Create flow can't search or persist a
-  // case. Attach to an existing early-stage fixture so the walkthrough still runs. A full
-  // browser reload resets the fixture, which is honest for a mock.
-  if (isPreview()) {
-    setGuide({ caseId: PREVIEW_DEMO_CASE, active: true, startedAt: nowStamp() });
-    toast("Guided demo ready — follow the highlighted next step.", "ok");
-    go(`#/case/${PREVIEW_DEMO_CASE}/franchise/franchise`);
-    window.dispatchEvent(new Event("hms:changed"));
-    return;
-  }
   // Only the AAT desk (Admin, in this demo) can create a new case. If the current role can't,
   // offer to switch — don't dead-end with a vague error.
   if (!(await ensureCanStart())) return;
@@ -118,23 +109,16 @@ export async function startGuide() {
   window.dispatchEvent(new Event("hms:changed"));
 }
 
-// Production default-on: the first time a visitor arrives in the static preview, switch the
-// walkthrough on so they land directly in guided mode. It fires at most once — after the user
-// exits or starts anything (a stored guide state exists thereafter) it never re-triggers, so
-// it is not a nag. Real backends keep the guide opt-in; auto-creating a case on every load
-// would litter the database.
+// Optional on both hosted and server-backed demos.
 export function maybeAutoStartGuide() {
-  if (!isPreview() || !DEMO_BYPASS) return;
-  if (!state.me) return;        // wait until a role is chosen
-  if (getGuide()) return;       // already started, resumed or dismissed before — respect it
-  startGuide();
+  // Guided mode is opt-in; never redirect visitors into an unrelated case.
 }
 
 function resumeGuide() {
   const g = getGuide();
   if (!g || !g.caseId) return startGuide();
   patchGuide({ active: true });
-  go(`#/case/${g.caseId}/franchise`);
+  go(`#/case/${g.caseId}`);
 }
 
 // Turn the guide off. The demo case is left exactly as it is (never deleted) so it can
@@ -301,7 +285,7 @@ function stepPanelHtml(ctx, { n, mine }) {
     return `${headHtml("")}
       <div class="gp-body"><b class="gp-what">Nothing waiting right now.</b><p class="gp-why">There is no open action on this case at the moment.</p></div>${footBtns()}`;
   }
-  const cta = ctaFor(n, { mine });
+  const cta = ctx.data.demo?.browserLocal ? (nextCtaEl()?.textContent||n.button) : ctaFor(n, { mine });
   const why = whyFor(n);
   // Who acts: your task, the client, or another team. For another team under the demo,
   // say plainly that you can record their (simulated) response yourself.
@@ -321,7 +305,7 @@ function stepPanelHtml(ctx, { n, mine }) {
       ${why ? `<p class="gp-why">${gloss(why).s}</p>` : ""}
       <p class="gp-look">${icon("arrowr", 14).s} ${esc(lookFor)}</p>
       ${actorNote ? `<p class="gp-actor">${gloss(actorNote).s}</p>` : ""}
-      ${sampleHint() ? `<p class="gp-tip">${icon("sparkle", 13).s} ${sampleHint()}</p>` : ""}
+      ${!ctx.data.demo?.browserLocal&&sampleHint() ? `<p class="gp-tip">${icon("sparkle", 13).s} ${sampleHint()}</p>` : ""}
     </div>${footBtns()}`;
 }
 
@@ -389,10 +373,11 @@ function wireCollapsed(panel) {
 // The single control to use. We trust the app's own Next-action link as the source of
 // truth: if it points at where we already are, highlight the in-section primary action;
 // otherwise highlight that link so the person is taken to the right place first.
-function nextCtaEl() { return document.querySelector("#main .rec-next .rn-act a.btn"); }
+function nextCtaEl() { return document.querySelector("#demoNext") || document.querySelector("#main .rec-next .rn-act a.btn"); }
 function isOnTarget() {
   const a = nextCtaEl();
   if (!a) return true; // no nav link => the action is here
+  if(a.id==='demoNext')return a.textContent!=='Go to current step';
   return pathOf(a.getAttribute("href") || "") === pathOf(location.hash);
 }
 function clearHighlight() {
@@ -401,14 +386,14 @@ function clearHighlight() {
 function applyHighlight(ctx, { n }) {
   clearHighlight();
   if (!n) return;
-  let target = null;
-  if (isOnTarget()) {
+  let target = ctx.data.demo?.browserLocal ? nextCtaEl() : null;
+  if (!target&&isOnTarget()) {
     const sec = document.querySelector("#step .step-sec:not([hidden])") || document.getElementById("step");
     target = sec && (sec.querySelector(".btn.primary:not([disabled]):not(.ghost)")
       || sec.querySelector("button.btn:not(.ghost):not(.danger):not([disabled])")
       || sec.querySelector("a.btn:not(.ghost)"));
     if (!target) target = nextCtaEl();
-  } else {
+  } else if(!target) {
     target = nextCtaEl();
   }
   if (!target) return;

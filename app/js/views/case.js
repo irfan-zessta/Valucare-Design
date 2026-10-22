@@ -4,6 +4,7 @@ import { icon, pill, stageBar, ownerText, docRow, wireUploads, field, mountCombo
 import { switchUser } from "../main.js";
 import { gloss, ctaFor, whyFor } from "../guidance.js";
 import { mountGuide, openGuideMenu, guideActive } from "../guide.js";
+import { demoNextCard, wireDemoNext, renderDemoSections } from "../demo-journey.js";
 
 // The record is organised as five user-facing work areas (steps). Each step is a
 // single scrolling work area built from stacked sections — no competing rows of
@@ -88,6 +89,7 @@ export async function render(main, { parts, query, force }) {
     return;
   }
   const s = data.summary, c = data.case;
+  if (data.demo?.browserLocal && s.next && (!parts[2] || parts[2] === "overview")) parts = s.next.link.replace(/^#\//, "").split("/");
   const { step: stepKey, anchor, focus } = resolveStep(parts, data);
   const stepDef = STEPS.find((x) => x.key === stepKey) || STEPS[0];
   document.title = `${s.company} · ${stepDef.label} · HMS3`;
@@ -147,10 +149,11 @@ export async function render(main, { parts, query, force }) {
     if (ok) go(n.link); else { b.removeAttribute("aria-busy"); b.disabled = false; }
   });
 
-  main.querySelector("#guideBtn")?.addEventListener("click", () => openGuideMenu());
+  main.querySelector("#guideBtn")?.addEventListener("click", () => openGuideMenu(ctx));
 
   ctx.el = main.querySelector("#step");
   await renderStep(ctx, stepKey, anchor, focus);
+  if (data.demo?.browserLocal) await wireDemoNext(ctx);
   // Optional guided mode: mounts an accessible, anchored explanation panel only when
   // the guide is switched on AND this is its isolated demo case (checked inside).
   mountGuide(ctx, { n, mine });
@@ -185,6 +188,7 @@ function stepForTask(link) {
 //   Why?            -> the one-sentence rationale from the shared guidance map
 //   What happens next? -> the owner / category chip (your task vs client vs another team)
 function nextStrip(ctx, { n, mine, suggested }) {
+  if (ctx.data.demo?.browserLocal) return demoNextCard(ctx);
   const s = ctx.data.summary, c = ctx.data.case;
   const others = s.tasks.filter((t) => t !== n && t.key !== n?.key);
   // Milestone-accurate completion state — never claims "handed over" unless it is.
@@ -305,6 +309,7 @@ function stepSections(stepKey, data) {
 }
 async function renderStep(ctx, stepKey, anchor, focus) {
   const el = ctx.el;
+  if (ctx.data.demo?.browserLocal) return renderDemoSections(ctx, stepSections(stepKey, ctx.data), anchor);
   const guard = stepGuard(stepKey, ctx.data);
   if (guard) { el.innerHTML = html`${guard}`.s; return; }
   const secs = stepSections(stepKey, ctx.data);
