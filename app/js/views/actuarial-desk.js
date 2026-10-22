@@ -175,7 +175,7 @@ function renderReports(main) {
     <details class="panel mt" open><summary class="ph"><h2>Assumption library</h2></summary><div class="pb">
       <p class="tiny">Named, versioned assumptions with owner, source and approval status. A quotation records which version it used.</p>
       <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Assumption</th><th>Version</th><th>Value</th><th>Owner</th><th>Status</th><th>Source · date</th></tr></thead>
-        <tbody>${raw(assumptions().map((a) => html`<tr><td>${a.name}${a.gloss ? html`<div class="tiny">${a.gloss}</div>` : ""}</td><td>${a.version}</td><td>${a.value}</td><td>${a.owner}</td><td>${pill(a.status, "ok")}</td><td class="tiny">${a.source} · ${fmtDate(a.date)}</td></tr>`).map((x) => x.s).join(""))}</tbody></table></div>
+        <tbody>${raw(assumptions().map((a) => html`<tr><td>${a.name}${a.gloss ? html`<div class="tiny">${a.gloss}</div>` : ""}</td><td>${a.version}</td><td>${a.value}</td><td>${a.owner}</td><td>${pill(a.status, /illustrative|pending|draft/i.test(a.status) ? "warn" : "ok")}</td><td class="tiny">${a.source} · ${fmtDate(a.date)}</td></tr>`).map((x) => x.s).join(""))}</tbody></table></div>
       <p class="tiny mt"><b>Used by:</b> ${used.filter((r) => r.calc?.assumptionVersion).map((r) => recName(r)).join(", ") || "—"} reference the current assumption versions.</p>
     </div></details>
 

@@ -7,8 +7,9 @@ import { icon, pill, successOverlay } from "../components.js";
 import {
   getCase, putCase, nextStep, statusOf, journeyLabel, priceBuildUp, rateRows, contractValue,
   approverFor, config, setConfig, peso, plural, log, assumptions,
-  deriveBase, rateSheetIdFor, rsVerLabel, nextCaseId, createCase, SAMPLE_INTAKE,
+  deriveBase, ibnrFor, nbIbnrConfig, rateSheetIdFor, rsVerLabel, nextCaseId, createCase, SAMPLE_INTAKE,
   NB_ROLES, roleKeyForOwner, roleLabelFor, NB_TEMPLATES,
+  NB_ASSUMPTION_SETS, nbAssumptionSet, applySampleCalc, calcSnapshot, calcWarnings, coveragePeriodFor,
 } from "./actdesk-core.js";
 import {
   backBar, recHead, nextStrip, stepsNav, highlightNav, wireHead, wireNext,
@@ -165,17 +166,23 @@ function loadingSource(l) {
 }
 function finTrailDialog(c) {
   const base = deriveBase(c); const b = priceBuildUp(c);
+  const ib = c.kind === "nb" ? ibnrFor(c) : { applicable: false };
   dialog({ title: "Calculation & source trail", body: html`
     <div class="note sim">Illustrative demonstration formula — requires Actuarial validation.</div>
     <h3 class="sub-h mt">Base benefit cost</h3>
     <ul class="trail">${base.steps.map((s) => html`<li><b>${s.label}</b> — ${s.value}<div class="tiny">${s.source}</div></li>`)}</ul>
+    ${c.kind === "nb" ? html`<h3 class="sub-h mt">IBNR allowance</h3>
+      ${ib.applicable ? html`<ul class="trail">
+          <li><b>Projected claims before IBNR</b> — ${peso(ib.claimsBasis)}<div class="tiny">Standard-plan expected cost × accepted utilization factor</div></li>
+          <li><b>IBNR allowance = ${peso(ib.claimsBasis)} × ${ib.effectivePct.toFixed(1)}%</b> — ${peso(ib.amount)}<div class="tiny">${ib.assumptionName} ${ib.version} · ${ib.source} · effective ${fmtDate(ib.effective)} · ${ib.label}${ib.overridden ? ` · overridden from ${Number(ib.basePct).toFixed(1)}%` : ""}</div></li>
+        </ul>` : html`<p class="tiny">Not applicable — no prior HMO claims experience (virgin account, priced from standard cost tables).</p>`}` : ""}
     <h3 class="sub-h mt">Rider 1 · non-standard benefits</h3>
     <ul class="trail">${(c.calc.rider1 || []).map((r) => html`<li><b>${r.label}</b> — ${peso(r.amount)}<div class="tiny">${r.source} · ${r.method}</div></li>`)}</ul>
     <h3 class="sub-h mt">Rider 2 · direct expenses</h3>
     <ul class="trail">${(c.calc.rider2 || []).map((r) => html`<li><b>${r.label}</b> — ${peso(r.amount)}<div class="tiny">${r.source} · ${r.method}</div></li>`)}</ul>
     <h3 class="sub-h mt">Commercial loadings</h3>
     <ul class="trail">${b.loadings.map((l) => html`<li><b>${l.label}</b> — ${l.pct}% → ${peso(l.amount)}<div class="tiny">${loadingSource(l)}</div></li>`)}</ul>
-    <p class="tiny mt">Assumptions: ${c.calc.assumptionVersion}. No IBNR is applied to Corporate New Business.</p>`,
+    <p class="tiny mt">Assumptions: ${c.calc.assumptionVersion}.${c.kind === "nb" ? (ib.applicable ? ` IBNR allowance ${peso(ib.amount)} (${ib.assumptionName} ${ib.version}) included — illustrative, pending Actuarial validation.` : " IBNR not applicable for this pricing approach.") : ""}</p>`,
     actions: [{ label: "Close", value: "ok" }] });
 }
 function finHistoryDialog(c) {
@@ -224,34 +231,623 @@ function rateTableFrom(rows) {
     <tbody>${(rows || []).map((r) => html`<tr><td>${r.plan}</td><td>${r.memberType}</td><td>${peso(r.proposedRate)}</td></tr>`)}</tbody></table></div>`;
 }
 
-// The transparent New Business build-up with a per-line "View calculation" trail.
-function buildPanel(ctx) {
-  const c = ctx.rec; const b = priceBuildUp(c);
+// ======================================================= Assumptions & Pricing Calculator
+// The expanded "Calculation" step (between "Review source data" and "Prepare rate sheet").
+// It lets the Actuarial Analyst supply/review the data, choose the assumptions, see how the
+// proposed rate was produced, and carry a traceable snapshot into the rate sheet. The system
+// calculates; the analyst decides. Everything is illustrative; nothing is sent.
+//
+// Five progressive-disclosure groups — the proposed-rate headline is shown first, then each
+// group reveals its inputs, sources and formulas on request. The pricing engine recomputes
+// from c.calc on every edit, so any change flows straight through to the proposed rate.
+
+// --- small provenance/correction helpers -------------------------------------------------
+function corrOf(c, field) {
+  const list = (c.calc?.corrections || []).filter((x) => x.field === field);
+  return list.length ? list[list.length - 1] : null;
+}
+function corrBadge(c, field) {
+  const k = corrOf(c, field);
+  return k ? html` <span class="pill info" title="Original value kept">Corrected · original kept</span>` : "";
+}
+// A labelled source-data row with provenance meta and an optional Edit/Correct button.
+function provRow(label, value, meta, { field, c } = {}) {
+  const k = field ? corrOf(c, field) : null;
+  return html`<div class="prov-row">
+    <div class="pr-main"><dt>${label}</dt><dd>${value}${field ? corrBadge(c, field) : ""}</dd></div>
+    ${meta ? html`<div class="pr-meta tiny">${meta}</div>` : ""}
+    ${k ? html`<div class="pr-orig tiny">Original: ${k.prev} — corrected ${fmtDateTime(k.at)}${k.note ? html` · “${k.note}”` : ""}</div>` : ""}
+    ${field ? html`<div class="pr-act"><button type="button" class="linklike tiny" data-edit="${field}">${k ? "Edit again" : "Correct with a note"}</button></div>` : ""}
+  </div>`;
+}
+
+// The readable proposed-rate component table (group 5's core), with a per-line trail.
+function proposedRateTable(c) {
+  const b = priceBuildUp(c); const ib = ibnrFor(c);
   const row = (label, amount, kind, idx, cls = "") => html`<tr class="${cls}"><td>${label}</td><td class="num">${peso(amount)}</td>
     <td class="tr-act">${kind ? html`<button type="button" class="linklike tiny" data-trace="${kind}:${idx}">View calculation</button>` : ""}</td></tr>`;
-  return html`${section("Build the proposed rate — transparent & traceable", html`
-    <div class="note sim"><b>Illustrative sample data — not an approved Valucare rate.</b> Every amount shows where it came from.${c.calc.demoFormula ? " The base uses an illustrative demonstration formula that requires Actuarial validation." : ""}</div>
-    <table class="tbl calc-tbl mt"><thead><tr><th>Component</th><th class="num">Amount / principal / yr</th><th></th></tr></thead><tbody>
+  return html`<table class="tbl calc-tbl mt"><thead><tr><th>Component</th><th class="num">Amount · per principal · per year</th><th></th></tr></thead><tbody>
+    ${ib.applicable ? html`
+      ${row("Historical utilization → projected claims (before IBNR)", ib.claimsBasis, "base", 0)}
+      ${row(html`IBNR allowance (${ib.effectivePct.toFixed(1)}%)${ib.overridden ? html` <span class="pill info">overridden</span>` : ""} <span class="pill warn">Illustrative</span>`, ib.amount, "ibnr", 0, "indent")}
+      ${row("Base benefit cost (projected claims incl. IBNR)", b.base, "base", 0)}
+    ` : html`
       ${row("Base benefit cost", b.base, "base", 0)}
-      ${(c.calc.rider1 || []).map((r, i) => row(html`Rider 1 · ${r.label}`, r.amount, "rider1", i, "indent"))}
-      ${(c.calc.rider2 || []).map((r, i) => row(html`Rider 2 · ${r.label}`, r.amount, "rider2", i, "indent"))}
-      ${row("Subtotal", b.subtotal, null, 0, "sub")}
-      ${b.loadings.map((l, i) => row(html`${l.label} (${l.pct}%)${(c.calc.overrides || []).some((o) => o.label === l.label) ? html` <span class="pill info">overridden</span>` : ""}`, l.amount, "loading", i))}
-      ${row("Illustrative annual premium / principal", b.perMemberYear, null, 0, "tot")}
-    </tbody></table>
-    <p class="tiny mt">No IBNR is applied to Corporate New Business — the documented explicit IBNR analysis belongs to Corporate Renewal. Assumptions used: ${c.calc.assumptionVersion}.</p>
-    <div class="row tight mt"><button type="button" class="btn ghost sm" id="pOverride">${icon("settings", 14)} Override a loading (reason required)</button></div>
-    ${(c.calc.overrides || []).length ? html`<ul class="timeline mt">${c.calc.overrides.map((o) => html`<li><div><b>${o.label} → ${o.pct}%</b><div class="tiny">Reason: ${o.reason} · prior value ${o.prev != null ? o.prev + "%" : "—"}</div></div></li>`)}</ul>` : ""}`,
-    { lead: "Base → Rider 1 (non-standard benefits) → Rider 2 (direct expenses) → loadings. Open any line to see its source." })}`;
+    `}
+    ${(c.calc.rider1 || []).map((r, i) => row(html`Rider 1 · ${r.label}`, r.amount, "rider1", i, "indent"))}
+    ${(c.calc.rider2 || []).map((r, i) => row(html`Rider 2 · ${r.label}`, r.amount, "rider2", i, "indent"))}
+    ${row("Subtotal", b.subtotal, null, 0, "sub")}
+    ${b.loadings.map((l, i) => row(html`${l.label} (${l.pct}%)${(c.calc.overrides || []).some((o) => o.label === l.label) ? html` <span class="pill info">overridden</span>` : ""}`, l.amount, "loading", i))}
+    ${row("Proposed annual premium · per principal", b.perMemberYear, null, 0, "tot")}
+  </tbody></table>`;
 }
+
+// Headline: the proposed rate shown first, clearly "not approved", with units spelled out.
+function calcHeader(ctx) {
+  const c = ctx.rec;
+  const rows = rateRows(c); const b = priceBuildUp(c);
+  const principal = rows.find((r) => r.memberType === "Principal")?.proposedRate || 0;
+  const dependent = rows.find((r) => r.memberType === "Dependent")?.proposedRate || 0;
+  const pathLabel = PATHS.find((p) => p.key === c.pricingPath)?.label || "—";
+  const ib = ibnrFor(c);
+  return html`${section("Assumptions & Pricing Calculator", html`
+    <div class="note sim"><b>Proposed rate — not approved.</b> Illustrative sample data, not an approved Valucare rate. The system calculates; the Actuarial Analyst makes the pricing decision. Open any group below to supply data, choose assumptions and see how the rate was produced.</div>
+    <div class="calc-approach mt">
+      <div><span class="tiny muted">Selected pricing approach</span><div><b>${pathLabel}</b> <span class="pill neutral">${c.calc.template?.version || ""}</span></div>
+        <div class="tiny">${ib.applicable ? "Existing-HMO — IBNR allowance applies." : "Virgin account — IBNR not applicable (no prior HMO claims experience)."} <a class="linklike" href="#/actuarial-desk/case/${c.id}/approach">Change approach</a></div></div>
+      <button type="button" class="btn" id="pLoadSample">${icon("copy", 15)} Load sample data</button>
+    </div>
+    <div class="calc-headline mt">
+      <div class="hl-fig"><span class="tiny muted">Principal · per month</span><b>${peso(principal)}</b></div>
+      <div class="hl-fig"><span class="tiny muted">Dependent · per month</span><b>${peso(dependent)}</b></div>
+      <div class="hl-fig"><span class="tiny muted">Annual premium · per principal</span><b>${peso(b.perMemberYear)}</b></div>
+      <div class="hl-fig"><span class="tiny muted">Illustrative annual contract value</span><b>${peso(contractValue(c))}</b></div>
+    </div>
+    <p class="tiny mt">Units are shown per principal, per dependent and as a total contract value — never mixed in one figure. Every amount below opens to reveal its inputs and calculation.</p>`,
+    { lead: "The proposed rate, shown first. The five groups below hold the source data, assumptions and formulas behind it." })}`;
+}
+
+// --- Group 1: Source data ----------------------------------------------------------------
+function sourceDataGroup(ctx) {
+  const c = ctx.rec; const md = c.memberData || {}; const u = c.utilization || {};
+  const mdMeta = `${md.source || "Sales endorsement"} · ${md.version || "v1"} · received ${fmtDate(c.receivedAt)}`;
+  const changed = c.sob.filter((l) => l.changed);
+  const utilDoc = (c.documents || []).find((d) => d.key === "util" && d.supplied);
+  return html`${section("1 · Source data", html`
+    <p class="tiny">The data this quotation is priced from. Each group shows its source document, version and date received, and whether it was accepted as supplied or corrected. Corrections keep the original value.</p>
+    <dl class="dl prov mt">
+      ${provRow("Principals", int(c.principals), mdMeta, { field: "principals", c })}
+      ${provRow("Dependents", int(c.dependents), mdMeta, { field: "dependents", c })}
+      ${provRow("Requested coverage period", coveragePeriodFor(c), "From the Sales request — requested effectivity", { field: "coveragePeriod", c })}
+    </dl>
+    <details class="mt"><summary>Demographic summary (age bands)</summary>
+      <table class="tbl mt"><thead><tr><th>Principal age band</th><th class="num">Count</th></tr></thead>
+        <tbody>${(md.ageBands || []).map((a) => html`<tr><td>${a.band}</td><td class="num">${int(a.count)}</td></tr>`)}
+        <tr class="sub"><td>Total principals</td><td class="num">${int((md.ageBands || []).reduce((s, a) => s + a.count, 0))}</td></tr></tbody></table>
+      ${(md.flags && md.flags.length) ? html`<div class="note warn mt"><b>Flagged beside the data:</b> ${md.flags.join("; ")}</div>` : ""}</details>
+    ${u.required ? html`<h3 class="sub-h mt">Existing-HMO utilization (reported / paid claims)</h3>
+      <dl class="dl prov">
+        ${provRow("Utilization period", u.period || "—", utilDoc ? `${utilDoc.name} · ${utilDoc.source}` : (u.source || "—"), { field: "utilPeriod", c })}
+        ${provRow("Reported / paid claims", u.claims || "—", "Client / prior-carrier supplied — never auto-validated", { field: "utilClaims", c })}
+        ${provRow("Accepted loss ratio (supplied)", (u.lossRatio != null ? Number(u.lossRatio).toFixed(2) : "—"), "Supplied figure — the pricing utilization factor is chosen in group 2", { field: "utilLoss", c })}
+        ${provRow("Current HMO / source", u.source || "—", "Where the utilization came from", { field: "utilSource", c })}
+      </dl>
+      <div class="note ${u.accepted ? "ok" : "warn"} mt"><b>${u.accepted ? "Accepted for pricing by the analyst." : "Not yet accepted for pricing."}</b> ${u.acceptedNote || ""}
+        ${u.accepted ? "" : html` <button type="button" class="linklike" id="pAcceptUtil">Accept utilization for pricing</button>`}</div>`
+      : html`<div class="note info mt"><b>Utilization — not applicable.</b> ${u.note || "New / virgin account; priced from standard cost tables."}</div>`}
+    <h3 class="sub-h mt">Requested benefits & non-standard items</h3>
+    <p class="tiny">${changed.length} benefit line${changed.length === 1 ? "" : "s"} differ from the standard Schedule of Benefits; these drive the riders in group 4. <a class="linklike" href="#/actuarial-desk/case/${c.id}/data">Review full SOB</a></p>
+    <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Benefit</th><th>Standard</th><th>Requested</th><th>Routed to</th></tr></thead>
+      <tbody>${changed.map((l) => html`<tr class="row-changed"><td>${l.service}</td><td>${l.standard}</td><td>${l.requested}</td><td class="tiny">${sobNote(l)}</td></tr>`)}</tbody></table></div>`,
+    { lead: "Member data, coverage period, utilization and requested benefits — editable, with the original kept on every correction." })}`;
+}
+
+// --- Group 2: Select assumptions ---------------------------------------------------------
+function assumptionsGroup(ctx) {
+  const c = ctx.rec; const set = nbAssumptionSet(c.calc.assumptionSetKey);
+  const existing = c.pricingPath === "existing-hmo";
+  const ib = ibnrFor(c);
+  const t = c.calc.baseTrace || {};
+  const ld = (key) => (c.calc.loadings || []).find((l) => l.assumptionKey === key) || {};
+  const editOf = (key) => { const l = (c.calc.assumptionEdits || []).filter((x) => x.key === key); return l.length ? l[l.length - 1] : null; };
+  const loadReason = (label) => { const l = (c.calc.overrides || []).filter((x) => x.label === label); return l.length ? l[l.length - 1] : null; };
+  // One assumption row: default (from set) · working value · explanation · edit · reason.
+  const row = (assum) => {
+    const changedFromDefault = assum.changed;
+    return html`<tr>
+      <td><b>${assum.name}</b><div class="tiny">${assum.explain}</div><div class="tiny muted">${assum.source}</div></td>
+      <td class="num">${assum.def}</td>
+      <td class="num"><b>${assum.work}</b>${changedFromDefault ? html` <span class="pill info">changed</span>` : ""}</td>
+      <td class="tr-act">${assum.editable ? html`<button type="button" class="linklike tiny" data-assum="${assum.key}">Edit${assum.needReason ? " (reason)" : ""}</button>` : html`<span class="tiny muted">${assum.fixedNote || "fixed"}</span>`}
+        ${assum.reason ? html`<div class="tiny">Reason: ${assum.reason}</div>` : ""}</td>
+    </tr>`;
+  };
+  const basisEdit = editOf("basis"); const utilEdit = editOf("util");
+  const rows = [
+    { key: "basis", name: "Standard-plan benefit cost basis", explain: "Expected annual benefit cost per principal before utilization.", source: `${set.name} ${set.version}`,
+      def: peso(set.basis), work: peso(t.basis), changed: t.basis !== set.basis, editable: true, needReason: true, reason: basisEdit?.reason },
+    { key: "util", name: "Utilization factor", explain: existing ? "Applied to the standard basis to project this account's claims." : "Virgin account — no utilization history, factor fixed at 1.00.",
+      source: existing ? "Accepted from the supplied loss ratio (group 1)" : "Standard cost table",
+      def: (existing ? set.utilFactor : 1.00).toFixed(2), work: Number(t.utilFactor).toFixed(2), changed: existing && t.utilFactor !== set.utilFactor,
+      editable: existing, needReason: true, reason: utilEdit?.reason, fixedNote: "1.00 (virgin)" },
+  ];
+  if (existing) {
+    rows.push({ key: "ibnr", name: "IBNR allowance", explain: "Reserve for claims incurred but not reported, added to projected claims.", source: `${ib.assumptionName} ${ib.version} — illustrative, pending validation`,
+      def: set.ibnrPct.toFixed(1) + "%", work: ib.effectivePct.toFixed(1) + "%", changed: ib.overridden, editable: true, needReason: true,
+      reason: ib.overrides.length ? ib.overrides[ib.overrides.length - 1].reason : null });
+  }
+  rows.push(
+    { key: "admin", name: "Admin & cost loading", explain: "Operating-cost loading applied to the subtotal.", source: "Admin & cost loading 2026.1",
+      def: set.adminPct.toFixed(1) + "%", work: Number(ld("loading").pct).toFixed(1) + "%", changed: ld("loading").pct !== set.adminPct, editable: true, needReason: true, reason: loadReason("Admin & cost loading")?.reason },
+    { key: "margin", name: "Risk & profit margin", explain: "Margin applied to the subtotal. A value below the floor escalates approval.", source: "Risk & profit margin 2026.1",
+      def: set.marginPct.toFixed(1) + "%", work: Number(ld("margin").pct).toFixed(1) + "%", changed: ld("margin").pct !== set.marginPct, editable: true, needReason: true, reason: loadReason("Risk & profit margin")?.reason },
+    { key: "commission", name: "Intermediary commission", explain: "Commission applied to the subtotal (intermediary channel).", source: "Intermediary commission 2026.1",
+      def: set.commissionPct.toFixed(1) + "%", work: Number(ld("commission").pct).toFixed(1) + "%", changed: ld("commission").pct !== set.commissionPct, editable: true, needReason: true, reason: loadReason("Intermediary commission")?.reason },
+  );
+  return html`${section("2 · Select assumptions", html`
+    <p class="tiny">Choose the documented assumption set, then review each working value. Changing any value from its set default records a reason. These are illustrative sample sets — pending Actuarial validation; not settled Valucare pricing rules.</p>
+    <div class="field" style="max-width:34rem"><label for="pAssumSet">Assumption set</label>
+      <select id="pAssumSet" class="inp">${NB_ASSUMPTION_SETS.map((s) => html`<option value="${s.key}" ${s.key === set.key ? "selected" : ""}>${s.name} · ${s.version}</option>`)}</select></div>
+    <dl class="dl mt"><div><dt>Version · effective</dt><dd>${set.version} · ${fmtDate(set.effective)}</dd></div>
+      <div><dt>Owner · status</dt><dd>${set.owner} · ${pill(set.status, "warn")}</dd></div></dl>
+    <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Assumption</th><th class="num">Set default</th><th class="num">Working value</th><th>Change</th></tr></thead>
+      <tbody>${rows.map(row)}</tbody></table></div>
+    ${!existing ? html`<div class="note info mt"><b>IBNR not applicable</b> — no prior HMO claims experience for a virgin account, so no IBNR assumption is shown.</div>` : ""}`,
+    { lead: "The assumption set and each working value behind the rate. Only assumptions relevant to the chosen approach are shown." })}`;
+}
+
+// --- Group 3: Existing-HMO IBNR calculation ----------------------------------------------
+function ibnrGroup(ctx) {
+  const c = ctx.rec; const ib = ibnrFor(c);
+  const prev = ibnrPrevResult(c);
+  return html`${section("3 · Existing-HMO: IBNR calculation", html`
+    ${ib.applicable
+      ? html`<p class="tiny">How this IBNR amount was produced, from reported utilization to projected claims cost. Changing the IBNR assumption updates the result immediately.</p>
+        ${prev ? html`<div class="note info"><b>Changed from the previous result:</b> ${peso(prev.amount)} → <b>${peso(ib.amount)}</b> (${ib.amount >= prev.amount ? "+" : ""}${peso(ib.amount - prev.amount)}) after the latest IBNR change.</div>` : ""}
+        ${ibnrSection(c)}`
+      : html`<div class="note info"><b>IBNR not applicable — no prior HMO claims experience.</b> This virgin-account approach is priced from standard cost tables, so no IBNR reserve is added to projected claims. Switch the pricing approach to an existing-HMO account to apply IBNR.</div>`}`,
+    { lead: ib.applicable ? "Reported utilization → IBNR allowance → projected claims cost." : "Only existing-HMO accounts carry an IBNR allowance." })}`;
+}
+// The IBNR result before the latest override, so group 3 can show "changed from previous".
+function ibnrPrevResult(c) {
+  const cfg = c.calc?.ibnr; const t = c.calc?.baseTrace;
+  if (!cfg || !cfg.applicable || !(cfg.overrides || []).length) return null;
+  const claimsBasis = t ? Math.round(t.basis * t.utilFactor) : (c.calc?.base ?? 0);
+  const last = cfg.overrides[cfg.overrides.length - 1];
+  const prevPct = last.prev != null ? last.prev : cfg.pct;
+  return { pct: prevPct, amount: Math.round(claimsBasis * (prevPct / 100)) };
+}
+
+// --- Group 4: Benefit and expense adjustments --------------------------------------------
+function adjustmentsGroup(ctx) {
+  const c = ctx.rec; const base = deriveBase(c);
+  const riderList = (key, title, lead) => html`
+    <h3 class="sub-h mt">${title}</h3>
+    <p class="tiny">${lead}</p>
+    <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Item</th><th class="num">Per principal / yr</th><th>Source & method</th><th></th></tr></thead>
+      <tbody>${(c.calc[key] || []).map((r, i) => html`<tr><td><b>${r.label}</b></td><td class="num">${peso(r.amount)}</td>
+        <td class="tiny">${r.source}<div class="muted">${r.method}</div></td>
+        <td class="tr-act"><button type="button" class="linklike tiny" data-${key}edit="${i}">Edit</button> · <button type="button" class="linklike tiny" data-${key}del="${i}">Remove</button></td></tr>`)}
+        ${(c.calc[key] || []).length ? "" : html`<tr><td colspan="4" class="tiny muted">None added.</td></tr>`}</tbody></table></div>
+    <div class="row tight mt"><button type="button" class="btn ghost sm" id="pAdd_${key}">${icon("plus", 14)} Add ${key === "rider1" ? "non-standard benefit" : "direct expense"}</button></div>`;
+  return html`${section("4 · Benefit and expense adjustments", html`
+    <h3 class="sub-h">Base benefit cost</h3>
+    <dl class="dl"><div><dt>Amount · per principal / yr</dt><dd><b>${peso(base.amount)}</b> <button type="button" class="linklike tiny" data-trace="base:0">View calculation</button></dd></div>
+      <div><dt>Source</dt><dd class="tiny">${c.calc.template?.name} (${c.calc.template?.version}) × accepted data. ${base.ibnrApplicable ? "Includes the IBNR allowance (group 3)." : "No IBNR (virgin account)."}</dd></div></dl>
+    ${riderList("rider1", "Rider 1 · non-standard benefits (vs standard SOB)", "Benefits requested above the standard Schedule of Benefits — each priced from the requested SOB.")}
+    ${riderList("rider2", "Rider 2 · direct expenses", "Direct expenses endorsed by Sales (e.g. wellness, financial-assistance desk) — each priced from its source.")}
+    <p class="tiny mt">Editing or adding an item records a reason and keeps the adjustment traceable. Illustrative — requires Actuarial validation.</p>`,
+    { lead: "Base benefit cost, then Rider 1 (non-standard benefits) and Rider 2 (direct expenses) — each with its own source and calculation." })}`;
+}
+
+// --- Group 5: Proposed rate --------------------------------------------------------------
+function proposedRateGroup(ctx) {
+  const c = ctx.rec; const b = priceBuildUp(c); const ib = ibnrFor(c); const rows = rateRows(c);
+  const principal = rows.find((r) => r.memberType === "Principal")?.proposedRate || 0;
+  const dependent = rows.find((r) => r.memberType === "Dependent")?.proposedRate || 0;
+  return html`${section("5 · Proposed rate", html`
+    <div class="note sim"><b>Proposed rate — not approved.</b> The reviewer is responsible for the final figure; this is not an automatic final rate.</div>
+    ${proposedRateTable(c)}
+    <p class="tiny mt">Assumptions used: ${c.calc.assumptionVersion}.${ib.applicable ? ` IBNR allowance (${ib.assumptionName} ${ib.version}) included — illustrative, pending Actuarial validation.` : " IBNR not applicable for this approach."}</p>
+    <h3 class="sub-h mt">Proposed monthly rates (units labelled)</h3>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Member type</th><th class="num">Per member · per month</th><th class="num">Annual (×12)</th></tr></thead>
+      <tbody>
+        <tr><td>Principal</td><td class="num">${peso(principal)}</td><td class="num">${peso(principal * 12)}</td></tr>
+        <tr><td>Dependent</td><td class="num">${peso(dependent)}</td><td class="num">${peso(dependent * 12)}</td></tr>
+        <tr class="tot"><td>Illustrative annual contract value (${int(c.principals)} principals · ${int(c.dependents)} dependents)</td><td></td><td class="num">${peso(contractValue(c))}</td></tr>
+      </tbody></table></div>
+    <p class="tiny mt">Per-principal, per-dependent and total-contract figures are shown separately and never mixed in one unexplained total. Open any component line above to see its inputs.</p>`,
+    { lead: "A readable trail from accepted data → IBNR (where applicable) → riders → loadings → proposed premium, with units spelled out." })}`;
+}
+
+// --- Analyst review footer: rationale, working drafts, warnings --------------------------
+function reviewFooter(ctx) {
+  const c = ctx.rec;
+  const warnings = calcWarnings(c);
+  const drafts = c.calc.drafts || [];
+  const changes = (c.calc.assumptionEdits || []).length + (c.calc.overrides || []).length + ((c.calc.ibnr?.overrides) || []).length + (c.calc.corrections || []).length;
+  return html`${section("Analyst review & decision", html`
+    ${warnings.length ? html`<div class="note warn"><b>Before submitting, note:</b>
+      <ul class="bullets mt">${warnings.map((w) => html`<li>${w.message} <button type="button" class="linklike" data-warnclar="${w.field}">Raise a clarification with Sales</button></li>`)}</ul></div>` : html`<div class="note ok">${icon("check", 15)} All required source inputs are present for this approach.</div>`}
+    <div class="field mt"><label for="pRationaleTxt">Pricing rationale</label>
+      <textarea id="pRationaleTxt" class="inp" rows="3" placeholder="Explain the pricing decision — why this approach, these assumptions and any overrides are appropriate for this account.">${c.calc.rationale || ""}</textarea>
+      <div class="row tight mt"><button type="button" class="btn ghost sm" id="pSaveRationale">Save rationale</button></div></div>
+    ${changes ? html`<div class="note info mt"><b>${changes} change${changes === 1 ? "" : "s"} recorded</b> (assumption edits, overrides and corrections). These travel with the rate sheet and are shown prominently to the approver.
+      <div class="mt">${overridesSummary(c)}</div></div>` : html`<p class="tiny mt">No assumptions or data have been changed from the loaded defaults yet.</p>`}
+    <div class="row tight mt"><button type="button" class="btn ghost sm" id="pSaveDraft">${icon("save", 14)} Save working draft</button>
+      ${drafts.length ? html`<button type="button" class="btn ghost sm" id="pCompareDraft">Compare with previous draft</button>` : ""}
+      <span class="tiny">${drafts.length ? `${drafts.length} working draft${drafts.length === 1 ? "" : "s"} saved` : "No working draft saved yet"}</span></div>`,
+    { lead: "Save a working draft, compare with the previous one, and record the rationale. Any changed assumption or adjusted result already carries its own reason." })}`;
+}
+
+// A compact, prominent summary of every analyst change — reused in the approver's review.
+// Accepts either a live case (reads c.calc) or a captured rate-sheet snapshot (reads its
+// flat arrays), so the approver always sees the changes exactly as submitted.
+function overridesSummary(src) {
+  const snap = src && src.ibnrOverrides !== undefined;
+  const ae = snap ? (src.assumptionEdits || []) : (src.calc?.assumptionEdits || []);
+  const ov = snap ? (src.overrides || []) : (src.calc?.overrides || []);
+  const ibo = snap ? (src.ibnrOverrides || []) : ((src.calc?.ibnr?.overrides) || []);
+  const cr = snap ? (src.corrections || []) : (src.calc?.corrections || []);
+  if (!(ae.length + ov.length + ibo.length + cr.length)) return html`<p class="tiny">No analyst overrides or corrections — priced on the loaded assumption set.</p>`;
+  const line = (title, from, to, meta) => html`<li><b>${title}:</b> ${from} → <b>${to}</b><div class="tiny">${meta}</div></li>`;
+  return html`<ul class="timeline tight">
+    ${ae.map((e) => line(e.label, e.prev, e.value, `Reason: ${e.reason} · ${e.by || "Analyst"} · ${fmtDateTime(e.at)}`))}
+    ${ibo.map((o) => line("IBNR allowance %", (o.prev != null ? Number(o.prev).toFixed(1) + "%" : "—"), Number(o.pct).toFixed(1) + "%", `Reason: ${o.reason} · ${o.by || "Analyst"} · ${fmtDateTime(o.at)}`))}
+    ${ov.map((o) => line(o.label, (o.prev != null ? o.prev + "%" : "—"), o.pct + "%", `Reason: ${o.reason} · ${fmtDateTime(o.at)}`))}
+    ${cr.map((k) => line(`${k.label} (source data)`, k.prev, k.value, `Original kept${k.note ? ` · “${k.note}”` : ""} · ${fmtDateTime(k.at)}`))}
+  </ul>`;
+}
+
+// A compact IBNR <dl> row for the draft rate sheet and approval views, so the IBNR
+// amount and assumption version travel with the sheet. New Business only.
+function ibnrDl(c) {
+  if (c.kind !== "nb") return "";
+  const ib = ibnrFor(c);
+  if (!ib.applicable) return html`<div><dt>IBNR allowance</dt><dd>Not applicable — no prior HMO claims experience.</dd></div>`;
+  return html`<div><dt>IBNR allowance</dt><dd>${peso(ib.amount)} / principal / yr · ${ib.effectivePct.toFixed(1)}%${ib.overridden ? " (overridden)" : ""}
+    · <span class="tiny">${ib.assumptionName} ${ib.version} — illustrative, pending Actuarial validation</span></dd></div>`;
+}
+
+// The expandable IBNR explanation, shown between historical utilization and the base
+// benefit cost. For existing-HMO it shows the full source trail, illustrative
+// calculation, premium effect, override button and audit trail; for a virgin account
+// it states plainly that IBNR is not applicable (no prior HMO claims experience).
+function ibnrSection(c) {
+  const ib = ibnrFor(c);
+  const pathLabel = PATHS.find((p) => p.key === c.pricingPath)?.label || "this approach";
+  if (!ib.applicable) {
+    return html`<details class="mt"><summary><b>IBNR allowance</b> — Not applicable</summary>
+      <div class="note info mt"><b>Not applicable — no prior HMO claims experience.</b> ${pathLabel} is priced from standard cost tables, so no IBNR reserve is added to projected claims.</div></details>`;
+  }
+  const b = priceBuildUp(c);
+  // Premium effect — recompute the build-up WITHOUT the IBNR amount, using the exact
+  // same loading method, so the designer can see what IBNR adds to the proposed premium.
+  const subtotalNo = b.subtotal - ib.amount;
+  const perYearNo = subtotalNo + b.loadings.reduce((s, l) => s + Math.round(subtotalNo * (l.pct / 100)), 0);
+  const monthlyWith = Math.round(b.perMemberYear / 12);
+  const monthlyNo = Math.round(perYearNo / 12);
+  const u = c.utilization || {};
+  const utilDoc = (c.documents || []).find((d) => d.key === "util" && d.supplied);
+  return html`<details class="mt" open>
+    <summary><b>IBNR allowance (illustrative)</b> — ${peso(ib.amount)} / principal / yr · ${ib.effectivePct.toFixed(1)}% <span class="pill warn">Illustrative — pending Actuarial validation</span></summary>
+    <div class="note warn mt">${ib.note}</div>
+    <dl class="dl mt">
+      <div><dt>Utilization period</dt><dd>${u.period || "—"}</dd></div>
+      <div><dt>Source file</dt><dd>${utilDoc ? html`${utilDoc.name} · <span class="tiny">${utilDoc.source}</span>` : (u.source || "—")}</dd></div>
+      <div><dt>Reported / paid claims used</dt><dd>${u.claims || "—"}${u.lossRatio != null ? ` · accepted loss ratio ${Number(u.lossRatio).toFixed(2)}` : ""}</dd></div>
+      <div><dt>IBNR assumption</dt><dd>${ib.assumptionName} · <b>${ib.version}</b></dd></div>
+      <div><dt>Source</dt><dd>${ib.source}</dd></div>
+      <div><dt>Effective date</dt><dd>${fmtDate(ib.effective)}</dd></div>
+    </dl>
+    <h3 class="sub-h mt">Illustrative calculation</h3>
+    <ul class="trail">
+      <li><b>Projected claims before IBNR</b> — ${peso(ib.claimsBasis)}<div class="tiny">Standard-plan expected cost × accepted utilization factor</div></li>
+      <li><b>IBNR allowance = ${peso(ib.claimsBasis)} × ${ib.effectivePct.toFixed(1)}%</b> — ${peso(ib.amount)}<div class="tiny">${ib.method}</div></li>
+      <li><b>Base benefit cost incl. IBNR</b> — ${peso(ib.claimsBasis + ib.amount)}<div class="tiny">Projected claims + IBNR allowance</div></li>
+    </ul>
+    <h3 class="sub-h mt">Effect of IBNR</h3>
+    <dl class="dl">
+      <div><dt>Projected claims cost</dt><dd>${peso(ib.claimsBasis)} → <b>${peso(ib.claimsBasis + ib.amount)}</b> (+${peso(ib.amount)})</dd></div>
+      <div><dt>Proposed premium / principal / yr</dt><dd>${peso(perYearNo)} → <b>${peso(b.perMemberYear)}</b> (+${peso(b.perMemberYear - perYearNo)})</dd></div>
+      <div><dt>Proposed monthly principal rate</dt><dd>${peso(monthlyNo)} → <b>${peso(monthlyWith)}</b> (+${peso(monthlyWith - monthlyNo)})</dd></div>
+    </dl>
+    <div class="row tight mt"><button type="button" class="btn ghost sm" id="pIbnrOverride">${icon("settings", 14)} Override IBNR % (reason required)</button></div>
+    ${ib.overrides.length ? html`<h3 class="sub-h mt">Override audit trail</h3>
+      <ul class="timeline mt">${ib.overrides.map((o) => html`<li><span class="when">${fmtDateTime(o.at)}</span>
+        <div><b>${o.prev != null ? Number(o.prev).toFixed(1) + "%" : "—"} → ${Number(o.pct).toFixed(1)}%</b>
+          <div class="tiny">Reason: ${o.reason} · by ${o.by || "Actuarial Analyst"}</div></div></li>`)}</ul>` : ""}
+  </details>`;
+}
+// Correctable source-data fields (group 1). Each keeps the original on correction.
+const CALC_FIELDS = {
+  principals: { label: "Principals", numeric: true, get: (x) => x.principals, set: (x, v) => { x.principals = v; if (x.memberData?.ageBands) x.memberData.ageBands = rescaleBands(x.memberData.ageBands, v); } },
+  dependents: { label: "Dependents", numeric: true, get: (x) => x.dependents, set: (x, v) => { x.dependents = v; } },
+  coveragePeriod: { label: "Requested coverage period", get: (x) => coveragePeriodFor(x), set: (x, v) => { x.coveragePeriod = v; } },
+  utilPeriod: { label: "Utilization period", get: (x) => x.utilization?.period, set: (x, v) => { x.utilization.period = v; } },
+  utilClaims: { label: "Reported / paid claims", get: (x) => x.utilization?.claims, set: (x, v) => { x.utilization.claims = v; } },
+  utilLoss: { label: "Accepted loss ratio (supplied)", numeric: true, fmt: (v) => Number(v).toFixed(2), get: (x) => x.utilization?.lossRatio, set: (x, v) => { x.utilization.lossRatio = v; } },
+  utilSource: { label: "Current HMO / source", get: (x) => x.utilization?.source, set: (x, v) => { x.utilization.source = v; } },
+};
+function rescaleBands(bands, total) {
+  const old = bands.reduce((s, b) => s + (b.count || 0), 0) || 1; let acc = 0;
+  return bands.map((b, i) => { const count = i === bands.length - 1 ? Math.max(0, total - acc) : Math.max(0, Math.round(total * (b.count / old))); acc += count; return { ...b, count }; });
+}
+
 function wireBuild(ctx, body) {
-  wireCalc(ctx, body);
+  // Per-line calculation traces.
   body.querySelectorAll("[data-trace]").forEach((btn) => (btn.onclick = () => {
     const [kind, idx] = btn.dataset.trace.split(":");
     showCalcTrace(ctx.rec, kind, Number(idx));
   }));
+  // Header: load sample data into the OPEN case.
+  body.querySelector("#pLoadSample")?.addEventListener("click", () => loadSampleIntoCase(ctx));
+  // Group 1: source-data corrections + accept utilization.
+  body.querySelectorAll("[data-edit]").forEach((b) => (b.onclick = () => editSourceField(ctx, b.dataset.edit)));
+  body.querySelector("#pAcceptUtil")?.addEventListener("click", () => { adoptRole(ctx, "Actuarial Analyst"); ctx.patch((x) => { x.utilization.accepted = true; x.utilization.acceptedAt = new Date().toISOString(); log(x, "Utilization accepted for pricing by the analyst."); }); toast("Utilization accepted for pricing.", "ok"); ctx.refresh(); });
+  // Group 2: assumption set + per-assumption edits.
+  body.querySelector("#pAssumSet")?.addEventListener("change", (e) => switchAssumptionSet(ctx, e.target.value));
+  body.querySelectorAll("[data-assum]").forEach((b) => (b.onclick = () => {
+    const k = b.dataset.assum;
+    if (k === "ibnr") return ibnrOverrideDialog(ctx);
+    if (k === "basis" || k === "util") return editAssumptionValue(ctx, k);
+    const label = { admin: "Admin & cost loading", margin: "Risk & profit margin", commission: "Intermediary commission" }[k];
+    if (label) editLoading(ctx, label);
+  }));
+  // Group 3: IBNR override button inside the card.
+  body.querySelector("#pIbnrOverride")?.addEventListener("click", () => ibnrOverrideDialog(ctx));
+  // Group 4: rider edit / remove / add.
+  ["rider1", "rider2"].forEach((key) => {
+    body.querySelectorAll(`[data-${key}edit]`).forEach((b) => (b.onclick = () => editRider(ctx, key, Number(b.dataset[`${key}edit`]))));
+    body.querySelectorAll(`[data-${key}del]`).forEach((b) => (b.onclick = () => removeRider(ctx, key, Number(b.dataset[`${key}del`]))));
+    body.querySelector(`#pAdd_${key}`)?.addEventListener("click", () => editRider(ctx, key, null));
+  });
+  // Footer: rationale, working drafts, missing-input clarifications.
+  body.querySelector("#pSaveRationale")?.addEventListener("click", () => {
+    const v = body.querySelector("#pRationaleTxt")?.value || "";
+    ctx.patch((x) => { x.calc.rationale = v.trim(); log(x, "Pricing rationale saved."); });
+    toast("Rationale saved.", "ok");
+  });
+  body.querySelector("#pSaveDraft")?.addEventListener("click", () => {
+    const v = body.querySelector("#pRationaleTxt")?.value || "";
+    adoptRole(ctx, "Actuarial Analyst");
+    ctx.patch((x) => {
+      x.calc.rationale = v.trim();
+      const b = priceBuildUp(x); const rows = rateRows(x);
+      (x.calc.drafts = x.calc.drafts || []).push({ at: new Date().toISOString(), by: x.assignedTo || "Actuarial Analyst", principal: rows[0].proposedRate, dependent: rows[1].proposedRate, perMemberYear: b.perMemberYear, setKey: x.calc.assumptionSetKey, rationale: x.calc.rationale });
+      log(x, "Working draft saved.");
+    });
+    toast("Working draft saved.", "ok"); ctx.refresh();
+  });
+  body.querySelector("#pCompareDraft")?.addEventListener("click", () => compareDraftDialog(ctx));
+  body.querySelectorAll("[data-warnclar]").forEach((b) => (b.onclick = () => raiseClarification(ctx, b.dataset.warnclar)));
+}
+
+// Load a complete illustrative sample into the open case, confirming first if the analyst
+// has already made edits (never silently overwrites their work; never navigates away).
+async function loadSampleIntoCase(ctx) {
+  const c = ctx.rec;
+  const edited = (c.calc.assumptionEdits || []).length || (c.calc.overrides || []).length || ((c.calc.ibnr?.overrides) || []).length || (c.calc.corrections || []).length || (c.calc.rationale || "").trim() || (c.calc.drafts || []).length;
+  if (edited) {
+    const ok = await confirmDialog("Load sample data", "This replaces the calculator inputs for THIS case with a complete set of illustrative demo data for the current approach. Your edits, overrides and corrections here will be overwritten — the case itself is not changed. Continue?", { confirm: "Load sample data", kind: "primary" });
+    if (!ok) return;
+  }
+  adoptRole(ctx, "Actuarial Analyst");
+  ctx.patch((x) => { applySampleCalc(x); if (x.rateSheet?.prepared) x.rateSheet.rows = rateRows(x); log(x, "Loaded illustrative sample data into the calculator (open case)."); });
+  toast("Illustrative demo data loaded — every input is still editable.", "ok"); ctx.refresh();
+}
+
+async function editSourceField(ctx, field) {
+  const c = ctx.rec; const meta = CALC_FIELDS[field]; if (!meta) return;
+  const cur = meta.get(c);
+  const r = await dialog({ title: `Correct — ${meta.label}`, body: html`
+    <p class="tiny">The original value is kept on the record. Enter the corrected value and a short note explaining the correction.</p>
+    <div class="field"><label for="cv">Corrected value</label><input id="cv" name="val" class="inp" ${meta.numeric ? 'type="number" step="any" min="0"' : ""} value="${cur ?? ""}"></div>
+    <div class="field"><label for="cn">Note (why corrected)</label><textarea id="cn" name="note" class="inp" rows="2" placeholder="e.g. Sales confirmed the corrected count by email"></textarea></div>`,
+    actions: [{ label: "Cancel" }, { label: "Save correction", kind: "primary", value: "ok" }] });
+  if (r?.action !== "ok") return;
+  const raw = (r.values.val ?? "").toString().trim();
+  const val = meta.numeric ? Number(raw) : raw;
+  if (meta.numeric && !(val >= 0)) { toast("Enter a valid number.", "warn"); return; }
+  if (!meta.numeric && !val) { toast("Enter a value.", "warn"); return; }
+  adoptRole(ctx, "Actuarial Analyst");
+  ctx.patch((x) => {
+    const prev = meta.get(x);
+    meta.set(x, val);
+    const fmt = meta.fmt || ((v) => v);
+    (x.calc.corrections = x.calc.corrections || []).push({ field, label: meta.label, prev: fmt(prev), value: fmt(val), note: (r.values.note || "").trim(), by: x.assignedTo || "Actuarial Analyst", at: new Date().toISOString() });
+    x.calc.base = deriveBase(x).amount;
+    if (x.rateSheet?.prepared) x.rateSheet.rows = rateRows(x);
+    log(x, `Source data corrected: ${meta.label} (original kept).`);
+  });
+  toast("Correction saved — original kept.", "ok"); ctx.refresh();
+}
+
+async function switchAssumptionSet(ctx, key) {
+  const c = ctx.rec; if (key === c.calc.assumptionSetKey) return;
+  const set = nbAssumptionSet(key); const existing = c.pricingPath === "existing-hmo";
+  const hasEdits = (c.calc.assumptionEdits || []).length || (c.calc.overrides || []).length || ((c.calc.ibnr?.overrides) || []).length;
+  if (hasEdits) {
+    const ok = await confirmDialog("Change assumption set", `Switch to “${set.name} ${set.version}”? This resets every working value to that set's defaults and clears your assumption overrides. Source-data corrections are kept.`, { confirm: "Change set", kind: "primary" });
+    if (!ok) { ctx.refresh(); return; }
+  }
+  adoptRole(ctx, "Actuarial Analyst");
+  ctx.patch((x) => {
+    x.calc.assumptionSetKey = key;
+    x.calc.baseTrace.basis = set.basis;
+    x.calc.baseTrace.utilFactor = existing ? set.utilFactor : 1.00;
+    if (x.calc.ibnr?.applicable) { x.calc.ibnr.pct = set.ibnrPct; x.calc.ibnr.overrides = []; }
+    const setPct = { loading: set.adminPct, margin: set.marginPct, commission: set.commissionPct };
+    (x.calc.loadings || []).forEach((l) => { if (setPct[l.assumptionKey] != null) l.pct = setPct[l.assumptionKey]; });
+    x.calc.assumptionEdits = []; x.calc.overrides = [];
+    x.calc.base = deriveBase(x).amount;
+    if (x.rateSheet?.prepared) x.rateSheet.rows = rateRows(x);
+    log(x, `Assumption set changed to ${set.name} ${set.version}.`);
+  });
+  toast(`Assumption set: ${set.version}.`, "ok"); ctx.refresh();
+}
+
+async function editAssumptionValue(ctx, key) {
+  const c = ctx.rec; const t = c.calc.baseTrace || {};
+  const conf = key === "basis"
+    ? { label: "Standard-plan benefit cost basis", cur: t.basis, step: "100", money: true }
+    : { label: "Utilization factor", cur: Number(t.utilFactor).toFixed(2), step: "0.01", money: false };
+  const r = await dialog({ title: `Edit — ${conf.label}`, body: html`
+    <div class="field"><label for="av">New value${conf.money ? " (₱ / principal / yr)" : ""}</label><input id="av" name="val" class="inp" type="number" step="${conf.step}" min="0" value="${conf.cur}"></div>
+    <div class="field"><label for="ar">Reason (required)</label><textarea id="ar" name="reason" class="inp" rows="2" placeholder="Why this value is appropriate for this account"></textarea></div>`,
+    actions: [{ label: "Cancel" }, { label: "Apply", kind: "primary", value: "ok" }] });
+  if (r?.action !== "ok") return;
+  if (!r.values.reason?.trim()) { toast("A reason is required.", "warn"); return; }
+  const val = Number(r.values.val); if (!(val > 0)) { toast("Enter a valid value.", "warn"); return; }
+  adoptRole(ctx, "Actuarial Analyst");
+  ctx.patch((x) => {
+    const tt = x.calc.baseTrace; const prev = key === "basis" ? tt.basis : tt.utilFactor;
+    if (key === "basis") tt.basis = val; else tt.utilFactor = val;
+    (x.calc.assumptionEdits = x.calc.assumptionEdits || []).push({ key, label: conf.label, prev: conf.money ? peso(prev) : Number(prev).toFixed(2), value: conf.money ? peso(val) : Number(val).toFixed(2), reason: r.values.reason.trim(), by: x.assignedTo || "Actuarial Analyst", at: new Date().toISOString() });
+    x.calc.base = deriveBase(x).amount;
+    if (x.rateSheet?.prepared) x.rateSheet.rows = rateRows(x);
+    log(x, `Assumption changed: ${conf.label} (${r.values.reason.trim()}).`);
+  });
+  toast("Assumption updated with reason.", "ok"); ctx.refresh();
+}
+
+async function editLoading(ctx, label) {
+  const c = ctx.rec; const l = (c.calc.loadings || []).find((z) => z.label === label); if (!l) return;
+  const r = await dialog({ title: `Edit — ${label}`, body: html`
+    <div class="field"><label for="lp">New value (%)</label><input id="lp" name="pct" class="inp" type="number" step="0.5" min="0" value="${l.pct}"></div>
+    <div class="field"><label for="lr">Reason (required)</label><textarea id="lr" name="reason" class="inp" rows="2" placeholder="Why this loading is justified for this account"></textarea></div>`,
+    actions: [{ label: "Cancel" }, { label: "Apply", kind: "primary", value: "ok" }] });
+  if (r?.action !== "ok") return;
+  if (!r.values.reason?.trim()) { toast("A reason is required.", "warn"); return; }
+  const pct = Number(r.values.pct); if (!(pct >= 0)) { toast("Enter a valid percentage.", "warn"); return; }
+  adoptRole(ctx, "Actuarial Analyst");
+  ctx.patch((x) => {
+    const ll = (x.calc.loadings || []).find((z) => z.label === label); const prev = ll ? ll.pct : null; if (ll) ll.pct = pct;
+    (x.calc.overrides = x.calc.overrides || []).push({ label, pct, prev, reason: r.values.reason.trim(), at: new Date().toISOString() });
+    if (x.rateSheet?.prepared) x.rateSheet.rows = rateRows(x);
+    log(x, `Loading changed: ${label} → ${pct}% (${r.values.reason.trim()}).`);
+  });
+  toast("Assumption updated with reason.", "ok"); ctx.refresh();
+}
+
+async function ibnrOverrideDialog(ctx) {
+  const c = ctx.rec; const cur = ibnrFor(c);
+  if (!cur.applicable) { toast("IBNR is not applicable for this pricing approach.", "warn"); return; }
+  const r = await dialog({ title: "Edit IBNR %", body: html`
+    <div class="note warn">${cur.note}</div>
+    <p class="tiny mt">Current IBNR assumption: <b>${cur.assumptionName} ${cur.version}</b> · ${cur.basePct.toFixed(1)}% default${cur.overridden ? ` (currently ${cur.effectivePct.toFixed(1)}%)` : ""}.</p>
+    <div class="field"><label for="ip">New IBNR (%)</label><input id="ip" name="pct" class="inp" type="number" step="0.5" min="0" value="${cur.effectivePct.toFixed(1)}"></div>
+    <div class="field"><label for="ir">Reason (required)</label><textarea id="ir" name="reason" class="inp" rows="2" placeholder="Why this IBNR value is justified for this account"></textarea></div>`,
+    actions: [{ label: "Cancel" }, { label: "Apply", kind: "primary", value: "ok" }] });
+  if (r?.action !== "ok") return;
+  if (!r.values.reason?.trim()) { toast("A reason is required.", "warn"); return; }
+  const pct = Number(r.values.pct); if (!(pct >= 0)) { toast("Enter a valid IBNR percentage.", "warn"); return; }
+  adoptRole(ctx, "Actuarial Analyst");
+  ctx.patch((x) => {
+    const cfg = x.calc.ibnr; if (!cfg || !cfg.applicable) return;
+    const prev = (cfg.overrides && cfg.overrides.length) ? cfg.overrides[cfg.overrides.length - 1].pct : cfg.pct;
+    (cfg.overrides = cfg.overrides || []).push({ pct, prev, reason: r.values.reason.trim(), by: x.assignedTo || "Actuarial Analyst", at: new Date().toISOString() });
+    x.calc.base = deriveBase(x).amount;
+    if (x.rateSheet?.prepared) x.rateSheet.rows = rateRows(x);
+    log(x, `IBNR changed: ${Number(prev).toFixed(1)}% → ${pct.toFixed(1)}% (${r.values.reason.trim()}).`);
+  });
+  toast("IBNR updated with reason.", "ok"); ctx.refresh();
+}
+
+async function editRider(ctx, key, idx) {
+  const c = ctx.rec; const existing = idx != null ? (c.calc[key] || [])[idx] : null;
+  const kindName = key === "rider1" ? "Rider 1" : "Rider 2";
+  const r = await dialog({ title: existing ? `Edit ${kindName} item` : `Add ${key === "rider1" ? "non-standard benefit (Rider 1)" : "direct expense (Rider 2)"}`, body: html`
+    <div class="field"><label for="rl">Item</label><input id="rl" name="label" class="inp" value="${existing ? existing.label : ""}"></div>
+    <div class="field"><label for="ra">Amount (₱ / principal / yr)</label><input id="ra" name="amount" class="inp" type="number" step="10" min="0" value="${existing ? existing.amount : ""}"></div>
+    <div class="field"><label for="rs">Source</label><input id="rs" name="source" class="inp" value="${existing ? existing.source : ""}" placeholder="e.g. Requested SOB — benefit line"></div>
+    <div class="field"><label for="rm">Method / reason (required)</label><textarea id="rm" name="method" class="inp" rows="2" placeholder="How this amount was derived">${existing ? existing.method : ""}</textarea></div>`,
+    actions: [{ label: "Cancel" }, { label: existing ? "Save" : "Add", kind: "primary", value: "ok" }] });
+  if (r?.action !== "ok") return;
+  const label = (r.values.label || "").trim(); const amount = Number(r.values.amount);
+  if (!label || !(amount >= 0)) { toast("Enter an item and a valid amount.", "warn"); return; }
+  const method = (r.values.method || "").trim(); if (!method) { toast("A method / reason is required.", "warn"); return; }
+  const source = (r.values.source || "Analyst-entered").trim();
+  adoptRole(ctx, "Actuarial Analyst");
+  ctx.patch((x) => {
+    const arr = (x.calc[key] = x.calc[key] || []);
+    const note = key === "rider1" ? "Non-standard benefit (Rider 1)" : "Direct expense (Rider 2)";
+    const edits = (x.calc.assumptionEdits = x.calc.assumptionEdits || []);
+    if (existing) { const prev = arr[idx].amount; arr[idx] = { ...arr[idx], label, amount, source, method };
+      edits.push({ key, label: `${kindName} · ${label}`, prev: peso(prev), value: peso(amount), reason: method, by: x.assignedTo || "Actuarial Analyst", at: new Date().toISOString() }); }
+    else { arr.push({ label, amount, source, method, note });
+      edits.push({ key, label: `${kindName} · ${label} (added)`, prev: "—", value: peso(amount), reason: method, by: x.assignedTo || "Actuarial Analyst", at: new Date().toISOString() }); }
+    if (x.rateSheet?.prepared) x.rateSheet.rows = rateRows(x);
+    log(x, `${existing ? "Edited" : "Added"} ${kindName} item: ${label} ${peso(amount)}.`);
+  });
+  toast(existing ? "Item updated." : "Item added.", "ok"); ctx.refresh();
+}
+
+async function removeRider(ctx, key, idx) {
+  const c = ctx.rec; const item = (c.calc[key] || [])[idx]; if (!item) return;
+  const kindName = key === "rider1" ? "Rider 1" : "Rider 2";
+  const ok = await confirmDialog("Remove item", `Remove “${item.label}” (${peso(item.amount)}) from the calculation?`, { confirm: "Remove", kind: "primary" });
+  if (!ok) return;
+  adoptRole(ctx, "Actuarial Analyst");
+  ctx.patch((x) => {
+    x.calc[key].splice(idx, 1);
+    (x.calc.assumptionEdits = x.calc.assumptionEdits || []).push({ key, label: `${kindName} · ${item.label} (removed)`, prev: peso(item.amount), value: "—", reason: "Removed by analyst", by: x.assignedTo || "Actuarial Analyst", at: new Date().toISOString() });
+    if (x.rateSheet?.prepared) x.rateSheet.rows = rateRows(x);
+    log(x, `Removed ${kindName} item: ${item.label}.`);
+  });
+  toast("Item removed.", "ok"); ctx.refresh();
+}
+
+function compareDraftDialog(ctx) {
+  const c = ctx.rec; const drafts = c.calc.drafts || []; if (!drafts.length) return;
+  const prev = drafts[drafts.length - 1];
+  const b = priceBuildUp(c); const rows = rateRows(c);
+  const cur = { principal: rows[0].proposedRate, dependent: rows[1].proposedRate, perMemberYear: b.perMemberYear };
+  const line = (label, a, bb) => html`<tr><td>${label}</td><td class="num">${peso(a)}</td><td class="num">${peso(bb)}</td><td class="num">${changeDelta(a, bb)}</td></tr>`;
+  dialog({ title: "Compare with previous working draft", body: html`
+    <p class="tiny">Latest saved draft (${fmtDateTime(prev.at)}) vs the current calculator state.</p>
+    <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th></th><th class="num">Saved draft</th><th class="num">Current</th><th class="num">Change</th></tr></thead>
+      <tbody>
+        ${line("Principal / month", prev.principal, cur.principal)}
+        ${line("Dependent / month", prev.dependent, cur.dependent)}
+        ${line("Annual premium / principal", prev.perMemberYear, cur.perMemberYear)}
+      </tbody></table></div>
+    ${prev.rationale ? html`<p class="tiny mt"><b>Draft rationale:</b> ${prev.rationale}</p>` : ""}`,
+    actions: [{ label: "Close", value: "ok" }] });
+}
+
+async function raiseClarification(ctx, field) {
+  const c = ctx.rec;
+  const w = calcWarnings(c).find((x) => x.field === field);
+  const r = await dialog({ title: "Raise a clarification with Sales", body: html`
+    <p class="tiny">This stays attached to the same request (no duplicate case) and appears in the Intake step's clarification thread.</p>
+    <div class="field"><label for="cm">Message to Sales</label><textarea id="cm" name="msg" class="inp" rows="3">${w ? w.message : "Please confirm the outstanding source data for pricing."}</textarea></div>`,
+    actions: [{ label: "Cancel" }, { label: "Send to Sales", kind: "primary", value: "ok" }] });
+  if (r?.action !== "ok") return;
+  adoptRole(ctx, "Actuarial Analyst");
+  ctx.patch((x) => { (x.clarifications = x.clarifications || []).push({ from: "Actuarial", to: "Sales", message: (r.values.msg || "").trim(), at: new Date().toISOString(), resolved: false, fromCalculator: true }); log(x, "Clarification raised with Sales from the calculator."); });
+  toast("Clarification sent to Sales — see the Intake step.", "ok"); ctx.refresh();
 }
 function showCalcTrace(c, kind, idx) {
+  if (kind === "ibnr") {
+    const ib = ibnrFor(c);
+    if (!ib.applicable) {
+      return dialog({ title: "IBNR allowance", body: html`<div class="note info"><b>Not applicable — no prior HMO claims experience.</b> This pricing approach is priced from standard cost tables, so no IBNR reserve is added.</div>`,
+        actions: [{ label: "Close", value: "ok" }] });
+    }
+    return dialog({ title: "IBNR allowance — how it was produced", body: html`
+      <div class="note warn">${ib.note}</div>
+      <p class="tiny mt">${ib.method}</p>
+      <ul class="trail mt">
+        <li><b>Projected claims before IBNR</b> — ${peso(ib.claimsBasis)}<div class="tiny">Standard-plan expected cost × accepted utilization factor</div></li>
+        <li><b>IBNR allowance = ${peso(ib.claimsBasis)} × ${ib.effectivePct.toFixed(1)}%</b> — ${peso(ib.amount)}<div class="tiny">${ib.assumptionName} ${ib.version} · ${ib.source}</div></li>
+      </ul>
+      <dl class="dl mt"><div><dt>Assumption</dt><dd>${ib.assumptionName} ${ib.version}</dd></div>
+        <div><dt>Effective date</dt><dd>${fmtDate(ib.effective)}</dd></div>
+        <div><dt>Status</dt><dd>${ib.label}</dd></div>
+        ${ib.overridden ? html`<div><dt>Override</dt><dd>${Number(ib.basePct).toFixed(1)}% → <b>${ib.effectivePct.toFixed(1)}%</b> (analyst, reason on file)</dd></div>` : ""}</dl>`,
+      actions: [{ label: "Close", value: "ok" }] });
+  }
   if (kind === "base") {
     const base = deriveBase(c);
     return dialog({ title: "Base benefit cost — how it was produced", body: html`
@@ -295,12 +891,16 @@ function rateSheetDoc(c) {
       <div><dt>Member data</dt><dd>${int(c.principals)} principals · ${int(c.dependents)} dependents · ${c.memberData?.source || ""} ${c.memberData?.version || ""}</dd></div>
       <div><dt>Source</dt><dd>${rs.uploaded ? html`Analyst-entered · uploaded sample <span class="tiny">${rs.fileName || ""}</span>` : "Built from the transparent calculation"}</dd></div>
       <div><dt>Prepared</dt><dd>${fmtDateTime(rs.at)}</dd></div>
+      ${ibnrDl(c)}
       <div><dt>Assumptions</dt><dd class="tiny">${c.calc.assumptionVersion}</dd></div></dl>
     ${rateTableFrom(rs.rows && rs.rows.length ? rs.rows : rateRows(c))}
     <details class="mt"><summary>Benefit differences (requested vs standard SOB)</summary>
       <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Benefit</th><th>Standard</th><th>Requested</th></tr></thead>
         <tbody>${c.sob.filter((l) => l.changed).map((l) => html`<tr><td>${l.service}</td><td>${l.standard}</td><td>${l.requested}</td></tr>`)}</tbody></table></div></details>
-    ${(c.calc.overrides || []).length ? html`<p class="tiny mt"><b>Overrides:</b> ${c.calc.overrides.map((o) => `${o.label} → ${o.pct}% (${o.reason})`).join("; ")}</p>` : ""}`;
+    ${c.kind === "nb" ? html`<h3 class="sub-h mt">Assumption set, overrides & analyst rationale (captured on this version)</h3>
+      <dl class="dl"><div><dt>Assumption set</dt><dd>${rs.snapshot?.assumptionSet ? `${rs.snapshot.assumptionSet.name} · ${rs.snapshot.assumptionSet.version}` : (nbAssumptionSet(c.calc.assumptionSetKey).name + " · " + nbAssumptionSet(c.calc.assumptionSetKey).version)}</dd></div></dl>
+      ${overridesSummary(rs.snapshot || c)}
+      <p class="tiny mt"><b>Analyst rationale:</b> ${(rs.snapshot?.rationale || c.calc?.rationale) || html`<span class="muted">None recorded.</span>`}</p>` : ""}`;
 }
 function releaseVersion(x, { v, supersedes = null, rows = null }) {
   const r = rows || ((x.rateSheet?.rows && x.rateSheet.rows.length) ? x.rateSheet.rows : rateRows(x));
@@ -515,8 +1115,13 @@ const NB_RENDER = {
           utilLabel: existing ? "Existing-HMO utilization factor" : "Virgin-account factor (no utilization history)",
           utilSource: existing ? "Prior-carrier utilization history, 24 months — loss ratio accepted for pricing" : "No prior utilization — manual standard cost table used (factor 1.00)",
         };
-        x.calc.base = Math.round(x.calc.baseTrace.basis * x.calc.baseTrace.utilFactor);
-        log(x, `Pricing approach confirmed: ${(NB_TEMPLATES[chosen] || {}).name} (${(NB_TEMPLATES[chosen] || {}).version}).`);
+        // Recalculate IBNR for the chosen approach. Existing-HMO gets a fresh IBNR
+        // allowance; virgin accounts have no prior claims experience, so IBNR is
+        // cleared entirely — never leave a stale amount (or override) behind.
+        x.calc.ibnr = existing ? nbIbnrConfig() : { applicable: false, note: "Not applicable — no prior HMO claims experience." };
+        x.calc.base = deriveBase(x).amount; // base now reflects the recalculated IBNR
+        if (x.rateSheet?.prepared) x.rateSheet.rows = rateRows(x); // keep any prepared sheet in sync
+        log(x, `Pricing approach confirmed: ${(NB_TEMPLATES[chosen] || {}).name} (${(NB_TEMPLATES[chosen] || {}).version}). IBNR ${existing ? "allowance applied (illustrative)" : "not applicable (virgin account)"}.`);
       });
       toast("Pricing approach confirmed.", "ok"); ctx.goArea("data");
     };
@@ -564,17 +1169,30 @@ const NB_RENDER = {
     return act;
   },
 
-  // 6 — build the proposed rate with full traceability.
+  // 6 — the Assumptions & Pricing Calculator (expanded Calculation step).
   build(ctx, body) {
     const c = ctx.rec;
     if (!c.dataReviewed) return gate(ctx, body, "Review the source data first.", "data");
     const returned = c.approval?.status === "Returned";
     body.innerHTML = html`
-      ${returned ? html`<div class="note warn"><b>Returned by ${c.approval.by || "approver"}.</b> ${c.approval.comment || ""} Adjust the calculation if needed, then prepare a new rate-sheet version.</div>` : ""}
-      ${buildPanel(ctx)}
+      ${returned ? html`<div class="note warn"><b>Returned by ${c.approval.by || "approver"}.</b> ${c.approval.comment || ""} Adjust the calculator if needed, then prepare a new rate-sheet version.</div>` : ""}
+      ${calcHeader(ctx)}
+      ${sourceDataGroup(ctx)}
+      ${assumptionsGroup(ctx)}
+      ${ibnrGroup(ctx)}
+      ${adjustmentsGroup(ctx)}
+      ${proposedRateGroup(ctx)}
+      ${reviewFooter(ctx)}
       <div class="pb-foot"><button class="btn primary" id="pBuild">Prepare rate sheet ›</button></div>`.s;
     wireBuild(ctx, body);
-    const act = () => { adoptRole(ctx, "Actuarial Analyst"); ctx.patch((x) => { x.calcReady = true; log(x, "Proposed rate built from the transparent calculation."); }); ctx.goArea("ratesheet"); };
+    const act = () => {
+      const c2 = ctx.rec;
+      const changed = (c2.calc.assumptionEdits || []).length + (c2.calc.overrides || []).length + ((c2.calc.ibnr?.overrides) || []).length + (c2.calc.corrections || []).length;
+      if (changed && !(c2.calc.rationale || "").trim()) { toast("Add a pricing rationale — you have changed assumptions or data from the defaults.", "warn"); body.querySelector("#pRationaleTxt")?.focus(); return; }
+      adoptRole(ctx, "Actuarial Analyst");
+      ctx.patch((x) => { x.calcReady = true; log(x, "Proposed rate produced in the Assumptions & Pricing Calculator."); });
+      ctx.goArea("ratesheet");
+    };
     body.querySelector("#pBuild").onclick = act;
     return act;
   },
@@ -599,7 +1217,7 @@ const NB_RENDER = {
         adoptRole(ctx, "Actuarial Analyst");
         ctx.patch((x) => {
           const v = (x.approval?.status === "Returned") ? ((x.rateSheet?.version || 1) + 1) : 1;
-          x.rateSheet = { id: rateSheetIdFor(x), version: v, status: "Draft", prepared: true, uploaded: false, source: "Built from the transparent calculation", at: new Date().toISOString(), rows: rateRows(x) };
+          x.rateSheet = { id: rateSheetIdFor(x), version: v, status: "Draft", prepared: true, uploaded: false, source: "Built from the transparent calculation", at: new Date().toISOString(), rows: rateRows(x), snapshot: calcSnapshot(x) };
           if (x.approval.status === "Returned") x.approval.status = "Not started";
           log(x, `Rate sheet ${x.rateSheet.id} v${v} prepared (Draft).`);
         });
@@ -622,13 +1240,13 @@ const NB_RENDER = {
         <p class="tiny">Threshold & floors are editable demo config (${peso(config().seniorThreshold)} contract value; margin floor ${config().marginFloor}%). <button type="button" class="linklike" id="editCfg">Adjust</button> — ${config().note}</p>
         <div class="pb-foot"><button class="btn primary" id="pSubmit">Submit ${rs.id} v${rs.version} to ${appr.label} ›</button></div>`)}`.s;
     body.querySelector("#editCfg").onclick = () => editConfig(ctx);
-    body.querySelector("#pReviseDraft").onclick = () => { adoptRole(ctx, "Actuarial Analyst"); ctx.patch((x) => { x.rateSheet.rows = rateRows(x); x.rateSheet.at = new Date().toISOString(); x.rateSheet.uploaded = false; x.rateSheet.source = "Built from the transparent calculation"; log(x, `Draft ${x.rateSheet.id} v${x.rateSheet.version} regenerated from the calculation.`); }); toast("Draft regenerated.", "ok"); ctx.refresh(); };
+    body.querySelector("#pReviseDraft").onclick = () => { adoptRole(ctx, "Actuarial Analyst"); ctx.patch((x) => { x.rateSheet.rows = rateRows(x); x.rateSheet.snapshot = calcSnapshot(x); x.rateSheet.at = new Date().toISOString(); x.rateSheet.uploaded = false; x.rateSheet.source = "Built from the transparent calculation"; log(x, `Draft ${x.rateSheet.id} v${x.rateSheet.version} regenerated from the calculation.`); }); toast("Draft regenerated.", "ok"); ctx.refresh(); };
     body.querySelector("#pUpload2").onclick = () => uploadRateSheet(ctx, { defaultName: `${slug(c.company)}_rate_sheet_v${rs.version}.xlsx` });
     const submit = () => {
       adoptRole(ctx, "Actuarial Analyst");
       ctx.patch((x) => {
         x.rateSheet.status = "Submitted";
-        (x.rsHistory = x.rsHistory || []).push({ id: x.rateSheet.id, v: x.rateSheet.version, at: new Date().toISOString(), rows: JSON.parse(JSON.stringify(x.rateSheet.rows)), source: x.rateSheet.source });
+        (x.rsHistory = x.rsHistory || []).push({ id: x.rateSheet.id, v: x.rateSheet.version, at: new Date().toISOString(), rows: JSON.parse(JSON.stringify(x.rateSheet.rows)), source: x.rateSheet.source, snapshot: x.rateSheet.snapshot ? JSON.parse(JSON.stringify(x.rateSheet.snapshot)) : null });
         x.approval = { ...x.approval, status: `Pending ${appr.label}`, submittedVersion: x.rateSheet.version, history: [...(x.approval.history || []), { at: new Date().toISOString(), action: `Submitted ${x.rateSheet.id} v${x.rateSheet.version} for approval`, by: x.assignedTo || "Actuarial Analyst" }] };
         log(x, `Submitted ${x.rateSheet.id} v${x.rateSheet.version} to ${appr.label}.`);
       });
@@ -965,11 +1583,17 @@ function approvalArea(ctx, body) {
       <dl class="dl mt"><div><dt>Illustrative contract value (annual)</dt><dd>${peso(contractValue(c))}</dd></div>
         <div><dt>Pricing path</dt><dd>${PATHS.find((p) => p.key === c.pricingPath)?.label || "—"}</dd></div>
         <div><dt>Rate sheet source</dt><dd>${rs.uploaded ? html`Analyst-entered · uploaded sample <span class="tiny">${rs.fileName}</span>` : "Built from the transparent calculation"}</dd></div>
+        ${ibnrDl(c)}
         <div><dt>Assumptions used</dt><dd class="tiny">${c.calc.assumptionVersion}</dd></div></dl>
       <details class="mt"><summary>Benefit differences & source documents</summary>
         <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Benefit</th><th>Standard</th><th>Requested</th></tr></thead>
           <tbody>${c.sob.filter((l) => l.changed).map((l) => html`<tr><td>${l.service}</td><td>${l.standard}</td><td>${l.requested}</td></tr>`)}</tbody></table></div>
         <div class="doclist mt">${c.documents.filter((d) => d.supplied).map((d) => html`<div class="doc-item"><span class="doc-ic">${icon("file", 15)}</span><div class="grow"><b>${d.name}</b><span class="tiny">${d.source}</span></div></div>`)}</div></details>`)}
+    ${c.kind === "nb" ? html`${section("Analyst's pricing decision — overrides & corrections", html`
+      <div class="note warn"><b>These are the analyst's changes from the loaded assumption set — shown in full, not hidden in a tooltip.</b> The system calculated; the analyst made the pricing decision. Review each change and its reason before approving.
+        <div class="mt">${overridesSummary(rs.snapshot || c)}</div></div>
+      <dl class="dl mt"><div><dt>Analyst's pricing rationale</dt><dd>${(rs.snapshot?.rationale || c.calc?.rationale) ? (rs.snapshot?.rationale || c.calc.rationale) : html`<span class="tiny muted">No rationale recorded.</span>`}</dd></div></dl>`,
+      { lead: "Every assumption edit, override and source-data correction that produced this proposed rate." })}` : ""}
     ${section("Approval route", html`
       <div class="note ${appr.level === "senior" ? "warn" : "info"}"><b>Routes to ${appr.label}.</b> ${appr.why}</div>
       <p class="tiny">Threshold & floors are editable demo config (${peso(config().seniorThreshold)} contract value; margin floor ${config().marginFloor}%). <button type="button" class="linklike" id="editCfg">Adjust</button> — ${config().note}</p>
@@ -1027,6 +1651,7 @@ async function uploadRateSheet(ctx, { defaultName, nextArea } = {}) {
       prepared: true, uploaded: true, fileName,
       source: "Analyst-entered from an uploaded sample rate sheet (external workbook)",
       at: new Date().toISOString(), rows: rateRows(x),
+      ...(isNb ? { snapshot: calcSnapshot(x) } : {}),
     };
     if (x.approval?.status === "Returned") x.approval.status = "Not started";
     log(x, `Rate sheet uploaded (sample file: ${fileName}) — recorded as analyst-entered.`);

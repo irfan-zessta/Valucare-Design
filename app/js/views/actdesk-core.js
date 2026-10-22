@@ -14,7 +14,7 @@ import { money, int } from "../core.js";
 
 export const STORE_KEY = "hms-actuarial:v1";
 export const GUIDE_KEY = "hms-actuarial-guide";
-const BASELINE = 5; // bump to force a reseed when the sample data shape changes
+const BASELINE = 7; // bump to force a reseed when the sample data shape changes
 
 // -------------------------------------------------------------- store plumbing
 export function loadStore() {
@@ -82,8 +82,10 @@ export function roleLabelFor(key) { return (NB_ROLES.find((r) => r.key === key) 
 // links a specific version to the case(s) that used it, so the library shows provenance.
 export const ASSUMPTION_SEED = [
   { key: "medinf", name: "Medical inflation", version: "2026.2", value: "12.0%", owner: "Actuarial", status: "Approved", source: "2025 industry trend study", date: "2026-07-01" },
-  { key: "ibnr", name: "IBNR reserve", version: "2026.1", value: "6.5%", owner: "Actuarial", status: "Approved", source: "Chain-ladder on 2022–2025 run-off", date: "2026-04-15",
-    gloss: "Incurred But Not Reported — a reserve for claims that have happened but not yet been filed." },
+  { key: "ibnr", name: "IBNR reserve (Corporate Renewal)", version: "2026.1", value: "6.5%", owner: "Actuarial", status: "Approved", source: "Chain-ladder on 2022–2025 run-off", date: "2026-04-15",
+    gloss: "Incurred But Not Reported — a reserve for claims that have happened but not yet been filed. This is the CONFIRMED Corporate Renewal figure; it is not valid for New Business." },
+  { key: "ibnr-nb", name: "IBNR allowance (New Business)", version: "NB-2026.0-draft", value: "5.0%", owner: "Actuarial", status: "Illustrative — pending validation", source: "Interim placeholder — approved New Business IBNR methodology not yet issued", date: "2026-03-01",
+    gloss: "Incurred But Not Reported — a reserve for claims incurred but not yet filed. This New Business percentage is ILLUSTRATIVE and deliberately not the confirmed 6.5% Corporate Renewal figure; it awaits the team's approved New Business methodology." },
   { key: "margin", name: "Risk & profit margin", version: "2026.1", value: "8.0%", owner: "Actuarial Supervisor", status: "Approved", source: "Board-approved pricing policy", date: "2026-01-10" },
   { key: "commission", name: "Intermediary commission", version: "2026.1", value: "10.0%", owner: "Sales / Actuarial", status: "Approved", source: "Standard broker schedule", date: "2026-01-10" },
   { key: "loading", name: "Admin & cost loading", version: "2026.1", value: "7.5%", owner: "Actuarial", status: "Approved", source: "Operating cost allocation", date: "2026-02-01" },
@@ -94,7 +96,51 @@ export const ASSUMPTION_SEED = [
 export function assumptions() { const s = loadStore(); return s.assumptions && s.assumptions.length ? s.assumptions : ASSUMPTION_SEED; }
 export function assumptionVersionLabel() {
   const a = assumptions();
-  return a.filter(x => x.key !== "equiv").map(x => `${x.name} ${x.version}`).join(", ");
+  // IBNR entries are surfaced explicitly where they apply (Renewal / New Business),
+  // not folded into the generic assumption label; equiv is IFG-only.
+  return a.filter(x => x.key !== "equiv" && x.key !== "ibnr-nb").map(x => `${x.name} ${x.version}`).join(", ");
+}
+
+// The New Business IBNR allowance config, seeded from the (illustrative) ibnr-nb
+// assumption. Deliberately NOT the confirmed Corporate Renewal 6.5% — it is a
+// placeholder pending the approved New Business methodology.
+export function nbIbnrConfig() {
+  const a = (assumptions().find(x => x.key === "ibnr-nb")) || ASSUMPTION_SEED.find(x => x.key === "ibnr-nb");
+  const pct = parseFloat(String(a?.value || "5.0"));
+  return {
+    applicable: true,
+    assumptionKey: "ibnr-nb",
+    assumptionName: a?.name || "IBNR allowance (New Business)",
+    pct,
+    version: a?.version || "NB-2026.0-draft",
+    source: a?.source || "Interim placeholder — approved New Business IBNR methodology not yet issued",
+    effective: a?.date || "2026-03-01",
+    method: "IBNR allowance = projected claims (base benefit cost before IBNR) × IBNR %",
+    label: "Illustrative — pending Actuarial validation",
+    note: "Illustrative New Business IBNR percentage — not the confirmed 6.5% Corporate Renewal figure. Pending the team's approved New Business methodology.",
+    overrides: [],
+  };
+}
+const NB_IBNR_NA = { applicable: false, note: "Not applicable — no prior HMO claims experience." };
+
+// The effective IBNR for a case: not-applicable for virgin accounts; otherwise the
+// seeded percentage unless the analyst has overridden it (latest override wins).
+// Returns a computed view including the peso amount and the premium effect.
+export function ibnrFor(c) {
+  const cfg = c.calc?.ibnr;
+  const t = c.calc?.baseTrace;
+  const claimsBasis = t ? Math.round(t.basis * t.utilFactor) : (c.calc?.base ?? 0);
+  if (!cfg || !cfg.applicable) return { applicable: false, note: cfg?.note || NB_IBNR_NA.note, claimsBasis };
+  const ovs = cfg.overrides || [];
+  const last = ovs.length ? ovs[ovs.length - 1] : null;
+  const effectivePct = last ? last.pct : cfg.pct;
+  const amount = Math.round(claimsBasis * (effectivePct / 100));
+  return {
+    applicable: true, claimsBasis, basePct: cfg.pct, effectivePct, overridden: !!last, overrides: ovs,
+    amount, assumptionKey: cfg.assumptionKey, assumptionName: cfg.assumptionName,
+    version: cfg.version, source: cfg.source, effective: cfg.effective,
+    method: cfg.method, label: cfg.label, note: cfg.note,
+  };
 }
 
 // IFG equivalence table — utilization band → recommended renewal change. Deterministic.
@@ -112,7 +158,10 @@ export function equivFor(ratio) { return EQUIV_TABLE.find(b => ratio <= b.max) |
 // documented build-up out transparently so the reviewer can see every component.
 // base cost → Rider 1 (non-standard benefits) → Rider 2 (direct expenses) → loadings.
 export function priceBuildUp(c) {
-  const base = c.calc?.base ?? 0;
+  // Base is the projected claims / base benefit cost — for an existing-HMO account
+  // this already folds in the IBNR allowance (see deriveBase), so IBNR flows through
+  // subtotal → loadings → premium. Virgin accounts carry no IBNR.
+  const base = deriveBase(c).amount;
   const rider1 = (c.calc?.rider1 || []).reduce((s, r) => s + r.amount, 0);
   const rider2 = (c.calc?.rider2 || []).reduce((s, r) => s + r.amount, 0);
   const subtotal = base + rider1 + rider2;
@@ -141,18 +190,34 @@ export function rateRows(c) {
 export function deriveBase(c) {
   const t = c.calc?.baseTrace;
   if (!t) return { amount: c.calc?.base ?? 0, steps: [], demo: true };
-  const amount = Math.round(t.basis * t.utilFactor);
+  const claimsAdjusted = Math.round(t.basis * t.utilFactor); // projected claims before IBNR
+  const cfg = c.calc?.ibnr;
+  const applicable = !!(cfg && cfg.applicable);
+  const ovs = applicable ? (cfg.overrides || []) : [];
+  const effectivePct = applicable ? (ovs.length ? ovs[ovs.length - 1].pct : cfg.pct) : 0;
+  const ibnrAmount = applicable ? Math.round(claimsAdjusted * (effectivePct / 100)) : 0;
+  const amount = claimsAdjusted + ibnrAmount;
+  const steps = [
+    { label: "Standard-plan expected annual benefit cost / principal", value: peso(t.basis), source: t.basisSource },
+    { label: t.utilLabel, value: "×" + t.utilFactor.toFixed(2), source: t.utilSource },
+  ];
+  if (applicable) {
+    steps.push(
+      { label: "Projected claims before IBNR / principal / year", value: peso(claimsAdjusted), source: "Calculated — standard cost × utilization factor" },
+      { label: `IBNR allowance (${effectivePct.toFixed(1)}% — illustrative, pending Actuarial validation)`, value: "+" + peso(ibnrAmount), source: `${cfg.assumptionName} ${cfg.version} · ${cfg.source}` },
+    );
+  }
+  steps.push({ label: `Base benefit cost (projected claims${applicable ? " incl. IBNR" : ""}) / principal / year`, value: peso(amount), source: "Calculated result" });
   return {
     demo: true,
     amount,
     basis: t.basis,
     utilFactor: t.utilFactor,
-    method: `Base = standard-plan expected annual benefit cost (${peso(t.basis)}) × utilization factor (${t.utilFactor.toFixed(2)})`,
-    steps: [
-      { label: "Standard-plan expected annual benefit cost / principal", value: peso(t.basis), source: t.basisSource },
-      { label: t.utilLabel, value: "×" + t.utilFactor.toFixed(2), source: t.utilSource },
-      { label: "Base benefit cost / principal / year", value: peso(amount), source: "Calculated result" },
-    ],
+    claimsAdjusted,
+    ibnrApplicable: applicable,
+    ibnrAmount,
+    method: `Base = standard-plan expected annual benefit cost (${peso(t.basis)}) × utilization factor (${t.utilFactor.toFixed(2)})${applicable ? ` + IBNR allowance (${effectivePct.toFixed(1)}% of projected claims)` : ""}`,
+    steps,
     note: t.note || "Illustrative demonstration formula — requires Actuarial validation.",
   };
 }
@@ -380,9 +445,9 @@ export const STANDARD_SOB = [
   { code: "WELL", service: "Wellness programme", standard: "Not included", requested: "Rider 2 — added", changed: true },
 ];
 
-// Assumption label for Corporate New Business — the loadings it actually uses.
-// Deliberately excludes medical inflation and IBNR: IBNR belongs to the documented
-// Corporate Renewal analysis, not New Business.
+// Assumption label for Corporate New Business — the commercial loadings it uses.
+// The New Business IBNR allowance is surfaced explicitly where it applies (the
+// Calculation / rate-sheet / approval views) rather than folded into this label.
 export function nbAssumptionLabel() {
   const keys = ["loading", "margin", "commission"];
   return assumptions().filter(x => keys.includes(x.key)).map(x => `${x.name} ${x.version}`).join(", ");
@@ -395,10 +460,30 @@ export const NB_TEMPLATES = {
   "existing-hmo": { name: "Existing-HMO account · with utilization history", version: "CNB-EH-2026.1", owner: "Actuarial", effective: "2026-01-15" },
 };
 
+// Named, versioned New Business assumption SETS the analyst can choose between in the
+// calculator. Each set carries its own default working values. These are ILLUSTRATIVE
+// sample sets — deliberately labelled "pending Actuarial validation" and never presented
+// as settled Valucare pricing rules. The first set reproduces the existing demo defaults
+// exactly; the second is a slightly more conservative draft, so switching sets visibly
+// moves the proposed rate (and the analyst must give a reason for any further change).
+export const NB_ASSUMPTION_SETS = [
+  { key: "nb-draft-2026", name: "New Business sample assumption set", version: "NB-2026.0-draft",
+    effective: "2026-03-01", owner: "Actuarial", status: "Illustrative — pending Actuarial validation",
+    basis: 12000, utilFactor: 0.90, ibnrPct: 5.0, adminPct: 7.5, marginPct: 8.0, commissionPct: 10.0,
+    note: "Interim placeholder set — the approved New Business methodology has not yet been issued." },
+  { key: "nb-conservative-2026", name: "New Business sample set · conservative draft", version: "NB-2026.0-conservative",
+    effective: "2026-03-01", owner: "Actuarial", status: "Illustrative — pending Actuarial validation",
+    basis: 12600, utilFactor: 0.92, ibnrPct: 6.0, adminPct: 7.5, marginPct: 9.0, commissionPct: 10.0,
+    note: "A more conservative illustrative draft (higher base, IBNR and margin) — for comparison only." },
+];
+export function nbAssumptionSet(key) { return NB_ASSUMPTION_SETS.find((s) => s.key === key) || NB_ASSUMPTION_SETS[0]; }
+
 // A Corporate New Business calculation, built with full provenance. Every rider line
 // records its source document and method; every loading links to a named assumption.
 // The base cost is DERIVED (never a mysterious prefilled figure): standard-plan
-// expected cost × a utilization factor. No IBNR is applied to New Business.
+// expected cost × a utilization factor. For existing-HMO (utilization-based) pricing
+// an illustrative IBNR allowance is folded into the base via deriveBase; virgin
+// accounts carry no IBNR.
 function nbCalc(planName, { path = "existing-hmo" } = {}) {
   const existing = path === "existing-hmo";
   const basis = 12000;
@@ -429,14 +514,111 @@ function nbCalc(planName, { path = "existing-hmo" } = {}) {
       { label: "Wellness programme", amount: 420, source: "Requested SOB — Wellness programme (added)", method: "Annual per-principal cost of the wellness vendor package", note: "Direct expense (Rider 2)" },
       { label: "Financial-assistance desk", amount: 180, source: "Sales note — client-requested financial-assistance support", method: "Allocated annual cost of the assistance desk", note: "Direct expense (Rider 2)" },
     ],
+    // IBNR allowance — applies only to existing-HMO (utilization-based) pricing. Virgin
+    // accounts have no prior HMO claims experience, so IBNR is not applicable.
+    ibnr: existing ? nbIbnrConfig() : { ...NB_IBNR_NA },
     loadings: [
       { label: "Admin & cost loading", pct: 7.5, assumptionKey: "loading" },
       { label: "Risk & profit margin", pct: 8.0, assumptionKey: "margin" },
       { label: "Intermediary commission", pct: 10.0, assumptionKey: "commission" },
     ],
     assumptionVersion: nbAssumptionLabel(),
+    // Calculator state. The chosen assumption set supplies default working values; each
+    // loading / IBNR change is logged in its own trail; assumptionEdits records changes to
+    // the base-cost basis and utilization factor; corrections records source-data edits
+    // (retaining the original value); rationale + drafts support the analyst review step.
+    assumptionSetKey: "nb-draft-2026",
+    assumptionEdits: [],
+    corrections: [],
+    rationale: "",
+    drafts: [],
     overrides: [],
   };
+}
+
+// The default requested coverage period — 12 months from the requested effectivity.
+// Shown as editable source data; the analyst can correct it with a note.
+export function coveragePeriodFor(c) {
+  if (c.coveragePeriod) return c.coveragePeriod;
+  const start = c.effectiveDate;
+  if (!start) return "12 months (requested)";
+  const end = addDaysCore(start, 365, -1);
+  return `${start} → ${end} (12 months)`;
+}
+
+// Load a complete, internally-consistent set of illustrative sample inputs into the
+// CURRENTLY OPEN case, for the approach it already uses. It never changes the case
+// identity or route — it only (re)populates member, utilization, benefit and assumption
+// inputs so a first-time user can price straight away. All values are demo data.
+export function applySampleCalc(c) {
+  const path = c.pricingPath || c.calc?.pricingPath || "existing-hmo";
+  const existing = path === "existing-hmo";
+  c.calc = nbCalc(c.calc?.planName || `${(c.company || "Account").split(" ")[0]} Standard`, { path });
+  c.calc.base = deriveBase(c).amount;
+  c.memberData = sampleMemberData(c.principals);
+  c.coveragePeriod = coveragePeriodFor({ ...c, coveragePeriod: null });
+  c.utilization = existing
+    ? { required: true, period: "Prior 24 months (client-supplied)", source: "Prior carrier via broker — sample",
+        lossRatio: 0.90, claims: "₱18.9M incurred (illustrative demo data)", accepted: true,
+        acceptedNote: "Illustrative demo data — accepted for pricing in this sample. Not validated Valucare claims data.", adjustments: [] }
+    : { required: false, note: "New / virgin account — no prior utilization; priced from standard cost tables." };
+  c.sob = JSON.parse(JSON.stringify(STANDARD_SOB));
+  c.calc.sampleLoaded = true;
+  return c;
+}
+
+// A full snapshot of the exact calculator state, captured when the rate sheet is
+// prepared so the submitted version is self-contained and cannot drift. Everything the
+// approver (and a future reader) needs to see how this proposed rate was produced.
+export function calcSnapshot(c) {
+  const b = priceBuildUp(c);
+  const ib = ibnrFor(c);
+  const set = nbAssumptionSet(c.calc?.assumptionSetKey);
+  const rows = rateRows(c);
+  return {
+    at: stamp(),
+    company: c.company, franchiseRef: c.franchiseRef,
+    approach: c.pricingPath, approachLabel: (NB_TEMPLATES[c.pricingPath] || {}).name,
+    templateVersion: (c.calc?.template || {}).version,
+    coveragePeriod: coveragePeriodFor(c),
+    members: { principals: c.principals, dependents: c.dependents, source: c.memberData?.source, version: c.memberData?.version || "v1" },
+    utilization: c.utilization?.required
+      ? { period: c.utilization.period, source: c.utilization.source, claims: c.utilization.claims, lossRatio: c.utilization.lossRatio, accepted: !!c.utilization.accepted }
+      : null,
+    assumptionSet: { key: set.key, name: set.name, version: set.version, effective: set.effective, owner: set.owner, status: set.status },
+    base: b.base,
+    ibnr: ib.applicable
+      ? { applicable: true, claimsBasis: ib.claimsBasis, pct: ib.effectivePct, amount: ib.amount, method: ib.method, assumption: `${ib.assumptionName} ${ib.version}`, overridden: ib.overridden }
+      : { applicable: false, note: ib.note },
+    rider1: JSON.parse(JSON.stringify(c.calc?.rider1 || [])),
+    rider2: JSON.parse(JSON.stringify(c.calc?.rider2 || [])),
+    loadings: b.loadings.map((l) => ({ label: l.label, pct: l.pct, amount: l.amount })),
+    perMemberYear: b.perMemberYear,
+    rows: JSON.parse(JSON.stringify(rows)),
+    assumptionEdits: JSON.parse(JSON.stringify(c.calc?.assumptionEdits || [])),
+    overrides: JSON.parse(JSON.stringify(c.calc?.overrides || [])),
+    ibnrOverrides: JSON.parse(JSON.stringify((c.calc?.ibnr?.overrides) || [])),
+    corrections: JSON.parse(JSON.stringify(c.calc?.corrections || [])),
+    rationale: c.calc?.rationale || "",
+    sobVersion: "SOB v1 (requested, marked for approval)",
+  };
+}
+
+// Specific, actionable source-data warnings (never a generic blocker). Empty when the
+// loaded sample data is complete — the common demo case.
+export function calcWarnings(c) {
+  const w = [];
+  const existing = c.pricingPath === "existing-hmo";
+  if (!(c.principals > 0)) w.push({ field: "members", message: "No principal count recorded — the proposed rate needs a member count." });
+  if (existing) {
+    const u = c.utilization || {};
+    if (!u.claims) w.push({ field: "utilization", message: "Existing-HMO account but no reported / paid claims amount recorded — IBNR and projected claims cannot be sourced." });
+    if (!u.accepted) w.push({ field: "utilization", message: "Utilization history is not yet accepted for pricing — accept it, or correct it with a note." });
+  }
+  if (!(c.documents || []).find((d) => d.key === "benefits")?.supplied) {
+    w.push({ field: "benefits", message: "Requested benefit document is not attached — benefit adjustments (riders) may be incomplete." });
+  }
+  return w;
 }
 
 // Deterministic age-band distribution for a principal count (summing exactly).
