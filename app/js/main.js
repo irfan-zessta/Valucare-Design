@@ -109,6 +109,20 @@ const WORKSPACES = {
     search: (q) => `#/actuarial-desk/queue/new?q=${encodeURIComponent(q)}`,
     searchPlaceholder: "Search cases and batches",
   },
+  "mda-desk": {
+    key: "mda-desk", dept: "MDA", name: "Members Data Administration", home: "#/mda-desk",
+    routes: ["mda-desk"],
+    nav: [
+      { key: "mywork", label: "My Work", icon: "tasks", href: "#/mda-desk" },
+      { key: "members", label: "Members", icon: "users", href: "#/mda-desk/members" },
+      { key: "cards", label: "Cards & Delivery", icon: "copy", href: "#/mda-desk/cards" },
+      { key: "certificates", label: "Certificates", icon: "file", href: "#/mda-desk/certificates" },
+      { key: "fa", label: "Financial Assistance", icon: "chart", href: "#/mda-desk/fa" },
+      { key: "monitoring", label: "Monitoring", icon: "history", href: "#/mda-desk/monitoring" },
+    ],
+    search: (q) => `#/mda-desk/queue/toprocess?q=${encodeURIComponent(q)}`,
+    searchPlaceholder: "Search requests by reference or account",
+  },
 };
 
 // Which workspace owns this route? Falls back to the New Business desk for shared
@@ -276,6 +290,7 @@ const VIEWS = {
   "renewal-ifg": () => import("./views/section.js"),
   create: () => import("./views/create.js"),
   "actuarial-desk": () => import("./views/actuarial-desk.js"),
+  "mda-desk": () => import("./views/mda-desk.js"),
   tasks: () => import("./views/tasks.js"),
   accounts: () => import("./views/accounts.js"),
   reports: () => import("./views/reports.js"),
