@@ -42,8 +42,21 @@ export class SheetGrid {
 
   setSheet(key) {
     if (!this.wb._sheetByKey(key)) return;
+    // §9 bug fix: commit any in-progress edit BEFORE switching, so the new worksheet
+    // renders with the committed value and the selected-tab indicator stays in sync.
+    this._commitActiveEdit();
     this.sheetKey = key; this.sel = "A1"; this.anchor = "A1"; this.editing = false;
     this.render();
+  }
+
+  // Flush an open inline editor without moving the selection. Safe to call when nothing
+  // is being edited. Used before a tab switch (where a blur-driven re-render would
+  // otherwise detach the clicked tab and swallow the switch).
+  _commitActiveEdit() {
+    if (!this.editing) return;
+    const inp = this.root && this.root.querySelector(".xl-input");
+    this.editing = false;
+    if (inp) this._commitRaw(this.sel, inp.value);
   }
 
   // ---------------------------------------------------------------- render
@@ -99,7 +112,9 @@ export class SheetGrid {
 
   _cellHtml(sh, addr, c, r) {
     const cell = sh.cells[addr];
-    const kind = cell ? (cell.kind || "input") : "input";
+    // §9: absent cells are genuinely empty (still editable), NOT input fields — so they
+    // must not get the pale-yellow "is-edit" fill. Only real input cells are highlighted.
+    const kind = cell ? (cell.kind || "input") : "empty";
     const isFormula = this.wb.isFormula(this.sheetKey, addr);
     const val = this.wb.value(this.sheetKey, addr);
     const disp = formatValue(val, cell ? cell.fmt : undefined);
@@ -123,8 +138,9 @@ export class SheetGrid {
   _wire() {
     const q = (s) => this.root.querySelector(s);
     const qa = (s) => Array.from(this.root.querySelectorAll(s));
-    // tabs
-    qa(".xl-tab").forEach((b) => (b.onclick = () => this.setSheet(b.dataset.sheet)));
+    // tabs — mousedown + preventDefault keeps focus on any open editor so we can commit
+    // it explicitly before switching (fixes the "old worksheet stays displayed" bug, §9).
+    qa(".xl-tab").forEach((b) => (b.onmousedown = (e) => { e.preventDefault(); this.setSheet(b.dataset.sheet); }));
     // toolbar
     qa(".xl-tbtn,[data-act]").forEach((b) => (b.onclick = (e) => this._tool(b.dataset.act, e)));
     // formula bar

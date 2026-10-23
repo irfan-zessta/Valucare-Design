@@ -5,19 +5,73 @@
 //   1  Proposed rates   — overview + per-plan build-up + credibility block (default tab)
 //   2  Assumptions      — reusable / case-specific values and % that feed the formulas
 //   3  Client experience — the §8 projection chain (observed → annualized → required)
-//   4  Benefits & riders — benefit comparison + Rider 1 (credibility-blended) + Rider 2
+//   4  Benefits & riders — ONE authoritative benefit record set + Rider 1 / Rider 2 costing
 //   5  Member Data       — individual synthetic members; per-type mean ages to 3 dp
-//   6  Reference rates    — a visible synthetic lookup table keyed to plan attributes
+//   6  Reference rates    — a visible synthetic lookup table keyed to room + MBL + network
 //
 // ALL figures are ILLUSTRATIVE / synthetic — not approved production actuarial policy.
 // The calculation order follows the spec exactly (reference → age → Rider 1 →
 // credibility/utilization → Rider 2 → other → round → VAT separately). Nothing is a
 // magic constant dropped into a subtotal: each assumption feeds its own stage.
+//
+// SINGLE SOURCE OF TRUTH. Two things that used to disagree now share one definition:
+//   · NB_BENEFITS — the authoritative benefit record set. The benefit-comparison sheet,
+//     the Rider 1 / Rider 2 costing AND the draft rate sheet's Schedule of Benefits all
+//     read it, so the workbook and the draft SOB can never diverge.
+//   · NB_PLANS — the priced plan identifiers (room / MBL / network). Member rows, the
+//     rate table headcounts, the reference lookup and the draft plan tables all key off
+//     these, so limits and priced plans always line up.
 import { Workbook } from "./actdesk-sheet.js";
+
+// ============================================================ authoritative records
+// The priced plans. Every member belongs to exactly one plan; each plan carries the
+// room tier, Maximum Benefit Limit and network that make up its reference-rate key.
+export const NB_PLANS = [
+  { id: "P-WARD", label: "Ward plan", room: "Ward", mbl: 150000, network: "Standard" },
+  { id: "P-SEMI", label: "Semi-private plan", room: "Semi-Private", mbl: 200000, network: "Wide" },
+  { id: "P-PRIV", label: "Private plan", room: "Private", mbl: 300000, network: "Wide" },
+];
+export function planByAttrs(room, mbl, network) {
+  return NB_PLANS.find((p) => p.room === room && p.mbl === mbl && p.network === network) || null;
+}
+
+// The ONE benefit record set. Fields follow the spec: stable id, benefit name, standard
+// reference, requested benefit/limit, applicable member group & plans, pricing treatment,
+// costing inputs and notes. Rider 1 = Maternity, Rider 2 = Dental — used consistently by
+// the workbook AND the draft Schedule of Benefits. (This is deliberately separate from
+// STANDARD_SOB, which the Renewal / Corporate-desk views use — those are untouched.)
+export const NB_BENEFITS = [
+  { id: "RB", name: "Room & board", std: "Standard ward and above", requested: "Per plan room tier",
+    plans: "All plans (P-WARD, P-SEMI, P-PRIV)", group: "All members", treatment: "In reference rate",
+    costing: "Priced within the plan reference rate", changed: false,
+    notes: "Room entitlement is part of the plan reference rate (room / MBL / network)." },
+  { id: "MBL", name: "Maximum Benefit Limit", std: "₱200,000 standard", requested: "₱150,000 / ₱200,000 / ₱300,000 by plan",
+    plans: "P-WARD / P-SEMI / P-PRIV", group: "All members", treatment: "In reference rate",
+    costing: "Priced within the plan reference rate", changed: true,
+    notes: "MBL is part of the plan key and priced in the reference rate. Matches the priced plan limits." },
+  { id: "OP", name: "Outpatient consultations", std: "Covered", requested: "Covered",
+    plans: "All plans", group: "All members", treatment: "In reference rate",
+    costing: "Priced within the plan reference rate", changed: false,
+    notes: "Matches the standard schedule of benefits." },
+  { id: "MAT", name: "Maternity", std: "Not in standard SOB", requested: "₱60,000 benefit",
+    plans: "Principal plans", group: "Eligible principals", treatment: "Rider 1 — benefit costing",
+    costing: "Eligible 8 · expected users 3 · unit ₱2,500 · spread over all principals", changed: true,
+    eligible: 8, expectedUsers: 3, unitCost: 2500, allocation: "All principals",
+    notes: "Added benefit. Eligible population is an explicitly entered synthetic count (member data has no maternity-eligibility field). The cost is deliberately spread across ALL principals." },
+  { id: "DEN", name: "Dental", std: "Not in standard SOB", requested: "₱12,000 benefit",
+    plans: "All plans", group: "All members", treatment: "Rider 2 — separately applied",
+    costing: "₱150 per member, applied at its own stage", changed: true,
+    perMember: 150,
+    notes: "Flat per-member expense applied separately at its own pricing stage — not blended, not double-counted." },
+];
+export const NB_MATERNITY = NB_BENEFITS.find((b) => b.id === "MAT");
+export const NB_DENTAL = NB_BENEFITS.find((b) => b.id === "DEN");
 
 // ----------------------------------------------------------- synthetic case shape
 // Plan groups drive BOTH the member generator and the per-plan rate rows, so the
-// Member Data counts always reconcile with the rate table headcounts.
+// Member Data counts always reconcile with the rate-table headcounts. Totals: 20
+// principals + 16 dependents = 36 members — the default sample case (ACT-NB-2214) is
+// set to the SAME 20 / 16 so the request summary, member records and pricing agree.
 const PRINCIPAL_GROUPS = [
   { room: "Ward", network: "Standard", mbl: 150000, cat: "Under 40", ages: [28, 33, 36, 39] },
   { room: "Ward", network: "Standard", mbl: 150000, cat: "40 and over", ages: [44, 51, 58] },
@@ -31,13 +85,20 @@ const DEPENDENT_GROUPS = [
   { room: "Semi-Private", network: "Wide", mbl: 200000, ages: [3, 7, 19, 29, 41] },
   { room: "Private", network: "Wide", mbl: 300000, ages: [2, 8, 22, 36, 44] },
 ];
+export const SAMPLE_PRINCIPALS = PRINCIPAL_GROUPS.reduce((n, g) => n + g.ages.length, 0); // 20
+export const SAMPLE_DEPENDENTS = DEPENDENT_GROUPS.reduce((n, g) => n + g.ages.length, 0); // 16
+
+// Reference-rate table keyed on room plan + MBL + network (issue C). Each priced plan has
+// a matching row; a couple of extra MBL rows let an analyst change a plan's MBL and SEE the
+// rate move, and some combinations are deliberately absent so an unlisted MBL produces a
+// clear "Reference rate not available" state rather than a silent substitution.
 const REF_TABLE = [
-  { room: "Ward", network: "Standard", rate: 9000 },
-  { room: "Ward", network: "Wide", rate: 10500 },
-  { room: "Semi-Private", network: "Standard", rate: 12000 },
-  { room: "Semi-Private", network: "Wide", rate: 13500 },
-  { room: "Private", network: "Standard", rate: 16000 },
-  { room: "Private", network: "Wide", rate: 18000 },
+  { room: "Ward", mbl: 150000, network: "Standard", rate: 9000 },
+  { room: "Ward", mbl: 200000, network: "Standard", rate: 9800 },
+  { room: "Semi-Private", mbl: 200000, network: "Wide", rate: 13500 },
+  { room: "Semi-Private", mbl: 300000, network: "Wide", rate: 14800 },
+  { room: "Private", mbl: 300000, network: "Wide", rate: 18000 },
+  { room: "Private", mbl: 500000, network: "Wide", rate: 21000 },
 ];
 
 // Build the list of synthetic members from the plan groups.
@@ -82,8 +143,8 @@ export function sampleWorkbook(opts) { return Workbook.from(buildWorkbook(opts))
 
 // ----------------------------------------------------------- 5 · Member Data
 function buildMembersSheet(members) {
-  const sh = sheet("members", "5 · Member Data", "Individual synthetic members. Average principal and dependent ages are each the arithmetic mean of valid ages, to three decimals.", 9, members.length + 12);
-  sh.colW = { 0: 70, 1: 110, 2: 70, 3: 92, 4: 74, 5: 112, 6: 92, 7: 90, 8: 104 };
+  const sh = sheet("members", "5 · Member Data", "Individual synthetic members. Average principal and dependent ages are each the arithmetic mean of valid ages, to three decimals. Counts here are the same 20 principals / 16 dependents used by the request and the rate table.", 9, members.length + 9);
+  sh.colW = { 0: 76, 1: 118, 2: 78, 3: 96, 4: 80, 5: 120, 6: 96, 7: 96, 8: 110 };
   T(sh, "A1", "Member Data (illustrative)");
   ["Ref", "Member type", "Birth yr", "Age as of", "Age (yrs)", "Room plan", "MBL", "Network", "Age category"]
     .forEach((h, i) => L(sh, col(i) + "2", h));
@@ -119,20 +180,23 @@ function buildMembersSheet(members) {
 
 // ----------------------------------------------------------- 6 · Reference rates
 function buildRefSheet() {
-  const sh = sheet("ref", "6 · Reference rates", "Visible synthetic reference-rate table keyed to room plan and network access. Illustrative, not production rates.", 5, REF_TABLE.length + 6);
-  sh.colW = { 0: 170, 1: 120, 2: 110, 3: 140 };
+  const sh = sheet("ref", "6 · Reference rates", "Visible synthetic reference-rate table keyed to room plan + MBL + network. Changing a plan's MBL re-keys the lookup; an unlisted combination shows “Reference rate not available” rather than silently substituting. Illustrative, not production rates.", 5, REF_TABLE.length + 6);
+  sh.colW = { 0: 210, 1: 130, 2: 120, 3: 120, 4: 150 };
   T(sh, "A1", "Reference rate table (illustrative)");
-  ["Lookup key", "Room plan", "Network", "Reference annual rate"].forEach((h, i) => L(sh, col(i) + "2", h));
+  ["Lookup key", "Room plan", "MBL", "Network", "Reference annual rate"].forEach((h, i) => L(sh, col(i) + "2", h));
   const first = 3;
   REF_TABLE.forEach((r, i) => {
     const row = first + i;
-    FX(sh, "A" + row, `=B${row}&"|"&C${row}`, "text", "Room plan | Network");
+    FX(sh, "A" + row, `=B${row}&"|"&C${row}&"|"&D${row}`, "text", "Room plan | MBL | Network");
     IN(sh, "B" + row, r.room, "text");
-    IN(sh, "C" + row, r.network, "text");
-    IN(sh, "D" + row, r.rate, "currency0", "Reference annual rate per member (illustrative)");
+    IN(sh, "C" + row, r.mbl, "int", "Maximum benefit limit");
+    IN(sh, "D" + row, r.network, "text");
+    IN(sh, "E" + row, r.rate, "currency0", "Reference annual rate per member (illustrative)");
   });
   const last = first + REF_TABLE.length - 1;
-  sh.ref = { table: `A${first}:D${last}`, first, last };
+  L(sh, "A" + (last + 2), "Member-type adjustment");
+  L(sh, "A" + (last + 3), "Dependent rate ratio"); RF(sh, "B" + (last + 3), `=assum!${AS("Dependent rate ratio")}`, "factor", "Documented member-type adjustment: dependents are priced at the principal reference rate × this ratio.", "assumption");
+  sh.ref = { table: `A${first}:E${last}`, first, last };
   return sh;
 }
 
@@ -144,23 +208,25 @@ const ASSUM = [
   ["Medical inflation", "Trend", 0.12, "%", "Group", "Illustrative trend", "percent"],
   ["Commission (base)", "Distribution", 0.10, "%", "Intermediary", "Standard intermediary rate", "percent"],
   ["Margin", "Pricing", 0.08, "%", "Group", "Target pricing margin", "percent"],
-  ["Credibility weight — client experience", "Blending", 0.60, "%", "Group", "Illustrative credibility", "percent"],
-  ["Credibility weight — reference", "Blending", 0.40, "%", "Group", "Complement of client weight", "percent"],
+  ["Credibility weight — client experience", "Blending", 0.60, "%", "Group", "Single editable credibility weight (0–100%)", "percent"],
+  ["Credibility weight — reference", "Blending", 0.40, "%", "Group", "Auto = 100% − client weight (not separately editable)", "percent"],
   ["Participation / rating-headcount factor", "Rating", 1.00, "factor", "Group", "Adjusted participation (illustrative)", "factor"],
-  ["Rider 1 — unit cost", "Benefit", 2500, "₱", "Group", "Illustrative unit cost", "currency0"],
-  ["Rider 1 — expected users (client observed)", "Benefit", 22, "count", "Group", "From client experience", "int"],
-  ["Rider 1 — expected users (reference)", "Benefit", 18, "count", "Group", "Reference assumption", "int"],
-  ["Rider 2 — per-member adjustment", "Benefit", 150, "₱", "Group", "Separately applied expense", "currency0"],
+  ["Rider 1 (maternity) — unit cost", "Benefit", 2500, "₱", "Maternity", "Illustrative unit cost per expected user", "currency0"],
+  ["Rider 1 (maternity) — eligible principals (synthetic)", "Benefit", 8, "count", "Eligible principals", "Explicitly entered synthetic eligible count", "int"],
+  ["Rider 1 (maternity) — expected users", "Benefit", 3, "count", "Eligible principals", "Expected claimants in the year", "int"],
+  ["Rider 2 (dental) — per-member adjustment", "Benefit", 150, "₱", "All members", "Separately applied expense", "currency0"],
   ["VAT rate", "Statutory", 0.12, "%", "Output", "Applied separately at output", "percent"],
   ["Payment factor — annual", "Billing", 1.00, "factor", "Billing", "One payment", "factor"],
   ["Payment factor — semi-annual", "Billing", 0.515, "factor", "Billing", "Explicit mode factor (not ÷2)", "factor"],
   ["Payment factor — quarterly", "Billing", 0.262, "factor", "Billing", "Explicit mode factor (not ÷4)", "factor"],
   ["Discount", "Pricing", 0.00, "%", "Group", "Optional concession", "percent"],
-  ["Dependent rate ratio", "Rating", 0.82, "factor", "Dependents", "Dependent vs principal", "factor"],
+  ["Dependent rate ratio", "Rating", 0.82, "factor", "Dependents", "Member-type adjustment: dependent vs principal", "factor"],
 ];
+const CLIENT_WEIGHT = "Credibility weight — client experience";
+const REF_WEIGHT = "Credibility weight — reference";
 function buildAssumptionsSheet(businessType) {
-  const sh = sheet("assum", "2 · Assumptions", "Reusable and case-specific assumptions. Edit value or formula; working value feeds the formulas on the other sheets.", 9, ASSUM.length + 10);
-  sh.colW = { 0: 240, 1: 110, 2: 110, 3: 72, 4: 130, 5: 190, 6: 100, 7: 110, 8: 170 };
+  const sh = sheet("assum", "2 · Assumptions", "Reusable and case-specific assumptions. Edit the working value or formula; it feeds the other sheets. The reference credibility weight is computed as 100% − the client weight, so the two always total 100%.", 9, ASSUM.length + 11);
+  sh.colW = { 0: 300, 1: 110, 2: 118, 3: 72, 4: 150, 5: 230, 6: 100, 7: 118, 8: 190 };
   T(sh, "A1", "Assumptions (illustrative — not approved production policy)");
   ["Name", "Category", "Working value", "Unit", "Applies to", "Source / basis", "Effective", "Original value", "Change reason"].forEach((h, i) => L(sh, col(i) + "2", h));
   const first = 3;
@@ -170,21 +236,29 @@ function buildAssumptionsSheet(businessType) {
     idx[a[0]] = "C" + r;
     L(sh, "A" + r, a[0]);
     IN(sh, "B" + r, a[1], "text");
-    IN(sh, "C" + r, a[2], a[6], a[5]);
+    if (a[0] === REF_WEIGHT) {
+      // Issue B: reference weight is the complement of the client weight, not a free input.
+      FX(sh, "C" + r, `=1-${idx[CLIENT_WEIGHT]}`, "percent", "Auto = 100% − client weight");
+    } else {
+      IN(sh, "C" + r, a[2], a[6], a[5]);
+    }
     IN(sh, "D" + r, a[3], "text");
     IN(sh, "E" + r, a[4], "text");
     IN(sh, "F" + r, a[5], "text");
     IN(sh, "G" + r, "2026-01-01", "text");
-    RF(sh, "H" + r, a[2], a[6], "Original (reusable set) value", "original");
+    if (a[0] === REF_WEIGHT) RF(sh, "H" + r, "(auto)", "text", "Computed, not from a reusable set", "original");
+    else RF(sh, "H" + r, a[2], a[6], "Original (reusable set) value", "original");
     IN(sh, "I" + r, "", "text", "Reason this case differs from the reusable set");
   });
   const last = first + ASSUM.length - 1;
-  // Business type + effective commission (the Direct=0% / Intermediary=base rule).
-  const btR = last + 2, ecR = last + 3, cwR = last + 4;
+  // Business type + effective commission (the Direct=0% / Intermediary=base rule), plus the
+  // live credibility total + a plain-language validation of the client weight (issue B).
+  const btR = last + 2, ecR = last + 3, cwR = last + 4, cvR = last + 5;
   L(sh, "A" + btR, "Business type"); IN(sh, "B" + btR, businessType, "text", "Direct or Intermediary");
   L(sh, "A" + ecR, "Commission (effective)"); FX(sh, "B" + ecR, `=IF(B${btR}="Intermediary",${idx["Commission (base)"]},0)`, "percent", "Direct business carries no commission loading");
-  L(sh, "A" + cwR, "Credibility weights total"); FX(sh, "B" + cwR, `=${idx["Credibility weight — client experience"]}+${idx["Credibility weight — reference"]}`, "percent", "Must total 100%");
-  sh.ref = Object.assign(idx, { businessType: "B" + btR, commissionEff: "B" + ecR, credTotal: "B" + cwR });
+  L(sh, "A" + cwR, "Credibility weights total"); FX(sh, "B" + cwR, `=${idx[CLIENT_WEIGHT]}+${idx[REF_WEIGHT]}`, "percent", "Client + reference — always 100% because reference is the complement");
+  L(sh, "A" + cvR, "Credibility weight check"); FX(sh, "B" + cvR, `=IF(AND(${idx[CLIENT_WEIGHT]}>=0,${idx[CLIENT_WEIGHT]}<=1),"Valid — weights total 100%","Invalid — client weight must be between 0% and 100%")`, "text", "Submission is blocked while this is Invalid");
+  sh.ref = Object.assign(idx, { businessType: "B" + btR, commissionEff: "B" + ecR, credTotal: "B" + cwR, credValid: "B" + cvR, clientWeight: idx[CLIENT_WEIGHT], refWeight: idx[REF_WEIGHT] });
   return sh;
 }
 
@@ -218,64 +292,70 @@ function buildClientExpSheet() {
   line("required", "Required contract value (group)", `=${ref.projUtil}/(1-${ref.comm}-${ref.margin})`, "currency0", "₱", "projected util ÷ (1 − commission − margin)");
   line("perMember", "Required value per member", `=${ref.required}/${ref.headcount}`, "currency", "₱", "required ÷ rating headcount");
   sh.ref = ref;
+  sh.rows = r + 1; // §9: trim trailing blank rows
   sh._fixups = true;
   return sh;
 }
 
 // ----------------------------------------------------------- 4 · Benefits & riders
+// ONE authoritative benefit table (NB_BENEFITS) + benefit costing for Rider 1 (maternity)
+// and Rider 2 (dental). NO credibility weighting happens here (issue F) — credibility is
+// applied once, later, at the contract-value stage on the Proposed rates sheet.
 function buildBenefitsSheet() {
-  const sh = sheet("ben", "4 · Benefits & riders", "Benefit comparison plus Rider 1 (credibility-blended benefit costing) and Rider 2 (separately applied).", 6, 40);
-  sh.colW = { 0: 220, 1: 170, 2: 130, 3: 150, 4: 160, 5: 220 };
-  T(sh, "A1", "Benefits & riders");
-  // Benefit comparison table
-  L(sh, "A2", "Requested benefit"); L(sh, "B2", "Standard SOB reference"); L(sh, "C2", "Requested limit"); L(sh, "D2", "Member group / plan"); L(sh, "E2", "Pricing treatment"); L(sh, "F2", "Notes");
-  const benefits = [
-    ["Room & board", "RB — standard ward+", 150000, "All principals", "In reference rate", "Matches standard SOB"],
-    ["Maternity (Rider 1)", "Not in standard SOB", 60000, "Female principals", "Rider 1 — blended costing", "Assumption-based, credibility blended"],
-    ["Dental (Rider 2)", "Not in standard SOB", 12000, "All members", "Rider 2 — added expense", "Separately applied at its stage"],
-    ["Outpatient", "OP — standard", 25000, "All members", "In reference rate", "Matches standard SOB"],
-  ];
+  const sh = sheet("ben", "4 · Benefits & riders", "The authoritative benefit record set shared with the draft Schedule of Benefits, plus the Rider 1 and Rider 2 benefit costing. Credibility is NOT applied here — it is applied once at the contract-value stage.", 8, NB_BENEFITS.length + 26);
+  sh.colW = { 0: 70, 1: 150, 2: 160, 3: 180, 4: 200, 5: 170, 6: 240, 7: 260 };
+  T(sh, "A1", "Benefits & riders (authoritative record set)");
+  ["ID", "Benefit", "Standard reference", "Requested benefit / limit", "Member group & plans", "Pricing treatment", "Costing inputs", "Notes"].forEach((h, i) => L(sh, col(i) + "2", h));
   let r = 3;
-  benefits.forEach((b) => { IN(sh, "A" + r, b[0], "text"); RF(sh, "B" + r, b[1], "text", "Standard SOB reference", "SOB"); IN(sh, "C" + r, b[2], "int"); IN(sh, "D" + r, b[3], "text"); IN(sh, "E" + r, b[4], "text"); IN(sh, "F" + r, b[5], "text"); r++; });
+  NB_BENEFITS.forEach((b) => {
+    IN(sh, "A" + r, b.id, "text");
+    IN(sh, "B" + r, b.name, "text");
+    IN(sh, "C" + r, b.std, "text");
+    IN(sh, "D" + r, b.requested, "text");
+    IN(sh, "E" + r, `${b.group} · ${b.plans}`, "text");
+    IN(sh, "F" + r, b.treatment, "text");
+    IN(sh, "G" + r, b.costing, "text");
+    L(sh, "H" + r, b.notes);
+    r++;
+  });
   const ref = {};
   r += 1;
-  L(sh, "A" + r, "Rider 1 — maternity (credibility-blended benefit costing)"); r++;
+  L(sh, "A" + r, "Rider 1 — Maternity (benefit costing · no credibility weighting here)"); r++;
   const line = (key, label, raw, fmt, note, kind) => { L(sh, "A" + r, label); (kind === "in" ? IN : FX)(sh, "B" + r, raw, fmt, note); L(sh, "C" + r, note || ""); ref[key] = "B" + r; r++; };
-  line("wClient", "Credibility weight — client", `=assum!${AS("Credibility weight — client experience")}`, "percent", "From Assumptions");
-  line("wRef", "Credibility weight — reference", `=assum!${AS("Credibility weight — reference")}`, "percent", "From Assumptions");
-  line("usersClient", "Expected users — client observed", `=assum!${AS("Rider 1 — expected users (client observed)")}`, "int", "From Assumptions");
-  line("usersRef", "Expected users — reference", `=assum!${AS("Rider 1 — expected users (reference)")}`, "int", "From Assumptions");
-  line("usersBlend", "Expected users — blended", `=${ref.usersClient}*${ref.wClient}+${ref.usersRef}*${ref.wRef}`, "num", "Credibility blend, not a surcharge");
-  line("unitCost", "Unit cost", `=assum!${AS("Rider 1 — unit cost")}`, "currency0", "From Assumptions");
+  // Issue G — eligible / expected users / allocation are shown SEPARATELY, each with a basis.
+  line("eligible", "Eligible principals (basis: synthetic count)", `=assum!${AS("Rider 1 (maternity) — eligible principals (synthetic)")}`, "int", "Explicitly entered — member data has no eligibility field");
+  line("expectedUsers", "Expected users (basis: assumption)", `=assum!${AS("Rider 1 (maternity) — expected users")}`, "int", "Expected claimants in the year");
+  line("allocation", "Allocation population — all principals (basis: member data)", `=members!__PRIN__`, "int", "Cost deliberately spread over ALL principals");
+  line("unitCost", "Unit cost per expected user", `=assum!${AS("Rider 1 (maternity) — unit cost")}`, "currency0", "From Assumptions");
   line("comm", "Commission (effective)", `=assum!__ECOMM__`, "percent", "Direct = 0%");
   line("margin", "Margin", `=assum!${AS("Margin")}`, "percent", "From Assumptions");
-  line("headcount", "Rating headcount", `=ROUND(members!__PRIN__*assum!${AS("Participation / rating-headcount factor")},0)`, "int", "Shown separately");
-  line("gross", "Rider 1 gross cost", `=${ref.usersBlend}*${ref.unitCost}`, "currency0", "blended users × unit cost");
+  line("gross", "Rider 1 gross cost", `=${ref.expectedUsers}*${ref.unitCost}`, "currency0", "expected users × unit cost (single figure, not blended)");
   line("loaded", "Rider 1 loaded cost", `=${ref.gross}/(1-${ref.comm}-${ref.margin})`, "currency0", "÷ (1 − commission − margin)");
-  line("perMember", "Rider 1 per member", `=${ref.loaded}/${ref.headcount}`, "currency", "loaded ÷ rating headcount");
+  line("perMember", "Rider 1 per principal", `=${ref.loaded}/${ref.allocation}`, "currency", "loaded ÷ allocation population (all principals)");
   r += 1;
-  L(sh, "A" + r, "Rider 2 — dental (separately applied)"); r++;
-  line("rider2", "Rider 2 per member", `=assum!${AS("Rider 2 — per-member adjustment")}`, "currency", "Added at its own stage — not double-counted");
+  L(sh, "A" + r, "Rider 2 — Dental (separately applied)"); r++;
+  line("rider2", "Rider 2 per member", `=assum!${AS("Rider 2 (dental) — per-member adjustment")}`, "currency", "Added at its own stage — not blended, not double-counted");
   sh.ref = ref;
+  sh.rows = r + 1; // §9: end at the last Rider 2 row, no trailing blanks
   return sh;
 }
 
 // ----------------------------------------------------------- 1 · Proposed rates
 function buildRatesSheet(members) {
-  const sh = sheet("rates", "1 · Proposed rates", "Overview and per-plan build-up. Order: reference → age → Rider 1 → credibility/utilization → Rider 2 → other → round → VAT separately.", 18, 46);
-  sh.colW = { 0: 96, 1: 118, 2: 80, 3: 86, 4: 96, 5: 78, 6: 104, 7: 86, 8: 118, 9: 104, 10: 108, 11: 112, 12: 88, 13: 128, 14: 96, 15: 128, 16: 128, 17: 140 };
+  const sh = sheet("rates", "1 · Proposed rates", "Overview and per-plan build-up. Order: reference → age → Rider 1 → credibility/utilization → Rider 2 → other → round → VAT separately. Credibility is applied ONCE, here, at the contract-value stage.", 18, 46);
+  sh.colW = { 0: 96, 1: 118, 2: 86, 3: 86, 4: 104, 5: 82, 6: 118, 7: 82, 8: 120, 9: 104, 10: 108, 11: 112, 12: 92, 13: 110, 14: 116, 15: 100, 16: 120, 17: 150 };
   T(sh, "A1", "Proposed rates (illustrative)");
 
   // --- Credibility block (top) ---
-  // client-experience required value and the actuarial/reference baseline, blended.
+  // client-experience required value and the actuarial/reference baseline, blended ONCE.
   const cb = {};
   let r = 2;
   const cline = (key, label, raw, fmt, note, kind) => { L(sh, "A" + r, label); (kind === "in" ? IN : FX)(sh, "B" + r, raw, fmt, note); L(sh, "D" + r, note || ""); cb[key] = "B" + r; r++; };
-  L(sh, "A2", "Credibility & utilization adjustment"); r = 3;
+  L(sh, "A2", "Credibility & utilization adjustment (single application)"); r = 3;
   cline("client", "Client-experience required value (group)", `=exp!__REQUIRED__`, "currency", "From Client experience");
   cline("actuarial", "Actuarial / reference baseline (group)", "__ACT__", "currency", "Pre-adjustment plan calc — does not read final rates");
-  cline("wClient", "Credibility weight — client", `=assum!${AS("Credibility weight — client experience")}`, "percent", "Weights total 100%");
-  cline("wAct", "Credibility weight — reference", `=assum!${AS("Credibility weight — reference")}`, "percent", "Complement");
+  cline("wClient", "Credibility weight — client", `=assum!${AS(CLIENT_WEIGHT)}`, "percent", "Single editable weight");
+  cline("wAct", "Credibility weight — reference", `=assum!${AS(REF_WEIGHT)}`, "percent", "Complement = 100% − client");
   cline("blended", "Blended value (group)", `=${cb.client}*${cb.wClient}+${cb.actuarial}*${cb.wAct}`, "currency", "client×weight + actuarial×weight");
   cline("adjCalc", "Utilization adjustment (computed)", `=${cb.blended}/${cb.actuarial}-1`, "percent", "blended ÷ actuarial − 1");
   cline("override", "Utilization adjustment — manual override", "", "percent", "Leave blank to use computed", "in");
@@ -298,16 +378,17 @@ function buildRatesSheet(members) {
     const isP = g.type === "Principal";
     L(sh, "A" + row, g.type);
     L(sh, "B" + row, g.room);
-    IN(sh, "C" + row, g.mbl, "int");
+    IN(sh, "C" + row, g.mbl, "int", "Maximum benefit limit — part of the reference-rate key");
     L(sh, "D" + row, g.network);
     L(sh, "E" + row, g.cat);
-    // headcount — COUNTIFS against Member Data so it reconciles
-    if (isP) FX(sh, "F" + row, `=COUNTIFS(members!__TYPE__,"Principal",members!__ROOM__,"${g.room}",members!__NET__,"${g.network}",members!__CAT__,"${g.cat}")`, "int", "From Member Data");
-    else FX(sh, "F" + row, `=COUNTIFS(members!__TYPE__,"Dependent",members!__ROOM__,"${g.room}",members!__NET__,"${g.network}")`, "int", "From Member Data");
-    // reference rate — VLOOKUP against the Reference-rate table
-    const key = `"${g.room}|${g.network}"`;
-    if (isP) FX(sh, "G" + row, `=VLOOKUP(${key},ref!__TABLE__,4,FALSE)`, "currency0", "Reference-rate table lookup");
-    else FX(sh, "G" + row, `=VLOOKUP(${key},ref!__TABLE__,4,FALSE)*assum!${AS("Dependent rate ratio")}`, "currency0", "Reference × dependent ratio");
+    // headcount — COUNTIFS against Member Data so it reconciles (room + MBL + network + cat)
+    if (isP) FX(sh, "F" + row, `=COUNTIFS(members!__TYPE__,"Principal",members!__ROOM__,"${g.room}",members!__MBL__,${g.mbl},members!__NET__,"${g.network}",members!__CAT__,"${g.cat}")`, "int", "From Member Data");
+    else FX(sh, "F" + row, `=COUNTIFS(members!__TYPE__,"Dependent",members!__ROOM__,"${g.room}",members!__MBL__,${g.mbl},members!__NET__,"${g.network}")`, "int", "From Member Data");
+    // reference rate — VLOOKUP keyed on room | MBL | network (reads the row's own cells so
+    // changing the MBL re-keys the lookup). No match → clear "Reference rate not available".
+    const key = `B${row}&"|"&C${row}&"|"&D${row}`;
+    if (isP) FX(sh, "G" + row, `=IFERROR(VLOOKUP(${key},ref!__TABLE__,5,FALSE),"Reference rate not available")`, "currency0", "Lookup on room | MBL | network");
+    else FX(sh, "G" + row, `=IFERROR(VLOOKUP(${key},ref!__TABLE__,5,FALSE)*assum!${AS("Dependent rate ratio")},"Reference rate not available")`, "currency0", "Reference × dependent ratio (member-type adjustment)");
     // age adjustment — links to the assumption for 40+ principals, else 0
     if (isP && g.cat === "40 and over") FX(sh, "H" + row, `=assum!${AS("Age adjustment (40 and over)")}`, "percent", "Age-band loading");
     else IN(sh, "H" + row, 0, "percent", "No age loading for this group");
@@ -355,6 +436,9 @@ function buildRatesSheet(members) {
   L(sh, "A" + (pm + 3), "Quarterly (per payment)"); FX(sh, "B" + (pm + 3), `=R${totRow}*assum!${AS("Payment factor — quarterly")}`, "currency", "× quarterly factor (not ÷4)");
 
   sh.ref = { firstData, lastData, totRow, cb, headRow };
+  // §9: trim trailing blank rows — the sheet ends at the payment-mode block, so size the
+  // grid to the last used row plus a one-row breather instead of a fixed 46.
+  sh.rows = pm + 4;
   return sh;
 }
 
@@ -364,7 +448,6 @@ function buildRatesSheet(members) {
 function col(i) { let s = ""; i = Number(i); do { s = String.fromCharCode(65 + (i % 26)) + s; i = Math.floor(i / 26) - 1; } while (i >= 0); return s; }
 function r0(addr) { return Number(/\d+/.exec(addr)[0]); }
 // AS("name") → the assumptions working-value address, filled during resolve.
-let _ASSUM_IDX = {};
 function AS(name) { return "__A:" + name + "__"; }
 
 export function buildResolvedWorkbook(opts) {
@@ -386,6 +469,7 @@ export function buildResolvedWorkbook(opts) {
     s = s.replace(/__TYPE__/g, membersRef.typeRange);
     s = s.replace(/__ROOM__/g, membersRef.roomRange);
     s = s.replace(/__NET__/g, membersRef.netRange);
+    s = s.replace(/__MBL__/g, membersRef.mblRange);
     s = s.replace(/__CAT__/g, membersRef.catRange);
     s = s.replace(/__TABLE__/g, refRef.table);
     s = s.replace(/__PERMEMBER__/g, expRef.perMember);

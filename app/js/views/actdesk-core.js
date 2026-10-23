@@ -14,7 +14,7 @@ import { money, int } from "../core.js";
 
 export const STORE_KEY = "hms-actuarial:v1";
 export const GUIDE_KEY = "hms-actuarial-guide";
-const BASELINE = 7; // bump to force a reseed when the sample data shape changes
+const BASELINE = 8; // bump to force a reseed when the sample data shape changes
 
 // -------------------------------------------------------------- store plumbing
 export function loadStore() {
@@ -387,8 +387,13 @@ function nbNext(c) {
       sentence: "Load the sample member data and open the pricing workbook to begin." };
   switch (wf.status) {
     case "Draft":
+      // The draft rate sheet must exist before "Submit for review" can be the next action
+      // (§3). Until then, the next step is to work through pricing and create the draft.
+      if (!wf.draftRateSheet)
+        return { area: "pricing", label: "Create draft rate sheet", owner: "Actuarial Analyst",
+          sentence: inRevision ? "Price the revision in the guided workspace, then create its draft rate sheet." : "Work through the guided pricing steps and create the draft rate sheet before it can be submitted for review." };
       return { area: "pricing", label: inRevision ? "Submit revision for review" : "Submit for review", owner: "Actuarial Analyst",
-        sentence: inRevision ? "Price the revision in the workbook, then submit it for review — the released version stays intact." : "Price the account in the editable workbook, then submit this version for review." };
+        sentence: inRevision ? "The revision's draft rate sheet is ready — submit it for review. The released version stays intact." : "The draft rate sheet is ready. Submit this version for review." };
     case "Submitted":
       return { area: "review", label: "Record approval decision", owner: approver,
         sentence: `This version is with ${approver}. Approve it, or request changes with a comment.` };
@@ -807,16 +812,16 @@ function SAMPLE_CASES() {
       channel: "Direct", businessType: "Direct", agentBroker: null,
       natureOfBusiness: "Third-party logistics & warehousing",
       requester: "Marco Reyes (Sales)", requesterContact: "marco.reyes@valucare.example · +63 2 8555 0101",
-      effectiveDate: "2026-12-01", targetQuoteDate: "2026-11-10", principals: 184, dependents: 221,
+      effectiveDate: "2026-12-01", targetQuoteDate: "2026-11-10", principals: 20, dependents: 16,
       priority: "standard", franchiseApproved: true,
-      salesNote: "Existing-HMO account switching carrier. 24-month utilization attached. Client wants private room, higher MBL, preventive dental and a wellness programme.",
+      salesNote: "Existing-HMO account switching carrier. 24-month utilization attached. Client wants private room, higher MBL, maternity cover and dental. (Illustrative sample: 20 principals / 16 dependents across three priced plans.)",
       assignedTo: null, reviewed: false, ready: true, assigned: false,
       pathConfirmed: false, dataReviewed: false, calcReady: false,
       pricingPath: null,
       receivedAt: "2026-10-18T09:10:00Z",
       memberData: {
         source: "Sales endorsement · member master list", version: "v1", flags: [],
-        ageBands: [{ band: "18–29", count: 46 }, { band: "30–39", count: 78 }, { band: "40–49", count: 41 }, { band: "50–59", count: 16 }, { band: "60+", count: 3 }],
+        ageBands: [{ band: "18–29", count: 5 }, { band: "30–39", count: 7 }, { band: "40–49", count: 5 }, { band: "50–59", count: 2 }, { band: "60+", count: 1 }],
       },
       utilization: {
         required: true, period: "Nov 2024 – Oct 2026 (24 months)", source: "Prior carrier, via Vanguard broker email",

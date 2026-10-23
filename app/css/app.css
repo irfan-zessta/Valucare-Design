@@ -1034,3 +1034,58 @@ main.nb-full{max-width:none;padding:12px 16px}
 main.nb-full .nb-grid-host{min-height:60vh}
 
 .nb-vtbl td{vertical-align:top}
+
+/* --- Guided pricing workspace (§3–§8) --------------------------------- */
+.nb-guide{display:flex;flex-direction:column;gap:14px}
+.nb-gstrip{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;
+  background:var(--surface-muted);border:1px solid var(--border);border-radius:var(--r-sm)}
+.nb-gstrip .sep{color:var(--text-subtle)}
+.nb-gsteps{display:flex;flex-wrap:wrap;gap:6px;counter-reset:gstep}
+.nb-gstep{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;font:inherit;font-size:13px;
+  font-weight:500;color:var(--text-muted);background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-sm);cursor:pointer;transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease),color var(--t-fast) var(--ease)}
+.nb-gstep:hover{background:var(--surface-muted);color:var(--text)}
+.nb-gstep .nb-gn{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:999px;
+  font-size:11.5px;font-weight:600;background:var(--surface-muted);color:var(--text-muted);border:1px solid var(--border);flex:none}
+.nb-gstep.on{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-strong);font-weight:600}
+.nb-gstep.on .nb-gn{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.nb-gstep.done .nb-gn{background:var(--success-soft,var(--surface-muted));color:var(--success,var(--text-muted));border-color:transparent}
+.nb-gstep.done .nb-gl{color:var(--text)}
+.nb-gstep[aria-current="step"]{box-shadow:var(--ring)}
+.nb-gbody{display:flex;flex-direction:column;gap:12px}
+.nb-ghead h2{margin:2px 0 0;font-size:19px}
+.nb-ghead .eyebrow{display:block}
+.nb-ghead p{margin:4px 0 0;max-width:72ch}
+.nb-gfoot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:4px;padding-top:12px;border-top:1px solid var(--border)}
+.nb-gfoot .btn.primary{font-weight:600}
+.nb-assum tr.grp td{background:var(--surface-muted);font-weight:600;font-size:12px;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:.03em;padding:7px 12px}
+.nb-ain{width:100%;max-width:150px;height:30px;padding:0 8px;text-align:right;font-variant-numeric:tabular-nums;
+  border:1px solid var(--border-input);border-radius:var(--r-sm);background:var(--surface);color:var(--text)}
+.nb-ain:focus{outline:none;border-color:var(--border-input-focus);box-shadow:var(--ring)}
+.tbl td.num.err,.tbl .err{color:var(--danger)}
+.tbl tr.tot td{background:var(--surface-muted);border-top:1px solid var(--border-strong)}
+details>summary{cursor:pointer;color:var(--accent);font-size:12px}
+details[open]>summary{margin-bottom:4px}
+.nb-terms{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.nb-terms[open]{padding-bottom:2px}
+.nb-terms dl{margin:6px 0 0}
+.nb-terms dt{font-weight:600;font-size:12.5px}
+.nb-terms dd{margin:0 0 8px}
+.fld{display:flex;flex-direction:column;gap:4px}
+.fld>span{font-size:12.5px;font-weight:500;color:var(--text-muted)}
+.fld textarea,.fld input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--border-input);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--text);font:inherit;font-size:13px;resize:vertical}
+.fld textarea:focus,.fld input:focus{outline:none;border-color:var(--border-input-focus);box-shadow:var(--ring)}
+.fld textarea:disabled{background:var(--surface-muted);color:var(--text-muted)}
+/* Draft rate-sheet document look */
+.nb-doc{position:relative}
+.nb-doc-ribbon{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--text-muted);background:var(--surface-muted);border:1px dashed var(--border-strong);
+  border-radius:var(--r-sm);padding:3px 9px;margin-bottom:10px}
+.nb-doc code{font-family:var(--mono);font-size:12px;background:var(--surface-muted);padding:1px 5px;border-radius:4px}
+.nb-doc-sign{display:flex;flex-wrap:wrap;gap:14px;padding-top:12px;border-top:1px solid var(--border)}
+.nb-doc-sign>div{flex:1;min-width:180px;display:flex;flex-direction:column;gap:1px}
+.nb-doc-sign b{font-size:14px}
+@media (prefers-reduced-motion:reduce){.nb-gstep{transition:none}}
