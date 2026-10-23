@@ -8,7 +8,7 @@ import { html, raw, go, fmtDate, int, prefs, toast } from "../core.js";
 import { icon, pill } from "../components.js";
 import {
   ensureSeeded, resetDemo, allRecords, nextStep, statusOf, journeyLabel, recName, recHref,
-  assumptions, peso, plural, config, rateSheetIdFor,
+  assumptions, peso, plural, config, rateSheetIdFor, NB_ASSUMPTION_SETS,
 } from "./actdesk-core.js";
 import { renderCase, renderCreate } from "./actdesk-corp.js";
 import { renderBatch } from "./actdesk-ifg.js";
@@ -42,8 +42,9 @@ function bucket(rec) {
   const started = rec.kind === "ifg" ? rec.reviewed : rec.reviewed;
   return started ? "progress" : "new";
 }
-// Dashboard tabs. The "Completed" tab shows released records (bucket "released").
-const TABS = ["new", "progress", "completed"];
+// Dashboard tabs. "Completed" shows released records (bucket "released"); "library" is a
+// read-only reference view (assumption library) rather than a list of cases.
+const TABS = ["new", "progress", "completed", "library"];
 const oneOfTab = (t) => (TABS.includes(t) ? t : "new");
 const bucketForTab = (t) => (t === "completed" ? "released" : t);
 
@@ -57,8 +58,10 @@ function renderHome(main, tab, query) {
     new: all.filter((r) => bucket(r) === "new").length,
     progress: all.filter((r) => bucket(r) === "progress").length,
     completed: all.filter((r) => bucket(r) === "released").length,
+    library: assumptions().length,
   };
   const isCompleted = tab === "completed";
+  const isLibrary = tab === "library";
 
   main.innerHTML = html`
     <div class="page-head"><div><h1>Actuarial Home</h1>
@@ -70,8 +73,10 @@ function renderHome(main, tab, query) {
       <button role="tab" class="${tab === "new" ? "on" : ""}" aria-selected="${tab === "new"}" data-tab="new">New requests <span class="cnt">${counts.new}</span></button>
       <button role="tab" class="${tab === "progress" ? "on" : ""}" aria-selected="${tab === "progress"}" data-tab="progress">In progress <span class="cnt">${counts.progress}</span></button>
       <button role="tab" class="${isCompleted ? "on" : ""}" aria-selected="${isCompleted}" data-tab="completed">Completed <span class="cnt">${counts.completed}</span></button>
+      <button role="tab" class="${isLibrary ? "on" : ""}" aria-selected="${isLibrary}" data-tab="library">Assumption library <span class="cnt">${counts.library}</span></button>
     </div>
 
+    ${isLibrary ? assumptionLibraryBody() : html`
     <div class="toolbar mt">
       <div class="search"><label class="sr-only" for="dq">Search</label>${icon("search", 15)}<input id="dq" type="search" placeholder="Search by company or case ID" value="${query.q || ""}"></div>
       <label class="sr-only" for="df">Filter by journey</label>
@@ -92,17 +97,18 @@ function renderHome(main, tab, query) {
             <th>Request</th><th>Journey</th><th>Owner of next action</th><th>Status</th><th>Next action</th></tr></thead>
             <tbody>${rows.map((r) => rowFor(r))}</tbody></table></div>`)
       : html`<div class="panel mt"><div class="pb"><div class="state-box"><b>Nothing in ${tab === "new" ? "New requests" : isCompleted ? "Completed" : "In progress"}.</b>
-        <p class="tiny">${tab === "new" ? "New requests from Sales and the renewal worklist appear here." : isCompleted ? "Released quotations appear here with their rate-sheet versions and final approved rate sheet." : "Cases you have started appear here until released."}</p></div></div></div>`}
+        <p class="tiny">${tab === "new" ? "New requests from Sales and the renewal worklist appear here." : isCompleted ? "Released quotations appear here with their rate-sheet versions and final approved rate sheet." : "Cases you have started appear here until released."}</p></div></div></div>`}`}
 
-    <p class="tiny mt"><a href="#/explore/actuarial">${icon("collapse", 13)} Back to demo selection</a> · Preloaded samples, each starting at its first step: a complete Corporate New Business request, a large Corporate Renewal (routes to Senior Approver / FA), and an incomplete request that will need clarification.</p>`.s;
+    <p class="tiny mt"><a href="#/explore/actuarial">${icon("collapse", 13)} Back to demo selection</a>${isLibrary ? "" : " · Preloaded samples, each starting at its first step: a complete Corporate New Business request, a large Corporate Renewal (routes to Senior Approver / FA), and an incomplete request that will need clarification."}</p>`.s;
 
   highlightNav(tab === "progress" && window.location.hash.includes("/queue/") ? "queue-progress" : (tab === "new" && window.location.hash.includes("/queue/") ? "queue-new" : "home"));
   document.title = "Actuarial Home · Demo";
 
   main.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => go(window.location.hash.includes("/queue/") ? `#/actuarial-desk/queue/${b.dataset.tab}` : `#/actuarial-desk?tab=${b.dataset.tab}`)));
   const dq = main.querySelector("#dq");
-  dq.oninput = () => { clearTimeout(dq._t); dq._t = setTimeout(() => renderHome(main, tab, { ...query, q: dq.value }), 150); };
-  main.querySelector("#df").onchange = (e) => { prefs.set("actdesk:filter", e.target.value); renderHome(main, tab, query); };
+  if (dq) dq.oninput = () => { clearTimeout(dq._t); dq._t = setTimeout(() => renderHome(main, tab, { ...query, q: dq.value }), 150); };
+  const df = main.querySelector("#df");
+  if (df) df.onchange = (e) => { prefs.set("actdesk:filter", e.target.value); renderHome(main, tab, query); };
   main.querySelector("#resetDemo").onclick = async () => {
     const { confirmDialog } = await import("../core.js");
     if (!(await confirmDialog("Reset this demo?", "Restores the Actuarial sample cases and batches to their starting state. Other demos are untouched.", { confirm: "Reset", kind: "danger" }))) return;
@@ -146,6 +152,35 @@ function completedRowFor(r) {
     <td>${versionsCell}</td>
     <td>${finalCell}</td>
     <td>${v ? fmtDate(v.at) : "—"}</td></tr>`;
+}
+
+// -------------------------------------------------------------- assumption library tab
+// A read-only reference shown as a dashboard tab: the named, versioned assumption entries
+// the quotation journeys reference, plus the documented New Business assumption sets the
+// calculator offers. Everything here is illustrative sample data, clearly labelled — no
+// figure is presented as a settled Valucare pricing rule.
+function assumptionLibraryBody() {
+  const lib = assumptions();
+  const referenced = allRecords().filter((r) => r.calc?.assumptionVersion).map((r) => recName(r));
+  const setRow = (s) => html`<tr>
+    <td><b>${s.name}</b>${s.note ? html`<div class="tiny">${s.note}</div>` : ""}</td>
+    <td>${s.version}</td><td>${peso(s.basis)}</td><td>${s.utilFactor.toFixed(2)}</td>
+    <td>${s.ibnrPct.toFixed(1)}%</td><td>${s.adminPct.toFixed(1)}%</td>
+    <td>${s.marginPct.toFixed(1)}%</td><td>${s.commissionPct.toFixed(1)}%</td>
+    <td>${pill(s.status, "warn")}</td></tr>`;
+  return html`
+    <div class="panel mt"><div class="ph"><h2>Assumption library</h2><span class="pill info">Reference · sample data</span></div><div class="pb">
+      <p class="tiny">Named, versioned assumptions with owner, source and approval status. A quotation records which version it used — so a released rate sheet always says what it was priced on.</p>
+      <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Assumption</th><th>Version</th><th>Value</th><th>Owner</th><th>Status</th><th>Source · date</th></tr></thead>
+        <tbody>${raw(lib.map((a) => html`<tr><td>${a.name}${a.gloss ? html`<div class="tiny">${a.gloss}</div>` : ""}</td><td>${a.version}</td><td>${a.value}</td><td>${a.owner}</td><td>${pill(a.status, /illustrative|pending|draft/i.test(a.status) ? "warn" : "ok")}</td><td class="tiny">${a.source} · ${fmtDate(a.date)}</td></tr>`).map((x) => x.s).join(""))}</tbody></table></div>
+      <p class="tiny mt"><b>Referenced by:</b> ${referenced.length ? referenced.join(", ") : "—"}.</p>
+    </div></div>
+
+    <div class="panel mt"><div class="ph"><h2>New Business assumption sets</h2></div><div class="pb">
+      <p class="tiny">The documented sets the New Business pricing calculator offers. Choosing a set seeds the working values; the analyst must give a reason for any further change. Illustrative — pending Actuarial validation.</p>
+      <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Set</th><th>Version</th><th>Base / member-year</th><th>Utilization factor</th><th>IBNR %</th><th>Admin &amp; cost</th><th>Margin</th><th>Commission</th><th>Status</th></tr></thead>
+        <tbody>${raw(NB_ASSUMPTION_SETS.map((s) => setRow(s).s).join(""))}</tbody></table></div>
+    </div></div>`;
 }
 
 // -------------------------------------------------------------- released quotations
