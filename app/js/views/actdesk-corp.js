@@ -8,6 +8,7 @@ import {
   getCase, putCase, nextStep, statusOf, journeyLabel, priceBuildUp, rateRows, contractValue,
   approverFor, config, setConfig, peso, plural, log, assumptions,
   deriveBase, ibnrFor, nbIbnrConfig, rateSheetIdFor, rsVerLabel, nextCaseId, createCase, SAMPLE_INTAKE,
+  rateSheetStatus, commissionIsIntermediary, commissionExceptionFor, effectiveLoadingPct,
   NB_ROLES, roleKeyForOwner, roleLabelFor, NB_TEMPLATES,
   NB_ASSUMPTION_SETS, nbAssumptionSet, applySampleCalc, calcSnapshot, calcWarnings, coveragePeriodFor,
 } from "./actdesk-core.js";
@@ -277,9 +278,18 @@ function proposedRateTable(c) {
     ${(c.calc.rider1 || []).map((r, i) => row(html`Rider 1 · ${r.label}`, r.amount, "rider1", i, "indent"))}
     ${(c.calc.rider2 || []).map((r, i) => row(html`Rider 2 · ${r.label}`, r.amount, "rider2", i, "indent"))}
     ${row("Subtotal", b.subtotal, null, 0, "sub")}
-    ${b.loadings.map((l, i) => row(html`${l.label} (${l.pct}%)${(c.calc.overrides || []).some((o) => o.label === l.label) ? html` <span class="pill info">overridden</span>` : ""}`, l.amount, "loading", i))}
-    ${row("Proposed annual premium · per principal", b.perMemberYear, null, 0, "tot")}
-  </tbody></table>`;
+    ${b.loadings.map((l, i) => {
+      const notApplied = (l.setPct || 0) > 0 && (l.pct || 0) === 0;
+      const label = notApplied
+        ? html`${l.label} (${l.setPct}% configured — <b>not applied</b>)`
+        : html`${l.label} (${l.pct}%)`;
+      return row(html`${label}${(c.calc.overrides || []).some((o) => o.label === l.label) ? html` <span class="pill info">overridden</span>` : ""}`, l.amount, "loading", i);
+    })}
+    ${row("Proposed annual premium (exact)", b.perMemberYearExact, null, 0, "sub")}
+    ${b.roundingAdj ? html`<tr class="indent"><td>Rounding to the quoted monthly rate (× 12)</td><td class="num">${b.roundingAdj > 0 ? "+" : ""}${peso(b.roundingAdj)}</td><td></td></tr>` : ""}
+    ${row(html`Proposed annual premium · per principal <span class="tiny muted">(monthly ${peso(b.monthly)} × 12 — authoritative)</span>`, b.perMemberYear, null, 0, "tot")}
+  </tbody></table>
+  <p class="tiny muted mt">The quoted monthly rate is authoritative; the annual figure is the monthly rate × 12.</p>`;
 }
 
 // Headline: the proposed rate shown first, clearly "not approved", with units spelled out.
@@ -300,7 +310,7 @@ function calcHeader(ctx) {
     <div class="calc-headline mt">
       <div class="hl-fig"><span class="tiny muted">Principal · per month</span><b>${peso(principal)}</b></div>
       <div class="hl-fig"><span class="tiny muted">Dependent · per month</span><b>${peso(dependent)}</b></div>
-      <div class="hl-fig"><span class="tiny muted">Annual premium · per principal</span><b>${peso(b.perMemberYear)}</b></div>
+      <div class="hl-fig"><span class="tiny muted">Annual premium · per principal (monthly × 12)</span><b>${peso(b.perMemberYear)}</b></div>
       <div class="hl-fig"><span class="tiny muted">Illustrative annual contract value</span><b>${peso(contractValue(c))}</b></div>
     </div>
     <p class="tiny mt">Units are shown per principal, per dependent and as a total contract value — never mixed in one figure. Every amount below opens to reveal its inputs and calculation.</p>`,
@@ -351,6 +361,24 @@ function assumptionsGroup(ctx) {
   const ld = (key) => (c.calc.loadings || []).find((l) => l.assumptionKey === key) || {};
   const editOf = (key) => { const l = (c.calc.assumptionEdits || []).filter((x) => x.key === key); return l.length ? l[l.length - 1] : null; };
   const loadReason = (label) => { const l = (c.calc.overrides || []).filter((x) => x.label === label); return l.length ? l[l.length - 1] : null; };
+  // Commission is channel-driven: intermediary business carries the configured commission;
+  // direct business applies 0% unless a documented exception override is recorded — so the
+  // row honestly shows "not applied (direct)" rather than silently loading 10%.
+  const commissionRow = () => {
+    const interm = commissionIsIntermediary(c);
+    const ex = commissionExceptionFor(c);
+    const eff = effectiveLoadingPct(c, ld("commission"));
+    const configured = Number(ld("commission").pct || 0);
+    if (interm) {
+      return { key: "commission", name: "Intermediary commission", explain: "Commission applied to the subtotal — this is intermediary-channel business.", source: "Intermediary commission 2026.1",
+        def: set.commissionPct.toFixed(1) + "%", work: configured.toFixed(1) + "%", changed: configured !== set.commissionPct, editable: true, needReason: true, reason: loadReason("Intermediary commission")?.reason };
+    }
+    return { key: "commission", name: "Intermediary commission", explain: ex
+        ? `Direct business — commission is normally 0%, but a documented exception applies ${eff.toFixed(1)}%.`
+        : "Direct business — no intermediary, so no commission is applied (0%). An exception requires a documented reason.",
+      source: "Intermediary commission 2026.1 · direct-channel rule",
+      def: "0.0% (direct)", work: ex ? eff.toFixed(1) + "%" : "0.0% — not applied", changed: !!ex, editable: true, needReason: true, reason: ex?.reason };
+  };
   // One assumption row: default (from set) · working value · explanation · edit · reason.
   const row = (assum) => {
     const changedFromDefault = assum.changed;
@@ -381,8 +409,7 @@ function assumptionsGroup(ctx) {
       def: set.adminPct.toFixed(1) + "%", work: Number(ld("loading").pct).toFixed(1) + "%", changed: ld("loading").pct !== set.adminPct, editable: true, needReason: true, reason: loadReason("Admin & cost loading")?.reason },
     { key: "margin", name: "Risk & profit margin", explain: "Margin applied to the subtotal. A value below the floor escalates approval.", source: "Risk & profit margin 2026.1",
       def: set.marginPct.toFixed(1) + "%", work: Number(ld("margin").pct).toFixed(1) + "%", changed: ld("margin").pct !== set.marginPct, editable: true, needReason: true, reason: loadReason("Risk & profit margin")?.reason },
-    { key: "commission", name: "Intermediary commission", explain: "Commission applied to the subtotal (intermediary channel).", source: "Intermediary commission 2026.1",
-      def: set.commissionPct.toFixed(1) + "%", work: Number(ld("commission").pct).toFixed(1) + "%", changed: ld("commission").pct !== set.commissionPct, editable: true, needReason: true, reason: loadReason("Intermediary commission")?.reason },
+    commissionRow(),
   );
   return html`${section("2 · Select assumptions", html`
     <p class="tiny">Choose the documented assumption set, then review each working value. Changing any value from its set default records a reason. These are illustrative sample sets — pending Actuarial validation; not settled Valucare pricing rules.</p>
@@ -456,7 +483,8 @@ function proposedRateGroup(ctx) {
         <tr><td>Dependent</td><td class="num">${peso(dependent)}</td><td class="num">${peso(dependent * 12)}</td></tr>
         <tr class="tot"><td>Illustrative annual contract value (${int(c.principals)} principals · ${int(c.dependents)} dependents)</td><td></td><td class="num">${peso(contractValue(c))}</td></tr>
       </tbody></table></div>
-    <p class="tiny mt">Per-principal, per-dependent and total-contract figures are shown separately and never mixed in one unexplained total. Open any component line above to see its inputs.</p>`,
+    <p class="tiny mt">Per-principal, per-dependent and total-contract figures are shown separately and never mixed in one unexplained total. Open any component line above to see its inputs.</p>
+    <p class="tiny muted">The quoted monthly rate is authoritative; the annual figure is the monthly rate × 12.</p>`,
     { lead: "A readable trail from accepted data → IBNR (where applicable) → riders → loadings → proposed premium, with units spelled out." })}`;
 }
 
@@ -882,10 +910,19 @@ function showCalcTrace(c, kind, idx) {
       actions: [{ label: "Close", value: "ok" }] });
   }
 }
+// One status pill for the current rate-sheet version, DERIVED from the workflow state
+// (rateSheetStatus) — so this pill can never disagree with the case header or next action.
+function rsStatusPill(c) {
+  const s = rateSheetStatus(c);
+  if (!s) return "";
+  const tone = (s === "Released" || s === "Approved") ? "ok" : s === "Returned" ? "warn" : s === "Submitted" ? "info" : "neutral";
+  return html`<span class="pill ${tone}">${s}</span>`;
+}
+
 function rateSheetDoc(c) {
   const rs = c.rateSheet || {};
   return html`
-    <dl class="dl"><div><dt>Rate sheet</dt><dd>${rs.id} <b>v${rs.version}</b> · <span class="pill neutral">${rs.status}</span></dd></div>
+    <dl class="dl"><div><dt>Rate sheet</dt><dd>${rs.id} <b>v${rs.version}</b> · ${rsStatusPill(c)}</dd></div>
       <div><dt>Company / franchise</dt><dd>${c.company} · ${c.franchiseRef}</dd></div>
       <div><dt>Pricing approach</dt><dd>${c.calc.template?.name} (${c.calc.template?.version})</dd></div>
       <div><dt>Member data</dt><dd>${int(c.principals)} principals · ${int(c.dependents)} dependents · ${c.memberData?.source || ""} ${c.memberData?.version || ""}</dd></div>
@@ -1227,9 +1264,36 @@ const NB_RENDER = {
       body.querySelector("#pUpload").onclick = () => uploadRateSheet(ctx, { defaultName: `${slug(c.company)}_rate_sheet.xlsx` });
       return prep;
     }
-    // prepared Draft, not yet submitted → preview + submit.
+    // prepared → one of Draft / Submitted / Approved / Released / Superseded.
+    // Only a Draft can be submitted; every other state is read-only here with an
+    // honest onward link, so the Rate Sheet screen can never contradict approval/release.
+    const st = rateSheetStatus(c);
+    if (st !== "Draft") {
+      const onward = st === "Submitted"
+        ? { area: "approval", label: "Go to approval ›" }
+        : (st === "Approved" ? { area: "release", label: "Go to release ›" }
+        : { area: "release", label: "View the released package ›" });
+      const noteTone = st === "Returned" ? "warn" : "info";
+      const noteMsg = st === "Submitted"
+        ? `This version is with ${appr.label} for approval. It is read-only until a decision is recorded.`
+        : st === "Approved"
+        ? "This version is approved but not yet released. Release it to finalize and share with Sales."
+        : st === "Superseded"
+        ? "This version has been superseded by a later released version."
+        : "This version has been released to Sales.";
+      body.innerHTML = html`
+        ${section(html`Rate sheet · ${rs.id} v${rs.version} ${rsStatusPill(c)}`, html`
+          <div class="note ${noteTone}">${noteMsg}</div>
+          <div class="note sim"><b>Illustrative sample data — not an approved Valucare rate.</b> This is the exact package recorded for this version.</div>
+          ${rateSheetDoc(c)}
+          <div class="pb-foot"><button class="btn primary" id="pOnward">${onward.label}</button></div>`,
+          { lead: "A specific, identifiable version — read-only once submitted." })}`.s;
+      body.querySelector("#pOnward").onclick = () => ctx.goArea(onward.area);
+      return;
+    }
+    // Draft → preview + submit.
     body.innerHTML = html`
-      ${section(html`Rate sheet · ${rs.id} v${rs.version} <span class="pill neutral">${rs.status}</span>`, html`
+      ${section(html`Rate sheet · ${rs.id} v${rs.version} ${rsStatusPill(c)}`, html`
         <div class="note sim"><b>Illustrative sample data — not an approved Valucare rate.</b> This is the exact package the approver will review.</div>
         ${rateSheetDoc(c)}
         <div class="row tight mt"><button type="button" class="btn ghost sm" id="pReviseDraft">Revise draft (re-generate from calculation)</button>
@@ -1273,7 +1337,7 @@ const NB_RENDER = {
         <div class="pb-foot"><button class="btn primary" id="pRelease">Release finalized rate sheet ›</button></div>`)}`.s;
       const release = () => {
         adoptRole(ctx, "Actuarial Analyst");
-        ctx.patch((x) => { (x.versions = x.versions || []).push(releaseVersion(x, { v: 1 })); log(x, `Finalized rate sheet ${x.versions[0].rsId} v1 released to Sales with approved SOB.`); });
+        ctx.patch((x) => { (x.versions = x.versions || []).push(releaseVersion(x, { v: 1 })); if (x.rateSheet) x.rateSheet.status = "Released"; log(x, `Finalized rate sheet ${x.versions[0].rsId} v1 released to Sales with approved SOB.`); });
         successOverlay({ tone: "ok", heading: "Quotation released to Sales", lead: c.company, statusPill: "Released", note: "End of the Actuarial journey. Any later change becomes a new revision, never a silent edit. The end state is “Quotation released to Sales” — account activation is a later downstream process.", primary: { label: "View finalized package", href: `#/actuarial-desk/case/${c.id}/release` }, secondary: { label: "Actuarial Home", href: "#/actuarial-desk" } });
         announce("Quotation released to Sales.");
         setTimeout(() => ctx.refresh(), 50);
@@ -1342,6 +1406,7 @@ const NB_RENDER = {
         const prev = x.versions[x.versions.length - 1];
         c2.released = true;
         x.versions.push(releaseVersion(x, { v: c2.v, supersedes: prev.v, rows: c2.rows }));
+        if (x.rateSheet) { x.rateSheet.version = c2.v; x.rateSheet.status = "Released"; }
         log(x, `Superseding version v${c2.v} released — v${prev.v} is now Superseded.`);
       });
       successOverlay({ tone: "ok", heading: `Revision v${crv || ""} released`, lead: c.company, statusPill: "Released", note: "The former release is now Superseded; its history is kept. Sales cannot use the earlier version by accident.", primary: { label: "View release", href: `#/actuarial-desk/case/${c.id}/release` } });
@@ -1610,14 +1675,14 @@ function approvalArea(ctx, body) {
     if (c.kind === "nb") adoptRole(ctx, appr.label);
     const ok = await confirmDialog("Approve", `Approve this ${c.kind === "nb" ? "quotation" : "renewal"} (${appr.label})? The reviewer is responsible for this decision — the rate is not an automatic final figure, and approval does not release it.`, { confirm: "Approve", kind: "primary" });
     if (!ok) return;
-    ctx.patch((x) => { x.approval = { ...x.approval, status: "Approved", by: appr.label, decidedAt: new Date().toISOString(), history: [...(x.approval.history || []), { at: new Date().toISOString(), action: "Approved", by: appr.label }] }; log(x, `Approved by ${appr.label}.`); });
+    ctx.patch((x) => { x.approval = { ...x.approval, status: "Approved", by: appr.label, decidedAt: new Date().toISOString(), history: [...(x.approval.history || []), { at: new Date().toISOString(), action: "Approved", by: appr.label }] }; if (x.rateSheet) x.rateSheet.status = "Approved"; log(x, `Approved by ${appr.label}.`); });
     toast("Approved.", "ok"); ctx.refresh();
   };
   const returnBack = async () => {
     if (c.kind === "nb") adoptRole(ctx, appr.label);
     const r = await dialog({ title: "Return with one comment", body: html`<div class="field"><label for="rc">Comment to analyst</label><textarea id="rc" name="c" class="inp" rows="3" placeholder="e.g. Re-check the private-room loading against the requested SOB."></textarea></div>`, actions: [{ label: "Cancel" }, { label: "Return to analyst", kind: "primary", value: "ok" }] });
     if (r?.action !== "ok") return;
-    ctx.patch((x) => { x.approval = { ...x.approval, status: "Returned", by: appr.label, comment: r.values.c, history: [...(x.approval.history || []), { at: new Date().toISOString(), action: "Returned", by: appr.label, comment: r.values.c }] }; log(x, `Returned to analyst by ${appr.label}.`); });
+    ctx.patch((x) => { x.approval = { ...x.approval, status: "Returned", by: appr.label, comment: r.values.c, history: [...(x.approval.history || []), { at: new Date().toISOString(), action: "Returned", by: appr.label, comment: r.values.c }] }; if (x.rateSheet) x.rateSheet.status = "Returned"; log(x, `Returned to analyst by ${appr.label}.`); });
     toast("Returned to analyst — same case, history retained.", "ok"); ctx.goArea(backArea);
   };
   body.querySelector("#pSubmit")?.addEventListener("click", submit);

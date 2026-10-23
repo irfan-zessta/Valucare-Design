@@ -165,15 +165,43 @@ export function priceBuildUp(c) {
   const rider1 = (c.calc?.rider1 || []).reduce((s, r) => s + r.amount, 0);
   const rider2 = (c.calc?.rider2 || []).reduce((s, r) => s + r.amount, 0);
   const subtotal = base + rider1 + rider2;
-  const loadings = (c.calc?.loadings || []).map(l => ({ ...l, amount: Math.round(subtotal * (l.pct / 100)) }));
+  // Each loading's effective % is channel-aware: the intermediary commission applies ONLY to
+  // intermediary business. For direct business it is 0 (never a silently-applied intermediary
+  // loading) unless the analyst records a documented exception — see effectiveLoadingPct.
+  const loadings = (c.calc?.loadings || []).map(l => {
+    const pct = effectiveLoadingPct(c, l);
+    return { ...l, pct, setPct: l.pct, amount: Math.round(subtotal * (pct / 100)) };
+  });
   const loadTotal = loadings.reduce((s, l) => s + l.amount, 0);
-  const perMemberYear = subtotal + loadTotal; // illustrative annual premium per principal
-  return { base, rider1, rider2, subtotal, loadings, loadTotal, perMemberYear };
+  // Single rounding rule: the quoted MONTHLY rate is the one authoritative figure. The exact
+  // annual build-up is rounded once to a whole-peso monthly rate; every annual figure is then
+  // monthly × 12, so the calculator, rate sheet and release package always reconcile.
+  const perMemberYearExact = subtotal + loadTotal; // exact annual build-up (pre-rounding)
+  const monthly = Math.round(perMemberYearExact / 12); // authoritative quoted monthly rate
+  const perMemberYear = monthly * 12; // annual as billed = monthly × 12 (authoritative)
+  return { base, rider1, rider2, subtotal, loadings, loadTotal, perMemberYearExact, monthly, roundingAdj: perMemberYear - perMemberYearExact, perMemberYear };
 }
+
+// The intermediary commission applies only to intermediary business. The case channel is the
+// single source of truth: direct business carries 0 commission unless the analyst records a
+// documented exception (an override on the commission loading, which always needs a reason).
+export function commissionIsIntermediary(c) {
+  return (c?.businessType === "Intermediary") || /intermediary/i.test(c?.channel || "");
+}
+export function commissionExceptionFor(c) {
+  return (c?.calc?.overrides || []).filter(o => /commission/i.test(o.label || "")).slice(-1)[0] || null;
+}
+export function effectiveLoadingPct(c, l) {
+  if (!l) return 0;
+  if (l.assumptionKey !== "commission") return l.pct;
+  if (commissionIsIntermediary(c)) return l.pct;
+  return commissionExceptionFor(c) ? l.pct : 0; // direct: 0 unless a documented exception
+}
+
 // Illustrative monthly rates by member type, derived from the per-member-year build-up.
 export function rateRows(c) {
   const b = priceBuildUp(c);
-  const principal = Math.round(b.perMemberYear / 12);
+  const principal = b.monthly; // authoritative quoted monthly rate (annual = monthly × 12)
   const dependent = Math.round(principal * 0.82); // dependents priced off the principal rate
   return [
     { plan: c.calc?.planName || "Standard plan", memberType: "Principal", prevRate: c.prior?.principalRate ?? null, proposedRate: principal },
@@ -270,6 +298,32 @@ export function nextStep(rec) {
 }
 
 export const rsVerLabel = (c) => "v" + (c.rateSheet?.version || 1);
+
+// The single source of truth for the CURRENT rate-sheet version's status, DERIVED from the
+// workflow state (approval record + released versions) — never stored independently. This is
+// why the case header, the Rate Sheet screen, the approval record and the next action can no
+// longer contradict each other: they all read one state. A version is:
+//   Draft      — prepared, not yet submitted
+//   Submitted  — submitted; with the approver (approval Pending)
+//   Approved   — approved, not yet released
+//   Released   — the latest released version (locked, shared with Sales)
+//   Superseded — released, then replaced by a later released version
+//   Returned   — the approver returned this submission for revision
+export function rateSheetStatus(c) {
+  const rs = c.rateSheet || {};
+  if (!rs.prepared) return null;
+  const a = c.approval || {};
+  const vs = c.versions || [];
+  const v = rs.version || 1;
+  if (vs.some((ver) => ver.v === v)) {
+    const latest = vs[vs.length - 1];
+    return latest.v === v ? "Released" : "Superseded";
+  }
+  if (a.status === "Returned") return "Returned";
+  if ((a.status || "").startsWith("Pending")) return "Submitted";
+  if (a.status === "Approved") return "Approved";
+  return "Draft";
+}
 
 // The Corporate New Business linear flow, one owned step at a time:
 // Request → Intake → Assignment → Pricing approach → Data & benefits →
