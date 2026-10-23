@@ -8,9 +8,10 @@ import { html, raw, go, fmtDate, int, prefs, toast } from "../core.js";
 import { icon, pill } from "../components.js";
 import {
   ensureSeeded, resetDemo, allRecords, nextStep, statusOf, journeyLabel, recName, recHref,
-  assumptions, peso, plural, config, rateSheetIdFor, NB_ASSUMPTION_SETS,
+  assumptions, peso, plural, config, rateSheetIdFor, NB_ASSUMPTION_SETS, getCase,
 } from "./actdesk-core.js";
 import { renderCase, renderCreate } from "./actdesk-corp.js";
+import { renderNbCase } from "./actdesk-nb.js";
 import { renderBatch } from "./actdesk-ifg.js";
 import { highlightNav } from "./actdesk-ui.js";
 
@@ -28,7 +29,13 @@ export async function render(main, { parts, query }) {
   if (sub === "batch" && DISABLED.ifg) return go("#/actuarial-desk");
   if (sub === "reports" && DISABLED.reports) return go("#/actuarial-desk");
   if (sub === "new") return renderCreate(main);
-  if (sub === "case") return renderCase(main, parts[2], parts[3] || "request");
+  if (sub === "case") {
+    const rec = getCase(parts[2]);
+    // Corporate New Business runs on the new four-area workbook workspace; Renewal
+    // stays on the shared corp renderer.
+    if (rec && rec.kind === "nb") return renderNbCase(main, parts[2], parts[3] || "request");
+    return renderCase(main, parts[2], parts[3] || "request");
+  }
   if (sub === "batch") return renderBatch(main, parts[2], parts[3] || "batch");
   if (sub === "released") return renderReleased(main);
   if (sub === "reports") return renderReports(main);
@@ -39,7 +46,9 @@ export async function render(main, { parts, query }) {
 // -------------------------------------------------------------- dashboard
 function bucket(rec) {
   if (!nextStep(rec)) return "released";
-  const started = rec.kind === "ifg" ? rec.reviewed : rec.reviewed;
+  // Corporate New Business counts as "started" once the pricing workbook exists;
+  // other journeys still key off their first-step flag.
+  const started = rec.kind === "nb" ? !!rec.wb : rec.reviewed;
   return started ? "progress" : "new";
 }
 // Dashboard tabs. "Completed" shows released records (bucket "released"); "library" is a

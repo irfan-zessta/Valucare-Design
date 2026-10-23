@@ -890,3 +890,147 @@ tr[data-href]:hover{background:var(--row-hover)}
 .demo-checks .chk.yes{background:var(--success-soft);color:var(--success)}
 .demo-checks .chk.no{background:var(--warning-soft);color:var(--warning)}
 .demo-checks .chk.na{background:var(--surface-muted);color:var(--text-subtle)}
+
+/* ===================================================================
+   Excel-style pricing workbook (SheetGrid) — the main Actuarial surface.
+   Cell TYPE is shown three ways, never colour alone: editable inputs get a
+   pale-yellow fill + dotted left edge; calc/formula cells get a neutral fill +
+   an "fx" corner marker; source-linked cells get a "src" marker.
+   =================================================================== */
+.xl{display:flex;flex-direction:column;border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--surface);overflow:hidden;outline:none}
+.xl:focus-visible{box-shadow:var(--ring)}
+/* tabs (workbook sheets) */
+.xl-tabs{display:flex;gap:2px;padding:6px 6px 0;background:var(--surface-muted);border-bottom:1px solid var(--border);overflow-x:auto}
+.xl-tab{flex:none;padding:6px 12px;font-size:12.5px;font-weight:600;color:var(--text-muted);background:transparent;border:1px solid transparent;border-bottom:none;border-radius:var(--r-xs) var(--r-xs) 0 0;cursor:pointer;white-space:nowrap}
+.xl-tab:hover{color:var(--text);background:var(--surface)}
+.xl-tab.on{color:var(--accent-strong);background:var(--surface);border-color:var(--border);border-bottom:1px solid var(--surface);margin-bottom:-1px}
+/* formula bar */
+.xl-bar{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--border);background:var(--surface)}
+.xl-addr{flex:none;min-width:56px;padding:4px 8px;font:600 12.5px var(--mono);text-align:center;border:1px solid var(--border);border-radius:var(--r-xs);background:var(--surface-muted)}
+.xl-fx{flex:none;width:30px;height:28px;font:italic 700 13px var(--mono);color:var(--accent-strong);background:var(--surface-muted);border:1px solid var(--border);border-radius:var(--r-xs);cursor:pointer}
+.xl-fx:hover{background:var(--accent-soft);border-color:var(--accent-line)}
+.xl-formula{flex:1 1 auto;min-width:0;padding:5px 10px;font:13px var(--mono);border:1px solid var(--border-input);border-radius:var(--r-xs);background:var(--surface);color:var(--text)}
+.xl-formula:focus{outline:none;border-color:var(--border-input-focus);box-shadow:var(--ring)}
+.xl-formula:disabled{background:var(--surface-muted);color:var(--text-subtle)}
+.xl-tools{flex:none;display:flex;align-items:center;gap:6px}
+.xl-tbtn{width:30px;height:28px;font-size:15px;line-height:1;color:var(--text);background:var(--surface-muted);border:1px solid var(--border);border-radius:var(--r-xs);cursor:pointer}
+.xl-tbtn:hover:not(:disabled){background:var(--accent-soft);border-color:var(--accent-line)}
+.xl-tbtn:disabled{opacity:.4;cursor:default}
+.xl-save{font-size:11.5px;color:var(--text-subtle);min-width:52px;text-align:right}
+.xl-save.flash{animation:xl-flash 1s var(--ease)}
+@keyframes xl-flash{0%{color:var(--success)}100%{color:var(--text-subtle)}}
+@media (prefers-reduced-motion:reduce){.xl-save.flash{animation:none}}
+/* grid */
+.xl-scroll{position:relative;overflow:auto;max-height:560px}
+.xl-tbl{border-collapse:separate;border-spacing:0;font-size:12.5px;table-layout:fixed}
+.xl-tbl th,.xl-tbl td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:0}
+.xl-tbl thead th{position:sticky;top:0;z-index:3;height:26px;background:var(--surface-muted);color:var(--text-subtle);font-weight:600;text-align:center;font-size:11.5px}
+.xl-corner{position:sticky;left:0;top:0;z-index:4;width:40px;min-width:40px;background:var(--surface-muted)}
+.xl-ch{position:relative;cursor:pointer}
+.xl-ch.hl{background:var(--accent-soft);color:var(--accent-strong)}
+.xl-resize{position:absolute;top:0;right:-3px;width:7px;height:100%;cursor:col-resize;z-index:5}
+.xl-rh{position:sticky;left:0;z-index:2;width:40px;min-width:40px;background:var(--surface-muted);color:var(--text-subtle);font-weight:600;text-align:center;font-size:11px;cursor:pointer}
+.xl-rh.hl{background:var(--accent-soft);color:var(--accent-strong)}
+.xl-cell{position:relative;height:28px;padding:0 7px;background:var(--surface);color:var(--text);cursor:cell;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0;vertical-align:middle}
+.xl-cell .xl-v{display:block;overflow:hidden;text-overflow:ellipsis}
+.xl-cell.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+/* type styling */
+.xl-cell.is-edit{background:#FEFBE8;box-shadow:inset 3px 0 0 #E8D24A}
+.xl-cell.k-calc,.xl-cell.is-fx{background:var(--surface);color:var(--text)}
+.xl-cell.is-ref{background:var(--surface-muted);color:var(--text-muted)}
+.xl-cell.is-label{background:var(--surface-muted);color:var(--text);font-family:var(--font);font-weight:600;white-space:normal;cursor:default}
+.xl-cell.k-title{background:var(--surface);font-weight:700;font-size:13px}
+.xl-cell.is-err{color:var(--danger);font-weight:600}
+.xl-mark{position:absolute;top:1px;right:2px;font:italic 700 8.5px var(--mono);color:var(--accent-line);pointer-events:none;opacity:.9}
+.xl-mark.src{font-style:normal;font-weight:600;color:var(--text-subtle)}
+/* selection */
+.xl-cell.rng{background:var(--accent-soft)}
+.xl-cell.sel{outline:2px solid var(--accent);outline-offset:-2px;z-index:1}
+.xl-cell.is-edit.sel{outline-color:var(--accent-strong)}
+.xl-input{width:100%;height:26px;padding:0 6px;border:none;outline:none;font:13px var(--mono);background:var(--surface);color:var(--text)}
+.xl-locked{padding:6px 10px;color:var(--text-muted);background:var(--surface-muted);border-top:1px solid var(--border)}
+/* show-calculation popover */
+.xl-pop{position:absolute;z-index:40;width:320px;max-width:94%;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);box-shadow:var(--shadow-md);font-size:12.5px}
+.xl-pop-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--surface-muted)}
+.xl-pop-x{border:none;background:none;font-size:18px;line-height:1;cursor:pointer;color:var(--text-muted)}
+.xl-pop-bd{padding:10px}
+.xl-pop-f{display:flex;align-items:baseline;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.xl-pop-f code{font:12px var(--mono);background:var(--surface-muted);padding:2px 6px;border-radius:var(--r-xs);word-break:break-all}
+.xl-pop-f .tag,.xl-pop-bd .tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-subtle)}
+.xl-pop-refs{width:100%;border-collapse:collapse;margin:6px 0}
+.xl-pop-refs th,.xl-pop-refs td{border:1px solid var(--border);padding:3px 6px;text-align:left;font-size:11.5px}
+.xl-pop-refs td.num{text-align:right;font-family:var(--mono)}
+.xl-pop-res{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.xl-pop-res b{font-size:14px}
+.xl-pop-res b.err,.xl-pop .err{color:var(--danger)}
+
+/* ===================================================================== *
+ * Corporate New Business — four-area pricing workspace (actdesk-nb.js)   *
+ * ===================================================================== */
+main.nb-full{max-width:none;padding:12px 16px}
+.nb-case{display:flex;flex-direction:column;gap:14px}
+
+/* compact header — one row of identity + status + ONE primary action */
+.nbh{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
+.nbh-id h1{font-size:20px;margin:2px 0 0;line-height:1.2}
+.nbh-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;color:var(--text-muted)}
+.nbh-meta .sep{color:var(--border-strong);opacity:.7}
+.nbh-save{font-weight:600;color:var(--text-muted)}
+.nbh-side{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+
+/* role-simulation bar — thin, calm, never a floating badge */
+.nb-rolebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:7px 12px;background:var(--surface-muted);border:1px solid var(--border);border-radius:var(--r-sm)}
+.nb-rolebar .nb-role b{font-weight:700}
+.nb-rolebar .grow{flex:1;min-width:200px;color:var(--text-muted)}
+
+/* four-area stepper */
+.nb-steps{display:flex;gap:6px;flex-wrap:wrap}
+.nb-step{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--text-muted);text-decoration:none;font-size:13px}
+.nb-step .nb-n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;
+  background:var(--surface-muted);color:var(--text-subtle);font-size:11px;font-weight:700}
+.nb-step.done{color:var(--text)}
+.nb-step.done .nb-n{background:var(--ok,#1a7f37);color:#fff}
+.nb-step.act{border-color:var(--accent);color:var(--text)}
+.nb-step.act .nb-n{background:var(--accent);color:#fff}
+.nb-step.on{box-shadow:inset 0 -2px 0 var(--accent);font-weight:600;color:var(--text)}
+.nb-step:hover{border-color:var(--border-strong)}
+
+.nb-area{min-width:0}
+.nb-foot{color:var(--text-subtle);text-align:center;margin-top:4px}
+
+/* layout helpers */
+.nb-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.nb-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:860px){.nb-grid2,.nb-grid3{grid-template-columns:1fr}}
+
+/* member-data / review stat strips */
+.nb-md-stats{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.nb-md-stats>div{flex:1;min-width:120px;padding:10px 12px;background:var(--surface-muted);
+  border:1px solid var(--border);border-radius:var(--r-sm);display:flex;flex-direction:column;gap:2px}
+.nb-md-stats>div b{font-size:19px;line-height:1.1}
+.nb-md-stats>div span{font-size:11.5px;color:var(--text-subtle)}
+
+/* turnaround */
+.nb-tat{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:8px}
+.nb-tat-big{font-size:34px;font-weight:700;line-height:1;display:flex;align-items:baseline;gap:6px}
+.nb-tat-big span{font-size:13px;font-weight:500;color:var(--text-subtle)}
+.nb-tat-big.over{color:var(--warn,#9a6700)}
+.nb-tat ul{margin:0;padding-left:18px;color:var(--text-muted)}
+
+/* three-state release row */
+.nb-state{display:flex;flex-direction:column;gap:3px}
+.nb-state b{font-size:18px}
+.nb-state.ok{border-color:var(--ok,#1a7f37)}
+
+/* pricing workspace */
+.nb-wb{display:flex;flex-direction:column;gap:10px}
+.nb-wb-bar{align-items:flex-start;gap:12px;flex-wrap:wrap}
+.nb-wb-h{margin:0;font-size:17px}
+.nb-wb-h .tiny{font-weight:500;color:var(--text-subtle);margin-left:6px}
+.nb-grid-host{min-height:360px}
+main.nb-full .nb-grid-host{min-height:60vh}
+
+.nb-vtbl td{vertical-align:top}

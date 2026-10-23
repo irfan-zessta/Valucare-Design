@@ -46,6 +46,7 @@ function defaultConfig() {
   return {
     seniorThreshold: 20000000,      // PHP contract value at/above which Senior Approver / FA reviews
     marginFloor: 3,                 // % — a parameter below its floor also escalates to Senior Approver / FA
+    turnaroundDays: 3,              // working-day target for a New Business quotation (excludes time waiting on Sales)
     note: "Confirm with Actuarial before production. These floors/thresholds are demo defaults, not settled policy.",
   };
 }
@@ -252,6 +253,9 @@ export function deriveBase(c) {
 
 // Illustrative total annual contract value — drives the approval route.
 export function contractValue(c) {
+  // New Business cases price in the live workbook; the module caches the group total
+  // on the case as wfTotal so the approval route reflects the real workbook figure.
+  if (typeof c.wfTotal === "number" && isFinite(c.wfTotal) && c.wfTotal > 0) return c.wfTotal;
   const rows = (c.rateSheet?.rows && c.rateSheet.rows.length) ? c.rateSheet.rows : rateRows(c);
   const p = rows.find(r => r.memberType === "Principal")?.proposedRate || 0;
   const d = rows.find(r => r.memberType === "Dependent")?.proposedRate || 0;
@@ -325,58 +329,79 @@ export function rateSheetStatus(c) {
   return "Draft";
 }
 
-// The Corporate New Business linear flow, one owned step at a time:
-// Request → Intake → Assignment → Pricing approach → Data & benefits →
-// Calculation → Rate sheet → Approval → Release (→ optional post-release revision).
-function nbNext(c) {
-  // 1 — Analyst opens the single Sales submission thread.
-  if (!c.reviewed) return { area: "request", label: "Review submission", owner: "Actuarial Analyst",
-    sentence: "Open the single request thread from Sales and review what was submitted." };
-  // 2 — Intake: franchise check, completeness, clarification loop.
-  if (!c.ready) {
-    const open = (c.clarifications || []).some(q => !q.resolved);
-    if (open) return { area: "intake", label: "Record Sales' response", owner: "Sales",
-      sentence: "A clarification is open with Sales — record their corrected file or answer to continue." };
-    return { area: "intake", label: "Send clarification to Sales", owner: "Actuarial Analyst",
-      sentence: "Something is missing or unclear. Send one clarification to Sales within this request." };
-  }
-  // 3 — Supervisor assignment.
-  if (!c.assigned) return { area: "assign", label: "Assign & start pricing", owner: "Actuarial Supervisor",
-    sentence: "The franchise is approved and inputs are complete. Assign an analyst and start pricing." };
-  // 4 — Pricing approach.
-  if (!c.pathConfirmed) return { area: "approach", label: "Confirm pricing approach", owner: "Actuarial Analyst",
-    sentence: "Confirm the documented Corporate New Business pricing approach for this account." };
-  // 5 — Review source data (member, utilization, requested vs standard SOB).
-  if (!c.dataReviewed) return { area: "data", label: "Review source data", owner: "Actuarial Analyst",
-    sentence: "Review member data, utilization and the requested vs standard Schedule of Benefits." };
-  // 6 — Build the proposed rate with full traceability.
-  if (!c.calcReady) return { area: "build", label: "Build proposed rate", owner: "Actuarial Analyst",
-    sentence: "Build the proposed rate from a transparent, traceable calculation — every amount shows its source." };
-  // 7 — Prepare and submit a specific rate-sheet version.
+// -------------------------------------------------------------- NB workflow (4 areas)
+// The Corporate New Business journey is organised into four work AREAS (not four data
+// stores) around a single case, one current working workbook, and clearly identified
+// rate-sheet versions:
+//   1 request  — Request & data: request status, clarification, Member Data, load sample
+//   2 pricing  — the editable Excel-style pricing workbook (the main surface)
+//   3 review   — Review & approval: submit, snapshot, approve / request changes
+//   4 release  — Release & revisions: release (locked) to Sales, client outcome, revisions
+//
+// The workflow state lives on c.wf. Legacy sample/created cases are migrated in place the
+// first time they are read, so the dashboard and routing keep working without a reseed.
+export const NB_WF_AREAS = [
+  { key: "request", n: 1, label: "Request & data" },
+  { key: "pricing", n: 2, label: "Pricing workbook" },
+  { key: "review", n: 3, label: "Review & approval" },
+  { key: "release", n: 4, label: "Release & revisions" },
+];
+
+export function ensureWf(c) {
+  if (c.wf && c.wf._v === 2) return c.wf;
   const a = c.approval || {};
-  if (a.status === "Returned") return { area: "ratesheet", label: "Revise & resubmit", owner: "Actuarial Analyst",
-    sentence: "The approver returned this with a comment. Revise and submit a new rate-sheet version — v1 is retained." };
-  if (!c.rateSheet?.prepared) return { area: "ratesheet", label: "Prepare rate sheet", owner: "Actuarial Analyst",
-    sentence: "Generate the working (Draft) rate sheet from the reviewed calculation." };
-  if (!a.status || a.status === "Not started") return { area: "ratesheet", label: `Submit ${rsVerLabel(c)} for approval`, owner: "Actuarial Analyst",
-    sentence: "Submit this specific rate-sheet version to the correct approver based on the contract value." };
-  // 8 — Approval (or return).
-  if (a.status.startsWith("Pending")) return { area: "approval", label: "Record approval decision", owner: approverFor(c).label,
-    sentence: `This is with ${approverFor(c).label}. Approve the submitted version, or return it with one comment.` };
-  // 9 — Release the finalized rate sheet + approved SOB.
-  if (a.status === "Approved" && !(c.versions || []).length) return { area: "release", label: "Release finalized rate sheet", owner: "Actuarial Analyst",
-    sentence: "Approved. Release a locked rate sheet with its approved Schedule of Benefits to Sales." };
-  // 10 — Optional post-release change request / superseding version.
-  const cr = (c.changeRequests || []).find(r => !r.released);
-  if (cr) {
-    if (!cr.draftReady) return { area: "release", label: "Draft the revised rate sheet", owner: "Actuarial Analyst",
-      sentence: "Sales requested a change. Draft a new rate-sheet version — the released version stays intact." };
-    if (cr.approval !== "Approved") return { area: "release", label: "Approve the revision", owner: approverFor(c).label,
-      sentence: "Route the revised version through the appropriate approval before it can be released." };
-    return { area: "release", label: "Release the superseding version", owner: "Actuarial Analyst",
-      sentence: "Release the approved revision. The former release becomes Superseded, with its history kept." };
+  const released = (c.versions || []).length > 0;
+  let status = "Draft";
+  if (released) status = "Released";
+  else if (a.status === "Approved") status = "Approved";
+  else if ((a.status || "").startsWith("Pending")) status = "Submitted";
+  else if (a.status === "Returned") status = "Changes requested";
+  const clar = c.clarifications || [];
+  const open = clar.some((q) => !q.resolved);
+  c.wf = {
+    _v: 2,
+    status,
+    requestState: released ? "Released" : open ? "Waiting for Sales" : c.reviewed ? "In progress" : "New",
+    analyst: c.assignedTo || null,
+    priority: c.priority || "standard",
+    clientOutcome: c.wf?.clientOutcome || null,     // SEPARATE from "released"
+    acceptedVersion: c.wf?.acceptedVersion || null,
+    draftRateSheet: c.wf?.draftRateSheet || null,
+    revision: c.wf?.revision || 0,
+    history: c.wf?.history || [],
+  };
+  return c.wf;
+}
+
+function nbNext(c) {
+  const wf = ensureWf(c);
+  const approver = approverFor(c).label;
+  if (wf.requestState === "Waiting for Sales")
+    return { area: "request", label: "Simulate Sales response", owner: "Sales",
+      sentence: "A clarification is open with Sales — simulate their response to resume pricing. Waiting time is excluded from turnaround." };
+  const inRevision = (c.versions || []).some((v) => v.released) && wf.status !== "Released";
+  // A released version is the end of the journey (a revision is started explicitly).
+  if (wf.status === "Released") return null;
+  if (!c.wb)
+    return { area: "request", label: "Load member data & open workbook", owner: "Actuarial Analyst",
+      sentence: "Load the sample member data and open the pricing workbook to begin." };
+  switch (wf.status) {
+    case "Draft":
+      return { area: "pricing", label: inRevision ? "Submit revision for review" : "Submit for review", owner: "Actuarial Analyst",
+        sentence: inRevision ? "Price the revision in the workbook, then submit it for review — the released version stays intact." : "Price the account in the editable workbook, then submit this version for review." };
+    case "Submitted":
+      return { area: "review", label: "Record approval decision", owner: approver,
+        sentence: `This version is with ${approver}. Approve it, or request changes with a comment.` };
+    case "Changes requested":
+      return { area: "pricing", label: "Revise & resubmit", owner: "Actuarial Analyst",
+        sentence: "The reviewer requested changes. Revise the workbook and submit a new version." };
+    case "Approved":
+      return { area: "release", label: inRevision ? "Release the superseding version" : "Release to Sales", owner: "Actuarial Supervisor",
+        sentence: inRevision ? "Release the approved revision. The former release becomes Superseded, with history kept." : "Approved. Release the locked rate sheet with its matching Schedule of Benefits to Sales." };
+    case "Released":
+    default:
+      return null; // released / idle — a revision is started explicitly from the Release area
   }
-  return null; // released / handover complete
 }
 
 function renewalNext(c) {
@@ -444,17 +469,21 @@ export function statusOf(rec) {
 // Plain-language Corporate New Business status — one word for every point in the
 // flow, distinguishing a proposed rate, an approved draft, and a released sheet.
 function nbStatus(c) {
-  const ns = nextStep(c);
-  const a = c.approval || {};
-  if (!ns) return { label: "Released to Sales", tone: "ok" };
-  if (!c.reviewed) return { label: "New request", tone: "info" };
-  if (!c.ready) return { label: "Waiting for information", tone: "warn" };
-  if (!c.assigned) return { label: "Ready for pricing", tone: "info" };
-  if (a.status === "Returned") return { label: "Returned for revision", tone: "warn" };
-  if (a.status && a.status.startsWith("Pending")) return { label: "For approval", tone: "info" };
-  if (a.status === "Approved" && !(c.versions || []).length) return { label: "Approved", tone: "ok" };
-  if ((c.versions || []).length && (c.changeRequests || []).some(r => !r.released)) return { label: "Revision in progress", tone: "neutral" };
-  return { label: "In pricing", tone: "neutral" };
+  const wf = ensureWf(c);
+  if (wf.requestState === "Waiting for Sales") return { label: "Waiting for Sales", tone: "warn" };
+  const inRevision = (c.versions || []).some((v) => v.released) && wf.status !== "Released";
+  if (wf.status === "Released")
+    return { label: wf.clientOutcome && wf.clientOutcome.startsWith("Accepted") ? "Released · client accepted" : "Released to Sales", tone: "ok" };
+  if (!c.wb) return { label: "New request", tone: "info" };
+  switch (wf.status) {
+    case "Draft": return { label: inRevision ? "Revision in progress" : "In pricing", tone: "neutral" };
+    case "Submitted": return { label: "For review", tone: "info" };
+    case "Changes requested": return { label: "Changes requested", tone: "warn" };
+    case "Approved": return { label: "Approved", tone: "ok" };
+    case "Released":
+    default:
+      return { label: wf.clientOutcome === "Accepted" ? "Released · client accepted" : "Released to Sales", tone: "ok" };
+  }
 }
 
 // Rows for the dashboard — a flat, uniform list across journeys.
