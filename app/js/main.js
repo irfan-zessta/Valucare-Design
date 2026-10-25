@@ -113,7 +113,7 @@ const WORKSPACES = {
     key: "mda-desk", dept: "MDA", name: "Members Data Administration", home: "#/mda-desk",
     routes: ["mda-desk"],
     nav: [
-      { key: "mywork", label: "My Work", icon: "tasks", href: "#/mda-desk" },
+      { key: "mywork", label: "Demos", icon: "tasks", href: "#/explore/mda" },
       { key: "members", label: "Members", icon: "users", href: "#/mda-desk/members" },
       { key: "cards", label: "Cards & Delivery", icon: "copy", href: "#/mda-desk/cards" },
       { key: "certificates", label: "Certificates", icon: "file", href: "#/mda-desk/certificates" },

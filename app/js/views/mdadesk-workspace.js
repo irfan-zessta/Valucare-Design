@@ -39,7 +39,10 @@ export async function renderRequest(main, id, step) {
   };
 
   main.innerHTML = html`
-    ${backBar([{ label: rec.reference || rec.id }])}
+    ${backBar([
+      { label: typeLabel(rec.type), href: `#/mda-desk/demo/${rec.type}` },
+      { label: rec.reference || rec.id },
+    ], "#/explore/mda", "Demos")}
     ${recHead(rec)}
     ${nextStrip(rec)}
     ${stepsNav(rec, step)}

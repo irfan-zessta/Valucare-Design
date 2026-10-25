@@ -15,7 +15,7 @@ import { money, int } from "../core.js";
 
 export const STORE_KEY = "hms-mda:v1";
 export const GUIDE_KEY = "hms-mda-guide";
-const BASELINE = 1; // bump to force a reseed when the sample data shape changes
+const BASELINE = 2; // bump to force a reseed when the sample data shape changes
 
 // -------------------------------------------------------------- store plumbing
 export function loadStore() {
@@ -523,8 +523,212 @@ export const STANDARD_SOB = [
   { code: "APE", service: "Annual physical exam", value: "Standard package" },
 ];
 
-// The nine named demo scenarios (§23). Each is self-contained and starts at its first
-// step. Exception scenarios are separate from happy-path scenarios so loading one never
+// -------------------------------------------------------------- scenario builders
+// Every request TYPE is its own demo with exactly five self-contained scenarios, so a
+// demo dashboard never mixes types. The first scenario of each type is the rich
+// "signature" case (duplicate detection, renewal removal guard, working-day cut-off…);
+// the rest are clean variations that walk end-to-end. Every figure here is fictional.
+const PLAN_PREMIUM = { "STD-PR": 18500, "STD-DP": 14200, "PRM-PR": 26750 };
+const premiumOf = (code) => PLAN_PREMIUM[code] || 18500;
+const sumPremium = (members) => members.reduce((s, x) => s + (x.financial?.premium || 0), 0);
+
+// Build principals (each with optional dependents) from a compact spec list.
+function fam(specs, eff) {
+  const out = [];
+  specs.forEach((s, i) => {
+    const ref = `P-${String(i + 1).padStart(3, "0")}`;
+    const prm = s.plan === "PRM-PR";
+    out.push(mkMember({ name: s.n, memberType: "Principal", principalRef: ref, dob: s.dob, planCode: s.plan || "STD-PR", effectivity: eff, employeeRef: `EMP-${ref}`, premium: premiumOf(s.plan || "STD-PR"), room: prm ? "Private" : "Semi-private", mbl: prm ? "₱300,000" : "₱200,000", cardNeeded: s.cardNeeded !== false, status: s.status, province: s.province, vessel: s.vessel }));
+    (s.dep || []).forEach((d) => out.push(mkMember({ name: d.n, memberType: "Dependent", principalRef: ref, dob: d.dob, planCode: d.plan || "STD-DP", effectivity: eff, relationship: d.rel || "Spouse", premium: premiumOf(d.plan || "STD-DP"), cardNeeded: d.cardNeeded !== false })));
+  });
+  return out;
+}
+
+// A clean new-account / additional-member request.
+function peopleReq({ id, type, ref, scenario, acct, requester, received, eff, specs, documents, historyText }) {
+  const members = fam(specs, eff);
+  return {
+    id, type, reference: ref, scenario, account: acct,
+    requester, receivedAt: received, effectiveDate: eff, premiumTotal: sumPremium(members),
+    assignedTo: "analyst", priority: "standard", waitingOn: null, members,
+    documents: documents || [{ key: "memberdata", name: "Member data file (prescribed format)", supplied: true, source: requester }],
+    history: [{ at: received, text: historyText || "Request received with member data.", actor: "Sales" }],
+  };
+}
+
+function renewalReq({ id, ref, scenario, acct, requester, received, eff, retained = [], changed = [], added = [], removed = [] }) {
+  let p = 200;
+  const tag = (n, r) => `${n} (${r})`;
+  const existing = [], members = [], gRet = [], gChg = [], gAdd = [], gRem = [];
+  retained.forEach((m) => { const r = `P-${++p}`; members.push(mkMember({ name: m.n, principalRef: r, dob: m.dob, planCode: m.plan || "STD-PR", effectivity: eff, employeeRef: `EMP-${r}`, premium: premiumOf(m.plan || "STD-PR"), cardNeeded: false, status: "Retained" })); existing.push(tag(m.n, r)); gRet.push(tag(m.n, r)); });
+  changed.forEach((m) => { const r = `P-${++p}`; const prm = m.to === "PRM-PR"; members.push(mkMember({ name: m.n, principalRef: r, dob: m.dob, planCode: m.to, effectivity: eff, employeeRef: `EMP-${r}`, premium: premiumOf(m.to), room: prm ? "Private" : "Semi-private", mbl: prm ? "₱300,000" : "₱200,000", cardNeeded: true, status: "Changed — new plan" })); existing.push(tag(m.n, r)); gChg.push(`${tag(m.n, r)} — plan ${m.from} → ${m.to}`); });
+  added.forEach((m) => { const r = `P-${++p}`; members.push(mkMember({ name: m.n, principalRef: r, dob: m.dob, planCode: m.plan || "STD-PR", effectivity: eff, employeeRef: `EMP-${r}`, premium: premiumOf(m.plan || "STD-PR"), cardNeeded: true, status: "Added" })); gAdd.push(tag(m.n, r)); });
+  removed.forEach((m) => { const r = `P-${++p}`; existing.push(tag(m.n, r)); gRem.push(tag(m.n, r)); });
+  return {
+    id, type: "renewal", reference: ref, scenario, account: acct,
+    requester, receivedAt: received, effectiveDate: eff, premiumTotal: sumPremium(members),
+    assignedTo: "analyst", priority: "standard", waitingOn: null,
+    renewal: { existing, groups: { retained: gRet, added: gAdd, removed: gRem, changed: gChg } }, members,
+    documents: [{ key: "renewal", name: "Renewal member submission", supplied: true, source: "Sales" }],
+    history: [{ at: received, text: "Renewal submission received for reconciliation.", actor: "Sales" }],
+  };
+}
+
+function amendmentReq({ id, ref, scenario, acct, requester, received, eff, rows, member }) {
+  const prm = (member.plan || "PRM-PR") === "PRM-PR";
+  return {
+    id, type: "amendment", reference: ref, scenario, account: acct,
+    requester, receivedAt: received, effectiveDate: eff, scheduledChange: true, premiumTotal: member.premium || 8250,
+    assignedTo: "analyst", priority: "standard", waitingOn: null, amendment: { rows },
+    members: [mkMember({ name: member.n, principalRef: "P-001", dob: member.dob, planCode: member.plan || "PRM-PR", effectivity: eff, room: prm ? "Private" : "Semi-private", mbl: prm ? "₱300,000" : "₱200,000", premium: member.premium || 26750, status: "Amendment" })],
+    documents: [{ key: "amendment", name: "Amendment request form", supplied: true, source: requester }],
+    history: [{ at: received, text: "Amendment request received (scheduled change).", actor: "Client HR / Member" }],
+  };
+}
+
+function lostCardReq({ id, ref, scenario, acct, requester, received, member }) {
+  return {
+    id, type: "lost-card", reference: ref, scenario, account: acct,
+    requester, receivedAt: received,
+    lostCard: { member: `${member.n} (P-201)`, reason: member.reason || "Physically lost", priorCardValid: true },
+    members: [mkMember({ name: member.n, principalRef: "P-201", dob: member.dob, planCode: member.plan || "STD-PR", status: "Active — coverage unchanged" })],
+    documents: [{ key: "request", name: "Lost-card request", supplied: true, source: "Member" }],
+    history: [{ at: received, text: "Lost-card replacement requested. Coverage status unchanged.", actor: "Client HR / Member" }],
+  };
+}
+
+function cancelReq({ id, ref, scenario, acct, requester, received, requestedEffective, reason, eventDate, principal, deps = [] }) {
+  const members = [mkMember({ name: principal.n, principalRef: "P-101", dob: principal.dob, planCode: principal.plan || "STD-PR", status: "For cancellation" })];
+  deps.forEach((d) => members.push(mkMember({ name: d.n, memberType: "Dependent", principalRef: "P-101", dob: d.dob, planCode: d.plan || "STD-DP", relationship: d.rel || "Child", status: "Dependent — follows principal" })));
+  return {
+    id, type: "cancellation", reference: ref, scenario, account: acct,
+    requester, receivedAt: received, requestedEffective, cancellationReason: reason, eventDate,
+    assignedTo: "analyst", priority: "standard", waitingOn: null, members,
+    documents: [{ key: "request", name: "Cancellation request", supplied: true, source: requester }],
+    history: [{ at: received, text: "Cancellation request received.", actor: "Client HR / Member" }],
+  };
+}
+
+function restoreReq({ id, type, ref, scenario, acct, requester, received, data, member }) {
+  const obj = {
+    id, type, reference: ref, scenario, account: acct,
+    requester, receivedAt: received, assignedTo: "analyst", priority: "standard", waitingOn: null,
+    members: [mkMember({ name: member.n, principalRef: member.ref || "P-301", dob: member.dob, planCode: member.plan || "STD-PR", employeeRef: `EMP-${member.ref || "P-301"}`, status: type === "reactivation" ? "For reactivation" : "For reapplication", cardNeeded: type === "reapplication", premium: type === "reapplication" ? (member.premium || 18500) : null })],
+    documents: [{ key: "request", name: type === "reactivation" ? "Reactivation request" : "Reapplication form", supplied: true, source: requester }],
+    history: [{ at: received, text: type === "reactivation" ? "Reactivation requested — cancellation withdrawn, policy reference retained." : "Reapplication received — rehired member; historical identity linked, history not overwritten.", actor: "Client HR / Member" }],
+  };
+  obj[type] = data;
+  return obj;
+}
+
+// Account fixtures reused across the demos.
+const ACCT = {
+  summit: () => stdAccount({ name: "Summit Retail Partners", code: "ACC-SR-0318" }),
+  harborview: () => stdAccount({ name: "Harborview Shipping Lines", code: "ACC-HS-0407" }),
+  greenfield: () => stdAccount({ name: "Greenfield Agritech Corp", code: "ACC-GA-0521" }),
+  metroline: () => stdAccount({ name: "Metroline Transit Services", code: "ACC-MT-0633" }),
+  pinnacle: () => stdAccount({ name: "Pinnacle Software Labs", code: "ACC-PS-0749" }),
+  coralbay: () => stdAccount({ name: "Coral Bay Resorts", code: "ACC-CB-0852" }),
+  ironwood: () => stdAccount({ name: "Ironwood Construction Group", code: "ACC-IW-0968" }),
+};
+
+// Append the four-or-so extra scenarios that bring every type up to five demos.
+function addExtraScenarios(reqs) {
+  // ---- NEW CLOSED ACCOUNT (+4 → 5) ----
+  const nbDocs = [
+    { key: "endorsement", name: "Sales endorsement / closing notice", supplied: true, source: "Sales" },
+    { key: "memberdata", name: "Member data file (prescribed format)", supplied: true, source: "Client HR via Sales" },
+  ];
+  reqs.push(peopleReq({ id: "MDA-2026-1020", type: "new-closed", ref: "REQ-NB-2026-1020", scenario: "New closed account — retail group", acct: ACCT.summit(), requester: "Marco Reyes (Sales)", received: "2026-10-19T10:00:00Z", eff: "2026-11-01", documents: nbDocs, historyText: "Request received from Sales with endorsement and member data.", specs: [
+    { n: "Daniel Garcia", dob: "1986-02-10", plan: "STD-PR", dep: [{ n: "Patricia Garcia", dob: "1989-05-04", rel: "Spouse" }] },
+    { n: "Sofia Mendoza", dob: "1991-09-21", plan: "STD-PR" },
+    { n: "Victor Ramos", dob: "1980-12-01", plan: "PRM-PR" },
+  ] }));
+  reqs.push(peopleReq({ id: "MDA-2026-1021", type: "new-closed", ref: "REQ-NB-2026-1021", scenario: "New closed account — shipping lines", acct: ACCT.harborview(), requester: "Marco Reyes (Sales)", received: "2026-10-18T11:30:00Z", eff: "2026-11-01", documents: nbDocs, specs: [
+    { n: "Ramon Castillo", dob: "1982-07-19", plan: "STD-PR", province: "Cebu", vessel: "MV Harbor Star" },
+    { n: "Teresa Flores", dob: "1988-03-02", plan: "STD-PR", dep: [{ n: "Lucas Flores", dob: "2016-10-11", rel: "Child" }] },
+    { n: "Oscar Ramos", dob: "1979-05-28", plan: "STD-PR" },
+  ] }));
+  reqs.push(peopleReq({ id: "MDA-2026-1022", type: "new-closed", ref: "REQ-NB-2026-1022", scenario: "New closed account — agritech", acct: ACCT.greenfield(), requester: "Marco Reyes (Sales)", received: "2026-10-17T09:45:00Z", eff: "2026-11-01", documents: nbDocs, specs: [
+    { n: "Isabel Domingo", dob: "1984-11-14", plan: "STD-PR" },
+    { n: "Francis Navarro", dob: "1977-06-08", plan: "PRM-PR", dep: [{ n: "Carla Navarro", dob: "1981-02-22", rel: "Spouse" }] },
+    { n: "Angela Bautista", dob: "1990-09-30", plan: "STD-PR" },
+  ] }));
+  reqs.push(peopleReq({ id: "MDA-2026-1023", type: "new-closed", ref: "REQ-NB-2026-1023", scenario: "New closed account — transit services", acct: ACCT.metroline(), requester: "Marco Reyes (Sales)", received: "2026-10-16T14:10:00Z", eff: "2026-11-01", documents: nbDocs, specs: [
+    { n: "Benedict Salazar", dob: "1983-01-26", plan: "STD-PR", dep: [{ n: "Rosa Salazar", dob: "1985-08-17", rel: "Spouse" }, { n: "Timmy Salazar", dob: "2018-04-03", rel: "Child" }] },
+    { n: "Rowena Pascual", dob: "1992-12-09", plan: "STD-PR" },
+  ] }));
+
+  // ---- ADDITIONAL / NEW MEMBER (+2 → 5) ----
+  reqs.push(peopleReq({ id: "MDA-2026-1040", type: "additional", ref: "REQ-ADD-2026-1040", scenario: "Additional members — software team", acct: ACCT.pinnacle(), requester: "Client HR (Pinnacle)", received: "2026-10-20T15:00:00Z", eff: "2026-11-15", documents: [{ key: "memberdata", name: "Additional member list", supplied: true, source: "Client HR" }], historyText: "Additional-member request received from Client HR.", specs: [
+    { n: "Arturo Gutierrez", dob: "1989-04-18", plan: "STD-PR" },
+    { n: "Melissa Yuzon", dob: "1986-10-27", plan: "PRM-PR" },
+  ] }));
+  reqs.push(peopleReq({ id: "MDA-2026-1041", type: "additional", ref: "REQ-ADD-2026-1041", scenario: "Additional members — resort staff", acct: ACCT.coralbay(), requester: "Client HR (Coral Bay)", received: "2026-10-19T13:20:00Z", eff: "2026-11-15", documents: [{ key: "memberdata", name: "Additional member list", supplied: true, source: "Client HR" }], historyText: "Additional-member request received from Client HR.", specs: [
+    { n: "Cecilia Guevarra", dob: "1990-02-14", plan: "STD-PR", dep: [{ n: "Mia Guevarra", dob: "2019-07-21", rel: "Child" }] },
+    { n: "Nathaniel Ong", dob: "1985-11-03", plan: "STD-PR" },
+    { n: "Diana Prieto", dob: "1993-05-16", plan: "STD-PR" },
+  ] }));
+
+  // ---- RENEWAL MEMBER (+4 → 5) ----
+  reqs.push(renewalReq({ id: "MDA-2026-1030", ref: "REQ-REN-2026-1030", scenario: "Renewal — retail group", acct: ACCT.summit(), requester: "Sales (renewal desk)", received: "2026-10-18T08:30:00Z", eff: "2026-12-01",
+    retained: [{ n: "Daniel Garcia", dob: "1986-02-10" }, { n: "Sofia Mendoza", dob: "1991-09-21" }],
+    changed: [{ n: "Victor Ramos", dob: "1980-12-01", from: "STD-PR", to: "PRM-PR" }],
+    added: [{ n: "Grace Uy", dob: "1994-03-12" }], removed: [{ n: "Patricia Cruz", dob: "1987-01-05" }] }));
+  reqs.push(renewalReq({ id: "MDA-2026-1031", ref: "REQ-REN-2026-1031", scenario: "Renewal — shipping lines", acct: ACCT.harborview(), requester: "Sales (renewal desk)", received: "2026-10-17T09:00:00Z", eff: "2026-12-01",
+    retained: [{ n: "Ramon Castillo", dob: "1982-07-19" }], changed: [],
+    added: [{ n: "Luis Fabregas", dob: "1990-08-01" }], removed: [{ n: "Teresa Flores", dob: "1988-03-02" }] }));
+  reqs.push(renewalReq({ id: "MDA-2026-1032", ref: "REQ-REN-2026-1032", scenario: "Renewal — agritech", acct: ACCT.greenfield(), requester: "Sales (renewal desk)", received: "2026-10-16T10:15:00Z", eff: "2026-12-01",
+    retained: [{ n: "Isabel Domingo", dob: "1984-11-14" }, { n: "Francis Navarro", dob: "1977-06-08" }],
+    changed: [{ n: "Angela Bautista", dob: "1990-09-30", from: "STD-PR", to: "PRM-PR" }],
+    added: [{ n: "Marco Lim", dob: "1992-06-24" }], removed: [] }));
+  reqs.push(renewalReq({ id: "MDA-2026-1033", ref: "REQ-REN-2026-1033", scenario: "Renewal — construction group", acct: ACCT.ironwood(), requester: "Sales (renewal desk)", received: "2026-10-15T08:45:00Z", eff: "2026-12-01",
+    retained: [{ n: "Edgar Ponce", dob: "1981-10-02" }], changed: [],
+    added: [{ n: "Rita Salas", dob: "1995-01-19" }, { n: "Noel Aquino", dob: "1988-12-11" }], removed: [{ n: "Jay Moreno", dob: "1986-04-07" }] }));
+
+  // ---- AMENDMENT (+4 → 5) ----
+  reqs.push(amendmentReq({ id: "MDA-2026-1050", ref: "REQ-AMD-2026-1050", scenario: "Amendment — plan upgrade", acct: ACCT.summit(), requester: "Client HR (Summit)", received: "2026-10-21T10:00:00Z", eff: "2026-12-01", member: { n: "Daniel Garcia", dob: "1986-02-10", plan: "PRM-PR", premium: 26750 }, rows: [
+    { member: "Daniel Garcia (P-001)", field: "Plan code", current: "STD-PR", requested: "PRM-PR", effective: "2026-12-01", impact: "Card replacement", downstream: ["Membership record", "Billing update", "Card replacement"] },
+  ] }));
+  reqs.push(amendmentReq({ id: "MDA-2026-1051", ref: "REQ-AMD-2026-1051", scenario: "Amendment — surname change", acct: ACCT.harborview(), requester: "Client HR (Harborview)", received: "2026-10-20T11:40:00Z", eff: "2026-12-01", member: { n: "Teresa Flores", dob: "1988-03-02", plan: "STD-PR", premium: 18500 }, rows: [
+    { member: "Teresa Flores (P-001)", field: "Surname", current: "Flores", requested: "Flores-Reyes", effective: "2026-12-01", impact: "Card replacement", downstream: ["Membership record", "Card replacement"] },
+  ] }));
+  reqs.push(amendmentReq({ id: "MDA-2026-1052", ref: "REQ-AMD-2026-1052", scenario: "Amendment — plan downgrade", acct: ACCT.greenfield(), requester: "Client HR (Greenfield)", received: "2026-10-19T09:25:00Z", eff: "2026-12-01", member: { n: "Francis Navarro", dob: "1977-06-08", plan: "STD-PR", premium: 18500 }, rows: [
+    { member: "Francis Navarro (P-001)", field: "Plan code", current: "PRM-PR", requested: "STD-PR", effective: "2026-12-01", impact: "Card replacement", downstream: ["Membership record", "Billing update", "Card replacement"] },
+  ] }));
+  reqs.push(amendmentReq({ id: "MDA-2026-1053", ref: "REQ-AMD-2026-1053", scenario: "Amendment — room entitlement upgrade", acct: ACCT.metroline(), requester: "Client HR (Metroline)", received: "2026-10-18T13:05:00Z", eff: "2026-12-01", member: { n: "Benedict Salazar", dob: "1983-01-26", plan: "PRM-PR", premium: 26750 }, rows: [
+    { member: "Benedict Salazar (P-001)", field: "Room entitlement", current: "Semi-private", requested: "Private", effective: "2026-12-01", impact: "Card replacement", downstream: ["Membership record", "Billing update", "Card replacement"] },
+  ] }));
+
+  // ---- LOST CARD (+4 → 5) ----
+  reqs.push(lostCardReq({ id: "MDA-2026-1060", ref: "REQ-LC-2026-1060", scenario: "Lost-card replacement — retail", acct: ACCT.summit(), requester: "Sofia Mendoza (member)", received: "2026-10-21T14:00:00Z", member: { n: "Sofia Mendoza", dob: "1991-09-21", reason: "Physically lost" } }));
+  reqs.push(lostCardReq({ id: "MDA-2026-1061", ref: "REQ-LC-2026-1061", scenario: "Lost-card replacement — damaged card", acct: ACCT.harborview(), requester: "Ramon Castillo (member)", received: "2026-10-20T15:30:00Z", member: { n: "Ramon Castillo", dob: "1982-07-19", reason: "Damaged / unreadable" } }));
+  reqs.push(lostCardReq({ id: "MDA-2026-1062", ref: "REQ-LC-2026-1062", scenario: "Lost-card replacement — agritech", acct: ACCT.greenfield(), requester: "Isabel Domingo (member)", received: "2026-10-19T10:50:00Z", member: { n: "Isabel Domingo", dob: "1984-11-14", reason: "Physically lost" } }));
+  reqs.push(lostCardReq({ id: "MDA-2026-1063", ref: "REQ-LC-2026-1063", scenario: "Lost-card replacement — stolen card", acct: ACCT.metroline(), requester: "Rowena Pascual (member)", received: "2026-10-18T16:40:00Z", member: { n: "Rowena Pascual", dob: "1992-12-09", reason: "Stolen" } }));
+
+  // ---- CANCELLATION (+4 → 5) ----
+  reqs.push(cancelReq({ id: "MDA-2026-1070", ref: "REQ-CAN-2026-1070", scenario: "Cancellation — resignation, within cut-off", acct: ACCT.summit(), requester: "Client HR (Summit)", received: "2026-10-20T10:00:00Z", requestedEffective: null, reason: "Resignation", eventDate: "2026-10-18", principal: { n: "Daniel Garcia", dob: "1986-02-10" } }));
+  reqs.push(cancelReq({ id: "MDA-2026-1071", ref: "REQ-CAN-2026-1071", scenario: "Cancellation — future-dated, with dependent", acct: ACCT.harborview(), requester: "Client HR (Harborview)", received: "2026-10-21T17:30:00Z", requestedEffective: "2026-12-15", reason: "End of contract", eventDate: "2026-12-10", principal: { n: "Ramon Castillo", dob: "1982-07-19" }, deps: [{ n: "Lucas Castillo", dob: "2016-10-11", rel: "Child" }] }));
+  reqs.push(cancelReq({ id: "MDA-2026-1072", ref: "REQ-CAN-2026-1072", scenario: "Cancellation — deceased member", acct: ACCT.greenfield(), requester: "Client HR (Greenfield)", received: "2026-10-22T09:15:00Z", requestedEffective: null, reason: "Deceased", eventDate: "2026-10-20", principal: { n: "Isabel Domingo", dob: "1984-11-14" } }));
+  reqs.push(cancelReq({ id: "MDA-2026-1073", ref: "REQ-CAN-2026-1073", scenario: "Cancellation — resignation, after cut-off, with dependents", acct: ACCT.metroline(), requester: "Client HR (Metroline)", received: "2026-10-20T16:30:00Z", requestedEffective: "2026-11-30", reason: "Resignation", eventDate: "2026-11-25", principal: { n: "Benedict Salazar", dob: "1983-01-26" }, deps: [{ n: "Rosa Salazar", dob: "1985-08-17", rel: "Spouse" }, { n: "Timmy Salazar", dob: "2018-04-03", rel: "Child" }] }));
+
+  // ---- REACTIVATION (+4 → 5) ----
+  reqs.push(restoreReq({ id: "MDA-2026-1080", type: "reactivation", ref: "REQ-RAC-2026-1080", scenario: "Reactivation — cancellation withdrawn", acct: ACCT.summit(), requester: "Client HR (Summit)", received: "2026-10-20T09:30:00Z", member: { n: "Sofia Mendoza", dob: "1991-09-21", ref: "P-202" }, data: { basis: "Cancellation withdrawn", employmentContinuous: true, policyRef: "POL-SR-0301", monthsElapsed: 1 } }));
+  reqs.push(restoreReq({ id: "MDA-2026-1081", type: "reactivation", ref: "REQ-RAC-2026-1081", scenario: "Reactivation — return from leave", acct: ACCT.harborview(), requester: "Client HR (Harborview)", received: "2026-10-19T11:00:00Z", member: { n: "Ramon Castillo", dob: "1982-07-19", ref: "P-201" }, data: { basis: "Return from leave without pay", employmentContinuous: true, policyRef: "POL-HS-0410", monthsElapsed: 0 } }));
+  reqs.push(restoreReq({ id: "MDA-2026-1082", type: "reactivation", ref: "REQ-RAC-2026-1082", scenario: "Reactivation — agritech", acct: ACCT.greenfield(), requester: "Client HR (Greenfield)", received: "2026-10-18T10:20:00Z", member: { n: "Francis Navarro", dob: "1977-06-08", ref: "P-202" }, data: { basis: "Cancellation withdrawn", employmentContinuous: true, policyRef: "POL-GA-0520", monthsElapsed: 2 } }));
+  reqs.push(restoreReq({ id: "MDA-2026-1083", type: "reactivation", ref: "REQ-RAC-2026-1083", scenario: "Reactivation — reinstated after suspension", acct: ACCT.ironwood(), requester: "Client HR (Ironwood)", received: "2026-10-17T13:45:00Z", member: { n: "Edgar Ponce", dob: "1981-10-02", ref: "P-201" }, data: { basis: "Reinstated after suspension", employmentContinuous: true, policyRef: "POL-IW-0967", monthsElapsed: 1 } }));
+
+  // ---- REAPPLICATION (+4 → 5) ----
+  reqs.push(restoreReq({ id: "MDA-2026-1090", type: "reapplication", ref: "REQ-RAP-2026-1090", scenario: "Reapplication — rehired after separation", acct: ACCT.summit(), requester: "Client HR (Summit)", received: "2026-10-20T13:15:00Z", member: { n: "Patricia Cruz", dob: "1987-01-05", ref: "P-301", premium: 18500 }, data: { basis: "Rehired after separation", employmentContinuous: false, historicalRef: "POL-SR-0288", monthsElapsed: 7 } }));
+  reqs.push(restoreReq({ id: "MDA-2026-1091", type: "reapplication", ref: "REQ-RAP-2026-1091", scenario: "Reapplication — rehired on new contract", acct: ACCT.harborview(), requester: "Client HR (Harborview)", received: "2026-10-19T14:05:00Z", member: { n: "Teresa Flores", dob: "1988-03-02", ref: "P-302", premium: 18500 }, data: { basis: "Rehired on new contract", employmentContinuous: false, historicalRef: "POL-HS-0355", monthsElapsed: 4 } }));
+  reqs.push(restoreReq({ id: "MDA-2026-1092", type: "reapplication", ref: "REQ-RAP-2026-1092", scenario: "Reapplication — agritech", acct: ACCT.greenfield(), requester: "Client HR (Greenfield)", received: "2026-10-18T15:30:00Z", member: { n: "Angela Bautista", dob: "1990-09-30", ref: "P-303", premium: 18500 }, data: { basis: "Rehired after separation", employmentContinuous: false, historicalRef: "POL-GA-0401", monthsElapsed: 9 } }));
+  reqs.push(restoreReq({ id: "MDA-2026-1093", type: "reapplication", ref: "REQ-RAP-2026-1093", scenario: "Reapplication — rehired after project gap", acct: ACCT.ironwood(), requester: "Client HR (Ironwood)", received: "2026-10-17T16:10:00Z", member: { n: "Jay Moreno", dob: "1986-04-07", ref: "P-304", premium: 18500 }, data: { basis: "Rehired after project gap", employmentContinuous: false, historicalRef: "POL-IW-0333", monthsElapsed: 6 } }));
+
+  return reqs;
+}
+
+// The seeded demo scenarios (§23): five self-contained scenarios per request type (40
+// total). The first of each type is the rich signature case; loading one never
 // contaminates another.
 function SAMPLE_REQUESTS() {
   _mid = 0;
@@ -721,6 +925,9 @@ function SAMPLE_REQUESTS() {
     documents: [{ key: "request", name: "FA cut-off candidate list", supplied: true, source: "FA Enrollment Analyst" }],
     history: [{ at: "2026-10-18T09:00:00Z", text: "FA cut-off batch opened for review.", actor: "FA Enrollment Analyst" }],
   });
+
+  // Bring every request type up to five self-contained demo scenarios.
+  addExtraScenarios(reqs);
 
   return reqs;
 }

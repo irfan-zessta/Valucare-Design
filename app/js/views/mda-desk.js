@@ -25,8 +25,16 @@ export async function render(main, { parts, query }) {
   if (sub === "certificates") return renderCertificates(main);
   if (sub === "fa") return renderFA(main);
   if (sub === "monitoring") return renderMonitoring(main);
+  // Per-demo scoped dashboard: #/mda-desk/demo/{type}/{tab?} shows ONLY that request
+  // type's five scenarios, never the mixed master queue.
+  if (sub === "demo") {
+    const type = parts[2];
+    if (!REQUEST_TYPES[type]) { go("#/explore/mda"); return; }
+    return renderHome(main, oneOfTab(parts[3] || query.tab), query, type);
+  }
   if (sub === "queue") return renderHome(main, oneOfTab(parts[2]), query);
-  return renderHome(main, oneOfTab(query.tab), query);
+  // Bare #/mda-desk has no mixed master queue — send to the demo chooser.
+  return go("#/explore/mda");
 }
 
 // -------------------------------------------------------------- My Work queue (§2)
@@ -34,11 +42,14 @@ const TABS = ["toprocess", "progress", "completed"];
 const oneOfTab = (t) => (TABS.includes(t) ? t : "toprocess");
 const TAB_LABEL = { toprocess: "To Process", progress: "In Progress", completed: "Completed" };
 
-function renderHome(main, tab, query) {
+function renderHome(main, tab, query, scope = null) {
+  const scoped = !!scope && !!REQUEST_TYPES[scope];
   const q = (query.q || "").toLowerCase();
-  const tf = prefs.get("mda:type", "all");
+  // When scoped to one demo, the type filter is meaningless — ignore it.
+  const tf = scoped ? "all" : prefs.get("mda:type", "all");
   const af = prefs.get("mda:assignee", "all");
-  const all = allRequests();
+  const all = allRequests().filter((r) => !scoped || r.type === scope);
+  const tabHref = (t) => (scoped ? `#/mda-desk/demo/${scope}/${t}` : `#/mda-desk/queue/${t}`);
   const counts = {
     toprocess: all.filter((r) => bucketOf(r) === "toprocess").length,
     progress: all.filter((r) => bucketOf(r) === "progress").length,
@@ -54,8 +65,10 @@ function renderHome(main, tab, query) {
     (!q || (r.reference || "").toLowerCase().includes(q) || (r.account?.name || "").toLowerCase().includes(q) || r.id.toLowerCase().includes(q)));
 
   main.innerHTML = html`
-    <div class="page-head"><div><h1>My Work</h1>
-      <p class="muted">Every member-data request in one queue. Each row shows who owns the next action and what it is — no separate monitoring sheet needed.</p></div>
+    <div class="page-head"><div><h1>${scoped ? typeLabel(scope) : "My Work"}</h1>
+      <p class="muted">${scoped
+        ? html`${REQUEST_TYPES[scope].movement} · five self-contained demo scenarios. Each row shows who owns the next action and what it is.`
+        : html`Every member-data request in one queue. Each row shows who owns the next action and what it is — no separate monitoring sheet needed.`}</p></div>
       <div class="ph-actions">
         <span class="mini-counts tiny">${icon("tasks", 14)} ${plural(needAction, "needs your action", "need your action")} · ${icon("clock", 14)} ${plural(pendingInfo, "pending info", "pending info")}</span>
         <button type="button" class="btn ghost sm" id="resetDemo">${icon("history", 15)} Reset this demo</button></div></div>
@@ -68,9 +81,9 @@ function renderHome(main, tab, query) {
 
     <div class="toolbar mt">
       <div class="search"><label class="sr-only" for="dq">Search</label>${icon("search", 15)}<input id="dq" type="search" placeholder="Search by reference, account or request ID" value="${query.q || ""}"></div>
-      <label class="sr-only" for="tfSel">Filter by request type</label>
+      ${scoped ? "" : html`<label class="sr-only" for="tfSel">Filter by request type</label>
       <select id="tfSel" class="inp sm"><option value="all" ${tf === "all" ? "selected" : ""}>All request types</option>
-        ${Object.values(REQUEST_TYPES).map((t) => html`<option value="${t.key}" ${tf === t.key ? "selected" : ""}>${t.label}</option>`)}</select>
+        ${Object.values(REQUEST_TYPES).map((t) => html`<option value="${t.key}" ${tf === t.key ? "selected" : ""}>${t.label}</option>`)}</select>`}
       <label class="sr-only" for="afSel">Filter by assignee</label>
       <select id="afSel" class="inp sm"><option value="all" ${af === "all" ? "selected" : ""}>All assignees</option>
         ${MDA_ROLES.map((r) => html`<option value="${r.key}" ${af === r.key ? "selected" : ""}>${r.label}</option>`)}</select>
@@ -86,15 +99,16 @@ function renderHome(main, tab, query) {
     <p class="tiny mt"><a href="#/explore/mda">${icon("collapse", 13)} Back to demo selection</a> · ${plural(all.length, "preloaded sample scenario")}, each starting at its first step. Open one and use its primary button to walk the journey.</p>`.s;
 
   highlightNav("mywork");
-  document.title = "My Work · MDA";
-  main.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => go(`#/mda-desk/queue/${b.dataset.tab}`)));
+  document.title = scoped ? `${typeLabel(scope)} · MDA` : "My Work · MDA";
+  main.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => go(tabHref(b.dataset.tab))));
   const dq = main.querySelector("#dq");
-  if (dq) dq.oninput = () => { clearTimeout(dq._t); dq._t = setTimeout(() => renderHome(main, tab, { ...query, q: dq.value }), 150); };
-  main.querySelector("#tfSel").onchange = (e) => { prefs.set("mda:type", e.target.value); renderHome(main, tab, query); };
-  main.querySelector("#afSel").onchange = (e) => { prefs.set("mda:assignee", e.target.value); renderHome(main, tab, query); };
+  if (dq) dq.oninput = () => { clearTimeout(dq._t); dq._t = setTimeout(() => renderHome(main, tab, { ...query, q: dq.value }, scope), 150); };
+  const tfSel = main.querySelector("#tfSel");
+  if (tfSel) tfSel.onchange = (e) => { prefs.set("mda:type", e.target.value); renderHome(main, tab, query, scope); };
+  main.querySelector("#afSel").onchange = (e) => { prefs.set("mda:assignee", e.target.value); renderHome(main, tab, query, scope); };
   main.querySelector("#resetDemo").onclick = async () => {
     if (!(await confirmDialog("Reset this demo?", "Restores the MDA sample requests to their starting state. Other demos (Sales, Actuarial) are untouched.", { confirm: "Reset", kind: "danger" }))) return;
-    resetDemo(); toast("MDA demo reset.", "ok"); renderHome(main, "toprocess", {});
+    resetDemo(); toast("MDA demo reset.", "ok"); renderHome(main, "toprocess", {}, scope);
   };
   main.querySelectorAll("[data-href]").forEach((tr) => (tr.onclick = () => go(tr.dataset.href)));
 }

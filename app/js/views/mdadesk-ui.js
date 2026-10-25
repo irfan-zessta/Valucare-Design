@@ -16,9 +16,9 @@ export function highlightNav(key) {
 }
 
 // -------------------------------------------------------------- breadcrumb
-export function backBar(trail) {
+export function backBar(trail, homeHref = "#/explore/mda", homeLabel = "Demos") {
   return html`<nav class="tiny mb crumbs-sm" aria-label="Breadcrumb">
-    <a href="#/mda-desk">${icon("collapse", 13)} My Work</a>
+    <a href="${homeHref}">${icon("collapse", 13)} ${homeLabel}</a>
     ${trail.map((t) => html`<span aria-hidden="true"> › </span>${t.href ? html`<a href="${t.href}">${t.label}</a>` : html`<b>${t.label}</b>`}`)}
   </nav>`;
 }
