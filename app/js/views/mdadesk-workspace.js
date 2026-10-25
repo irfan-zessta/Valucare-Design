@@ -13,9 +13,10 @@
 import { html, raw, go, fmtDate, fmtDateTime, dialog, confirmDialog, toast } from "../core.js";
 import { icon, pill } from "../components.js";
 import {
-  getReq, putReq, ensureWf, log, validateMembers, reconcile, processRequest, simulate,
-  nextStep, stepsFor, typeLabel, typeShort, peso, plural, config, cancellationEffectivity,
-  issueCertificate, resetRequest, roleLabelFor, completionState, REQUEST_TYPES,
+  getReq, putReq, ensureWf, log, validateMembers, reconcile, reconcileAmendment, amendmentNeedsCard,
+  processRequest, simulate, nextStep, stepsFor, typeLabel, typeShort, peso, plural, config,
+  cancellationEffectivity, resetRequest, roleLabelFor, completionState, REQUEST_TYPES, isService,
+  fmtManila, fmtManilaDate, cardStageActor,
 } from "./mdadesk-core.js";
 import {
   highlightNav, backBar, recHead, nextStrip, stepsNav, wireNext, wireHead, renderGuideCard,
@@ -27,8 +28,11 @@ export async function renderRequest(main, id, step) {
   if (!rec) { go("#/mda-desk"); return; }
   ensureWf(rec);
   // The member-data checks are deterministic — run them so the table and counts are
-  // always current (excluded rows are left untouched by the engine).
-  if (rec.members && rec.members.length) validateMembers(rec);
+  // always current (excluded rows are left untouched by the engine). Once a request is
+  // committed, the engine is NEVER re-run: the member table and counts are frozen to the
+  // snapshot taken at processing, so they can never drift from what was actually
+  // processed (critical #2, defect g). Services (certificate / FA) don't use this engine.
+  if (!rec.wf?.processed && !isService(rec.type) && rec.members && rec.members.length) validateMembers(rec);
   const steps = stepsFor(rec.type);
   if (!steps.find((s) => s.key === step)) step = steps[0].key;
 
@@ -83,47 +87,131 @@ function onPrimary(ctx) {
   if (ns.step === "track") { return handleTrack(ctx); }
 }
 
+// Each movement gets its OWN confirmation wording and its own resulting actions — never a
+// generic "creates membership records, Billing, card tasks and FA population" (critical #4).
 function doProcess(ctx) {
   const rec = ctx.rec;
-  const rc = reconcile(rec);
-  const extra = rec.type === "renewal"
-    ? `This renewal removes ${plural((rec.renewal?.groups?.removed || []).length, "member")}. Removed members are only end-dated after you confirm the renewal population.`
-    : rec.type === "cancellation"
-      ? "Coverage will be end-dated on the calculated effectivity. Future-dated cancellations stay scheduled until they take effect."
-      : `Creates membership records, a Billing endorsement (Not Sent), ${plural(rc.ready, "card task")} where needed and adds eligible members to the FA population.`;
-  confirmDialog(
-    rec.type === "cancellation" ? "Confirm cancellation?" : rec.type === "renewal" ? "Confirm renewal population?" : `Process ${plural(rc.ready, "eligible member")}?`,
-    `Input ${rc.input} = ${rc.ready} processed + ${rc.held} held + ${rc.excluded} excluded. ${extra} Held and excluded rows are not processed. This is a simulated demo action.`,
-    { confirm: "Confirm", kind: "primary" },
-  ).then((ok) => {
+  const t = rec.type;
+  const cfg = config();
+  let title, body, confirm;
+
+  if (t === "amendment") {
+    const ra = reconcileAmendment(rec);
+    const cardRows = ra.rows.filter((x) => (x.status || "processed") === "processed" && amendmentNeedsCard(x));
+    title = `Apply ${plural(ra.processed, "change")}?`;
+    body = `Requested ${ra.requested} = ${ra.processed} applied + ${ra.held} held + ${ra.excluded} excluded. Only the applied changes take effect — a request listing ${plural(ra.requested, "change")} never quietly processes a different number. ${ra.processed ? `A Billing amendment endorsement covers only the affected members/fields; ${cardRows.length ? plural(cardRows.length, "replacement card") + " ordered for card-affecting change(s)" : "no card is ordered"}. Amended members are not added to the FA population.` : "Nothing will be applied."} Simulated demo action.`;
+    confirm = "Apply changes";
+  } else if (t === "cancellation") {
+    const rc = reconcile(rec);
+    title = "Confirm cancellation?";
+    body = `${plural(rc.ready, "member")} under this contract will be end-dated on the calculated working-day effectivity (future-dated cancellations stay scheduled until they take effect). This prepares a Billing cancellation — no card order, no FA population and no membership is created. Dependents follow their principal. Simulated demo action.`;
+    confirm = "Confirm cancellation";
+  } else if (t === "renewal") {
+    const rc = reconcile(rec);
+    const removed = (rec.renewal?.groups?.removed || []).length;
+    title = "Confirm renewal population?";
+    body = `Input ${rc.input} = ${rc.ready} processed + ${rc.held} held + ${rc.excluded} excluded. Removed members (${removed}) are only end-dated after you confirm — never cancelled merely for being absent from the file. This reuses retained identities, prepares a Billing renewal endorsement, orders cards only for added / changed / card-relevant members, and refreshes the FA eligibility population. Simulated demo action.`;
+    confirm = "Confirm renewal";
+  } else if (t === "reactivation") {
+    title = "Reactivate existing membership?";
+    body = `Prepares a reactivation fee ${peso(cfg.reactivationFee)} plus premiums with Billing. Coverage is restored only after payment is acknowledged, reusing the original policy reference — no new member record is created and history is retained. No card is re-ordered. Simulated demo action.`;
+    confirm = "Prepare reactivation";
+  } else if (t === "reapplication") {
+    title = "Create new application?";
+    body = `Prepares a new-application fee ${peso(cfg.reactivationFee)} plus premium with Billing and a new card order. The new membership is created once payment is acknowledged, linked to the historical identity without overwriting previous history. Simulated demo action.`;
+    confirm = "Prepare application";
+  } else if (t === "certificate") {
+    const sel = (rec.members || []).filter((m) => m.validation !== "excluded").length;
+    title = "Send for Manager signature?";
+    body = `Prepares a Certificate of Membership for ${plural(sel, "member")} at ${peso(cfg.certificateFee)} VAT-inclusive each (configurable), reviewed and signed by the MDA Manager (simulated). This is a service — it makes no coverage change and creates no membership, card or FA record. Release stays blocked until the fee is paid. Simulated demo action.`;
+    confirm = "Prepare & sign";
+  } else if (t === "fa-batch") {
+    const b = rec.faBatch || {};
+    const elig = (b.candidates || []).filter((c) => c.status === "Eligible").length;
+    title = "Confirm FA batch?";
+    body = `Confirms ${plural(elig, "eligible member")} for the ${b.cutoff || "selected"} cut-off; ${plural((b.exclusions || []).length, "member")} excluded with reasons. FA coverage (sum assured ${peso(b.sumAssured ?? cfg.faSumAssured)} per member) is separate from the insurer charge (${peso(b.insurerCharge ?? cfg.faInsurerCharge)} per member). No membership and no standard new-member Billing endorsement are created. Simulated demo action.`;
+    confirm = "Confirm batch";
+  } else {
+    // new-closed / additional — a genuine new-coverage batch.
+    const rc = reconcile(rec);
+    title = `Process ${plural(rc.ready, "eligible member")}?`;
+    body = `Input ${rc.input} = ${rc.ready} processed + ${rc.held} held + ${rc.excluded} excluded. Creates membership records for the eligible members, a Billing new-enrolment endorsement (Not Sent), card tasks only for members who need a new card, and adds eligible members to the FA eligibility population. Held and excluded rows are not processed. Simulated demo action.`;
+    confirm = "Process";
+  }
+
+  confirmDialog(title, body, { confirm, kind: "primary" }).then((ok) => {
     if (!ok) return;
     processRequest(rec);
-    toast(`Processed ${plural(rc.ready, "eligible member")}.`, "ok");
+    toast(processedToast(rec), "ok");
     ctx.goStep("track");
   });
 }
+function processedToast(rec) {
+  const t = rec.type;
+  if (t === "amendment") { const ra = reconcileAmendment(rec); return `Applied ${plural(ra.processed, "change")}.`; }
+  if (t === "cancellation") return rec.scheduled ? "Cancellation scheduled." : "Cancellation confirmed.";
+  if (t === "reactivation") return "Reactivation prepared — awaiting fee payment.";
+  if (t === "reapplication") return "New application prepared — awaiting fee payment.";
+  if (t === "certificate") return "Certificate prepared and signed (simulated).";
+  if (t === "fa-batch") return "FA batch confirmed.";
+  const rc = reconcile(rec); return `Processed ${plural(rc.ready, "eligible member")}.`;
+}
 
+// One next-action for Track, honouring every gate the engine defines (fee before card
+// dispatch, payment before certificate release, receiving copy before Delivered, the FA
+// insurer→invoice→manager→accounting chain, restore finalisation after payment).
 function handleTrack(ctx) {
   const rec = ctx.rec;
-  const b = rec.billing, c = rec.cards, fa = rec.fa;
-  if (b && b.status === "Not Sent") { simulate(rec, "billing-send"); toast("Billing endorsement sent (simulated).", "ok"); return ctx.refresh(); }
-  if (b && b.status === "Sent") { simulate(rec, "billing-ack"); toast("Billing acknowledged (simulated).", "ok"); return ctx.refresh(); }
-  if (c && c.stage !== "Delivered") { simulate(rec, "card-advance"); toast(`Card batch advanced to "${rec.cards.stage}" (simulated).`, "ok"); return ctx.refresh(); }
+  if (rec.type === "certificate") return certTrackPrimary(ctx);
+  if (rec.type === "fa-batch") return faTrackPrimary(ctx);
+  const b = rec.billing, c = rec.cards, fa = rec.fa, rs = rec.restore;
+  const paid = b && (b.payment === "Received" || b.billedUnderRule);
+  const feeGate = ["lost-card", "reactivation", "reapplication"].includes(rec.type);
+  if (b && b.status === "Not Sent") { simulate(rec, "billing-send", "MDA Analyst"); toast("Billing endorsement sent (simulated).", "ok"); return ctx.refresh(); }
+  if (b && b.status === "Sent") { simulate(rec, "billing-ack", "Billing & Collection"); toast("Billing acknowledged (simulated).", "ok"); return ctx.refresh(); }
+  if (feeGate && b && !paid) { simulate(rec, "payment-received", "Billing & Collection"); toast("Fee payment recorded (simulated).", "ok"); return ctx.refresh(); }
+  if (rs && !rs.finalized) { simulate(rec, "restore-finalize", "MDA Analyst"); toast(rs.kind === "reactivation" ? "Membership reactivated (simulated)." : "New application membership created (simulated).", "ok"); return ctx.refresh(); }
+  if (c && c.stage !== "Delivered") {
+    if (c.waitsForPayment && c.stage === "Ordered" && !paid) { simulate(rec, "payment-received", "Billing & Collection"); toast("Fee payment recorded (simulated) — the card can now be sent to the provider.", "ok"); return ctx.refresh(); }
+    if (c.stage === "Dispatched" && !c.receivingCopy) { simulate(rec, "card-receiving-copy", "Facility Management Admin"); toast("Receiving copy attached (simulated).", "ok"); return ctx.refresh(); }
+    simulate(rec, "card-advance"); toast(`Card batch advanced to "${rec.cards.stage}" (simulated).`, "ok"); return ctx.refresh();
+  }
   if (fa && fa.status === "Eligible — not endorsed") { toast("FA enrolment runs on its own cut-off — opening Financial Assistance.", "info"); return go("#/mda-desk/fa"); }
+  ctx.refresh();
+}
+function certTrackPrimary(ctx) {
+  const r = ctx.rec, cb = r.certBatch || {};
+  if (cb.payment !== "Received" && !cb.billedUnderRule) { simulate(r, "cert-payment", "Billing & Collection"); toast("Certificate fee recorded as received (simulated).", "ok"); return ctx.refresh(); }
+  if (!cb.released) { simulate(r, "cert-release", "MDA Analyst"); toast("Certificate released by simulated email; hard copy prepared for Sales.", "ok"); return ctx.refresh(); }
+  ctx.refresh();
+}
+function faTrackPrimary(ctx) {
+  const r = ctx.rec, fe = r.faEnroll || {};
+  if (!fe.endorsed) { simulate(r, "fa-endorse", "FA Enrollment Analyst"); toast("FA batch endorsed to the insurer (simulated).", "ok"); }
+  else if (!fe.invoiced) { simulate(r, "fa-invoice", "FA Insurer"); toast("Insurer invoice attached; payment request raised (simulated).", "ok"); }
+  else if (!fe.managerReviewed) { simulate(r, "fa-manager-review", "MDA Manager"); toast("MDA Manager reviewed the payment request (simulated).", "ok"); }
+  else if (!fe.accountingAck) { simulate(r, "fa-accounting-ack", "Accounting"); toast("Accounting acknowledged and recorded payment (simulated).", "ok"); }
   ctx.refresh();
 }
 
 // ============================================================== step dispatch
 function stepBody(ctx) {
+  const t = ctx.rec.type;
+  if (t === "certificate") return certStep(ctx);
+  if (t === "fa-batch") return faStep(ctx);
   if (ctx.step === "request") return stepRequest(ctx);
-  if (ctx.step === "data") return ctx.rec.type === "lost-card" ? stepConfirmReplacement(ctx) : stepData(ctx);
-  if (ctx.step === "confirm") return stepConfirm(ctx);
+  if (ctx.step === "data") return t === "lost-card" ? stepConfirmReplacement(ctx) : stepData(ctx);
+  if (ctx.step === "confirm") return t === "amendment" ? stepConfirmAmendment(ctx) : stepConfirm(ctx);
   if (ctx.step === "track") return stepTrack(ctx);
   return stepRequest(ctx);
 }
 function wireStep(ctx) {
+  const t = ctx.rec.type;
+  if (t === "certificate") return wireCert(ctx);
+  if (t === "fa-batch") return wireFa(ctx);
   if (ctx.step === "request") wireRequest(ctx);
-  else if (ctx.step === "data" && ctx.rec.type !== "lost-card") wireData(ctx);
+  else if (ctx.step === "data" && t !== "lost-card") wireData(ctx);
+  else if (ctx.step === "confirm" && t === "amendment") wireConfirmAmendment(ctx);
   else if (ctx.step === "track") wireTrack(ctx);
 }
 
@@ -167,7 +255,7 @@ function linkedRefs(r) {
     <div><dt>Sales endorsement</dt><dd>${a.salesEndorsement || "—"}</dd></div>
     ${a.contractStart ? html`<div><dt>Contract period</dt><dd>${fmtDate(a.contractStart)} – ${fmtDate(a.contractEnd)}</dd></div>` : ""}
     <div><dt>Requester</dt><dd>${r.requester || "—"}</dd></div>
-    <div><dt>Received</dt><dd>${fmtDateTime(r.receivedAt)}</dd></div>
+    <div><dt>Received</dt><dd>${fmtManila(r.receivedAt)}</dd></div>
     ${a.planCodes ? html`<div><dt>Plan codes</dt><dd>${a.planCodes.map((p) => p.code).join(" · ")}</dd></div>` : ""}
     ${a.premiumBreakdown ? html`<div><dt>Premium breakdown</dt><dd class="tiny">${a.premiumBreakdown}</dd></div>` : ""}
     ${a.rulesNote ? html`<div><dt>Account rules</dt><dd class="tiny">${a.rulesNote}</dd></div>` : ""}
@@ -230,6 +318,9 @@ function wireRequest(ctx) {
 
 async function addMemberDialog(ctx) {
   const r = ctx.rec;
+  // A processed request is committed — its member set can never be edited in place
+  // (critical #2, defect g). The honest action is to raise a NEW addition.
+  if (r.wf?.processed) { offerNewMovement(r); return; }
   const res = await dialog({
     title: "Add member manually",
     body: html`<div class="field"><label for="nmName">Member name</label><input id="nmName" name="name" class="inp" placeholder="Full name"></div>
@@ -261,6 +352,7 @@ async function addMemberDialog(ctx) {
 // ============================================================== STEP 2 · Review Member Data (§8/§9)
 function stepData(ctx) {
   const r = ctx.rec;
+  if (r.wf?.processed) return stepDataProcessed(ctx);
   const rc = reconcile(r);
   const members = r.members || [];
   return html`
@@ -273,6 +365,35 @@ function stepData(ctx) {
       <div class="row tight mt"><button type="button" class="btn ghost sm" id="loadSample2">${icon("download", 14)} Load sample data</button>
         <button type="button" class="btn ghost sm" id="addMember2">${icon("plus", 14)} Add member manually</button></div>
     </div></div>`;
+}
+// Once committed, the member table is read-only and shows the FROZEN processed snapshot —
+// it can never display six members "ready" while tracking says 5/5 (critical #2, defect g).
+function stepDataProcessed(ctx) {
+  const r = ctx.rec;
+  const rc = reconcile(r); // frozen to wf.counts
+  const members = r.members || [];
+  return html`
+    <div class="panel"><div class="ph"><h2>Member Data</h2>${pill("Committed — read-only", "ok")}</div><div class="pb">
+      <p class="tiny">This request is processed. The member set is committed and shown exactly as processed — it cannot be edited in place, so these counts always match the tracking below. To add or change a member, raise a new request.</p>
+      ${reconBar(rc)}
+      <div class="tbl-wrap mt"><table class="tbl"><thead><tr>
+        <th>Member name</th><th>Type</th><th>Principal ref</th><th>DOB</th><th>Plan</th><th>Effectivity</th><th>Outcome</th></tr></thead>
+        <tbody>${members.map((m) => html`<tr class="mem-row">
+          <td><button type="button" class="linklike" data-drawer="${m.id}">${m.name || "(no name)"}</button></td>
+          <td class="tiny">${m.memberType}</td><td class="tiny">${m.principalRef || "—"}</td>
+          <td class="tiny">${m.dob ? fmtDate(m.dob) : "—"}</td><td class="tiny">${m.planCode || "—"}</td>
+          <td class="tiny">${m.effectivity ? fmtDate(m.effectivity) : "—"}</td>
+          <td>${m.validation === "ready" ? pill("Processed", "ok") : m.validation === "excluded" ? pill("Excluded", "neutral") : pill("Held — not processed", "warn")}</td></tr>`)}</tbody></table></div>
+      <div class="row tight mt">${newMovementButtons(r)}</div>
+    </div></div>`;
+}
+// Honest post-commit affordance — never silent in-place editing.
+function newMovementButtons(r) {
+  return html`<button type="button" class="btn ghost sm" data-new="additional">${icon("plus", 14)} Create a new Additional Member</button>
+    <button type="button" class="btn ghost sm" data-new="amendment">${icon("settings", 14)} Create an Amendment</button>`;
+}
+function offerNewMovement(r) {
+  toast("This request is already processed — create a new Additional Member or Amendment instead of editing it.", "info");
 }
 function reconBar(rc) {
   return html`<div class="recon-bar row tight wrap">
@@ -312,6 +433,7 @@ function wireData(ctx) {
   document.querySelectorAll("[data-clarify]").forEach((b) => (b.onclick = () => clarifyDialog(ctx, find(b.dataset.clarify))));
   document.querySelectorAll("[data-override]").forEach((b) => (b.onclick = () => overrideDialog(ctx, find(b.dataset.override))));
   document.querySelectorAll("[data-reinstate]").forEach((b) => (b.onclick = () => { const m = find(b.dataset.reinstate); m.validation = "ready"; m.excludeReason = null; log(r, `Reinstated ${m.name}.`); putReq(r); ctx.refresh(); }));
+  document.querySelectorAll("[data-new]").forEach((b) => (b.onclick = () => go(`#/mda-desk/demo/${b.dataset.new}`)));
   document.getElementById("loadSample2")?.addEventListener("click", async () => {
     if (!(await confirmDialog("Load sample data?", "Restores this request's sample members to their starting state. Only this request is affected.", { confirm: "Load sample", kind: "primary" }))) return;
     resetRequest(r.id); toast("Sample data loaded.", "ok"); ctx.refresh();
@@ -448,73 +570,336 @@ function stepConfirm(ctx) {
   </div></div>`;
 }
 
+// Amendment Check & Confirm — reconciles on the requested CHANGES, not the member rows,
+// so a request listing two changes can never quietly apply one (defect d, Demo 4). Each
+// row can be held or excluded with a reason, and only "process" rows are applied.
+function stepConfirmAmendment(ctx) {
+  const r = ctx.rec;
+  if (r.wf?.processed) return amendmentProcessedConfirm(ctx);
+  const ra = reconcileAmendment(r);
+  const st = (x) => x.status || "processed";
+  const tone = { processed: "ok", held: "warn", excluded: "neutral" };
+  const lbl = { processed: "Will apply", held: "Held", excluded: "Excluded" };
+  return html`<div class="panel"><div class="ph"><h2>Check & confirm changes</h2><span class="pill info">Step 3</span></div><div class="pb">
+    <p class="tiny">Reconcile the requested changes. Requested = will apply + held + excluded. Only "will apply" changes take effect, each billed for its own affected member/field. A replacement card is ordered only for a card-affecting change.</p>
+    <div class="recon-bar row tight wrap">
+      <span class="pill neutral">Requested ${ra.requested}</span><span class="tiny">=</span>
+      <span class="pill ok">${ra.processed} will apply</span><span class="tiny">+</span>
+      <span class="pill warn">${ra.held} held</span><span class="tiny">+</span>
+      <span class="pill neutral">${ra.excluded} excluded</span></div>
+    <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Member</th><th>Field</th><th>Change</th><th>Effective</th><th>Card</th><th>Status</th><th></th></tr></thead>
+      <tbody>${ra.rows.map((x, i) => html`<tr>
+        <td>${x.member}</td><td class="tiny">${x.field}</td>
+        <td class="tiny">${x.current} → <b>${x.requested}</b></td>
+        <td class="tiny">${fmtManilaDate(x.effective)}</td>
+        <td class="tiny">${amendmentNeedsCard(x) ? "Replacement" : "—"}</td>
+        <td>${pill(lbl[st(x)], tone[st(x)])}${(x.holdReason || x.excludeReason) ? html`<span class="tiny"> · ${x.holdReason || x.excludeReason}</span>` : ""}</td>
+        <td class="tiny">${st(x) === "processed"
+          ? html`<button type="button" class="linklike" data-row-hold="${i}">Hold</button> · <button type="button" class="linklike" data-row-exclude="${i}">Exclude</button>`
+          : html`<button type="button" class="linklike" data-row-process="${i}">Set to apply</button>`}</td></tr>`)}</tbody></table></div>
+    ${simNote("Applying is a simulated demo action. Only the rows set to apply are written to a field-level history; held/excluded changes are left untouched. Scheduled changes stay pending until their effective date.")}
+  </div></div>`;
+}
+function amendmentProcessedConfirm(ctx) {
+  const r = ctx.rec;
+  const ra = reconcileAmendment(r);
+  return html`<div class="panel"><div class="ph"><h2>Changes applied</h2>${pill("Committed", "ok")}</div><div class="pb">
+    <p class="tiny">This amendment is processed: ${ra.processed} applied, ${ra.held} held, ${ra.excluded} excluded. The field-level history is shown on Track completion. To make further changes, raise a new amendment.</p>
+    <div class="row tight mt"><button type="button" class="btn ghost sm" data-new="amendment">${icon("settings", 14)} Create another amendment</button></div>
+  </div></div>`;
+}
+async function wireConfirmAmendment(ctx) {
+  const r = ctx.rec;
+  const rows = (r.amendment && r.amendment.rows) || [];
+  document.querySelectorAll("[data-new]").forEach((b) => (b.onclick = () => go(`#/mda-desk/demo/${b.dataset.new}`)));
+  document.querySelectorAll("[data-row-process]").forEach((b) => (b.onclick = () => { const x = rows[+b.dataset.rowProcess]; if (!x) return; x.status = "processed"; x.holdReason = x.excludeReason = null; putReq(r); ctx.refresh(); }));
+  document.querySelectorAll("[data-row-hold]").forEach((b) => (b.onclick = async () => {
+    const x = rows[+b.dataset.rowHold]; if (!x) return;
+    const res = await dialog({ title: `Hold change · ${x.member}`, body: html`<p class="tiny">A held change is not applied. Record why so Monitoring and the requester can see it.</p><div class="field"><label for="hr">Reason</label><input id="hr" name="reason" class="inp" placeholder="e.g. awaiting member confirmation"></div>`, actions: [{ label: "Cancel" }, { label: "Hold change", kind: "primary", value: "ok" }] });
+    if (!res || res.action !== "ok") return; x.status = "held"; x.holdReason = res.values.reason || "Held by analyst"; putReq(r); ctx.refresh();
+  }));
+  document.querySelectorAll("[data-row-exclude]").forEach((b) => (b.onclick = async () => {
+    const x = rows[+b.dataset.rowExclude]; if (!x) return;
+    const res = await dialog({ title: `Exclude change · ${x.member}`, body: html`<p class="tiny">An excluded change is dropped from this request. Record why.</p><div class="field"><label for="er">Reason</label><input id="er" name="reason" class="inp" placeholder="e.g. duplicate of a prior amendment"></div>`, actions: [{ label: "Cancel" }, { label: "Exclude change", kind: "danger", value: "ok" }] });
+    if (!res || res.action !== "ok") return; x.status = "excluded"; x.excludeReason = res.values.reason || "Excluded by analyst"; putReq(r); ctx.refresh();
+  }));
+}
+
 // ============================================================== STEP 4 · Track Completion (§16/§19)
+function notProcessed() { return html`<div class="panel"><div class="pb"><div class="state-box"><b>Not processed yet.</b><p class="tiny">Complete the earlier steps first.</p></div></div></div>`; }
+
 function stepTrack(ctx) {
   const r = ctx.rec;
-  if (!r.wf?.processed) return html`<div class="panel"><div class="pb"><div class="state-box"><b>Not processed yet.</b><p class="tiny">Complete Check & Confirm first.</p></div></div></div>`;
+  if (!r.wf?.processed) return notProcessed();
   const cs = completionState(r);
   const counts = r.wf.counts || reconcile(r);
+  const summary = r.type === "amendment"
+    ? `Changes applied: ${counts.processed}/${counts.input}${counts.held ? `, ${counts.held} held` : ""}${counts.excluded ? `, ${counts.excluded} excluded` : ""}.`
+    : r.type === "cancellation"
+      ? `Cancellation ${r.scheduled ? "scheduled" : "effective"} for ${plural(counts.processed, "member")}${r.calculatedEffective ? ` on ${fmtManilaDate(r.calculatedEffective)}` : ""}.`
+      : `Membership processed: ${counts.processed}/${counts.input}${counts.held ? `, ${counts.held} held` : ""}${counts.excluded ? `, ${counts.excluded} excluded` : ""}.`;
   return html`<div class="panel"><div class="ph"><h2>Track completion</h2>${cs.allDone ? pill("All services complete", "ok") : pill("In progress", "neutral")}</div><div class="pb">
-    <p class="tiny">Each connected service completes independently. There is no single "all done" until every one below is complete. Membership was processed: ${counts.processed}/${counts.input}${counts.held ? `, ${counts.held} held` : ""}${counts.excluded ? `, ${counts.excluded} excluded` : ""}.</p>
-
+    <p class="tiny">Each connected service completes independently — there is no single "all done" until every card below is complete. ${summary}</p>
+    ${r.restore ? restoreCard(r) : ""}
     ${r.billing ? billingCard(r) : ""}
     ${r.cards ? cardsCard(r) : ""}
     ${r.fa ? faCard(r) : ""}
-    ${r.certificateRequest ? certCard(r) : ""}
-    ${r.scheduled ? simNote(`This change is scheduled for ${fmtDate(r.calculatedEffective || r.requestedEffective)} and does not apply until then. It can be withdrawn or rescheduled.`) : ""}
+    ${(r.fieldHistory && r.fieldHistory.length) ? fieldHistoryCard(r) : ""}
+    ${r.scheduled ? simNote("Scheduled change(s) do not apply until their effective date and can be withdrawn or rescheduled.") : ""}
   </div></div>`;
 }
 function billingCard(r) {
   const b = r.billing;
   const chain = ["Not Sent", "Sent", "Acknowledged", "Completed"];
   const i = Math.max(0, chain.indexOf(b.status === "Needs Clarification" ? "Sent" : b.status));
+  const paid = b.payment === "Received" || b.billedUnderRule;
+  const feeGate = ["lost-card", "reactivation", "reapplication"].includes(r.type);
   return html`<div class="svc-card"><div class="between"><h3>${icon("inbox", 15)} Billing & Collection</h3>${pill(b.status, b.status === "Acknowledged" || b.status === "Completed" ? "ok" : "neutral")}</div>
     <div class="stage-row tiny mt">${chain.map((s, n) => html`<span class="stage ${n <= i ? "on" : ""}">${s}</span>`)}</div>
     <dl class="dl mt"><div><dt>Reference</dt><dd>${b.ref}</dd></div><div><dt>Movement</dt><dd>${b.movementType}</dd></div>
-      <div><dt>Payment</dt><dd>${b.payment} <span class="tiny">(tracked separately from acknowledgement)</span></dd></div>
+      <div><dt>Payment</dt><dd>${b.billedUnderRule ? "Billed under account rule" : b.payment} <span class="tiny">(tracked separately from acknowledgement)</span></dd></div>
       ${b.fee ? html`<div><dt>Fee</dt><dd>${peso(b.fee)}</dd></div>` : ""}</dl>
     <p class="tiny">${b.note}</p>
+    ${feeGate && !paid ? simNote(r.type === "lost-card" ? "The replacement card cannot be sent to the provider until this fee is settled." : "Coverage is not restored until this fee and the premiums are settled.") : ""}
     <div class="row tight mt">
-      ${b.status === "Not Sent" ? html`<button type="button" class="btn sm" data-sim="billing-send">Send endorsement (simulated)</button>` : ""}
-      ${b.status === "Sent" ? html`<button type="button" class="btn sm" data-sim="billing-ack">Simulate Billing acknowledgement</button>` : ""}
-      ${b.payment !== "Received" && b.status !== "Not Sent" ? html`<button type="button" class="btn ghost sm" data-sim="payment-received">Simulate payment received</button>` : ""}</div></div>`;
+      ${b.status === "Not Sent" ? html`<button type="button" class="btn sm" data-sim="billing-send" data-actor="MDA Analyst">Send endorsement (simulated)</button>` : ""}
+      ${b.status === "Sent" ? html`<button type="button" class="btn sm" data-sim="billing-ack" data-actor="Billing & Collection">Simulate Billing acknowledgement</button>` : ""}
+      ${b.status !== "Not Sent" && !paid ? html`<button type="button" class="btn ghost sm" data-sim="payment-received" data-actor="Billing & Collection">Simulate payment received</button>` : ""}
+      ${b.fee && !paid ? html`<button type="button" class="btn ghost sm" data-sim="bill-under-rule" data-actor="MDA Analyst">Bill under account rule</button>` : ""}</div></div>`;
 }
 function cardsCard(r) {
   const c = r.cards;
   const stages = ["Ordered", "Sent to Provider", "Printed", "Received", "Packed", "Dispatched", "Delivered"];
   const i = stages.indexOf(c.stage);
+  const paid = r.billing && (r.billing.payment === "Received" || r.billing.billedUnderRule);
+  const blockedByFee = c.waitsForPayment && c.stage === "Ordered" && !paid;
+  const needCopy = c.stage === "Dispatched" && !c.receivingCopy;
+  const actor = cardStageActor(c.stage);
   return html`<div class="svc-card"><div class="between"><h3>${icon("copy", 15)} Cards & delivery</h3>${pill(c.stage, c.stage === "Delivered" ? "ok" : "neutral")}</div>
     <div class="stage-row tiny mt">${stages.map((s, n) => html`<span class="stage ${n <= i ? "on" : ""}">${s}</span>`)}</div>
-    <dl class="dl mt"><div><dt>Cards</dt><dd>${c.count} · ${c.cardType}</dd></div><div><dt>Provider</dt><dd>${c.provider}</dd></div>
-      <div><dt>Delivery address</dt><dd>${c.address}</dd></div>${c.dispatchRef ? html`<div><dt>Dispatch ref</dt><dd>${c.dispatchRef}</dd></div>` : ""}</dl>
-    <p class="tiny">Printing and courier are external — we track them, we don't perform them. A batch is only Delivered with a (simulated) proof of receipt.</p>
-    ${c.stage !== "Delivered" ? html`<div class="row tight mt"><button type="button" class="btn sm" data-sim="card-advance">Simulate card provider update ›</button></div>` : simNote("Delivered with a simulated proof of receipt.")}</div>`;
+    <dl class="dl mt"><div><dt>Cards</dt><dd>${c.count} · ${c.cardType}</dd></div>
+      ${c.reason ? html`<div><dt>Reason</dt><dd>${c.reason}</dd></div>` : ""}
+      <div><dt>Provider</dt><dd>${c.provider}</dd></div>
+      <div><dt>Delivery address</dt><dd>${c.address}</dd></div>
+      ${c.dispatchRef ? html`<div><dt>Dispatch ref</dt><dd>${c.dispatchRef}</dd></div>` : ""}
+      <div><dt>Next actor</dt><dd>${c.stage === "Delivered" ? "—" : actor}</dd></div></dl>
+    <details class="mt"><summary>Provider file & transmittal (sample)</summary>
+      <p class="tiny mt">Transmittal CARD-TR-${r.id} · ${plural(c.count, "card")} · provider ${c.provider}. This is the (simulated) file handed to the card provider — printing and courier are external; we track them, we don't perform them.</p></details>
+    ${blockedByFee ? simNote("Blocked: the fee must be paid or billed under an account rule before the order is sent to the provider.") : ""}
+    ${needCopy ? simNote("Dispatched — a batch is only marked Delivered once a receiving copy is attached.") : ""}
+    <div class="row tight mt">
+      ${c.stage === "Delivered" ? simNote("Delivered with a simulated receiving copy.")
+        : blockedByFee ? html`<button type="button" class="btn ghost sm" data-sim="payment-received" data-actor="Billing & Collection">Record fee payment first</button>`
+        : needCopy ? html`<button type="button" class="btn sm" data-sim="card-receiving-copy" data-actor="Facility Management Admin">Attach receiving copy (simulated)</button>`
+        : html`<button type="button" class="btn sm" data-sim="card-advance">${c.stage === "Ordered" ? "Send order to card provider ›" : `${actor}: advance stage ›`}</button>`}</div></div>`;
+}
+function restoreCard(r) {
+  const rs = r.restore;
+  const paid = r.billing && (r.billing.payment === "Received" || r.billing.billedUnderRule);
+  return html`<div class="svc-card"><div class="between"><h3>${icon("check", 15)} ${rs.kind === "reactivation" ? "Reactivation" : "New application"}</h3>${pill(rs.finalized ? "Completed" : "Awaiting payment", rs.finalized ? "ok" : "neutral")}</div>
+    <dl class="dl mt">${rs.kind === "reactivation"
+      ? html`<div><dt>Policy reference</dt><dd>${rs.policyRef || "—"} <span class="tiny">(retained)</span></dd></div>`
+      : html`<div><dt>New reference</dt><dd>${rs.newRef || "—"}</dd></div><div><dt>Historical reference</dt><dd>${rs.historicalRef || "—"} <span class="tiny">(linked, not overwritten)</span></dd></div>`}</dl>
+    <p class="tiny">${rs.kind === "reactivation" ? "Coverage is restored using the original policy reference once payment is acknowledged — no new member record is created." : "A new membership is created once payment is acknowledged, linked to the historical identity without overwriting history."}</p>
+    ${rs.finalized ? simNote("Completed (simulated).")
+      : !paid ? simNote("Waiting on the fee / premium payment (see Billing above) before this can finalise.")
+      : html`<div class="row tight mt"><button type="button" class="btn sm" data-sim="restore-finalize" data-actor="MDA Analyst">${rs.kind === "reactivation" ? "Reactivate membership (simulated)" : "Create new membership (simulated)"}</button></div>`}</div>`;
 }
 function faCard(r) {
   const fa = r.fa;
-  return html`<div class="svc-card"><div class="between"><h3>${icon("chart", 15)} Financial Assistance</h3>${pill(fa.status, /Endorsed|Payment|Completed/.test(fa.status) ? "ok" : "info")}</div>
-    <p class="tiny mt">${fa.note} Population: ${plural(fa.population, "member")}.</p>
+  return html`<div class="svc-card"><div class="between"><h3>${icon("chart", 15)} Financial Assistance (eligibility)</h3>${pill(fa.status, /Endorsed|Payment|Completed/.test(fa.status) ? "ok" : "info")}</div>
+    <p class="tiny mt">${fa.note} Population: ${plural(fa.population, "member")}. Enrolment itself is a separate cut-off batch service.</p>
     <div class="row tight mt"><a class="btn ghost sm" href="#/mda-desk/fa">Open Financial Assistance ›</a></div></div>`;
 }
-function certCard(r) {
-  const issued = r.certificates || [];
-  return html`<div class="svc-card"><div class="between"><h3>${icon("file", 15)} Certificate of Membership</h3>${issued.length ? pill("Prepared", "ok") : pill("Requested", "info")}</div>
-    <p class="tiny mt">Purpose: ${r.certificateRequest.purpose}. ${plural(r.certificateRequest.count, "member")} requested. ${peso(config().certificateFee)} VAT-inclusive (configurable).</p>
-    ${issued.length ? html`<ul class="tiny mt">${issued.map((c) => html`<li>${c.id} · ${plural(c.members, "member")} · ${c.managerSignature}${c.released ? " · released (simulated email)" : ""}</li>`)}</ul>` : ""}
-    <div class="row tight mt">
-      ${!issued.length ? html`<button type="button" class="btn sm" data-cert="issue">Prepare certificate (Manager signature placeholder)</button>` : (!issued[issued.length - 1].released ? html`<button type="button" class="btn ghost sm" data-cert="release">Simulate email release</button>` : "")}</div></div>`;
+function fieldHistoryCard(r) {
+  return html`<div class="svc-card"><div class="between"><h3>${icon("file", 15)} Field-level change history</h3>${pill("Applied", "ok")}</div>
+    <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Member</th><th>Field</th><th>From</th><th>To</th><th>Effective</th><th>Status</th></tr></thead>
+      <tbody>${r.fieldHistory.map((h) => html`<tr><td>${h.member}</td><td class="tiny">${h.field}</td><td class="tiny">${h.from}</td><td class="tiny"><b>${h.to}</b></td><td class="tiny">${fmtManilaDate(h.effective)}</td><td>${pill(h.status, h.status === "Applied" ? "ok" : "warn")}</td></tr>`)}</tbody></table></div></div>`;
 }
-function wireTrack(ctx) {
+function wireTrack(ctx) { wireSim(ctx); }
+function wireSim(ctx) {
   const r = ctx.rec;
   document.querySelectorAll("[data-sim]").forEach((b) => (b.onclick = () => {
-    const kind = b.dataset.sim;
-    const actor = { "billing-send": "MDA Analyst", "billing-ack": "Billing & Collection", "payment-received": "Billing & Collection", "card-advance": "Card Provider" }[kind];
-    simulate(r, kind, actor);
+    simulate(r, b.dataset.sim, b.dataset.actor || undefined);
     toast("Simulated update applied.", "ok"); ctx.refresh();
   }));
-  document.querySelectorAll("[data-cert]").forEach((b) => (b.onclick = () => {
-    if (b.dataset.cert === "issue") { issueCertificate(r, { members: r.certificateRequest.count, purpose: r.certificateRequest.purpose }); toast("Certificate prepared (demo watermark, placeholder signature).", "ok"); }
-    else { const c = (r.certificates || [])[r.certificates.length - 1]; if (c) { c.released = true; log(r, `Certificate ${c.id} released by simulated email.`, "MDA Analyst"); putReq(r); toast("Certificate released (simulated email).", "ok"); } }
-    ctx.refresh();
+}
+
+// ============================================================== Certificate of Membership service (§17)
+function certStep(ctx) {
+  const r = ctx.rec;
+  if (ctx.step === "request") return certRequest(r);
+  if (ctx.step === "data") return certData(r);
+  if (ctx.step === "confirm") return certConfirm(r);
+  return certTrack(r);
+}
+function wireCert(ctx) { wireSim(ctx); }
+function certRequest(r) {
+  const cfg = config();
+  const sel = (r.members || []).filter((m) => m.validation !== "excluded");
+  return html`<div class="panel"><div class="ph"><h2>Certificate request</h2><span class="pill info">Step 1</span></div><div class="pb">
+    <p class="tiny">A Certificate of Membership is a document service. It confirms coverage for a stated purpose — it makes no coverage change and creates no membership, card or FA record.</p>
+    <dl class="dl mt"><div><dt>Account</dt><dd>${r.account?.name} · ${r.account?.code}</dd></div>
+      <div><dt>Requester</dt><dd>${r.requester}</dd></div>
+      <div><dt>Received</dt><dd>${fmtManila(r.receivedAt)}</dd></div>
+      <div><dt>Purpose</dt><dd>${r.certificateRequest?.purpose || "General"}</dd></div>
+      <div><dt>Members selected</dt><dd>${plural(sel.length, "member")}</dd></div>
+      <div><dt>Fee</dt><dd>${peso(cfg.certificateFee)} per certificate <span class="tiny">VAT-inclusive · configurable · payable before release</span></dd></div></dl>
+    <h3 class="tiny mt">Selected members</h3>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Member</th><th>Membership no.</th><th>Plan</th></tr></thead>
+      <tbody>${sel.map((m) => html`<tr><td>${m.name}</td><td class="tiny">${m.identity?.employeeRef || m.principalRef || "—"}</td><td class="tiny">${m.planCode || "—"}</td></tr>`)}</tbody></table></div>
+    ${illus("Continue to prepare the certificate preview. The MDA Manager signs on the following step; release is blocked until the fee is paid.")}
+  </div></div>`;
+}
+function certData(r) {
+  const cb = r.certBatch;
+  const sel = cb ? cb.certs : (r.members || []).filter((m) => m.validation !== "excluded").map((m, i) => ({
+    certNo: `COM-${String(r.id).slice(-4)}-${String(i + 1).padStart(2, "0")}`,
+    member: m.name, membershipNo: m.identity?.employeeRef || m.principalRef || "—",
+    account: r.account?.name,
+    coverage: `${fmtManilaDate(r.account?.contractStart || r.effectiveDate)} – ${fmtManilaDate(r.account?.contractEnd || r.effectiveDate)}`,
   }));
+  const issueDate = cb?.issueDate || "2026-10-23";
+  return html`<div class="panel"><div class="ph"><h2>Prepare certificate</h2><span class="pill info">Step 2</span></div><div class="pb">
+    <p class="tiny">Preview for each selected member. Each certificate shows the membership number, account, coverage dates, purpose, issue date and a 15-day validity, with a demo watermark — nothing is a real seal or live verification.</p>
+    ${sel.map((c) => html`<div class="cert-preview mt">
+      <div class="cert-wm">${cb?.watermark || "SAMPLE — demo certificate, not a real seal or live verification"}</div>
+      <h3 class="cert-title">Certificate of Membership</h3>
+      <dl class="dl mt"><div><dt>Certificate no.</dt><dd>${c.certNo}</dd></div>
+        <div><dt>Member</dt><dd>${c.member}</dd></div>
+        <div><dt>Membership no.</dt><dd>${c.membershipNo}</dd></div>
+        <div><dt>Account</dt><dd>${c.account}</dd></div>
+        <div><dt>Coverage</dt><dd>${c.coverage}</dd></div>
+        <div><dt>Purpose</dt><dd>${r.certificateRequest?.purpose || cb?.purpose || "General"}</dd></div>
+        <div><dt>Issue date</dt><dd>${fmtManilaDate(issueDate)}</dd></div>
+        <div><dt>Validity</dt><dd>Valid for 15 days from issue (demo)</dd></div>
+        <div><dt>Signature</dt><dd>${cb?.managerSigned ? "Signed — MDA Manager (simulated)" : "Pending MDA Manager signature"}</dd></div></dl></div>`)}
+    ${illus("Continue to send the batch for the MDA Manager's review and signature.")}
+  </div></div>`;
+}
+function certConfirm(r) {
+  const cfg = config();
+  const sel = (r.members || []).filter((m) => m.validation !== "excluded");
+  if (r.wf?.processed) return html`<div class="panel"><div class="ph"><h2>Manager review</h2>${pill("Signed", "ok")}</div><div class="pb">
+    <p class="tiny">The MDA Manager has reviewed and signed the certificate batch (simulated). Continue to Payment &amp; Release.</p></div></div>`;
+  return html`<div class="panel"><div class="ph"><h2>Manager review</h2><span class="pill info">Step 3</span></div><div class="pb">
+    <p class="tiny">The MDA Manager reviews the prepared batch and applies the signature (simulated) — a step distinct from the analyst's preparation. No coverage, card or FA record is created.</p>
+    <dl class="dl mt"><div><dt>Certificates</dt><dd>${plural(sel.length, "certificate")}</dd></div>
+      <div><dt>Prepared by</dt><dd>MDA Analyst</dd></div>
+      <div><dt>Signed by</dt><dd>MDA Manager (on confirm)</dd></div>
+      <div><dt>Fee</dt><dd>${peso(cfg.certificateFee)} each — payable before release</dd></div></dl>
+    ${illus("The primary button prepares and signs the batch. Release stays blocked on the next step until the fee is recorded.")}
+  </div></div>`;
+}
+function certTrack(r) {
+  const cb = r.certBatch;
+  if (!cb) return notProcessed();
+  const paid = cb.payment === "Received" || cb.billedUnderRule;
+  return html`<div class="panel"><div class="ph"><h2>Payment &amp; release</h2>${cb.released ? pill("Released", "ok") : pill(paid ? "Ready to release" : "Awaiting payment", paid ? "info" : "warn")}</div><div class="pb">
+    <p class="tiny">Release is gated on payment — a certificate is never released while the fee shows "Not received", unless an account rule permits billing.</p>
+    <div class="svc-card"><div class="between"><h3>${icon("file", 15)} Certificate batch</h3>${pill(plural(cb.certs.length, "certificate"), "neutral")}</div>
+      <dl class="dl mt"><div><dt>Purpose</dt><dd>${cb.purpose}</dd></div>
+        <div><dt>Fee</dt><dd>${peso(cb.fee)} each <span class="tiny">VAT-inclusive, configurable</span></dd></div>
+        <div><dt>Payment</dt><dd>${cb.billedUnderRule ? "Billed under account rule" : cb.payment}</dd></div>
+        <div><dt>Signature</dt><dd>${cb.managerSigned ? "Signed — MDA Manager (simulated)" : "Pending"}</dd></div>
+        <div><dt>Validity</dt><dd>${cb.validity}</dd></div>
+        <div><dt>Sales handoff</dt><dd>${cb.salesHandoff ? "Hard copy prepared for Sales" : "After release"}</dd></div></dl>
+      ${!paid ? simNote("Release blocked until the fee is recorded or billed under an account rule.") : ""}
+      <div class="row tight mt">
+        ${!paid ? html`<button type="button" class="btn sm" data-sim="cert-payment" data-actor="Billing & Collection">Record certificate fee payment</button>
+          <button type="button" class="btn ghost sm" data-sim="cert-bill-under-rule" data-actor="MDA Manager">Bill under account rule</button>` : ""}
+        ${paid && !cb.released ? html`<button type="button" class="btn sm" data-sim="cert-release" data-actor="MDA Analyst">Release certificate (simulated email)</button>` : ""}
+        ${cb.released ? simNote("Released by simulated email; hard copy prepared for Sales handoff.") : ""}</div></div>
+  </div></div>`;
+}
+
+// ============================================================== Financial Assistance enrolment service (§18)
+function faStep(ctx) {
+  const r = ctx.rec;
+  if (ctx.step === "request") return faReqStep(r);
+  if (ctx.step === "data") return faDataStep(r);
+  if (ctx.step === "confirm") return faConfirmStep(r);
+  return faTrackStep(r);
+}
+function wireFa(ctx) {
+  wireSim(ctx);
+  const r = ctx.rec;
+  const sel = document.getElementById("faCut");
+  if (sel && !r.wf?.processed) sel.onchange = () => { if (r.faBatch) { r.faBatch.cutoff = sel.value; putReq(r); log(r, `FA cut-off set to ${sel.value}.`, "FA Enrollment Analyst"); } };
+}
+function faReqStep(r) {
+  const b = r.faBatch || {};
+  const cfg = config();
+  const opts = b.cutoffOptions || [b.cutoff].filter(Boolean);
+  return html`<div class="panel"><div class="ph"><h2>FA cut-off</h2><span class="pill info">Step 1</span></div><div class="pb">
+    <p class="tiny">Financial Assistance enrolment runs as a cut-off-based batch to an insurer. It is a separate service — it creates no membership and no standard new-member Billing endorsement.</p>
+    <dl class="dl mt"><div><dt>Account</dt><dd>${r.account?.name} · ${r.account?.code}</dd></div>
+      <div><dt>Insurer</dt><dd>${b.insurer || "—"}</dd></div>
+      <div><dt>Cut-off frequency</dt><dd>${cfg.faCutoffFrequency} <span class="tiny">account rule — ${b.rulePending ? "pending MDA validation" : "confirmed"}</span></dd></div></dl>
+    <div class="field mt" style="max-width:360px"><label for="faCut">Cut-off period</label>
+      <select id="faCut" class="inp" ${r.wf?.processed ? "disabled" : ""}>${opts.map((o) => html`<option ${o === b.cutoff ? "selected" : ""}>${o}</option>`)}</select></div>
+    <p class="tiny">${plural((b.candidates || []).length, "candidate")} in this cut-off, ${plural((b.exclusions || []).length, "exclusion")}. FA coverage (sum assured ${peso(b.sumAssured ?? cfg.faSumAssured)} per member) is distinct from the insurer charge (${peso(b.insurerCharge ?? cfg.faInsurerCharge)} per member).</p>
+    ${b.rulePending ? simNote("The cut-off frequency is treated as an account rule pending MDA validation — it is not assumed universal across accounts.") : ""}
+  </div></div>`;
+}
+function faDataStep(r) {
+  const b = r.faBatch || {};
+  const cfg = config();
+  const fe = r.faEnroll;
+  const eligible = fe ? fe.eligible : (b.candidates || []).filter((c) => c.status === "Eligible");
+  const exclusions = fe ? fe.exclusions : (b.exclusions || []);
+  const sum = b.sumAssured ?? cfg.faSumAssured, charge = b.insurerCharge ?? cfg.faInsurerCharge;
+  return html`<div class="panel"><div class="ph"><h2>Eligibility review</h2><span class="pill info">Step 2</span></div><div class="pb">
+    <p class="tiny">Every candidate is either eligible or excluded with a specific reason. The member's FA coverage is the sum assured; the insurer charge is what the insurer invoices us — the two are shown separately and never conflated.</p>
+    <div class="recon-bar row tight wrap"><span class="pill neutral">Candidates ${eligible.length + exclusions.length}</span><span class="tiny">=</span>
+      <span class="pill ok">${eligible.length} eligible</span><span class="tiny">+</span><span class="pill warn">${exclusions.length} excluded</span></div>
+    <h3 class="tiny mt">Eligible (${eligible.length})</h3>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Member</th><th>FA coverage (sum assured)</th><th>Insurer charge</th></tr></thead>
+      <tbody>${eligible.map((c) => html`<tr><td>${c.name}</td><td class="tiny">${peso(sum)}</td><td class="tiny">${peso(charge)}</td></tr>`)}</tbody></table></div>
+    <h3 class="tiny mt">Excluded (${exclusions.length})</h3>
+    <ul class="tiny">${exclusions.map((e) => html`<li>${e.name} — ${e.reason}</li>`)}</ul>
+    ${illus("Continue to confirm the eligible population for this cut-off.")}
+  </div></div>`;
+}
+function faConfirmStep(r) {
+  const b = r.faBatch || {};
+  const cfg = config();
+  const eligible = (b.candidates || []).filter((c) => c.status === "Eligible");
+  const sum = b.sumAssured ?? cfg.faSumAssured, charge = b.insurerCharge ?? cfg.faInsurerCharge;
+  if (r.wf?.processed) return html`<div class="panel"><div class="ph"><h2>Confirm batch</h2>${pill("Confirmed", "ok")}</div><div class="pb">
+    <p class="tiny">The eligible population is confirmed for this cut-off. Continue to Endorse &amp; Invoice.</p></div></div>`;
+  return html`<div class="panel"><div class="ph"><h2>Confirm batch</h2><span class="pill info">Step 3</span></div><div class="pb">
+    <p class="tiny">Confirm the eligible population for the ${b.cutoff} cut-off. No membership and no standard new-member Billing endorsement are created.</p>
+    <dl class="dl mt"><div><dt>Eligible members</dt><dd>${plural(eligible.length, "member")}</dd></div>
+      <div><dt>FA coverage total</dt><dd>${peso(eligible.length * sum)} <span class="tiny">(sum assured — the members' coverage)</span></dd></div>
+      <div><dt>Insurer charge total</dt><dd>${peso(eligible.length * charge)} <span class="tiny">(what the insurer invoices us — not a member benefit)</span></dd></div></dl>
+    ${illus("The primary button confirms the batch. Endorsement, invoice, Manager review and Accounting follow on the next step.")}
+  </div></div>`;
+}
+function faTrackStep(r) {
+  const fe = r.faEnroll;
+  if (!fe) return notProcessed();
+  const step = (label, done) => html`<li class="${done ? "on" : ""}">${done ? icon("check", 13) : "○"} ${label}</li>`;
+  return html`<div class="panel"><div class="ph"><h2>Endorse &amp; invoice</h2>${fe.accountingAck ? pill("Paid (acknowledged)", "ok") : pill("In progress", "neutral")}</div><div class="pb">
+    <p class="tiny">The batch flows insurer → invoice → MDA Manager → Accounting. Each step records its own simulated actor.</p>
+    <div class="svc-card"><div class="between"><h3>${icon("chart", 15)} FA enrolment batch</h3>${pill(`${fe.eligible.length} eligible`, "neutral")}</div>
+      <dl class="dl mt"><div><dt>Insurer</dt><dd>${fe.insurer}</dd></div><div><dt>Cut-off</dt><dd>${fe.cutoff}</dd></div>
+        <div><dt>FA coverage / member</dt><dd>${peso(fe.sumAssured)} <span class="tiny">(sum assured)</span></dd></div>
+        <div><dt>Insurer charge / member</dt><dd>${peso(fe.insurerCharge)} <span class="tiny">(invoice amount — not a member benefit)</span></dd></div>
+        <div><dt>Invoice total</dt><dd>${peso(fe.eligible.length * fe.insurerCharge)}</dd></div></dl>
+      <ul class="fa-steps tiny mt">
+        ${step("Endorsed to insurer (file sent)", fe.endorsed)}
+        ${step("Insurer invoice attached & payment request raised", fe.invoiced)}
+        ${step("MDA Manager reviewed payment request", fe.managerReviewed)}
+        ${step("Accounting acknowledged & recorded payment", fe.accountingAck)}
+      </ul>
+      ${fe.endorsed ? html`<details class="mt"><summary>Insurer file (sample)</summary><p class="tiny mt">FA-ENDO-${r.id} · ${plural(fe.eligible.length, "member")} · ${fe.insurer}. ${fe.corrected ? "A corrected file was resent (guarded against duplicate endorsement)." : "The file can be corrected and resent; resend is guarded against duplicate endorsement."}</p></details>` : ""}
+      <div class="row tight mt">
+        ${!fe.endorsed ? html`<button type="button" class="btn sm" data-sim="fa-endorse" data-actor="FA Enrollment Analyst">Endorse to insurer (simulated)</button>` : ""}
+        ${fe.endorsed && !fe.invoiced ? html`<button type="button" class="btn ghost sm" data-sim="fa-correct-resend" data-actor="FA Enrollment Analyst">Correct &amp; resend file</button>
+          <button type="button" class="btn sm" data-sim="fa-invoice" data-actor="FA Insurer">Attach insurer invoice</button>` : ""}
+        ${fe.invoiced && !fe.managerReviewed ? html`<button type="button" class="btn sm" data-sim="fa-manager-review" data-actor="MDA Manager">MDA Manager review</button>` : ""}
+        ${fe.managerReviewed && !fe.accountingAck ? html`<button type="button" class="btn sm" data-sim="fa-accounting-ack" data-actor="Accounting">Accounting acknowledgement</button>` : ""}
+        ${fe.accountingAck ? simNote("Batch complete — payment acknowledged (simulated).") : ""}</div></div>
+  </div></div>`;
 }

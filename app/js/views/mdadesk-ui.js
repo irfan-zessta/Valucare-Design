@@ -5,7 +5,7 @@
 // document preview. Everything is additive and self-contained.
 import { html, raw, go, fmtDate, fmtDateTime, dialog, announce } from "../core.js";
 import { icon, pill } from "../components.js";
-import { GUIDE_KEY, nextStep, statusOf, stepsFor, typeLabel, roleLabelFor, plural } from "./mdadesk-core.js";
+import { GUIDE_KEY, nextStep, statusOf, stepsFor, typeLabel, roleLabelFor, plural, fmtManila } from "./mdadesk-core.js";
 
 // -------------------------------------------------------------- sidebar highlight
 export function highlightNav(key) {
@@ -34,6 +34,7 @@ export function recHead(r) {
         <span>Ref ${r.reference || r.id}</span>
         <span>Account ${r.account?.code || "—"}</span>
         ${r.account?.contractStart ? html`<span>Contract ${fmtDate(r.account.contractStart)} – ${fmtDate(r.account.contractEnd)}</span>` : ""}
+        ${r.receivedAt ? html`<span>Received ${fmtManila(r.receivedAt)}</span>` : ""}
         <span>Assigned ${roleLabelFor(r.assignedTo)}</span>
       </div>
     </div>

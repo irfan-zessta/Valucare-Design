@@ -1111,3 +1111,16 @@ details[open]>summary{margin-bottom:4px}
 .stage-row{display:flex;flex-wrap:wrap;gap:4px}
 .stage-row .stage{padding:2px 8px;border:1px solid var(--border);border-radius:999px;color:var(--text-subtle);background:var(--surface)}
 .stage-row .stage.on{color:var(--text);border-color:var(--border-strong);background:var(--surface-muted);font-weight:600}
+/* Certificate preview — a watermarked sample document, never a real seal */
+.cert-preview{position:relative;overflow:hidden;border:1px solid var(--border);border-radius:var(--r-sm);padding:16px 18px;background:var(--surface);margin-top:12px}
+.cert-preview .cert-title{margin:0;font-size:15px;letter-spacing:.02em}
+.cert-wm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(-18deg);
+  font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--text);opacity:.07;pointer-events:none;text-align:center;padding:0 24px}
+/* FA endorse→invoice→review→accounting checklist */
+.fa-steps{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+.fa-steps li{display:flex;gap:6px;align-items:center;color:var(--text-subtle)}
+.fa-steps li.on{color:var(--text)}
+/* Monitoring QC expansion */
+.qc-detail{padding:4px 2px 8px}
+.qc-detail h3{margin:0 0 6px}
+tr.qc-row>td{background:var(--surface-muted)}

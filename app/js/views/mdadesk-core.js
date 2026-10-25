@@ -15,7 +15,7 @@ import { money, int } from "../core.js";
 
 export const STORE_KEY = "hms-mda:v1";
 export const GUIDE_KEY = "hms-mda-guide";
-const BASELINE = 2; // bump to force a reseed when the sample data shape changes
+const BASELINE = 3; // bump to force a reseed when the sample data shape changes
 
 // -------------------------------------------------------------- store plumbing
 export function loadStore() {
@@ -57,9 +57,12 @@ function defaultConfig() {
   return {
     lostCardFee: 112,          // ₱ VAT-inclusive — source example, configurable (§13)
     certificateFee: 56,        // ₱ VAT-inclusive — source example, configurable (§17)
+    reactivationFee: 112,      // ₱ sample reactivation/reapplication fee — configurable (§15)
     cutoffHour: 16,            // 4 p.m. Asia/Manila request cut-off for cancellations (§14)
     reactivationMonths: 2,     // reapplication threshold — configurable, not the sole determinant (§15)
     faCutoffFrequency: "Semi-monthly (1–15 / 16–end)", // FA cut-off frequency differs by account (§18)
+    faSumAssured: 50000,       // ₱ FA coverage / sum assured per member, from the account plan (§18)
+    faInsurerCharge: 1500,     // ₱ insurer charge / invoice amount per member — NOT the member's benefit (§18)
     note: "Demo defaults — confirm with MDA, Billing and the FA insurer before production. These fees, cut-offs and thresholds are illustrative, not settled policy.",
   };
 }
@@ -67,6 +70,37 @@ export function setConfig(patch) { const s = loadStore(); s.config = { ...config
 
 // -------------------------------------------------------------- small helpers
 export const stamp = () => new Date().toISOString();
+
+// One demo "now" so age, scheduling and effectivity all agree.
+export const DEMO_NOW_ISO = "2026-10-23";
+
+// -------------------------------------------------------------- Asia/Manila time (§5, §14)
+// A sample timestamp is treated as Asia/Manila WALL-CLOCK, read straight from its written
+// components — never through the browser's local time zone. This guarantees the received
+// time shown in the header, the history and the effectivity explanation are IDENTICAL on
+// every machine, and that the 4 p.m. cut-off uses the actual source hour.
+const _MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export function dparts(iso) {
+  const m = /(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(iso || ""));
+  if (!m) return null;
+  return { y: +m[1], mo: +m[2], d: +m[3], h: m[4] ? +m[4] : 0, mi: m[5] ? +m[5] : 0 };
+}
+// A tz-safe Date anchored at noon UTC on the Manila calendar day (for working-day math).
+export function manilaDateUTC(iso) {
+  const p = dparts(iso);
+  return p ? new Date(Date.UTC(p.y, p.mo - 1, p.d, 12, 0, 0)) : null;
+}
+export function fmtManilaDate(iso) {
+  const p = dparts(iso);
+  return p ? `${p.d} ${_MON[p.mo - 1]} ${p.y}` : "—";
+}
+export function fmtManila(iso, withZone = true) {
+  const p = dparts(iso);
+  if (!p) return "—";
+  let h = p.h % 12; if (h === 0) h = 12;
+  const ap = p.h < 12 ? "a.m." : "p.m.";
+  return `${p.d} ${_MON[p.mo - 1]} ${p.y}, ${h}:${String(p.mi).padStart(2, "0")} ${ap}${withZone ? " (Asia/Manila)" : ""}`;
+}
 export function log(r, text, actor) {
   (r.history = r.history || []).unshift({ at: stamp(), text, actor: actor || "MDA Analyst" });
 }
@@ -110,7 +144,12 @@ export const REQUEST_TYPES = {
   "cancellation":  { key: "cancellation",  label: "Cancellation",              short: "Cancellation",  movement: "Cancellation" },
   "reactivation":  { key: "reactivation",  label: "Reactivation",              short: "Reactivation",  movement: "Reactivation (policy reference retained)" },
   "reapplication": { key: "reapplication", label: "Reapplication",             short: "Reapplication", movement: "Reapplication (new application, history linked)" },
+  // Connected SERVICES — not member movements. A certificate and an FA batch never create
+  // memberships, cards, FA population or a standard new-member Billing endorsement (§17, §18).
+  "certificate":   { key: "certificate",   label: "Certificate of Membership", short: "Certificate",   movement: "Certificate of Membership (no coverage change)", service: true },
+  "fa-batch":      { key: "fa-batch",       label: "Financial Assistance",      short: "FA batch",      movement: "Financial Assistance enrolment (no coverage change)", service: true },
 };
+export const isService = (t) => !!(REQUEST_TYPES[t] || {}).service;
 export const typeLabel = (t) => (REQUEST_TYPES[t] || { label: t }).label;
 export const typeShort = (t) => (REQUEST_TYPES[t] || { short: t }).short;
 
@@ -127,6 +166,18 @@ export function stepsFor(type) {
     { key: "data", n: 2, label: "Members & Effectivity" },
     { key: "confirm", n: 3, label: "Check & Confirm" },
     { key: "track", n: 4, label: "Track Completion" },
+  ];
+  if (type === "certificate") return [
+    { key: "request", n: 1, label: "Select Members" },
+    { key: "data", n: 2, label: "Prepare Certificate" },
+    { key: "confirm", n: 3, label: "Manager Review" },
+    { key: "track", n: 4, label: "Payment & Release" },
+  ];
+  if (type === "fa-batch") return [
+    { key: "request", n: 1, label: "Review Cut-off" },
+    { key: "data", n: 2, label: "Eligibility Review" },
+    { key: "confirm", n: 3, label: "Confirm Batch" },
+    { key: "track", n: 4, label: "Endorse & Invoice" },
   ];
   return [
     { key: "request", n: 1, label: "Review Request" },
@@ -158,11 +209,36 @@ export function ensureWf(r) {
 
 // Member reconciliation: total input = processed (ready) + held (attention) + excluded.
 export function reconcile(r) {
+  // Once committed, counts are frozen to the snapshot taken at processing — the member
+  // table can never drift away from what was actually processed (critical #2, defect g).
+  if (r.wf && r.wf.processed && r.wf.counts) {
+    const c = r.wf.counts;
+    return { input: c.input, processed: c.processed, held: c.held, excluded: c.excluded, ready: c.processed };
+  }
   const m = r.members || [];
   const ready = m.filter((x) => x.validation === "ready").length;
   const held = m.filter((x) => x.validation === "attention").length;
   const excluded = m.filter((x) => x.validation === "excluded").length;
   return { input: m.length, processed: ready, held, excluded, ready };
+}
+
+// Amendment reconciliation runs over the requested CHANGES, not the member rows — so a
+// request listing two changes can never quietly process one (defect d, Demo 4). Each row
+// carries its own status: processed / held (reason) / excluded (reason).
+export function reconcileAmendment(r) {
+  const rows = (r.amendment && r.amendment.rows) || [];
+  const st = (x) => x.status || "processed";
+  return {
+    requested: rows.length,
+    processed: rows.filter((x) => st(x) === "processed").length,
+    held: rows.filter((x) => st(x) === "held").length,
+    excluded: rows.filter((x) => st(x) === "excluded").length,
+    rows,
+  };
+}
+// Does an amendment row replace a physical card? (plan/room/name changes do; others may not.)
+export function amendmentNeedsCard(row) {
+  return (row.downstream || []).some((d) => /card/i.test(d)) || /card/i.test(row.impact || "");
 }
 
 // -------------------------------------------------------------- validation engine (§9)
@@ -173,40 +249,57 @@ export function validateMembers(r) {
   const m = r.members || [];
   const acct = r.account || {};
   const planCodes = (acct.planCodes || []).map((p) => p.code);
-  const byPrincipal = {};
-  m.forEach((x) => { if (x.memberType === "Principal") byPrincipal[x.principalRef || x.id] = x; });
+
+  // Pass 1 — intrinsic checks for every row (name, DOB, plan, overage, duplicate). We stash
+  // these so Pass 2 can judge whether a principal will actually be COMMITTED (§9, critical #3).
   m.forEach((x) => {
-    // Rows explicitly excluded by a human keep their state and reason.
-    if (x.validation === "excluded") return;
+    if (x.validation === "excluded") { x._intrinsic = []; return; }
     const issues = [];
     if (!x.name) issues.push(issue("name", "Member name is blank", "A membership record cannot be created without a name.", "Add the member's full name."));
     if (!x.dob) issues.push(issue("dob", "Date of birth missing", "Age eligibility and the FA population cannot be assessed.", "Enter the date of birth from the member file."));
     if (x.planCode && planCodes.length && !planCodes.includes(x.planCode))
       issues.push(issue("planCode", `Plan code ${x.planCode} is not on this account`, "The plan must exist on the account's approved plan list before benefits can be applied.", `Use one of: ${planCodes.join(", ")}, or request the plan from Sales.`));
-    if (x.memberType === "Dependent") {
-      const principal = m.find((p) => p.memberType === "Principal" && (p.principalRef === x.principalRef || p.id === x.principalRef));
-      if (!x.principalRef || !principal)
-        issues.push(issue("principalRef", "Dependent has no matching principal", "A dependent cannot be processed without a valid principal relationship.", "Link to a valid principal reference, or request clarification from the requester."));
-    }
-    // Age eligibility — account-rule driven; overage is flagged for review, never auto-cancelled.
     const age = ageFrom(x.dob);
     if (x.memberType === "Dependent" && age != null && age > 60 && !x.overrideReason)
       issues.push(issue("dob", `Dependent age ${age} is over the eligibility guide (60)`, "Overage dependents need an account-rule decision before enrolment.", "Confirm the account's overage rule, then override with a reason or exclude the row."));
-    // Duplicate candidates — surfaced for human review, not merged.
+    // Duplicate candidates — surfaced for human review, never merged by name (§9).
     x.duplicateOf = null;
     const dupe = m.find((o) => o !== x && o.validation !== "excluded" && sameName(o.name, x.name) && o.memberType === x.memberType);
-    if (dupe) { x.duplicateOf = dupe.id; issues.push(issue("name", `Possible duplicate of ${dupe.name}`, "Creating two records for the same person causes double Billing and duplicate cards.", "Review both rows. Keep one and exclude the other — never auto-merge by name.")); }
+    if (dupe && !x.dupResolved) { x.duplicateOf = dupe.id; issues.push(issue("name", `Possible duplicate of ${dupe.name}`, "Creating two records for the same person causes double Billing and duplicate cards.", "Compare both records, then choose same person / different person / request clarification — never auto-merge by name.")); }
+    x._intrinsic = issues;
+  });
 
+  // Pass 2 — a dependent is checked against the ACTUAL set of members that will be committed.
+  // It may only proceed when its principal is itself committable (ready, not held/excluded/
+  // duplicate), OR it is a verified dependent-only enrolment against an existing principal.
+  // A dummy enrolled principal is never created (critical #3, Demo 2).
+  m.forEach((x) => {
+    if (x.validation === "excluded") { x.issues = []; return; }
+    const issues = (x._intrinsic || []).slice();
+    if (x.memberType === "Dependent") {
+      const principal = m.find((p) => p.memberType === "Principal" && (p.principalRef === x.principalRef || p.id === x.principalRef));
+      if (x.existingPrincipalVerified && x.principalRef) {
+        // Verified link to an existing in-system principal — allowed without an input row.
+      } else if (!x.principalRef || !principal) {
+        issues.push(issue("principalRef", "Dependent has no matching principal in this request", "A dependent cannot be processed without a valid principal relationship, and a dummy principal must never be created.", "Link to a principal in this request, verify an existing in-system principal, or request clarification."));
+      } else if (principal.validation === "excluded") {
+        issues.push(issue("principalRef", `Principal ${principal.name} is excluded from this commit`, "A dependent cannot be enrolled while the principal it depends on is excluded.", "Reinstate and resolve the principal, or verify a link to an existing in-system principal."));
+      } else if (principal.duplicateOf) {
+        issues.push(issue("principalRef", `Principal ${principal.name} is a held duplicate candidate`, "A dependent cannot be enrolled against an unresolved duplicate principal — resolving by creating a dummy principal is not allowed.", "Resolve the duplicate (same / different person), or verify a link to the existing in-system principal."));
+      } else if ((principal._intrinsic || []).length) {
+        issues.push(issue("principalRef", `Principal ${principal.name} is held (${principal._intrinsic[0].what})`, "A dependent can only be committed together with a principal that will itself be committed.", "Resolve the principal's issue first, or verify a link to an existing in-system principal."));
+      }
+    }
     x.issues = issues;
-    // Preserve a human's accepted/override; otherwise derive from the checks.
     if (issues.length) x.validation = "attention";
     else x.validation = "ready";
+    delete x._intrinsic;
   });
   putReq(r);
   return reconcile(r);
 }
 function issue(field, what, why, fix) { return { field, what, why, fix }; }
-function ageFrom(dob) { if (!dob) return null; const d = new Date(dob); if (isNaN(d)) return null; const n = new Date("2026-10-23"); let a = n.getFullYear() - d.getFullYear(); if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) a--; return a; }
+function ageFrom(dob) { if (!dob) return null; const d = new Date(dob); if (isNaN(d)) return null; const n = new Date(DEMO_NOW_ISO); let a = n.getFullYear() - d.getFullYear(); if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) a--; return a; }
 // Case / punctuation / suffix-insensitive name comparison for duplicate candidates.
 function norm(s) { return String(s || "").toLowerCase().replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, "").replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim(); }
 function sameName(a, b) { return !!a && !!b && norm(a) === norm(b); }
@@ -216,25 +309,29 @@ function sameName(a, b) { return !!a && !!b && norm(a) === norm(b); }
 // 4 p.m. cut-off and a small demo working-day calendar (Asia/Manila). The underlying
 // event date (death / resignation) is kept separate from the system-processing date.
 const DEMO_HOLIDAYS = ["2026-11-01", "2026-11-30", "2026-12-25", "2026-12-30", "2026-12-31"];
-function isWorkingDay(d) { const dow = d.getDay(); if (dow === 0 || dow === 6) return false; return !DEMO_HOLIDAYS.includes(d.toISOString().slice(0, 10)); }
-function nextWorkingDay(d) { const n = new Date(d); do { n.setDate(n.getDate() + 1); } while (!isWorkingDay(n)); return n; }
+const isoUTC = (d) => d.toISOString().slice(0, 10);
+function isWorkingDay(d) { const dow = d.getUTCDay(); if (dow === 0 || dow === 6) return false; return !DEMO_HOLIDAYS.includes(isoUTC(d)); }
+function nextWorkingDay(d) { const n = new Date(d); do { n.setUTCDate(n.getUTCDate() + 1); } while (!isWorkingDay(n)); return n; }
 export function cancellationEffectivity(receivedISO, requestedISO, cfg = config()) {
-  const received = new Date(receivedISO);
-  const hour = received.getUTCHours(); // demo: treat stored time as Manila wall-clock
-  const afterCutoff = hour >= cfg.cutoffHour;
-  // Effective processing date: within cut-off → next working day from receipt; after
-  // cut-off → treated as received the next working day, effectivity follows from there.
+  // Read the cut-off from the ACTUAL source hour (Asia/Manila wall-clock), and do all
+  // day math on noon-UTC anchors so no browser time zone can shift a day (critical #5).
+  const p = dparts(receivedISO) || { h: 0 };
+  const afterCutoff = p.h >= cfg.cutoffHour;
+  const received = manilaDateUTC(receivedISO);
+  const now = manilaDateUTC(DEMO_NOW_ISO);
+  // Within cut-off → next working day from receipt; after cut-off → treated as received the
+  // next working day, effectivity follows from there.
   let base = afterCutoff ? nextWorkingDay(received) : new Date(received);
   let effective = nextWorkingDay(base);
   // If the requester asked for a later effective date, respect it (future-dated).
-  let requested = requestedISO ? new Date(requestedISO) : null;
+  const requested = requestedISO ? manilaDateUTC(requestedISO) : null;
   let scheduled = false;
-  if (requested && requested > effective) { effective = requested; scheduled = requested > new Date("2026-10-23"); }
-  else if (effective > new Date("2026-10-23")) scheduled = true;
-  const iso = effective.toISOString().slice(0, 10);
-  const explain = `Received ${received.toISOString().slice(0, 16).replace("T", " ")} (Asia/Manila). ` +
+  if (requested && requested > effective) { effective = requested; scheduled = requested > now; }
+  else if (effective > now) scheduled = true;
+  const iso = isoUTC(effective);
+  const explain = `Received ${fmtManila(receivedISO)}. ` +
     `${afterCutoff ? `After the ${cfg.cutoffHour}:00 cut-off → treated as received the next working day. ` : `Within the ${cfg.cutoffHour}:00 cut-off. `}` +
-    `Effectivity follows on the next working day, skipping weekends and demo holidays → ${iso}.`;
+    `Effectivity follows on the next working day, skipping weekends and demo holidays → ${fmtManilaDate(iso)}.`;
   return { effective: iso, afterCutoff, scheduled, explain };
 }
 
@@ -245,6 +342,8 @@ export function nextStep(r) {
   const wf = ensureWf(r);
   const type = r.type;
   if (type === "lost-card") return lostCardNext(r);
+  if (type === "certificate") return certificateNext(r);
+  if (type === "fa-batch") return faBatchNext(r);
   // Waiting on Sales clarification keeps the request honest.
   if (r.waitingOn === "Sales")
     return { step: "request", label: "Simulate Sales response", owner: "Sales", sentence: "A clarification is open with Sales — simulate their response to resume. The request stays with Sales until then." };
@@ -253,11 +352,42 @@ export function nextStep(r) {
   if (!wf.dataReviewed)
     return { step: "data", label: "Review member data", owner: "MDA Analyst", sentence: "Open the Member Data table, resolve any rows that need attention, then continue. Valid rows can proceed while held rows stay held." };
   if (!wf.processed) {
+    if (type === "amendment") {
+      const ra = reconcileAmendment(r);
+      return { step: "confirm", label: processLabel(type, ra.processed), owner: "MDA Analyst", sentence: `Reconcile the requested changes (requested = processed + held + excluded) and apply the ${plural(ra.processed, "change")}. Held and excluded changes are not applied.` };
+    }
     const rc = reconcile(r);
     return { step: "confirm", label: processLabel(type, rc.ready), owner: "MDA Analyst", sentence: `Check the reconciliation (input = processed + held + excluded) and process the ${plural(rc.ready, "eligible member")}. Held and excluded rows are not processed.` };
   }
   // Track completion — surface the first incomplete connected service honestly.
   return trackNext(r);
+}
+
+// --- Certificate of Membership (service) — never a member movement.
+function certificateNext(r) {
+  const wf = ensureWf(r);
+  if (r.waitingOn === "Sales") return { step: "request", label: "Simulate Sales response", owner: "Sales", sentence: "A clarification is open — simulate the response to resume." };
+  if (!wf.requestReviewed) return { step: "request", label: "Review certificate request", owner: "MDA Analyst", sentence: "Review the purpose, the selected members and the fee. A certificate makes no coverage change and creates no membership, card or FA record." };
+  if (!wf.dataReviewed) return { step: "data", label: "Prepare certificate preview", owner: "MDA Analyst", sentence: "Prepare the certificate preview for each selected member — name, membership number, account, coverage dates, purpose, issue date and 15-day validity, with a demo watermark." };
+  if (!wf.processed) return { step: "confirm", label: "Send for Manager signature", owner: "MDA Manager", sentence: "The MDA Manager reviews and applies the signature (simulated) — a step distinct from the analyst's preparation." };
+  const cb = r.certBatch || {};
+  if (cb.payment !== "Received" && !cb.billedUnderRule) return { step: "track", label: "Record certificate fee payment", owner: "Billing & Collection", sentence: `The ${peso(config().certificateFee)} fee is not yet received. Release is blocked until payment is recorded, unless an account rule permits billing.` };
+  if (!cb.released) return { step: "track", label: "Release certificate", owner: "MDA Analyst", sentence: "Payment is settled — release by simulated email and prepare the hard copy for Sales handoff." };
+  return null;
+}
+
+// --- Financial Assistance enrolment batch (service) — never a member movement.
+function faBatchNext(r) {
+  const wf = ensureWf(r);
+  if (!wf.requestReviewed) return { step: "request", label: "Review the FA cut-off", owner: "FA Enrollment Analyst", sentence: "Review the insurer and the selected cut-off. The cut-off frequency is an account rule, pending MDA validation — it is not assumed universal." };
+  if (!wf.dataReviewed) return { step: "data", label: "Review eligibility", owner: "FA Enrollment Analyst", sentence: "Review eligible candidates and every excluded member with its specific reason. FA coverage (sum assured) is shown separately from the insurer charge." };
+  if (!wf.processed) return { step: "confirm", label: "Confirm FA batch", owner: "FA Enrollment Analyst", sentence: "Confirm the eligible population for this cut-off. No membership and no standard new-member Billing endorsement are created." };
+  const fe = r.faEnroll || {};
+  if (!fe.endorsed) return { step: "track", label: "Endorse to insurer", owner: "FA Enrollment Analyst", sentence: "Preview the insurer file and endorse the batch (simulated). The file can be corrected and resent; resend is protected against duplicate endorsement." };
+  if (!fe.invoiced) return { step: "track", label: "Attach insurer invoice & payment request", owner: "FA Insurer", sentence: "Attach the sample insurer invoice and raise the payment request for Accounting." };
+  if (!fe.managerReviewed) return { step: "track", label: "MDA Manager review", owner: "MDA Manager", sentence: "The MDA Manager reviews the payment request (simulated) before Accounting." };
+  if (!fe.accountingAck) return { step: "track", label: "Accounting acknowledgement", owner: "Accounting", sentence: "Accounting acknowledges and records payment (simulated)." };
+  return null;
 }
 function reviewSentence(r) {
   if (r.type === "new-closed") return "Review the Sales endorsement, account code, contract dates, plan codes and Schedule of Benefits, then continue to member data.";
@@ -268,6 +398,9 @@ function reviewSentence(r) {
 function processLabel(type, n) {
   if (type === "cancellation") return "Confirm cancellation";
   if (type === "renewal") return "Confirm renewal population";
+  if (type === "amendment") return `Apply ${plural(n, "change")}`;
+  if (type === "reactivation") return "Reactivate existing membership";
+  if (type === "reapplication") return "Create new application";
   return `Process ${plural(n, "eligible member")}`;
 }
 function lostCardNext(r) {
@@ -277,15 +410,36 @@ function lostCardNext(r) {
   return trackNext(r);
 }
 function trackNext(r) {
-  const b = r.billing, c = r.cards, fa = r.fa;
+  const b = r.billing, c = r.cards, fa = r.fa, rs = r.restore;
+  const paid = b && (b.payment === "Received" || b.billedUnderRule);
   if (b && b.status === "Not Sent") return { step: "track", label: "Send Billing endorsement", owner: "MDA Analyst", sentence: "Send the prepared Billing endorsement to Billing & Collection. Nothing is really transmitted — this is a simulated handoff." };
   if (b && b.status === "Sent") return { step: "track", label: "Simulate Billing acknowledgement", owner: "Billing & Collection", sentence: "Billing has the endorsement. Simulate their acknowledgement. Payment status is tracked separately from acknowledgement." };
-  if (c && c.stage === "Ordered") return { step: "track", label: "Simulate card provider update", owner: "Card Provider", sentence: "Advance the card order through the provider stages. Printing and courier are external — we track, we don't perform them." };
-  if (c && ["Sent to Provider", "Printed", "Received", "Packed", "Dispatched"].includes(c.stage))
-    return { step: "track", label: "Simulate next card stage", owner: "Card Provider", sentence: `Card batch is "${c.stage}". Advance the next delivery stage. A batch is only Delivered with a (simulated) proof of receipt.` };
+  // Fee gate — a lost-card replacement and reactivation/reapplication settle a fee before finishing.
+  const feeGate = ["lost-card", "reactivation", "reapplication"].includes(r.type);
+  if (feeGate && b && !paid) return { step: "track", label: "Record fee payment", owner: "Billing & Collection", sentence: `The ${b.fee ? peso(b.fee) + " " : ""}fee is not yet received. ${r.type === "lost-card" ? "The card cannot be sent to the provider" : "Coverage is not restored"} until payment is recorded, unless an account rule permits billing.` };
+  // Restore movements finalise only after payment.
+  if (rs && !rs.finalized) return { step: "track", label: rs.kind === "reactivation" ? "Reactivate existing membership" : "Create new application membership", owner: "MDA Analyst", sentence: rs.kind === "reactivation" ? `Payment acknowledged — reactivate using the original policy reference ${rs.policyRef || ""}. History is preserved.` : `Payment acknowledged — create the new membership linked to historical reference ${rs.historicalRef || ""} (historical coverage is not overwritten).` };
+  // Cards — correct actor per stage; replacement never reaches the provider before its fee settles.
+  if (c && c.stage !== "Delivered") {
+    if (c.waitsForPayment && c.stage === "Ordered" && !paid)
+      return { step: "track", label: "Record fee payment first", owner: "Billing & Collection", sentence: "The card cannot be sent to the provider until the fee is paid or billed under an account rule." };
+    if (c.stage === "Dispatched" && !c.receivingCopy)
+      return { step: "track", label: "Attach receiving copy", owner: "Facility Management Admin", sentence: "A batch is only marked Delivered once a (simulated) receiving copy is attached — being dispatched is not enough." };
+    return { step: "track", label: c.stage === "Ordered" ? "Send order to card provider" : "Advance card stage", owner: cardStageActor(c.stage), sentence: `Card batch is "${c.stage}". ${cardStageActor(c.stage)} performs the next step. Printing and courier are external — we track, we don't perform them.` };
+  }
   if (fa && fa.status === "Eligible — not endorsed") return { step: "track", label: "Open FA enrolment", owner: "FA Enrollment Analyst", sentence: "Members were added to the FA eligibility population. FA enrolment runs on its own cut-off in Financial Assistance." };
   return null; // every tracked service is complete
 }
+// Who performs the transition FROM a given card stage — real actors, not all "Card Provider".
+const CARD_STAGE_ACTOR = {
+  "Ordered": "Card Admin",                // sends the order to the provider
+  "Sent to Provider": "Card Provider",    // provider prints
+  "Printed": "Card Admin",                // MDA receives from provider
+  "Received": "Card Admin",               // packs the batch
+  "Packed": "Facility Management Admin",  // dispatches
+  "Dispatched": "Facility Management Admin", // delivers (with receiving copy)
+};
+export const cardStageActor = (stage) => CARD_STAGE_ACTOR[stage] || "Card Admin";
 
 // A short, honest completion summary — never one misleading "Everything completed"
 // while cards / Billing / insurer are still pending (§19).
@@ -294,8 +448,17 @@ export function completionState(r) {
   if (r.billing) parts.push({ label: "Billing", done: ["Acknowledged", "Completed"].includes(r.billing.status), state: r.billing.status });
   if (r.cards) parts.push({ label: "Cards", done: r.cards.stage === "Delivered", state: r.cards.stage });
   if (r.fa) parts.push({ label: "Financial Assistance", done: ["Endorsed to insurer", "Payment requested", "Completed"].includes(r.fa.status), state: r.fa.status });
+  if (r.certBatch) parts.push({ label: "Certificate", done: !!r.certBatch.released, state: r.certBatch.released ? "Released" : (r.certBatch.payment === "Received" || r.certBatch.billedUnderRule ? "Ready to release" : "Awaiting payment") });
+  if (r.faEnroll) parts.push({ label: "FA enrolment", done: !!r.faEnroll.accountingAck, state: faEnrollState(r.faEnroll) });
   const allDone = parts.length > 0 && parts.every((p) => p.done);
   return { parts, allDone };
+}
+function faEnrollState(fe) {
+  if (fe.accountingAck) return "Paid (acknowledged)";
+  if (fe.managerReviewed) return "Payment request with Accounting";
+  if (fe.invoiced) return "Invoice attached";
+  if (fe.endorsed) return "Endorsed to insurer";
+  return "Confirmed — not endorsed";
 }
 
 // -------------------------------------------------------------- status language
@@ -337,6 +500,10 @@ export const memberCount = (r) => (r.members || []).length;
 export function processRequest(r, actor = "MDA Analyst") {
   const wf = ensureWf(r);
   if (wf.processed) return r; // guard against double processing
+  if (r.type === "certificate") return processCertificate(r, actor);
+  if (r.type === "fa-batch") return processFaBatch(r, actor);
+  if (r.type === "amendment") return processAmendment(r, actor);
+
   const rc = reconcile(r);
   wf.counts = { input: rc.input, processed: rc.ready, held: rc.held, excluded: rc.excluded };
   wf.processed = true;
@@ -344,42 +511,63 @@ export function processRequest(r, actor = "MDA Analyst") {
 
   const movement = (REQUEST_TYPES[r.type] || {}).movement || "Membership change";
   const cfg = config();
+  const isRestore = r.type === "reactivation" || r.type === "reapplication";
+  const restoreFee = isRestore ? cfg.reactivationFee : 0;
 
-  // Billing handoff (§19) — Not Sent until explicitly sent; payment separate from ack.
-  // Lost card / certificate carry a fee rather than premium movement.
+  // Billing handoff (§19) — Not Sent until explicitly sent; payment separate from ack. Each
+  // movement carries its own basis (critical #4): a lost card / reactivation carries a fee.
   r.billing = {
     status: "Not Sent",
     ref: `BILL-ENDO-${r.id}`,
     movementType: movement,
     members: rc.ready,
     effectiveDates: r.effectiveDate || r.account?.contractStart || null,
-    premium: r.type === "lost-card" ? cfg.lostCardFee : (r.premiumTotal || null),
-    fee: r.type === "lost-card" ? cfg.lostCardFee : null,
+    premium: r.type === "lost-card" ? null : (r.premiumTotal || null),
+    fee: r.type === "lost-card" ? cfg.lostCardFee : (restoreFee || null),
     payment: "Not received",
-    note: r.type === "lost-card" ? `Card replacement fee ${peso(cfg.lostCardFee)} (VAT-inclusive, configurable).` : "Prepared from processed members — adjustments passed to Billing, not pro-rated here.",
+    note: billingNote(r.type, cfg),
   };
 
-  // Card tasks (§16) — created from processing, not a separate manual log. Only for
-  // members who need a new/replacement card. Corporate initial cards do NOT wait for
-  // Billing payment unless an account rule requires it.
-  const needCards = r.type === "lost-card" ? 1 : (r.members || []).filter((x) => x.validation === "ready" && x.cardNeeded !== false).length;
+  // Card tasks (§16) — only for members who need a new/replacement card. Reactivation reuses
+  // the existing card; cancellation issues none.
+  let needCards = 0;
+  if (r.type === "lost-card") needCards = 1;
+  else if (["new-closed", "additional", "renewal", "reapplication"].includes(r.type))
+    needCards = (r.members || []).filter((x) => x.validation === "ready" && x.cardNeeded !== false).length;
   if (needCards > 0) {
+    // A lost-card replacement must not reach the provider before its fee is settled (defect e).
+    const waitsForPayment = r.type === "lost-card" || r.type === "reapplication";
     r.cards = {
       stage: "Ordered",
       count: needCards,
       cardType: r.type === "lost-card" ? "Replacement" : "Initial",
+      reason: cardReason(r.type),
       provider: "Cardlogix PH (demo provider)",
       address: r.account?.deliveryAddress || "Client HR, " + (r.account?.name || "Account"),
       dispatchRef: null,
-      waitsForPayment: false,
-      history: [{ at: stamp(), text: "Card order created from membership processing." }],
+      receivingCopy: false,
+      waitsForPayment,
+      history: [{ at: stamp(), text: "Card order created from processing.", actor }],
     };
   } else { r.cards = null; }
 
-  // FA eligibility population (§7, §18) — members added to eligibility; enrolment runs
-  // on its own cut-off. Not every member is auto-included; cancelled are not auto-excluded.
-  if (!["lost-card", "cancellation"].includes(r.type)) {
+  // FA eligibility population (§7, §18) — ONLY genuine new/renewed coverage is added. Amendment,
+  // reactivation and reapplication do NOT populate FA (critical #4). Cancelled are handled below.
+  if (["new-closed", "additional", "renewal"].includes(r.type)) {
     r.fa = { status: "Eligible — not endorsed", population: rc.ready, cutoff: null, note: "Added to the FA eligibility population. FA enrolment runs on its own cut-off in Financial Assistance." };
+  } else { r.fa = null; }
+
+  // Reactivation / reapplication — coverage is NOT restored until the fee/premiums settle.
+  if (isRestore) {
+    const d = r[r.type] || {};
+    r.restore = {
+      kind: r.type,
+      policyRef: d.policyRef || d.historicalRef || null,
+      historicalRef: d.historicalRef || d.policyRef || null,
+      newRef: r.type === "reapplication" ? `POL-${(r.account?.code || "ACC").split("-").slice(-1)[0]}-${String(r.id).slice(-4)}` : null,
+      finalized: false,
+    };
+    r.billing.movementType = movement;
   }
 
   // Cancellations: compute the working-day effectivity; future-dated stays scheduled.
@@ -389,12 +577,126 @@ export function processRequest(r, actor = "MDA Analyst") {
     r.effectivityExplain = eff.explain;
     r.scheduled = eff.scheduled;
     r.billing.movementType = "Cancellation";
-    r.fa = null;
-    r.cards = null;
-    r.billing.note = "Coverage end-dated per the calculated effectivity. No refund is claimed as already paid.";
+    r.billing.premium = null; r.billing.fee = null;
   }
 
-  log(r, `Processed ${plural(rc.ready, "eligible member")}. ${rc.held ? plural(rc.held, "member") + " held" : "No members held"}, ${rc.excluded ? plural(rc.excluded, "member") + " excluded" : "none excluded"}. Billing endorsement, card and FA tasks prepared as applicable.`, actor);
+  log(r, processLog(r.type, rc), actor);
+  putReq(r);
+  return r;
+}
+function billingNote(type, cfg) {
+  if (type === "lost-card") return `Card replacement fee ${peso(cfg.lostCardFee)} (VAT-inclusive, configurable). Fee must settle before the card is sent to the provider.`;
+  if (type === "cancellation") return "Coverage end-dated per the calculated effectivity. No refund is claimed as already paid — any adjustment is left for Billing to compute.";
+  if (type === "reactivation") return `Reactivation fee ${peso(cfg.reactivationFee)} plus premiums to settle. Coverage is not restored until payment is acknowledged.`;
+  if (type === "reapplication") return `New-application fee ${peso(cfg.reactivationFee)} plus premium. The new membership is created once payment is acknowledged; historical coverage is not overwritten.`;
+  return "Premium/fee basis is passed to Billing — Billing does its own prorating. Nothing is pro-rated here.";
+}
+function cardReason(type) {
+  if (type === "lost-card") return "Lost / damaged card replacement";
+  if (type === "reapplication") return "New application card";
+  if (type === "renewal") return "Renewal — new / transferred / card-relevant change";
+  return "New enrolment card";
+}
+function processLog(type, rc) {
+  if (type === "cancellation") return `Cancellation confirmed for ${plural(rc.ready, "member")}. Working-day effectivity calculated; Billing cancellation prepared.`;
+  if (type === "reactivation") return "Reactivation prepared — fee and premiums raised with Billing. Coverage restores on payment acknowledgement; original policy reference retained.";
+  if (type === "reapplication") return "Reapplication prepared — fee and premium raised with Billing. New membership created on payment acknowledgement; historical identity linked.";
+  return `Processed ${plural(rc.ready, "eligible member")}. ${rc.held ? plural(rc.held, "member") + " held" : "No members held"}, ${rc.excluded ? plural(rc.excluded, "member") + " excluded" : "none excluded"}. Downstream records prepared for this movement only.`;
+}
+
+// Amendment processing reconciles the requested CHANGES, applies each processed change with a
+// field-level history entry, and raises Billing / replacement-card tasks only for affected
+// fields. Amended members are never pushed into the FA population (defect d, Demo 4).
+function processAmendment(r, actor = "MDA Analyst") {
+  const wf = ensureWf(r);
+  const ra = reconcileAmendment(r);
+  wf.counts = { input: ra.requested, processed: ra.processed, held: ra.held, excluded: ra.excluded };
+  wf.processed = true;
+  wf.processedAt = stamp();
+  const cfg = config();
+  const applied = ra.rows.filter((x) => (x.status || "processed") === "processed");
+  // Scheduled rows stay pending until their effective date.
+  const now = manilaDateUTC(DEMO_NOW_ISO);
+  let anyScheduled = false;
+  applied.forEach((row) => {
+    const eff = manilaDateUTC(row.effective);
+    row.applied = !(eff && eff > now);
+    if (!row.applied) anyScheduled = true;
+    (r.fieldHistory = r.fieldHistory || []).push({ at: stamp(), member: row.member, field: row.field, from: row.current, to: row.requested, effective: row.effective, status: row.applied ? "Applied" : "Scheduled", actor });
+  });
+  r.scheduled = anyScheduled;
+  r.billing = {
+    status: "Not Sent", ref: `BILL-ENDO-${r.id}`, movementType: "Amendment",
+    members: applied.length,
+    effectiveDates: (applied[0] || {}).effective || r.effectiveDate || null,
+    premium: applied.some((x) => /plan/i.test(x.field)) ? (r.premiumTotal || null) : null,
+    fee: null, payment: "Not received",
+    note: `Amendment affecting ${applied.map((x) => x.field).join(", ") || "no fields"}. Only affected members/fields are billed — recalculated from the confirmed plan rule, not a global formula.`,
+  };
+  const cardRows = applied.filter(amendmentNeedsCard);
+  if (cardRows.length) {
+    r.cards = { stage: "Ordered", count: cardRows.length, cardType: "Replacement", reason: "Amendment — card-affecting change", provider: "Cardlogix PH (demo provider)", address: r.account?.deliveryAddress || "Client HR, " + (r.account?.name || "Account"), dispatchRef: null, receivingCopy: false, waitsForPayment: false, history: [{ at: stamp(), text: "Replacement card order created for card-affecting amendment(s).", actor }] };
+  } else { r.cards = null; }
+  r.fa = null; // amended members are NOT auto-enrolled into FA
+  log(r, `Amendment reconciled: ${ra.requested} requested = ${ra.processed} applied + ${ra.held} held + ${ra.excluded} excluded. ${anyScheduled ? "Scheduled change(s) stay pending until the effective date." : ""}`, actor);
+  putReq(r);
+  return r;
+}
+
+// Certificate of Membership — a service. No membership, card, FA or standard Billing endorsement.
+function processCertificate(r, actor = "MDA Analyst") {
+  const wf = ensureWf(r);
+  const cfg = config();
+  const sel = (r.members || []).filter((m) => m.validation !== "excluded");
+  const issueDate = DEMO_NOW_ISO;
+  r.certBatch = {
+    purpose: r.certificateRequest?.purpose || "General",
+    fee: cfg.certificateFee,
+    payment: "Not received",
+    billedUnderRule: false,
+    managerSigned: true,
+    preparedBy: "MDA Analyst",
+    signedBy: "MDA Manager",
+    issueDate,
+    validity: "Valid for 15 days from issue (demo)",
+    watermark: "SAMPLE — demo certificate, not a real seal or live verification",
+    released: false,
+    salesHandoff: false,
+    certs: sel.map((m, i) => ({
+      certNo: `COM-${String(r.id).slice(-4)}-${String(i + 1).padStart(2, "0")}`,
+      member: m.name, membershipNo: m.identity?.employeeRef || m.principalRef || "—",
+      account: r.account?.name, coverage: `${fmtManilaDate(r.account?.contractStart || r.effectiveDate)} – ${fmtManilaDate(r.account?.contractEnd || r.effectiveDate)}`,
+    })),
+  };
+  wf.counts = { input: sel.length, processed: sel.length, held: 0, excluded: (r.members || []).length - sel.length };
+  wf.processed = true; wf.processedAt = stamp();
+  r.billing = null; r.cards = null; r.fa = null;
+  log(r, `Certificate of Membership prepared and signed (simulated) for ${plural(sel.length, "member")} — ${peso(cfg.certificateFee)} VAT-inclusive, configurable. No coverage, card or FA record created.`, actor);
+  putReq(r);
+  return r;
+}
+
+// Financial Assistance enrolment batch — a service. No membership, card or standard new-member
+// Billing endorsement. FA coverage (sum assured) is kept separate from the insurer charge.
+function processFaBatch(r, actor = "FA Enrollment Analyst") {
+  const wf = ensureWf(r);
+  const cfg = config();
+  const b = r.faBatch || {};
+  const eligible = (b.candidates || []).filter((c) => c.status === "Eligible");
+  r.faEnroll = {
+    insurer: b.insurer || "FA insurer (demo)",
+    cutoff: b.cutoff || "—",
+    eligible,
+    exclusions: b.exclusions || [],
+    sumAssured: b.sumAssured ?? cfg.faSumAssured,   // FA coverage from the account plan
+    insurerCharge: b.insurerCharge ?? cfg.faInsurerCharge, // insurer invoice amount per member
+    endorsed: false, invoiced: false, managerReviewed: false, accountingAck: false,
+    corrected: false,
+  };
+  wf.counts = { input: (b.candidates || []).length + (b.exclusions || []).length, processed: eligible.length, held: 0, excluded: (b.exclusions || []).length };
+  wf.processed = true; wf.processedAt = stamp();
+  r.billing = null; r.cards = null; r.fa = null;
+  log(r, `FA batch confirmed for ${plural(eligible.length, "eligible member")} (${(b.exclusions || []).length} excluded with reasons). No membership or standard new-member Billing endorsement created.`, actor);
   putReq(r);
   return r;
 }
@@ -404,6 +706,7 @@ export function processRequest(r, actor = "MDA Analyst") {
 // record + history, and never implies a real message / payment / integration.
 export function simulate(r, kind, actor) {
   ensureWf(r);
+  const cfg = config();
   switch (kind) {
     case "sales-response":
       r.waitingOn = null;
@@ -418,14 +721,47 @@ export function simulate(r, kind, actor) {
     case "payment-received":
       if (r.billing) { r.billing.payment = "Received"; log(r, "Payment recorded as received (simulated — no real payment occurred).", actor || "Billing & Collection"); }
       break;
+    case "bill-under-rule":
+      if (r.billing) { r.billing.billedUnderRule = true; log(r, "Fee billed under the account rule instead of collected up front (simulated). Release/dispatch may proceed.", actor || "MDA Analyst"); }
+      break;
     case "card-advance":
       if (r.cards) advanceCard(r, actor);
       break;
-    case "fa-endorse":
-      if (r.fa) { r.fa.status = "Endorsed to insurer"; log(r, "FA batch endorsed to the insurer (simulated).", actor || "FA Enrollment Analyst"); }
+    case "card-receiving-copy":
+      if (r.cards) { r.cards.receivingCopy = true; r.cards.history.unshift({ at: stamp(), text: "Simulated receiving copy attached.", actor: actor || "Facility Management Admin" }); log(r, "Receiving copy attached (simulated) — batch may now be marked Delivered.", actor || "Facility Management Admin"); }
       break;
-    case "insurer-response":
-      if (r.fa) { r.fa.status = "Payment requested"; log(r, "Simulated insurer response received; payment request prepared for Accounting.", actor || "FA Insurer"); }
+    case "restore-finalize":
+      if (r.restore && !r.restore.finalized) {
+        r.restore.finalized = true;
+        if (r.restore.kind === "reactivation") log(r, `Existing membership reactivated using original policy reference ${r.restore.policyRef || ""} (simulated). History retained, no new member created.`, actor || "MDA Analyst");
+        else log(r, `New application membership ${r.restore.newRef || ""} created, linked to historical reference ${r.restore.historicalRef || ""} (simulated). Historical coverage not overwritten.`, actor || "MDA Analyst");
+      }
+      break;
+    // Certificate service
+    case "cert-payment":
+      if (r.certBatch) { r.certBatch.payment = "Received"; log(r, `Certificate fee ${peso(r.certBatch.fee)} recorded as received (simulated).`, actor || "Billing & Collection"); }
+      break;
+    case "cert-bill-under-rule":
+      if (r.certBatch) { r.certBatch.billedUnderRule = true; log(r, "Certificate fee billed under the account rule (simulated) — release may proceed.", actor || "MDA Manager"); }
+      break;
+    case "cert-release":
+      if (r.certBatch && (r.certBatch.payment === "Received" || r.certBatch.billedUnderRule)) { r.certBatch.released = true; r.certBatch.salesHandoff = true; log(r, "Certificate released by simulated email; hard copy prepared for Sales handoff.", actor || "MDA Analyst"); }
+      break;
+    // FA enrolment service
+    case "fa-endorse":
+      if (r.faEnroll) { r.faEnroll.endorsed = true; log(r, `FA batch endorsed to ${r.faEnroll.insurer} (simulated insurer file sent).`, actor || "FA Enrollment Analyst"); }
+      break;
+    case "fa-correct-resend":
+      if (r.faEnroll && r.faEnroll.endorsed) { r.faEnroll.corrected = true; log(r, "Corrected insurer file prepared and resent (simulated). Resend is guarded against duplicate endorsement.", actor || "FA Enrollment Analyst"); }
+      break;
+    case "fa-invoice":
+      if (r.faEnroll && r.faEnroll.endorsed) { r.faEnroll.invoiced = true; log(r, "Sample insurer invoice attached; payment request raised for Accounting (simulated).", actor || "FA Insurer"); }
+      break;
+    case "fa-manager-review":
+      if (r.faEnroll && r.faEnroll.invoiced) { r.faEnroll.managerReviewed = true; log(r, "MDA Manager reviewed the FA payment request (simulated).", actor || "MDA Manager"); }
+      break;
+    case "fa-accounting-ack":
+      if (r.faEnroll && r.faEnroll.managerReviewed) { r.faEnroll.accountingAck = true; log(r, "Accounting acknowledged and recorded payment (simulated).", actor || "Accounting"); }
       break;
     default: break;
   }
@@ -438,12 +774,16 @@ function advanceCard(r, actor) {
   const c = r.cards;
   const i = CARD_STAGES.indexOf(c.stage);
   if (i < 0 || i >= CARD_STAGES.length - 1) return;
+  // A replacement must not reach the provider before its fee settles (defect e).
+  if (c.stage === "Ordered" && c.waitsForPayment && !(r.billing && (r.billing.payment === "Received" || r.billing.billedUnderRule))) return;
+  // A batch is only Delivered once a (simulated) receiving copy is attached.
+  if (c.stage === "Dispatched" && !c.receivingCopy) return;
   const next = CARD_STAGES[i + 1];
-  // A batch is only Delivered with a (simulated, clearly-labelled) proof of receipt.
+  const who = actor || cardStageActor(c.stage);
   if (next === "Dispatched") c.dispatchRef = `DISP-${r.id}-${String(c.count).padStart(3, "0")}`;
   c.stage = next;
-  c.history.unshift({ at: stamp(), text: `Card batch advanced to "${next}"${next === "Delivered" ? " (simulated proof of receipt)" : ""}.` });
-  log(r, `Card provider update (simulated): batch now "${next}".`, actor || "Card Provider");
+  c.history.unshift({ at: stamp(), text: `Batch moved to "${next}" by ${who}${next === "Delivered" ? " (with simulated receiving copy)" : ""}.`, actor: who });
+  log(r, `Card update (simulated): batch now "${next}".`, who);
 }
 
 // -------------------------------------------------------------- certificates (§17)
@@ -768,7 +1108,7 @@ function SAMPLE_REQUESTS() {
     members: [
       mkMember({ name: "Jose Ramirez", memberType: "Principal", principalRef: "P-101", dob: "1983-06-14", planCode: "STD-PR", effectivity: "2026-11-15", employeeRef: "EMP-2101", premium: 18500 }),
       mkMember({ name: "Jose Ramirez Jr.", memberType: "Principal", principalRef: "P-102", dob: "1983-06-14", planCode: "STD-PR", effectivity: "2026-11-15", employeeRef: "EMP-2102", premium: 18500 }),
-      mkMember({ name: "Child Ramirez", memberType: "Dependent", principalRef: "P-999", dob: "2015-02-20", planCode: "STD-DP", effectivity: "2026-11-15", relationship: "Child", premium: 14200 }),
+      mkMember({ name: "Child Ramirez", memberType: "Dependent", principalRef: "P-101", dob: "2015-02-20", planCode: "STD-DP", effectivity: "2026-11-15", relationship: "Child", premium: 14200 }),
     ],
     documents: [
       { key: "memberdata", name: "Additional member list", supplied: true, source: "Client HR" },
@@ -881,9 +1221,9 @@ function SAMPLE_REQUESTS() {
     history: [{ at: "2026-10-20T13:15:00Z", text: "Reapplication received — rehired member; historical identity linked, history not overwritten.", actor: "Client HR / Member" }],
   });
 
-  // 8 — Bulk certificate request (shared service)
+  // 8 — Bulk certificate request (SERVICE — not an Additional Member)
   reqs.push({
-    id: "MDA-2026-1009", type: "additional",
+    id: "MDA-2026-1009", type: "certificate",
     reference: "REQ-COM-2026-1009", scenario: "Bulk Certificate of Membership request",
     account: stdAccount({ name: "Northwind Logistics Corp", code: "ACC-NW-0192" }),
     requester: "Client HR (Northwind)", receivedAt: "2026-10-22T09:00:00Z",
@@ -897,25 +1237,29 @@ function SAMPLE_REQUESTS() {
     history: [{ at: "2026-10-22T09:00:00Z", text: "Bulk Certificate of Membership request received.", actor: "Client HR / Member" }],
   });
 
-  // 9 — FA batch with eligible members + explained exclusions (shared service)
+  // 9 — FA batch with eligible members + explained exclusions (SERVICE — not an Additional Member)
   reqs.push({
-    id: "MDA-2026-1010", type: "additional",
+    id: "MDA-2026-1010", type: "fa-batch",
     reference: "REQ-FA-2026-1010", scenario: "Financial Assistance batch — eligible members + explained exclusions",
     account: stdAccount({ name: "Cascade Manufacturing Inc", code: "ACC-CM-0144" }),
     requester: "FA Enrollment Analyst", receivedAt: "2026-10-18T09:00:00Z",
     effectiveDate: "2026-10-01", premiumTotal: 0,
     faBatch: {
       cutoff: "2026-10-01 to 2026-10-15",
+      cutoffOptions: ["2026-10-01 to 2026-10-15", "2026-10-16 to 2026-10-31"],
+      sumAssured: 50000,     // FA coverage / sum assured per member, from the account plan
+      insurerCharge: 1500,   // insurer invoice amount per member — NOT the member's FA benefit
       candidates: [
-        { name: "Lourdes Aquino (P-201)", amount: 1500, status: "Eligible" },
-        { name: "Nestor Dela Cruz (P-202)", amount: 1500, status: "Eligible" },
-        { name: "Pedro Villanueva (P-203)", amount: 1500, status: "Eligible" },
+        { name: "Lourdes Aquino (P-201)", status: "Eligible" },
+        { name: "Nestor Dela Cruz (P-202)", status: "Eligible" },
+        { name: "Pedro Villanueva (P-203)", status: "Eligible" },
       ],
       exclusions: [
-        { name: "Carmen Reyes (P-204)", reason: "Already endorsed for this period" },
+        { name: "Carmen Reyes (P-204)", reason: "Already endorsed for this cut-off (duplicate prior endorsement)" },
         { name: "Bianca Tan (P-205)", reason: "Future effectivity beyond the cut-off" },
       ],
       insurer: "Pioneer FA (demo insurer)",
+      rulePending: true,
     },
     members: [
       mkMember({ name: "Lourdes Aquino", memberType: "Principal", principalRef: "P-201", dob: "1975-09-01", planCode: "STD-PR", cardNeeded: false }),

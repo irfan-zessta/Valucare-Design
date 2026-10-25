@@ -146,3 +146,41 @@ These are encoded as **configurable demo defaults** and should be confirmed agai
 - "Pass" above reflects observed behaviour in this session on the named records, not a formal
   QA sign-off. Items marked Code-verified were confirmed by reading the implementation, not by
   clicking them live.
+
+## 5. Audit & repair — Critical #1–5 and reproduce-and-fix defects (Oct 2026)
+
+A second audit pass walked the eight MDA demos and the connected Certificate, Financial
+Assistance, Cards and Monitoring areas to make the screens, actions, state changes, member
+counts and downstream records **agree**. Everything below was reproduced and re-checked
+**in the browser** (visible state + downstream records), per the instruction not to report a
+fix complete on code reading alone.
+
+| Ref | Requirement / defect | Result (in-browser) |
+|-----|----------------------|---------------------|
+| Critical #1 | Certificate and FA are **separate request types** — neither routes through Additional Member, neither creates a membership | Pass — Certificate runs a COM release workflow, FA runs an enrolment-batch workflow; both carry "no membership / no standard new-member Billing endorsement is created" copy |
+| Critical #2 | Member record, status, processed count and downstream tasks derive from **one committed state**; a processed request can't be edited in place; never "6 ready" while completion says 5/5 | Pass — processed set is read-only; editing a processed request offers a **new movement**, not an in-place change (defect g); reconciliation and tracking counts stay identical |
+| Critical #3 | Partial processing checks relationships against the **actual committable set** — a dependent can't proceed if its principal is held/excluded | Pass — dependent held when principal held; counts reconcile (e.g. 2/3 processed, 1 held) |
+| Critical #4 | Each movement gets its **own** confirmation wording and resulting downstream actions | Pass — cancellation confirm reads "N members … end-dated … no card order, no FA population, no membership … dependents follow their principal"; amendment/lost-card/certificate/FA each distinct |
+| Critical #5 | **One** source timestamp per sample date, displayed Asia/Manila; shown received time and the cut-off explanation are **identical** | Pass — REQ-CAN-2026-1006 header, review card, Step-3 effectivity explanation and confirm dialog all read "22 Oct 2026, 4:45 p.m. (Asia/Manila)"; other samples (10:30 a.m. / 11:00 a.m. / 2:20 p.m.) consistent header+body |
+| Defect a | Certificate/FA routed as Additional Member | Fixed — separate services (see Critical #1) |
+| Defect b | Certificate released while payment "Not received" | Fixed — release gated; COM workflow honours payment state |
+| Defect c | Dependent processed while principal held | Fixed — see Critical #3 |
+| Defect d | Amendment listing two changes but processing one | Fixed — per-row Hold / Exclude / Set-to-apply; only applied rows written to field history; Billing endorsement names the **applied** field; tracking reads "1/2, 1 held" |
+| Defect e | Lost-card order sent to provider **before** its fee gate | Fixed — provider send blocked until the ₱112 fee is recorded; card stages carry distinct actors (MDA → Card Provider → Card Admin → Facility Management Admin) with provider file, transmittal and receiving copy |
+| Defect f | Cancellation received-time mismatch | Fixed — single `receivedAt` source; `cancellationEffectivity().explain` opens with that exact `fmtManila(receivedAt)`; 4:45 p.m. is after the 16:00 cut-off → rolls to next working day, future-dated request respected → scheduled 30 Nov 2026 |
+| Defect g | Processed request edited to show more ready than tracking | Fixed — see Critical #2 (read-only committed set; edits spawn a new movement) |
+
+**Downstream agreement confirmed for the cancellation walk (REQ-CAN-2026-1006):** status
+badge *Scheduled*; Track Completion reads "Cancellation scheduled for 2 members on 30 Nov
+2026"; the **only** downstream record is a single Billing & Collection endorsement
+(BILL-ENDO-MDA-2026-1006, movement *Cancellation*, payment *Not received — tracked
+separately*) — no card order and no FA population, exactly as the confirmation promised.
+
+**Other areas:** the eight MDA demo cards render with honest per-type scenario counts (the
+"five self-contained demo scenarios" subtitle was hard-coded and drifted from the footer —
+fixed to derive from the actual request count). The department chooser still lists Sales (3),
+Actuarial (2) and MDA (8 demos) and loads the other departments normally — no regression.
+
+**Known preview-only noise:** the console shows repeated `history.replaceState is not a
+function` — a limitation of the embedded preview sandbox, caught by a try/finally in
+`main.js` so navigation never wedges (navigation worked throughout). Not a code regression.
