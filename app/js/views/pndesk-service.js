@@ -14,6 +14,8 @@ import { icon, pill } from "../components.js";
 import {
   allInpatient, getInpatient, putInpatient, resetInpatient, allApe, getApe, resetApe,
   ILC_STEPS, ilcStatus, ilcNext, ilcHref, issueInitialLoa, logVisit, reviewFinalBill, issueFinalLoa,
+  newInpatientId, newInpatientCase, sampleAdmission, sampleFinalBill, coverageCheck, inpatientDocuments,
+  reviewAdmission, saveAdmission, toNum, getProvider,
   APE_STEPS, apeStatus, apeNext, apeHref, apeKindLabel, apePackages, allProviders,
   confirmApeMember, checkApePrior, priorInPolicyYear, scheduleApe, issueLoe, completeApe,
   log, peso, plural, fmtD, DEMO_NOW_ISO,
@@ -39,7 +41,8 @@ function renderOperations(main, query) {
   const ape = allApe();
   main.innerHTML = html`
     <div class="page-head"><div><h1>Service Operations</h1>
-      <p class="muted">Day-to-day provider-network cases: inpatient liaison and APE/ECU. Each row shows the status and the next action — open one to walk the journey.</p></div></div>
+      <p class="muted">Day-to-day provider-network cases: inpatient liaison and APE/ECU. Each row shows the status and the next action — open one to walk the journey.</p></div>
+      <div class="ph-actions">${tab === "inpatient" ? html`<button type="button" class="btn primary" id="newIlc">${icon("plus", 15)} New inpatient case</button>` : ""}</div></div>
 
     <div class="seg mt" role="tablist" aria-label="Service type">
       <button role="tab" class="${tab === "inpatient" ? "on" : ""}" aria-selected="${tab === "inpatient"}" data-tab="inpatient">Inpatient Liaison <span class="cnt">${inpatient.length}</span></button>
@@ -50,9 +53,9 @@ function renderOperations(main, query) {
       <th>Case</th><th>Member</th><th>Hospital</th><th>Admission</th><th>Status</th><th>Next action</th></tr></thead>
       <tbody>${inpatient.map((c) => { const st = ilcStatus(c); const ns = ilcNext(c); return html`<tr data-href="${ilcHref(c)}" tabindex="0">
         <td><b>${c.id}</b></td>
-        <td>${c.member.name}<div class="tiny">${c.member.policyNo}</div></td>
-        <td class="tiny">${c.hospital.name}</td>
-        <td class="tiny">${fmtD(c.admission.date)}<div class="tiny">${c.admission.diagnosis}</div></td>
+        <td>${c.member.name || html`<span class="tiny muted">New case — details pending</span>`}<div class="tiny">${c.member.policyNo || ""}</div></td>
+        <td class="tiny">${c.hospital.name || "—"}</td>
+        <td class="tiny">${c.admission.date ? fmtD(c.admission.date) : "—"}<div class="tiny">${c.admission.diagnosis || ""}</div></td>
         <td>${pill(st.label, st.tone)}</td>
         <td>${ns ? html`<span class="linklike">${ns.label} ›</span>` : html`<span class="tiny">Discharged</span>`}</td></tr>`; })}</tbody></table></div>`
       : html`<div class="tbl-wrap mt"><table class="tbl rowlink cardify"><thead><tr>
@@ -71,6 +74,12 @@ function renderOperations(main, query) {
     <p class="tiny mt"><a href="#/pn-desk/directory">${icon("collapse", 13)} Provider Directory</a> · Sample cases may be new, in progress or complete. Open a row to continue at its next action.</p>`.s;
   highlightNav("operations");
   document.title = "Service Operations · Provider & Network";
+  main.querySelector("#newIlc")?.addEventListener("click", () => {
+    const id = newInpatientId();
+    putInpatient(newInpatientCase(id));
+    toast("New inpatient case created.", "ok");
+    go(`#/pn-desk/inpatient/${id}/admission`);
+  });
   main.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => go(`#/pn-desk/operations?tab=${b.dataset.tab}`)));
   main.querySelectorAll("[data-href]").forEach((tr) => {
     tr.onclick = () => go(tr.dataset.href);
@@ -87,6 +96,7 @@ function renderOperations(main, query) {
 const ILC_DEFS = {
   steps: ILC_STEPS, next: ilcNext, status: ilcStatus,
   stepHref: (c, k) => `#/pn-desk/inpatient/${c.id}/${k}`,
+  docs: inpatientDocuments,
   doneTitle: "Member discharged — case complete.",
   doneWhy: "Admission, initial LOA, confinement updates, final bill review and the final LOA have all finished. Any later change would start a new case.",
 };
@@ -101,11 +111,13 @@ function renderInpatientCase(main, id, step) {
     ${backBar([{ label: "Service Operations", href: "#/pn-desk/operations?tab=inpatient" }, { label: "Inpatient Liaison" }, { label: c.id }])}
     ${caseHead(c, ILC_DEFS, {
       eyebrow: "Inpatient Liaison · " + c.id,
-      title: c.member.name,
+      title: c.member.name || "New inpatient case",
       refs: [
-        `Policy ${c.member.policyNo}`, `Account ${c.member.account} · ${c.member.accountName}`,
-        `${c.hospital.name}`, `Admitted ${fmtD(c.admission.date)}`,
-      ],
+        c.member.policyNo ? `Policy ${c.member.policyNo}` : null,
+        c.member.account ? `Account ${c.member.account}${c.member.accountName ? " · " + c.member.accountName : ""}` : null,
+        c.hospital.name || null,
+        c.admission.date ? `Admitted ${fmtD(c.admission.date)}` : null,
+      ].filter(Boolean),
     })}
     ${nextStrip(c, ILC_DEFS)}
     ${stepsNav(c, ILC_DEFS, step)}
@@ -123,99 +135,252 @@ function renderInpatientCase(main, id, step) {
   };
 }
 
+// Short "What you do here" line at the top of every step.
+function whatYouDo(text) { return html`<p class="tiny note info"><b>What you do here.</b> ${text}</p>`; }
+// Shown when a step is opened out of order — never fabricates a completed state.
+function ilcGuard(host, ctx, msg, toKey) {
+  const to = ILC_STEPS.find((s) => s.key === toKey);
+  host.innerHTML = html`<div class="panel"><div class="pb">
+    <div class="note info"><b>Do this step first.</b> ${msg}</div>
+    <div class="savebar"><div></div><button type="button" class="btn primary" id="ilcGoto">Go to ${to.label} ›</button></div>
+  </div></div>`.s;
+  host.querySelector("#ilcGoto").onclick = () => ctx.goStep(toKey);
+}
+// One obvious primary action at the bottom of each step.
+function ilcSaveBar(label) {
+  return html`<div class="savebar mt"><div></div><button type="button" class="btn primary" id="ilcPrimary">${label} ›</button></div>`;
+}
+
 function renderInpatientStep(host, ctx) {
-  const c = ctx.rec, step = ctx.step;
-  const w = c.wf;
-  const member = html`<dl class="dl cols">
-    <div><dt>Member</dt><dd>${c.member.name}</dd></div>
-    <div><dt>Policy no.</dt><dd>${c.member.policyNo}</dd></div>
-    <div><dt>Account</dt><dd>${c.member.account} · ${c.member.accountName}</dd></div>
-    <div><dt>Hospital</dt><dd>${c.hospital.name}</dd></div></dl>`;
+  const c = ctx.rec, step = ctx.step, w = c.wf;
 
+  // ---- Step 1 · Admission request -----------------------------------------
   if (step === "admission") {
-    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Admission request</h2></div><div class="pb">
-      ${member}
-      <dl class="dl cols mt">
-        <div><dt>Admission date</dt><dd>${fmtD(c.admission.date)}</dd></div>
-        <div><dt>Admitting diagnosis</dt><dd>${c.admission.diagnosis}</dd></div>
-        <div><dt>Attending doctor</dt><dd>${c.admission.attendingDoctor}</dd></div>
-        <div><dt>Room</dt><dd>${c.admission.room} · ${peso(c.admission.roomRate)}/day</dd></div>
-        <div><dt>Initial guarantee limit</dt><dd>${peso(c.admission.initialLimit)}</dd></div>
-        <div><dt>Plan coverage limit</dt><dd>${peso(c.coverageLimit)}</dd></div>
-      </dl>
-      <p class="tiny mt note info">Everything for this confinement — member, hospital, documents and approvals — stays together in this one case.</p>
+    const hospitals = allProviders().filter((p) => p.type === "Hospital" && p.status === "Active");
+    const keepHosp = c.hospital.name && !hospitals.some((p) => p.code === c.hospital.code);
+    const cc = coverageCheck(c);
+    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Admission request</h2>
+      <button type="button" class="btn ghost sm" id="ilcSample" title="Fill this form with realistic demo data">${icon("plus", 13)} Load sample data</button></div><div class="pb">
+      ${whatYouDo("Capture the admission request, run the illustrative member & coverage check, then record that you reviewed it. Opening the page does not count as a review.")}
+      <div class="grid2 mt">
+        <div class="field"><label for="imName">Member name</label><input id="imName" class="inp" value="${c.member.name || ""}"></div>
+        <div class="field"><label for="imPolicy">Policy no.</label><input id="imPolicy" class="inp" value="${c.member.policyNo || ""}"></div>
+        <div class="field"><label for="imAcct">Account no.</label><input id="imAcct" class="inp" value="${c.member.account || ""}"></div>
+        <div class="field"><label for="imAcctName">Account name</label><input id="imAcctName" class="inp" value="${c.member.accountName || ""}"></div>
+      </div>
+      <div class="grid2 mt">
+        <div class="field"><label for="imHosp">Hospital</label>
+          <select id="imHosp" class="inp">
+            <option value="">— Select accredited hospital —</option>
+            ${hospitals.map((p) => html`<option value="${p.code}" ${c.hospital.code === p.code ? "selected" : ""}>${p.providerName} (${p.location})</option>`)}
+            ${keepHosp ? html`<option value="__keep__" selected>${c.hospital.name}</option>` : ""}
+          </select></div>
+        <div class="field"><label for="imDate">Admission date</label><input type="date" id="imDate" class="inp" value="${c.admission.date || ""}"></div>
+        <div class="field"><label for="imDiag">Admitting diagnosis</label><input id="imDiag" class="inp" value="${c.admission.diagnosis || ""}"></div>
+        <div class="field"><label for="imDoc">Attending doctor</label><input id="imDoc" class="inp" value="${c.admission.attendingDoctor || ""}"></div>
+        <div class="field"><label for="imRoom">Room type</label>
+          <select id="imRoom" class="inp">${["Ward", "Semi-private", "Private", "Suite"].map((r) => html`<option ${c.admission.room === r ? "selected" : ""}>${r}</option>`)}</select></div>
+        <div class="field"><label for="imRoomRate">Room rate (₱/day)</label><input id="imRoomRate" class="inp" inputmode="decimal" value="${c.admission.roomRate ?? ""}"></div>
+        <div class="field"><label for="imInit">Requested initial guarantee (₱)</label><input id="imInit" class="inp" inputmode="decimal" value="${c.admission.initialLimit ?? ""}"></div>
+        <div class="field"><label for="imCov">Plan coverage limit (₱)</label><input id="imCov" class="inp" inputmode="decimal" value="${c.coverageLimit ?? ""}"></div>
+      </div>
+      <div class="note ${cc.tone} mt" id="imCheck"><b>Member & coverage check.</b> ${cc.ok ? html`${cc.label}. Plan limit ${cc.planLimit != null ? peso(cc.planLimit) : "—"}.` : cc.label}. <span class="tiny">${cc.note}</span></div>
       ${w.admissionReviewed ? html`<p class="tiny mt">${icon("check", 14)} Admission reviewed.</p>` : ""}
+      ${ilcSaveBar("Review and continue")}
     </div></div>`.s;
-    wireNext(ctx, ILC_DEFS, () => { c.wf.admissionReviewed = true; log(c, "Admission request reviewed — eligibility confirmed.", "Inpatient Liaison Officer"); putInpatient(c); go(`#/pn-desk/inpatient/${c.id}/initial`); });
+    const readForm = () => {
+      const sel = host.querySelector("#imHosp"); let code = sel.value, name = "";
+      if (code === "__keep__") { code = c.hospital.code; name = c.hospital.name; }
+      else if (code) { const p = getProvider(code); name = p ? p.providerName : ""; }
+      return {
+        memberName: host.querySelector("#imName").value.trim(), policyNo: host.querySelector("#imPolicy").value.trim(),
+        account: host.querySelector("#imAcct").value.trim(), accountName: host.querySelector("#imAcctName").value.trim(),
+        hospitalCode: code, hospitalName: name, admissionDate: host.querySelector("#imDate").value,
+        diagnosis: host.querySelector("#imDiag").value.trim(), attendingDoctor: host.querySelector("#imDoc").value.trim(),
+        room: host.querySelector("#imRoom").value, roomRate: host.querySelector("#imRoomRate").value,
+        initialLimit: host.querySelector("#imInit").value, coverageLimit: host.querySelector("#imCov").value,
+      };
+    };
+    host.querySelector("#ilcSample").onclick = () => { saveAdmission(c, sampleAdmission()); toast("Sample admission loaded.", "ok"); ctx.refresh(); };
+    const primary = () => {
+      const d = readForm();
+      if (!d.memberName || !d.hospitalName || !d.admissionDate) { toast("Enter at least the member, hospital and admission date.", "err"); return; }
+      reviewAdmission(c, d); toast("Admission reviewed.", "ok"); ctx.goStep("initial");
+    };
+    host.querySelector("#ilcPrimary").onclick = primary;
+    wireNext(ctx, ILC_DEFS, primary);
     return;
   }
 
+  // ---- Step 2 · Initial LOA ------------------------------------------------
   if (step === "initial") {
-    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Initial LOA</h2></div><div class="pb">
-      ${demoPreview("Issuing the initial LOA generates a sample letter guaranteeing admission up to the initial limit.")}
+    if (!w.admissionReviewed) return ilcGuard(host, ctx, "Review the admission request before issuing the initial LOA.", "admission");
+    const guarantee = c.initialLoa?.guaranteeAmount ?? c.admission.initialLimit ?? "";
+    const noteVal = c.initialLoa?.coverage || "Room & board, drugs and supplies up to the guarantee amount, subject to the plan.";
+    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Initial LOA — Letter of Authorization</h2></div><div class="pb">
+      ${whatYouDo("Set the admission guarantee and issue the initial Letter of Authorization (LOA). This guarantees admission — it is not the final bill settlement.")}
+      ${demoPreview("Issuing the initial LOA generates a sample letter guaranteeing admission up to the guarantee amount.")}
       <dl class="dl cols mt">
-        <div><dt>Guarantee amount</dt><dd>${peso(c.admission.initialLimit)}</dd></div>
-        <div><dt>Covers</dt><dd>Room & board, drugs and supplies up to the initial limit</dd></div>
-        <div><dt>Kind</dt><dd><b>Initial</b> LOA — a guarantee of admission, not the final settlement</dd></div>
+        <div><dt>Member</dt><dd>${c.member.name}</dd></div>
+        <div><dt>Hospital</dt><dd>${c.hospital.name}</dd></div>
+        <div><dt>Diagnosis</dt><dd>${c.admission.diagnosis || "—"}</dd></div>
+        <div><dt>Room</dt><dd>${c.admission.room}${c.admission.roomRate ? " · " + peso(c.admission.roomRate) + "/day" : ""}</dd></div>
       </dl>
-      ${c.initialLoa ? html`<div class="note info mt"><b>Initial LOA ${c.initialLoa.no}</b> issued ${fmtD(c.initialLoa.date)} · guarantee ${peso(c.initialLoa.guaranteeAmount)}.
-        <button type="button" class="btn ghost sm" id="viewInit">View letter</button></div>` : ""}
+      <div class="grid2 mt">
+        <div class="field"><label for="ilGuar">Proposed initial guarantee (₱)</label><input id="ilGuar" class="inp" inputmode="decimal" value="${guarantee}"></div>
+        <div class="field"><label for="ilNote">Coverage note</label><textarea id="ilNote" rows="2">${noteVal}</textarea></div>
+      </div>
+      <div class="row tight mt"><button type="button" class="btn ghost sm" id="ilPreview">${icon("file", 13)} Preview initial LOA</button></div>
+      ${c.initialLoa ? html`<div class="note ok mt"><b>Initial LOA ${c.initialLoa.no}</b> issued ${fmtD(c.initialLoa.date)} · guarantee ${peso(c.initialLoa.guaranteeAmount)}. Shared with ${c.hospital.name} (simulated).</div>` : ""}
+      ${ilcSaveBar(c.initialLoa ? "Continue to hospital visit" : "Issue initial LOA")}
     </div></div>`.s;
-    if (c.initialLoa) host.querySelector("#viewInit").onclick = () => previewLetter({ title: `Initial LOA ${c.initialLoa.no}`, kind: "Initial Letter of Authorization",
-      lines: [["LOA no.", c.initialLoa.no], ["Member", c.member.name], ["Policy no.", c.member.policyNo], ["Hospital", c.hospital.name], ["Guarantee amount", peso(c.initialLoa.guaranteeAmount)], ["Validity", c.initialLoa.validity], ["Coverage", c.initialLoa.coverage]] });
-    wireNext(ctx, ILC_DEFS, () => { issueInitialLoa(c); toast("Initial LOA issued (Demo preview).", "ok"); go(`#/pn-desk/inpatient/${c.id}/visit`); });
+    const read = () => ({ guaranteeAmount: host.querySelector("#ilGuar").value, note: host.querySelector("#ilNote").value });
+    host.querySelector("#ilPreview").onclick = () => { const d = read(); previewLetter({ title: "Initial LOA (preview)", kind: "Initial Letter of Authorization",
+      lines: [["Member", c.member.name], ["Policy no.", c.member.policyNo], ["Hospital", c.hospital.name], ["Guarantee amount", peso(toNum(d.guaranteeAmount) || 0)], ["Validity", "72 hours from admission (demo)"], ["Coverage", d.note.trim()]] }); };
+    const primary = () => {
+      if (c.initialLoa) { ctx.goStep("visit"); return; }
+      const d = read();
+      if (!(toNum(d.guaranteeAmount) >= 0)) { toast("Enter a valid guarantee amount.", "err"); return; }
+      issueInitialLoa(c, d); toast("Initial LOA issued (Demo preview).", "ok"); ctx.goStep("visit");
+    };
+    host.querySelector("#ilcPrimary").onclick = primary;
+    wireNext(ctx, ILC_DEFS, primary);
     return;
   }
 
+  // ---- Step 3 · Hospital visit & updates ----------------------------------
   if (step === "visit") {
+    if (!w.initialIssued) return ilcGuard(host, ctx, "Issue the initial LOA before logging hospital visits.", "initial");
     host.innerHTML = html`<div class="panel"><div class="ph"><h2>Hospital visit & updates</h2></div><div class="pb">
-      <p class="tiny">Log the bedside visit and any status change while the member is in confinement.</p>
-      ${(c.visits || []).length ? html`<ul class="timeline mt">${c.visits.map((v) => html`<li><span class="when">${fmtD(v.at)}</span><div>${v.note}<div class="tiny">${v.by}</div></div></li>`)}</ul>` : html`<p class="tiny mt">No visits logged yet.</p>`}
-      <div class="field mt"><label for="visitNote">Visit note</label>
-        <textarea id="visitNote" rows="2" placeholder="e.g. Bedside visit — member stable, confinement ongoing.">Bedside visit — member stable, confinement ongoing.</textarea></div>
+      ${whatYouDo("Record bedside visits and status changes during confinement. Add as many updates as you like — each appears in the timeline below immediately.")}
+      ${(c.visits || []).length ? html`<ul class="timeline mt">${c.visits.map((v) => html`<li><span class="when">${fmtD(v.date || v.at)}</span><div><b>${v.condition || "Update"}</b> — ${v.note}${v.dischargeChange ? html`<div class="tiny">Expected discharge / requirements: ${v.dischargeChange}</div>` : ""}<div class="tiny">${v.by}</div></div></li>`)}</ul>` : html`<p class="tiny mt">No visits logged yet.</p>`}
+      <div class="grid2 mt">
+        <div class="field"><label for="vDate">Visit date</label><input type="date" id="vDate" class="inp" value="${DEMO_NOW_ISO}"></div>
+        <div class="field"><label for="vCond">Member condition / status</label><input id="vCond" class="inp" value="Stable — confinement ongoing"></div>
+      </div>
+      <div class="field mt"><label for="vNote">Update note</label><textarea id="vNote" rows="2">Bedside visit — member stable, responding to treatment.</textarea></div>
+      <div class="field mt"><label for="vDisch">Change in expected discharge / requirements (optional)</label><input id="vDisch" class="inp" placeholder="e.g. Expected discharge moved to 28 Oct; awaiting final statement of account."></div>
+      <div class="savebar mt"><button type="button" class="btn ghost" id="vAdd">${icon("plus", 14)} Save and add another</button>
+        <button type="button" class="btn primary" id="ilcPrimary">Save visit update ›</button></div>
     </div></div>`.s;
-    wireNext(ctx, ILC_DEFS, () => { logVisit(c, host.querySelector("#visitNote").value.trim()); toast("Visit logged.", "ok"); go(`#/pn-desk/inpatient/${c.id}/finalbill`); });
+    const read = () => ({ date: host.querySelector("#vDate").value, condition: host.querySelector("#vCond").value.trim(), note: host.querySelector("#vNote").value.trim(), dischargeChange: host.querySelector("#vDisch").value.trim() });
+    const hasInput = (d) => d.note || d.dischargeChange || (d.condition && d.condition !== "Stable — confinement ongoing");
+    host.querySelector("#vAdd").onclick = () => { const d = read(); if (!hasInput(d)) { toast("Add a note or condition for the update.", "err"); return; } logVisit(c, d); toast("Visit update saved.", "ok"); ctx.refresh(); };
+    const primary = () => {
+      const d = read();
+      if (hasInput(d)) { logVisit(c, d); toast("Visit update saved.", "ok"); }
+      else if (!w.visitLogged) { toast("Add a note or condition for the update.", "err"); return; }
+      ctx.goStep("finalbill");
+    };
+    host.querySelector("#ilcPrimary").onclick = primary;
+    wireNext(ctx, ILC_DEFS, primary);
     return;
   }
 
+  // ---- Step 4 · Final bill review -----------------------------------------
   if (step === "finalbill") {
-    const fb = c.finalBill;
-    const supplied = (c.documents || []).find((d) => d.key === "finalsoa")?.supplied;
-    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Final bill review</h2></div><div class="pb">
-      ${supplied ? "" : html`<div class="note warn"><b>Final statement of account not yet supplied.</b> In the real process you would wait for the hospital's final SOA. For the demo you can review the sample figures below.</div>`}
-      <table class="tbl mt"><thead><tr><th>Line item</th><th class="num">Amount</th></tr></thead>
-        <tbody>${fb.lineItems.map((l) => html`<tr><td>${l.label}</td><td class="num">${peso(l.amount)}</td></tr>`)}
-          <tr><td><b>Total</b></td><td class="num"><b>${peso(fb.total)}</b></td></tr></tbody></table>
+    if (!w.visitLogged) return ilcGuard(host, ctx, "Log at least one hospital visit before reviewing the final bill.", "visit");
+    const lim = toNum(c.coverageLimit);
+    let rows = (c.finalBill?.lineItems || []).map((l) => ({ label: l.label || "", kind: l.kind === "pf" ? "pf" : "hospital", amount: l.amount ?? "" }));
+    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Final bill review</h2>
+      <button type="button" class="btn ghost sm" id="ilcSampleBill" title="Fill the table with a sample statement of account">${icon("plus", 13)} Load sample bill</button></div><div class="pb">
+      ${whatYouDo("Enter or load the hospital's final charges and professional fees, check the covered amount and member share, and flag anything that needs clarification. Charges are not treated as approved until you record the review.")}
+      <table class="tbl mt" id="fbTable"><thead><tr><th>Line item</th><th>Type</th><th class="num">Amount (₱)</th><th aria-label="Remove"></th></tr></thead><tbody></tbody></table>
+      <div class="row tight mt"><button type="button" class="btn ghost sm" id="fbAdd">${icon("plus", 14)} Add line item</button></div>
       <dl class="dl cols mt">
-        <div><dt>Hospital bill</dt><dd>${peso(fb.hospitalBill)}</dd></div>
-        <div><dt>Professional fees</dt><dd>${peso(fb.professionalFee)}</dd></div>
-        <div><dt>Plan coverage limit</dt><dd>${peso(c.coverageLimit)}</dd></div>
-        <div><dt>Projected approved</dt><dd>${peso(Math.min(fb.total, c.coverageLimit))}${fb.total > c.coverageLimit ? html` · member share ${peso(fb.total - c.coverageLimit)}` : ""}</dd></div>
+        <div><dt>Bill total</dt><dd id="fbTotal">—</dd></div>
+        <div><dt>Plan coverage limit</dt><dd>${lim != null ? peso(lim) : "—"}</dd></div>
+        <div><dt>Illustrative covered</dt><dd id="fbCovered">—</dd></div>
+        <div><dt>Potential member share</dt><dd id="fbShare">—</dd></div>
       </dl>
-      ${w.finalBillReviewed ? html`<p class="tiny mt">${icon("check", 14)} Final bill reviewed.</p>` : ""}
+      <div class="field mt"><label for="fbExc">Exception / clarification (optional)</label><textarea id="fbExc" rows="2" placeholder="e.g. Verify ₱4,500 'miscellaneous' charge with hospital billing before approval.">${c.finalBill?.exception || ""}</textarea>
+        <div class="help">Recording an exception flags charges for checking — they are not treated as approved.</div></div>
+      ${w.finalBillReviewed ? html`<p class="tiny mt">${icon("check", 14)} Final bill reviewed.${c.finalBill?.exception ? " Exception recorded." : ""}</p>` : ""}
+      ${ilcSaveBar("Complete bill review")}
     </div></div>`.s;
-    wireNext(ctx, ILC_DEFS, () => { reviewFinalBill(c); toast("Final bill reviewed.", "ok"); go(`#/pn-desk/inpatient/${c.id}/discharge`); });
+    const tbody = host.querySelector("#fbTable tbody");
+    const fbRow = (l, i) => html`<tr data-fb="${i}">
+      <td><input class="inp sm" data-f="label" value="${l.label}"></td>
+      <td><select class="inp sm" data-f="kind"><option value="hospital" ${l.kind !== "pf" ? "selected" : ""}>Hospital</option><option value="pf" ${l.kind === "pf" ? "selected" : ""}>Professional fee</option></select></td>
+      <td class="num"><input class="inp sm" data-f="amount" inputmode="decimal" value="${l.amount}" style="max-width:120px"></td>
+      <td><button type="button" class="btn ghost sm" data-fb-rm="${i}" aria-label="Remove line item">${icon("trash", 13)}</button></td></tr>`.s;
+    const recalc = () => {
+      const t = rows.reduce((s, l) => s + (toNum(l.amount) || 0), 0);
+      const cov = lim != null ? Math.min(t, lim) : t;
+      host.querySelector("#fbTotal").textContent = peso(t);
+      host.querySelector("#fbCovered").textContent = peso(cov);
+      host.querySelector("#fbShare").textContent = peso(Math.max(0, t - cov));
+    };
+    const draw = () => {
+      tbody.innerHTML = rows.length ? rows.map((l, i) => fbRow(l, i)).join("") : `<tr><td colspan="4" class="tiny">No line items yet — load the sample bill or add a row.</td></tr>`;
+      tbody.querySelectorAll("[data-fb]").forEach((tr) => {
+        const i = +tr.dataset.fb;
+        tr.querySelectorAll("[data-f]").forEach((inp) => (inp.oninput = () => { rows[i][inp.dataset.f] = inp.value; recalc(); }));
+        tr.querySelector("[data-fb-rm]").onclick = () => { rows.splice(i, 1); draw(); recalc(); };
+      });
+    };
+    draw(); recalc();
+    host.querySelector("#fbAdd").onclick = () => { rows.push({ label: "", kind: "hospital", amount: "" }); draw(); };
+    host.querySelector("#ilcSampleBill").onclick = () => { rows = sampleFinalBill().lineItems.map((l) => ({ ...l })); draw(); recalc(); toast("Sample bill loaded.", "ok"); };
+    const primary = () => {
+      const valid = rows.filter((l) => (l.label || "").trim() && toNum(l.amount) != null);
+      if (!valid.length) { toast("Add at least one line item with an amount, or load the sample bill.", "err"); return; }
+      reviewFinalBill(c, { lineItems: rows, exception: host.querySelector("#fbExc").value });
+      toast("Final bill reviewed.", "ok"); ctx.goStep("discharge");
+    };
+    host.querySelector("#ilcPrimary").onclick = primary;
+    wireNext(ctx, ILC_DEFS, primary);
     return;
   }
 
+  // ---- Step 5 · Final LOA & discharge -------------------------------------
   if (step === "discharge") {
-    const fb = c.finalBill;
+    if (!w.finalBillReviewed) return ilcGuard(host, ctx, "Complete the final bill review before issuing the final LOA.", "finalbill");
+    const fb = c.finalBill || { total: 0 };
+    const lim = toNum(c.coverageLimit);
+    const approved = lim != null ? Math.min(fb.total || 0, lim) : (fb.total || 0);
+    const share = Math.max(0, (fb.total || 0) - approved);
+    const complete = !!w.finalIssued;
+    const initGuar = c.initialLoa?.guaranteeAmount ?? 0;
+    const diff = (fb.total || 0) - initGuar;
     host.innerHTML = html`<div class="panel"><div class="ph"><h2>Final LOA & discharge</h2></div><div class="pb">
-      ${demoPreview("Issuing the final LOA settles the actual approved amount and clears the member for discharge.")}
-      <dl class="dl cols mt">
-        <div><dt>Final bill total</dt><dd>${peso(fb.total)}</dd></div>
-        <div><dt>Approved amount</dt><dd>${peso(Math.min(fb.total, c.coverageLimit))}</dd></div>
-        <div><dt>Member share</dt><dd>${peso(Math.max(0, fb.total - c.coverageLimit))}</dd></div>
-        <div><dt>Kind</dt><dd><b>Final</b> LOA — settles the confinement (distinct from the initial LOA)</dd></div>
-      </dl>
-      ${c.finalLoa ? html`<div class="note info mt"><b>Final LOA ${c.finalLoa.no}</b> issued ${fmtD(c.finalLoa.date)} · approved ${peso(c.finalLoa.approvedAmount)}, member share ${peso(c.finalLoa.patientShare)}. Member discharged ${fmtD(c.finalLoa.dischargeDate)}.
-        <button type="button" class="btn ghost sm" id="viewFinal">View letter</button></div>` : ""}
+      ${whatYouDo("Compare the initial guarantee with the reviewed final figures, issue the separate final LOA, and record the discharge.")}
+      ${complete ? "" : demoPreview("Issuing the final LOA settles the approved amount and clears the member for discharge.")}
+      <div class="grid2 mt">
+        <div class="panel"><div class="pb"><p class="eyebrow">Initial LOA — guarantee</p>
+          <dl class="dl"><div><dt>LOA no.</dt><dd>${c.initialLoa?.no || "—"}</dd></div><div><dt>Guarantee</dt><dd>${c.initialLoa ? peso(c.initialLoa.guaranteeAmount) : "—"}</dd></div></dl></div></div>
+        <div class="panel"><div class="pb"><p class="eyebrow">Final — reviewed figures</p>
+          <dl class="dl"><div><dt>Bill total</dt><dd>${peso(fb.total || 0)}</dd></div><div><dt>Approved</dt><dd>${peso(approved)}</dd></div><div><dt>Member share</dt><dd>${peso(share)}</dd></div></dl></div></div>
+      </div>
+      <p class="tiny">Final bill total is ${diff === 0 ? "the same as" : diff > 0 ? `${peso(diff)} above` : `${peso(-diff)} below`} the initial guarantee.</p>
+      ${fb.exception ? html`<div class="note warn mt"><b>Exception on file.</b> ${fb.exception}</div>` : ""}
+      ${complete ? "" : html`<div class="field mt" style="max-width:260px"><label for="dcDate">Discharge date</label><input type="date" id="dcDate" class="inp" value="${DEMO_NOW_ISO}"></div>`}
+      <div class="row tight mt"><button type="button" class="btn ghost sm" id="dcPreview">${icon("file", 13)} Preview final LOA</button></div>
+      ${complete ? html`<div class="note ok mt"><b>Final LOA ${c.finalLoa.no}</b> issued ${fmtD(c.finalLoa.date)} · approved ${peso(c.finalLoa.approvedAmount)}, member share ${peso(c.finalLoa.patientShare)}. Member discharged ${fmtD(c.finalLoa.dischargeDate)}.</div>
+        ${ilcCompletionSummary(c)}` : ilcSaveBar("Issue final LOA and discharge")}
     </div></div>`.s;
-    if (c.finalLoa) host.querySelector("#viewFinal").onclick = () => previewLetter({ title: `Final LOA ${c.finalLoa.no}`, kind: "Final Letter of Authorization",
-      lines: [["LOA no.", c.finalLoa.no], ["Member", c.member.name], ["Policy no.", c.member.policyNo], ["Hospital", c.hospital.name], ["Final bill total", peso(fb.total)], ["Approved amount", peso(c.finalLoa.approvedAmount)], ["Member share", peso(c.finalLoa.patientShare)], ["Discharge date", fmtD(c.finalLoa.dischargeDate)]] });
-    wireNext(ctx, ILC_DEFS, () => { issueFinalLoa(c); toast("Final LOA issued — member discharged (Demo preview).", "ok"); ctx.refresh(); });
+    host.querySelector("#dcPreview").onclick = () => previewLetter({ title: c.finalLoa ? `Final LOA ${c.finalLoa.no}` : "Final LOA (preview)", kind: "Final Letter of Authorization",
+      lines: [["Member", c.member.name], ["Policy no.", c.member.policyNo], ["Hospital", c.hospital.name], ["Final bill total", peso(fb.total || 0)], ["Approved amount", peso(approved)], ["Member share", peso(share)], ["Discharge date", fmtD(host.querySelector("#dcDate")?.value || c.finalLoa?.dischargeDate || DEMO_NOW_ISO)]] });
+    if (!complete) {
+      const primary = () => { const dd = host.querySelector("#dcDate").value || DEMO_NOW_ISO; issueFinalLoa(c, { dischargeDate: dd }); toast("Final LOA issued — member discharged (Demo preview).", "ok"); ctx.refresh(); };
+      host.querySelector("#ilcPrimary").onclick = primary;
+      wireNext(ctx, ILC_DEFS, primary);
+    }
     return;
   }
+}
+
+// Completion recap shown on a discharged case — the whole journey in one place.
+function ilcCompletionSummary(c) {
+  const ck = (t) => html`<li>${icon("check", 13)} ${t}</li>`;
+  return html`<div class="panel mt"><div class="ph"><h2>Case summary</h2></div><div class="pb"><ul class="plain-list tiny">
+    ${ck(`Admission reviewed — ${c.member.name} at ${c.hospital.name}, ${fmtD(c.admission.date)}.`)}
+    ${ck(`Initial LOA ${c.initialLoa?.no} — guarantee ${peso(c.initialLoa?.guaranteeAmount || 0)}.`)}
+    ${ck(`${plural((c.visits || []).length, "visit update")} recorded.`)}
+    ${ck(`Final bill reviewed — total ${peso(c.finalBill?.total || 0)}${c.finalBill?.exception ? " (exception on file)" : ""}.`)}
+    ${ck(`Final LOA ${c.finalLoa?.no} — approved ${peso(c.finalLoa?.approvedAmount || 0)}, member share ${peso(c.finalLoa?.patientShare || 0)}.`)}
+    ${ck(`Member discharged ${fmtD(c.finalLoa?.dischargeDate)}.`)}
+  </ul><p class="tiny mt">Open <b>Documents</b> for the letters and <b>History</b> for the full timestamped trail.</p></div></div>`;
 }
 
 // ============================================================== APE / ECU workspace

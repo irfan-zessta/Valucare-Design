@@ -114,15 +114,18 @@ export function drawer(title, bodyHtml, onMount) {
   return close;
 }
 
-export function documentsDrawer(rec) {
-  const docs = rec.documents || [];
+export function documentsDrawer(rec, docs) {
+  docs = docs || rec.documents || [];
   drawer("Documents in this case", html`
-    <p class="tiny">Everything for this case kept together — member, hospital, letters and attachments. Sources are recorded; documents are <b>not</b> automatically verified. Missing items show how to request them.</p>
+    <p class="tiny">Everything for this case kept together — member, hospital, letters and attachments. Sources are recorded; documents are <b>not</b> automatically verified. Items not yet produced are shown as <b>Not received</b>, never as verified.</p>
     <div class="doclist mt">${docs.length ? docs.map((d) => html`<div class="doc-item ${d.supplied ? "" : "miss"}">
       <span class="doc-ic" aria-hidden="true">${icon(d.supplied ? "file" : "alert", 16)}</span>
-      <div class="grow"><b>${d.name}</b><span class="tiny">${d.supplied ? d.source : (d.note || "Not supplied")}</span></div>
-      ${d.supplied ? html`<button type="button" class="btn ghost sm" data-prev="${d.key}">View</button>` : html`<span class="pill warn">Missing</span>`}</div>`) : html`<p class="tiny">No documents attached.</p>`}</div>`,
-    (body) => body.querySelectorAll("[data-prev]").forEach((b) => (b.onclick = () => previewDoc(docs.find((x) => x.key === b.dataset.prev), rec))));
+      <div class="grow"><b>${d.name}</b><span class="tiny">${d.supplied ? d.source : (d.note || "Not received")}</span></div>
+      ${d.supplied ? html`<button type="button" class="btn ghost sm" data-prev="${d.key}">View</button>` : html`<span class="pill warn">Not received</span>`}</div>`) : html`<p class="tiny">No documents attached.</p>`}</div>`,
+    (body) => body.querySelectorAll("[data-prev]").forEach((b) => (b.onclick = () => {
+      const d = docs.find((x) => x.key === b.dataset.prev);
+      if (d && d.letter) previewLetter(d.letter); else previewDoc(d, rec);
+    })));
 }
 export function activityDrawer(rec) {
   const items = rec.history || [];
@@ -204,7 +207,7 @@ export function wireHead(ctx, defs) {
   document.querySelectorAll("[data-pn-open]").forEach((b) => (b.onclick = () => {
     const w = b.dataset.pnOpen;
     if (w === "guide") { toggleGuide(ctx.rec.id); ctx.refresh(); }
-    else if (w === "docs") documentsDrawer(ctx.rec);
+    else if (w === "docs") documentsDrawer(ctx.rec, defs.docs ? defs.docs(ctx.rec) : undefined);
     else if (w === "activity") activityDrawer(ctx.rec);
   }));
   // keep eslint-style parity with mda: defs available for future per-kind wiring

@@ -61,10 +61,13 @@ to the shell:
   Location, Accreditation Status, Hospital affiliations). Each affiliation is **facility-
   specific** — a general accreditation status does **not** imply affiliation with every
   hospital, stated explicitly and modelled per facility (status / privileges / since).
-- **Inpatient liaison (Service Operations):** admission request → **initial LOA** → hospital
-  visit & updates → final bill review → **final LOA & discharge**. One case holds member /
-  hospital / documents / approvals / next action. Initial and final LOAs are distinct and
-  labelled as such.
+- **Inpatient liaison (Service Operations):** a hands-on, presenter-driven journey —
+  **New inpatient case** from the worklist → editable admission request + coverage check →
+  **initial LOA** (guarantee) → hospital visit & updates (timeline) → final bill review (editable
+  line items + exception) → **final LOA & discharge** (side-by-side with the initial guarantee).
+  One case holds member / hospital / documents / history / next action; it is editable, saved in
+  the browser and reopens at its real next action. Initial and final LOAs are distinct and
+  labelled as such. Steps complete only on presenter action, never on page open. See §2c.
 - **APE / ECU (Service Operations):** member & account → prior-check → schedule & rate (provider
   / package / date / rate, rate syncs to package) → **issue sample LOE** → completion &
   results. **APE and ECU are kept distinct** (separate eyebrows, batches and package/rate
@@ -148,6 +151,67 @@ warning):
 | W10 | Draft persists across a full page reload | Pass |
 | W11 | Save & exit → "Drafts in progress" panel shows the draft with Resume | Pass |
 | W12 | "Fill sample data" populates all 6 steps, flips the indicator to all-Done, Review reads "Ready to submit"; preserves already-typed fields | Pass |
+
+## 2c. Inpatient Liaison — hands-on, presenter-driven demo
+
+The existing Inpatient Liaison journey (`pndesk-service.js`, `#/pn-desk/operations?tab=inpatient`)
+was turned into a simple, believable, **hands-on** demo a presenter can complete from admission
+request to discharge in ~3–5 minutes. It is illustrative only — no real patient data, messages,
+integrations, approvals or payments; everything is saved in the browser. The other Provider &
+Network demos and CSA were not touched.
+
+What changed:
+
+- **Worklist** now carries a prominent **New inpatient case** button and a Status + Next-action
+  column per row. Seeded with a mix so the presenter always has a starting point and an outcome:
+  **ILC-2026-0007** (Jose A. Ramirez) sits at *Admission request* ready to start, **ILC-2026-0011**
+  (Maria L. Santos) is already *Discharged* / complete.
+- **Editable, resumable case.** A new case starts empty and reopens at its real next action; a
+  completed step, letter or history entry is created **only when the presenter takes that action**
+  — never because a page was opened. Nothing is auto-approved.
+- **Step 1 — Admission request:** a full editable form (member / policy / account / hospital /
+  admission date / diagnosis / attending doctor / room type / requested admission) with a compact
+  **Member and coverage check** (illustrative eligibility + plan limit). **Load sample data** fills
+  blanks while leaving the form editable; *Review and continue* records the review explicitly, then
+  advances.
+- **Step 2 — Initial LOA:** shows admission info, an editable proposed guarantee + coverage note, a
+  **Preview Initial Letter of Authorization** (demo-preview, nothing sent), then issues a numbered
+  LOA with a simulated "shared with hospital" event recorded as *System (simulated)*. Labelled as
+  the admission **guarantee**, not final settlement.
+- **Step 3 — Hospital visit & updates:** a small form (visit date / condition / note / change in
+  expected discharge), **Save and add another**, shown immediately in a chronological timeline.
+- **Step 4 — Final bill review:** load a sample final bill or enter line items (hospital charges +
+  professional fees); live **bill total, illustrative covered amount, potential member share**; an
+  **exception / clarification** can be recorded so a charge is not silently treated as approved.
+  Figures stay editable.
+- **Step 5 — Final LOA & discharge:** the reviewed final figures sit **side-by-side with the earlier
+  initial guarantee** with a plain difference sentence; a **separate, distinctly-numbered Final LOA**
+  is previewed and issued (demo-preview); discharge date recorded, case marked complete. The
+  completion state recaps initial LOA, final LOA, bill review, visit updates and discharge in one
+  summary.
+- **Orientation & honesty:** the 5-step indicator keeps unmistakable active / Done states; each step
+  carries a short "What you do here" sentence; LOA is expanded as "Letter of Authorization" where
+  first shown; the compact header keeps member / hospital / policy / account / case number visible;
+  **Documents** shows items as they become available and labels anything missing as **"Not received"**
+  (never "verified"); **History** records actor + time + what changed, keeping simulated actors
+  separate from the presenter.
+
+Walked end-to-end in the live preview (console clean apart from the known preview-sandbox warning):
+
+| # | Scenario | Result |
+|---|----------|--------|
+| I1 | Worklist shows member/hospital/admission/status/next action, **New inpatient case** button, one ready-to-start + one discharged case | Pass |
+| I2 | New case ILC-2026-9039 created from worklist, appears in list, opens at Admission request | Pass |
+| I3 | Step 1 **Load sample data** fills blanks, form stays editable, review **not** auto-recorded on page open | Pass |
+| I4 | *Review and continue* records review explicitly + advances to Initial LOA | Pass |
+| I5 | Step 2 preview + issue Initial LOA (LOA-I-2026-9039, ₱60,000 guarantee) + simulated "shared with hospital"; advances | Pass |
+| I6 | Step 3 **Save and add another** visit shows in timeline; advancing with empty form does not duplicate | Pass |
+| I7 | Step 4 load sample bill, live totals, exception recorded (charge not silently approved); advances | Pass |
+| I8 | Step 5 initial-guarantee vs final-reviewed side-by-side + difference sentence; **distinct** Final LOA (LOA-F-2026-9039) previewed + issued; discharge recorded → COMPLETE | Pass |
+| I9 | Completion summary recaps initial LOA, final LOA, bill, visit, discharge in one history | Pass |
+| I10 | Documents drawer: supplied items + distinct LOA letter previews; missing items labelled **"Not received"**, never verified | Pass |
+| I11 | History drawer: full timestamped trail, simulated actors separate from presenter | Pass |
+| I12 | Reopen ILC-2026-9039 → all data / documents / statuses / history consistent; ILC-0007 still ready-to-start, ILC-0011 still discharged | Pass |
 
 ## 3. Honesty
 

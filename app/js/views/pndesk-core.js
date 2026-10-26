@@ -16,7 +16,7 @@ import { money, int } from "../core.js";
 
 export const STORE_KEY = "hms-pn:v1";
 export const GUIDE_KEY = "hms-pn-guide";
-const BASELINE = 1; // bump to force a reseed when the sample data shape changes
+const BASELINE = 2; // bump to force a reseed when the sample data shape changes
 
 // -------------------------------------------------------------- store plumbing
 function blank() { return { providers: {}, doctors: {}, inpatient: {}, ape: {}, drafts: {}, seeded: 0 }; }
@@ -64,7 +64,20 @@ export const allApe = () => Object.values(loadStore().ape).map((r) => (ensureApe
 export const getApe = (id) => { const r = loadStore().ape[id]; if (r) ensureApeWf(r); return r || null; };
 export function putApe(r) { const s = loadStore(); s.ape[r.id] = r; saveStore(s); }
 
-export function resetInpatient(id) { const fresh = SEED_INPATIENT().find((c) => c.id === id); if (!fresh) return null; putInpatient(fresh); return fresh; }
+export function resetInpatient(id) {
+  const fresh = SEED_INPATIENT().find((c) => c.id === id);
+  if (fresh) { putInpatient(fresh); return fresh; }
+  // A presenter-created case has no seed to restore — clear its progress but keep the
+  // admission details they entered, so "Reset" still returns it to step 1.
+  const c = getInpatient(id);
+  if (!c) return null;
+  c.initialLoa = null; c.finalLoa = null; c.visits = [];
+  if (c.finalBill) { c.finalBill.reviewed = false; c.finalBill.exception = ""; }
+  c.wf = { _v: 1, admissionReviewed: false, initialIssued: false, visitLogged: false, finalBillReviewed: false, finalIssued: false };
+  c.history = [{ at: stamp(), text: "Case reset to start.", actor: "You (demo)" }];
+  putInpatient(c);
+  return c;
+}
 export function resetApe(id) { const fresh = SEED_APE().find((r) => r.id === id); if (!fresh) return null; putApe(fresh); return fresh; }
 
 // -------------------------------------------------------------- Add-Provider drafts
@@ -95,6 +108,8 @@ export function fmtD(iso) { const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(iso 
 function dayUTC(iso) { const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null; }
 export function daysBetween(fromIso, toIso) { const a = dayUTC(fromIso), b = dayUTC(toIso); return a != null && b != null ? Math.round((b - a) / 86400000) : null; }
 export function log(rec, text, actor) { (rec.history = rec.history || []).unshift({ at: stamp(), text, actor: actor || "Provider Network Officer" }); }
+// Lenient numeric parse for presenter-entered form fields: strips commas, tolerates blanks.
+export function toNum(v) { const s = String(v ?? "").replace(/,/g, "").trim(); if (s === "") return null; const n = Number(s); return Number.isFinite(n) ? n : null; }
 
 // -------------------------------------------------------------- status model (§ "Make provider status understandable")
 // The five statuses HMS3 users discuss, each with a reason and an effective date. Tones
@@ -180,54 +195,174 @@ export function ilcNext(c) {
 }
 export const ilcHref = (c) => { const ns = ilcNext(c); return `#/pn-desk/inpatient/${c.id}/${ns ? ns.step : "discharge"}`; };
 
-// Issue the initial LOA — a guarantee of admission up to an initial limit (distinct from
-// the final LOA, which settles the actual approved amount at discharge).
-export function issueInitialLoa(c) {
+// ---- new / blank cases ----------------------------------------------------
+// Readable, collision-safe inpatient id (keeps the ILC-YEAR-#### shape).
+export function newInpatientId() {
+  const base = "ILC-2026-" + ("9" + Date.now().toString().slice(-3));
+  let id = base, n = 1;
+  while (getInpatient(id)) id = `${base}-${n++}`;
+  return id;
+}
+// A brand-new case starts empty at the admission step — nothing is reviewed, issued or
+// logged until the presenter does it. The final-bill shell carries no line items yet.
+export function newInpatientCase(id) {
+  return {
+    id,
+    member: { name: "", policyNo: "", account: "", accountName: "" },
+    hospital: { code: "", name: "" },
+    admission: { date: "", diagnosis: "", attendingDoctor: "", room: "Semi-private", roomRate: "", initialLimit: "" },
+    coverageLimit: "",
+    initialLoa: null, visits: [],
+    finalBill: { lineItems: [], hospitalBill: 0, professionalFee: 0, total: 0, reviewed: false, exception: "" },
+    finalLoa: null,
+    wf: { _v: 1, admissionReviewed: false, initialIssued: false, visitLogged: false, finalBillReviewed: false, finalIssued: false },
+    history: [{ at: stamp(), text: "New inpatient case created.", actor: "You (demo)" }],
+  };
+}
+// One-click illustrative admission the presenter can load (and then edit) on step 1.
+export function sampleAdmission() {
+  return {
+    memberName: "Antonio B. Cruz", policyNo: "VC-PLN-640318", account: "ACC-NL-0442", accountName: "Northwind Logistics Corp.",
+    hospitalCode: "H-00142", hospitalName: "St. Lucia Medical Center",
+    admissionDate: DEMO_NOW_ISO, diagnosis: "Acute gastroenteritis with moderate dehydration",
+    attendingDoctor: "Dr. Elena Marquez (Internal Medicine)", room: "Semi-private", roomRate: 3200,
+    initialLimit: 60000, coverageLimit: 150000,
+  };
+}
+// A sample final statement of account (hospital charges + a professional fee line).
+export function sampleFinalBill() {
+  return { lineItems: [
+    { label: "Room & board (2 nights, semi-private)", kind: "hospital", amount: 6400 },
+    { label: "Drugs & medicines", kind: "hospital", amount: 18400 },
+    { label: "Laboratory & diagnostics", kind: "hospital", amount: 12600 },
+    { label: "Supplies & miscellaneous", kind: "hospital", amount: 7800 },
+    { label: "Professional fees (attending physician)", kind: "pf", amount: 12000 },
+  ] };
+}
+
+// Illustrative member & coverage check shown on the admission step — no real eligibility
+// system is queried; this only reads what is on the case.
+export function coverageCheck(c) {
+  const hasMember = !!((c.member?.name || "").trim() && ((c.member?.policyNo || "").trim() || (c.member?.account || "").trim()));
+  if (!hasMember) return { ok: false, tone: "info", label: "Enter the member and policy to run the eligibility check", planLimit: null, note: "Illustrative only — no real eligibility system is checked." };
+  const lim = toNum(c.coverageLimit);
+  return { ok: true, tone: "ok", label: "Eligible — policy active", planLimit: lim, note: "Illustrative result only — no real eligibility system was checked." };
+}
+
+// ---- editable engines -----------------------------------------------------
+// Map a flat form payload onto the case shape (numbers parsed leniently).
+function applyAdmission(c, d) {
+  if (!d) return;
+  c.member = { name: d.memberName ?? "", policyNo: d.policyNo ?? "", account: d.account ?? "", accountName: d.accountName ?? "" };
+  c.hospital = { code: d.hospitalCode ?? "", name: d.hospitalName ?? "" };
+  c.admission = { date: d.admissionDate ?? "", diagnosis: d.diagnosis ?? "", attendingDoctor: d.attendingDoctor ?? "", room: d.room || "Semi-private", roomRate: toNum(d.roomRate), initialLimit: toNum(d.initialLimit) };
+  c.coverageLimit = toNum(d.coverageLimit);
+}
+// Save entered admission details without yet marking the request reviewed.
+export function saveAdmission(c, d) { ensureIlcWf(c); applyAdmission(c, d); putInpatient(c); return c; }
+// Record that the admission request was actually reviewed (only on the presenter's action).
+export function reviewAdmission(c, d) {
   ensureIlcWf(c);
+  if (d) applyAdmission(c, d);
+  c.wf.admissionReviewed = true;
+  log(c, `Admission request reviewed — ${c.member.name || "member"} at ${c.hospital.name || "hospital"}; eligibility confirmed (illustrative).`, "Inpatient Liaison Officer");
+  putInpatient(c);
+  return c;
+}
+
+// Issue the initial LOA — a guarantee of admission up to a guarantee amount (distinct from
+// the final LOA, which settles the actual approved amount at discharge).
+export function issueInitialLoa(c, opts = {}) {
+  ensureIlcWf(c);
+  const guarantee = toNum(opts.guaranteeAmount) ?? toNum(c.admission?.initialLimit) ?? 60000;
   c.initialLoa = {
     no: c.id.replace("ILC", "LOA-I"),
     date: DEMO_NOW_ISO,
-    guaranteeAmount: c.admission?.initialLimit ?? 60000,
+    guaranteeAmount: guarantee,
     validity: "72 hours from admission (demo)",
-    coverage: "Room & board, drugs and supplies up to the initial limit, subject to the plan.",
+    coverage: (opts.note || "").trim() || "Room & board, drugs and supplies up to the guarantee amount, subject to the plan.",
     kind: "Initial",
   };
   c.wf.initialIssued = true;
-  log(c, `Initial LOA ${c.initialLoa.no} issued — guarantee ${peso(c.initialLoa.guaranteeAmount)}.`, "Inpatient Liaison Officer");
+  log(c, `Initial LOA ${c.initialLoa.no} issued — guarantee ${peso(guarantee)}.`, "Inpatient Liaison Officer");
+  log(c, `Initial LOA ${c.initialLoa.no} shared with ${c.hospital.name || "the hospital"} (simulated — no real message sent).`, "System (simulated)");
   putInpatient(c);
   return c;
 }
-export function logVisit(c, note) {
+// Record a hospital visit / status update. Many may be logged; each appears in the timeline.
+export function logVisit(c, v = {}) {
   ensureIlcWf(c);
-  (c.visits = c.visits || []).push({ at: DEMO_NOW_ISO, note: note || "Bedside visit — member stable, confinement ongoing.", by: "Inpatient Liaison Officer" });
+  const visit = {
+    at: stamp(),
+    date: v.date || DEMO_NOW_ISO,
+    condition: (v.condition || "").trim() || "Stable",
+    note: (v.note || "").trim() || "Bedside visit — member stable, confinement ongoing.",
+    dischargeChange: (v.dischargeChange || "").trim(),
+    by: "Inpatient Liaison Officer",
+  };
+  (c.visits = c.visits || []).push(visit);
   c.wf.visitLogged = true;
-  log(c, "Hospital visit logged — confinement ongoing.", "Inpatient Liaison Officer");
+  log(c, `Hospital visit logged (${fmtD(visit.date)}) — ${visit.condition}.${visit.dischargeChange ? " " + visit.dischargeChange : ""}`, "Inpatient Liaison Officer");
   putInpatient(c);
   return c;
 }
-export function reviewFinalBill(c) {
+// Recompute the final bill from entered line items and record the review (and any exception).
+export function reviewFinalBill(c, data = {}) {
   ensureIlcWf(c);
+  if (Array.isArray(data.lineItems)) {
+    const items = data.lineItems
+      .filter((l) => (l.label || "").trim() && toNum(l.amount) != null)
+      .map((l) => ({ label: l.label.trim(), kind: l.kind === "pf" ? "pf" : "hospital", amount: toNum(l.amount) || 0 }));
+    const total = items.reduce((s, l) => s + l.amount, 0);
+    const professionalFee = items.filter((l) => l.kind === "pf").reduce((s, l) => s + l.amount, 0);
+    c.finalBill = { ...(c.finalBill || {}), lineItems: items, total, professionalFee, hospitalBill: total - professionalFee };
+  }
+  c.finalBill = c.finalBill || { total: 0, lineItems: [] };
+  c.finalBill.exception = (data.exception || "").trim();
+  c.finalBill.reviewed = true;
   c.wf.finalBillReviewed = true;
-  log(c, `Final bill reviewed — hospital ${peso(c.finalBill.hospitalBill)} + PF ${peso(c.finalBill.professionalFee)}.`, "Inpatient Liaison Officer");
+  const exc = c.finalBill.exception;
+  log(c, `Final bill reviewed — total ${peso(c.finalBill.total || 0)}${exc ? "; exception recorded: " + exc : "; no exceptions"}.`, "Inpatient Liaison Officer");
   putInpatient(c);
   return c;
 }
-export function issueFinalLoa(c) {
+export function issueFinalLoa(c, opts = {}) {
   ensureIlcWf(c);
   const fb = c.finalBill || { total: 0 };
-  const approved = Math.min(fb.total, c.coverageLimit ?? fb.total);
+  const lim = toNum(c.coverageLimit);
+  const approved = lim != null ? Math.min(fb.total || 0, lim) : (fb.total || 0);
   c.finalLoa = {
     no: c.id.replace("ILC", "LOA-F"),
     date: DEMO_NOW_ISO,
     approvedAmount: approved,
-    patientShare: Math.max(0, fb.total - approved),
-    dischargeDate: DEMO_NOW_ISO,
+    patientShare: Math.max(0, (fb.total || 0) - approved),
+    dischargeDate: opts.dischargeDate || DEMO_NOW_ISO,
     kind: "Final",
   };
   c.wf.finalIssued = true;
   log(c, `Final LOA ${c.finalLoa.no} issued — approved ${peso(approved)}, member share ${peso(c.finalLoa.patientShare)}. Member cleared for discharge.`, "Inpatient Liaison Officer");
+  log(c, `Member discharged ${fmtD(c.finalLoa.dischargeDate)} (simulated — no real message sent).`, "System (simulated)");
   putInpatient(c);
   return c;
+}
+
+// Derive the Documents list from case state so it stays honest: items the presenter has not
+// yet produced are labelled "Not received", never shown as verified. LOA rows carry the
+// letter lines so the drawer can preview them.
+export function inpatientDocuments(c) {
+  const w = ensureIlcWf(c);
+  const visits = (c.visits || []).length;
+  const il = c.initialLoa, fl = c.finalLoa;
+  return [
+    { key: "approval", name: "Admission request", supplied: !!w.admissionReviewed, source: "Captured in this case", note: "Not received — complete the Admission request step." },
+    { key: "diag", name: "Admitting diagnosis / clinical abstract", supplied: !!(c.admission?.diagnosis || "").trim(), source: "Attending physician", note: "Not received — add the admitting diagnosis." },
+    { key: "initloa", name: "Initial LOA (Letter of Authorization)", supplied: !!il, source: il ? `${il.no} · issued ${fmtD(il.date)}` : "", note: "Not received — issue the initial LOA.",
+      letter: il ? { title: `Initial LOA ${il.no}`, kind: "Initial Letter of Authorization", lines: [["LOA no.", il.no], ["Member", c.member.name], ["Policy no.", c.member.policyNo], ["Hospital", c.hospital.name], ["Guarantee amount", peso(il.guaranteeAmount)], ["Validity", il.validity], ["Coverage", il.coverage]] } : null },
+    { key: "visits", name: "Hospital visit updates", supplied: visits > 0, source: visits ? plural(visits, "update") + " recorded" : "", note: "Not received — record a hospital visit." },
+    { key: "finalsoa", name: "Final statement of account", supplied: !!w.finalBillReviewed, source: "Hospital billing", note: "Not received — awaited from hospital billing." },
+    { key: "finalloa", name: "Final LOA (Letter of Authorization)", supplied: !!fl, source: fl ? `${fl.no} · issued ${fmtD(fl.date)}` : "", note: "Not received — issue the final LOA at discharge.",
+      letter: fl ? { title: `Final LOA ${fl.no}`, kind: "Final Letter of Authorization", lines: [["LOA no.", fl.no], ["Member", c.member.name], ["Policy no.", c.member.policyNo], ["Hospital", c.hospital.name], ["Final bill total", peso(c.finalBill?.total || 0)], ["Approved amount", peso(fl.approvedAmount)], ["Member share", peso(fl.patientShare)], ["Discharge date", fmtD(fl.dischargeDate)]] } : null },
+  ];
 }
 
 // -------------------------------------------------------------- APE / ECU (§ demo)
@@ -542,44 +677,55 @@ function SEED_DOCTORS() {
 
 function SEED_INPATIENT() {
   return [
+    // A case at the very beginning — ready to start from the admission request.
     {
       id: "ILC-2026-0007", member: { name: "Jose A. Ramirez", policyNo: "VC-PLN-882104", account: "ACC-NL-0442", accountName: "Northwind Logistics Corp." },
       hospital: { code: "H-00142", name: "St. Lucia Medical Center" },
       admission: { date: "2026-10-24", diagnosis: "Community-acquired pneumonia, moderate risk", attendingDoctor: "Dr. Elena Marquez (Internal Medicine)", room: "Semi-private", roomRate: 3200, initialLimit: 60000 },
       coverageLimit: 150000,
-      finalBill: { hospitalBill: 84200, professionalFee: 18500, total: 102700, lineItems: [
-        { label: "Room & board (3 nights, semi-private)", amount: 9600 },
-        { label: "Drugs & medicines", amount: 31400 },
-        { label: "Laboratory & diagnostics", amount: 22100 },
-        { label: "Supplies & misc.", amount: 21100 },
-        { label: "Professional fees", amount: 18500 },
+      initialLoa: null, visits: [],
+      finalBill: { reviewed: false, exception: "", hospitalBill: 84200, professionalFee: 18500, total: 102700, lineItems: [
+        { label: "Room & board (3 nights, semi-private)", kind: "hospital", amount: 9600 },
+        { label: "Drugs & medicines", kind: "hospital", amount: 31400 },
+        { label: "Laboratory & diagnostics", kind: "hospital", amount: 22100 },
+        { label: "Supplies & miscellaneous", kind: "hospital", amount: 21100 },
+        { label: "Professional fees (attending physician)", kind: "pf", amount: 18500 },
       ] },
-      documents: [
-        { key: "approval", name: "Admission approval request", supplied: true, source: "Hospital billing (fax)" },
-        { key: "diag", name: "Admitting diagnosis / clinical abstract", supplied: true, source: "Attending physician" },
-        { key: "finalsoa", name: "Final statement of account", supplied: true, source: "Hospital billing" },
-      ],
-      visits: [], history: [],
+      finalLoa: null,
+      wf: { _v: 1, admissionReviewed: false, initialIssued: false, visitLogged: false, finalBillReviewed: false, finalIssued: false },
+      history: [],
     },
+    // A case further along — a completed, discharged outcome so a presenter can see the end state.
     {
       id: "ILC-2026-0011", member: { name: "Maria L. Santos", policyNo: "VC-PLN-773920", account: "ACC-BL-0231", accountName: "Brightlane Hospitality Group" },
       hospital: { code: "H-00205", name: "Cebu Metropolitan Hospital" },
-      admission: { date: "2026-10-25", diagnosis: "Acute appendicitis — for appendectomy", attendingDoctor: "Dr. Marco Villanueva (Surgery referral)", room: "Private", roomRate: 4200, initialLimit: 80000 },
+      admission: { date: "2026-10-20", diagnosis: "Acute appendicitis — for appendectomy", attendingDoctor: "Dr. Marco Villanueva (Surgery referral)", room: "Private", roomRate: 4200, initialLimit: 80000 },
       coverageLimit: 200000,
-      finalBill: { hospitalBill: 121500, professionalFee: 42000, total: 163500, lineItems: [
-        { label: "Room & board (2 nights, private)", amount: 8400 },
-        { label: "Operating room & anesthesia", amount: 46000 },
-        { label: "Drugs & medicines", amount: 28600 },
-        { label: "Laboratory & diagnostics", amount: 18500 },
-        { label: "Supplies & misc.", amount: 20000 },
-        { label: "Professional fees (surgeon + anesthesiologist)", amount: 42000 },
-      ] },
-      documents: [
-        { key: "approval", name: "Admission approval request", supplied: true, source: "Hospital billing" },
-        { key: "diag", name: "Admitting diagnosis / clinical abstract", supplied: true, source: "Attending physician" },
-        { key: "finalsoa", name: "Final statement of account", supplied: false, note: "Awaited from hospital billing on discharge." },
+      initialLoa: { no: "LOA-I-2026-0011", date: "2026-10-20", guaranteeAmount: 80000, validity: "72 hours from admission (demo)", coverage: "Room & board, drugs and supplies up to the guarantee amount, subject to the plan.", kind: "Initial" },
+      visits: [
+        { at: "2026-10-21T02:00:00.000Z", date: "2026-10-21", condition: "Post-op, stable", note: "Bedside visit — appendectomy done, member recovering well.", dischargeChange: "Expected discharge 23 Oct.", by: "Inpatient Liaison Officer" },
+        { at: "2026-10-22T03:00:00.000Z", date: "2026-10-22", condition: "Stable for discharge", note: "Cleared by attending surgeon; awaiting final statement of account.", dischargeChange: "Discharge confirmed 23 Oct.", by: "Inpatient Liaison Officer" },
       ],
-      visits: [], history: [],
+      finalBill: { reviewed: true, exception: "", hospitalBill: 121500, professionalFee: 42000, total: 163500, lineItems: [
+        { label: "Room & board (3 nights, private)", kind: "hospital", amount: 12600 },
+        { label: "Operating room & anesthesia", kind: "hospital", amount: 46000 },
+        { label: "Drugs & medicines", kind: "hospital", amount: 28600 },
+        { label: "Laboratory & diagnostics", kind: "hospital", amount: 18500 },
+        { label: "Supplies & miscellaneous", kind: "hospital", amount: 15800 },
+        { label: "Professional fees (surgeon + anesthesiologist)", kind: "pf", amount: 42000 },
+      ] },
+      finalLoa: { no: "LOA-F-2026-0011", date: "2026-10-23", approvedAmount: 163500, patientShare: 0, dischargeDate: "2026-10-23", kind: "Final" },
+      wf: { _v: 1, admissionReviewed: true, initialIssued: true, visitLogged: true, finalBillReviewed: true, finalIssued: true },
+      history: [
+        { at: "2026-10-23T05:30:00.000Z", text: "Member discharged 23 Oct 2026 (simulated — no real message sent).", actor: "System (simulated)" },
+        { at: "2026-10-23T05:29:00.000Z", text: "Final LOA LOA-F-2026-0011 issued — approved ₱163,500, member share ₱0. Member cleared for discharge.", actor: "Inpatient Liaison Officer" },
+        { at: "2026-10-23T04:00:00.000Z", text: "Final bill reviewed — total ₱163,500; no exceptions.", actor: "Inpatient Liaison Officer" },
+        { at: "2026-10-22T03:00:00.000Z", text: "Hospital visit logged (22 Oct 2026) — Stable for discharge. Discharge confirmed 23 Oct.", actor: "Inpatient Liaison Officer" },
+        { at: "2026-10-21T02:00:00.000Z", text: "Hospital visit logged (21 Oct 2026) — Post-op, stable. Expected discharge 23 Oct.", actor: "Inpatient Liaison Officer" },
+        { at: "2026-10-20T01:05:00.000Z", text: "Initial LOA LOA-I-2026-0011 shared with Cebu Metropolitan Hospital (simulated — no real message sent).", actor: "System (simulated)" },
+        { at: "2026-10-20T01:00:00.000Z", text: "Initial LOA LOA-I-2026-0011 issued — guarantee ₱80,000.", actor: "Inpatient Liaison Officer" },
+        { at: "2026-10-20T00:30:00.000Z", text: "Admission request reviewed — Maria L. Santos at Cebu Metropolitan Hospital; eligibility confirmed (illustrative).", actor: "Inpatient Liaison Officer" },
+      ],
     },
   ];
 }
