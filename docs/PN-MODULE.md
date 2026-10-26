@@ -125,7 +125,11 @@ saved"), an honest **position-aware step indicator** (Now / Upcoming / Done / Ne
 a false green check on an unvisited step), inline + consolidated validation, unsaved-work
 safety via Save & exit, a **Drafts in progress** panel on the directory for resume, and
 labelled simulations (letters, portal access and integrations are "simulated here — nothing is
-really sent").
+really sent"). A **"Fill sample data"** button in the page head (demo convenience) populates
+every step at once with realistic, internally-consistent values — but only fills what has been
+left blank, so anything already typed, any document/discount already set and any payee/doctor
+already added are preserved; it then marks all steps visited so the draft becomes immediately
+reviewable.
 
 Verified end-to-end in the browser preview (console clean apart from the known preview-sandbox
 warning):
@@ -143,6 +147,7 @@ warning):
 | W9 | Activated provider appears in the directory (H-90001, Active) with the doctor affiliated | Pass |
 | W10 | Draft persists across a full page reload | Pass |
 | W11 | Save & exit → "Drafts in progress" panel shows the draft with Resume | Pass |
+| W12 | "Fill sample data" populates all 6 steps, flips the indicator to all-Done, Review reads "Ready to submit"; preserves already-typed fields | Pass |
 
 ## 3. Honesty
 

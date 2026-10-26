@@ -208,6 +208,7 @@ function renderStep(main, d, stepKey, errors, ctl) {
       <p class="muted">Onboard and accredit a hospital or clinic for the ValuCare network. Step ${step.n} of ${DRAFT_STEPS.length} — ${step.label}.
         <span class="tiny">Draft ${d.id} · <span id="wizSaved" class="save-state">${icon("check", 12)} All changes saved</span></span></p>
     </div><div class="ph-actions">
+      <button type="button" class="btn ghost sm" id="wizSample" title="Populate every step with realistic demo data">${icon("sparkle", 14)} Fill sample data</button>
       <span class="pill neutral plain tiny">Internal accreditation workflow</span>
     </div></div>
 
@@ -258,6 +259,7 @@ function wireShell(main, d, stepKey, ctl) {
   on("wizNext", () => ctl.next());
   on("wizReview", () => ctl.submit("review"));
   on("wizActivate", () => ctl.submit("active"));
+  on("wizSample", () => fillSample(main, d, stepKey, ctl));
 
   // Autosave: debounce typed edits into the draft so there is never unsaved work to lose.
   const form = document.getElementById("wizForm");
@@ -273,6 +275,140 @@ function wireShell(main, d, stepKey, ctl) {
   }
 }
 function flagSaved() { const s = document.getElementById("wizSaved"); if (s) s.innerHTML = html`${icon("check", 12)} All changes saved`.s; }
+
+// -------------------------------------------------------------- demo convenience: sample data
+// One-click fill so a demo can walk the whole wizard without typing. It tops up EVERY step
+// with realistic, internally-consistent values, but only fills what has been left blank —
+// anything already typed, any requirement/discount already set, and any payee/doctor already
+// added are preserved. Purely a demo aid, clearly labelled as such.
+function sampleFor(d) {
+  const hospital = d.type !== "Clinic";
+  return {
+    // Step 1 — Provider Details
+    providerName: hospital ? "St. Benedict Medical Center" : "ValuWell Family Clinic",
+    shortName: hospital ? "St. Benedict MC" : "ValuWell Clinic",
+    groupName: "Metro Benedict Health Group",
+    category: hospital ? "Level 3" : "Primary care",
+    tier: hospital ? "Tertiary" : "Clinic",
+    tin: "245-891-003-000",
+    contactNumber: hospital ? "+63 2 8721 0981" : "+63 2 8845 2210",
+    email: hospital ? "accreditation@stbenedictmc.ph" : "admin@valuwellclinic.ph",
+    website: hospital ? "https://stbenedictmc.ph" : "https://valuwellclinic.ph",
+    address: hospital ? "88 Katipunan Avenue, Quezon City, Metro Manila" : "2F Equitable Bldg, Makati Avenue, Makati City",
+    region: "NCR",
+    location: hospital ? "Quezon City" : "Makati City",
+    operatingHours: hospital ? "24/7" : "Mon–Sat, 8:00 AM – 6:00 PM",
+    bedCapacity: "220",
+    emergency: hospital,
+    group: hospital ? "HG-METRO" : "HG-INDY",
+    mgmt: {
+      accountOfficer: "Marco Villanueva",
+      relationshipManager: "Liza Ferrer",
+      onboardingNotes: "Priority onboarding — primary documents received and verified; awaiting notarized MOA before activation.",
+    },
+    // Step 2 — Accreditation & Documents
+    reqStates: {
+      "dti-sec": { state: "complete", verified: true, expiry: "2027-06-30" },
+      "doh-license": { state: "complete", verified: true, expiry: "2027-03-31" },
+      "mayor-permit": { state: "complete", verified: true, expiry: "2026-12-31" },
+      "philhealth": { state: "complete", verified: true, expiry: "2027-01-31" },
+      "bir-2303": { state: "complete", verified: true, expiry: "" },
+      "moa": { state: "complete", verified: true, expiry: "" },
+      "notarized-moa": { state: "submitted", verified: false, expiry: "" },
+      "orientation": { state: "submitted", verified: false, expiry: "" },
+    },
+    workflowStage: "orientation",
+    contract: {
+      no: "VC-MOA-2026-0481", signedBy: "Dr. Ramon Castillo (Medical Director)",
+      start: "2026-10-01", end: "2028-09-30", renewalDue: "2028-07-01",
+    },
+    // Step 3 — Financial & Payment Terms
+    tax: { vatStatus: "VAT-registered", withholding: "2% EWT", businessStyle: hospital ? "St. Benedict Medical Center, Inc." : "ValuWell Family Clinic" },
+    terms: { mode: "Bank transfer", net: "Net 30", providerCreditLimit: hospital ? "5000000" : "800000",
+      notes: "Settlement 30 days from complete documentation; consolidated billing per cutoff." },
+    apeRate: hospital ? "1800" : "1500",
+    ecuRate: hospital ? "950" : "800",
+    integration: { hms3: true, vcLive: true, providerPortal: true, claims: hospital },
+    payee: { name: hospital ? "St. Benedict Medical Center, Inc." : "ValuWell Family Clinic", tin: "245-891-003-000",
+      mode: "Bank transfer", terms: "Net 30", bank: "BDO Unibank", account: "0012-3456-7890",
+      creditLimit: hospital ? "2500000" : "500000", isDefault: true },
+    // Step 4 — Discounts & Procedure Rates
+    discounts: {
+      d1: { value: "10", basis: "percent", scope: "All plan members" },
+      d2: { value: "15", basis: "percent", scope: "Room & board charges" },
+      d3: { value: "12", basis: "percent", scope: "Laboratory services" },
+      d5: { value: "10", basis: "percent", scope: "In-house pharmacy" },
+    },
+    cptRates: hospital
+      ? [{ code: "99213", desc: "Office / outpatient visit, established patient", rate: "1200" },
+         { code: "99285", desc: "Emergency dept visit, high complexity", rate: "4500" }]
+      : [{ code: "99213", desc: "Office / outpatient visit, established patient", rate: "900" }],
+    roomRates: [
+      { type: "Private", rate: "4500" }, { type: "Semi-private", rate: "3000" },
+      { type: "Ward", rate: "1800" }, { type: "Suite", rate: "9000" },
+    ],
+    // Step 5 — Accredited Doctors
+    doctors: hospital
+      ? [{ name: "Dr. Ramon Castillo", prc: "0123456", specialization: "Internal Medicine", privileges: "Admitting & consultation", accreditationType: "Individual", status: "Active", facilities: [THIS_FACILITY], linkCode: "", active: true },
+         { name: "Dr. Grace Lim", prc: "0654321", specialization: "Pediatrics", privileges: "Consultation", accreditationType: "Individual", status: "Active", facilities: [THIS_FACILITY], linkCode: "", active: true }]
+      : [{ name: "Dr. Grace Lim", prc: "0654321", specialization: "Family Medicine", privileges: "Consultation", accreditationType: "Individual", status: "Active", facilities: [THIS_FACILITY], linkCode: "", active: true }],
+  };
+}
+
+function fillSample(main, d, stepKey, ctl) {
+  ctl.capture(); // keep whatever is on screen before we top up the blanks
+  const s = sampleFor(d);
+  const blank = (v) => !String(v ?? "").trim();
+  const fill = (k, v) => { if (blank(d[k])) d[k] = v; };
+
+  // Step 1 — only fill blanks so typed work survives
+  ["providerName", "shortName", "category", "tier", "tin", "contactNumber", "email",
+   "website", "address", "region", "location", "operatingHours"].forEach((k) => fill(k, s[k]));
+  if (d.type === "Hospital" && blank(d.bedCapacity)) d.bedCapacity = s.bedCapacity;
+  if (d.type === "Hospital" && !d.emergency) d.emergency = s.emergency;
+  if (d.group === "HG-INDY") d.group = s.group;
+  if (d.accreditationType === "Umbrella" && blank(d.groupName)) d.groupName = s.groupName;
+  Object.entries(s.mgmt).forEach(([k, v]) => { if (blank(d.mgmt[k])) d.mgmt[k] = v; });
+
+  // Step 2 — only touch documents still at their default "missing" state
+  (d.requirements || []).forEach((r) => {
+    const sr = s.reqStates[r.key];
+    if (sr && r.state === "missing") { r.state = sr.state; r.verified = sr.verified; r.expiry = sr.expiry; }
+  });
+  if (d.workflowStage === "collection") d.workflowStage = s.workflowStage;
+  Object.entries(s.contract).forEach(([k, v]) => { if (blank(d.contract[k])) d.contract[k] = v; });
+
+  // Step 3
+  Object.entries(s.tax).forEach(([k, v]) => { if (blank(d.tax[k])) d.tax[k] = v; });
+  if (blank(d.terms.providerCreditLimit)) d.terms.providerCreditLimit = s.terms.providerCreditLimit;
+  if (blank(d.terms.notes)) d.terms.notes = s.terms.notes;
+  fill("apeRate", s.apeRate); fill("ecuRate", s.ecuRate);
+  d.integration = { ...d.integration, ...s.integration };
+  if (!(d.payees || []).length) d.payees = [{ ...s.payee }];
+
+  // Step 4 — enable sample discounts only if none are on yet
+  if (!(d.discounts || []).some((x) => x.enabled)) {
+    (d.discounts || []).forEach((row) => {
+      const sd = s.discounts[row.key];
+      if (sd) { row.enabled = true; row.value = sd.value; row.basis = sd.basis; row.scope = sd.scope; }
+    });
+  }
+  if (!(d.cptRates || []).length) d.cptRates = s.cptRates.map((c) => ({ ...c }));
+  if (d.type === "Hospital" && !(d.roomRates || []).length) d.roomRates = s.roomRates.map((r) => ({ ...r }));
+
+  // Step 5
+  if (!(d.doctors || []).length) d.doctors = s.doctors.map((dr) => ({ ...dr, facilities: [...dr.facilities] }));
+
+  // Mark every step visited so the indicator reflects the now-complete draft, then persist.
+  d.visited = DRAFT_STEPS.map((x) => x.key);
+  d.updatedAt = stamp();
+  log(d, "Filled the draft with sample data (demo convenience).", "You (demo)");
+  putDraft(d);
+  ctl.refresh();
+  flagSaved();
+  toast("Sample data filled across all six steps — review and adjust as needed.", "ok");
+  announce("Sample data filled across all steps.");
+}
 
 // -------------------------------------------------------------- capture (form → draft)
 function captureStep(container, d, stepKey) {
