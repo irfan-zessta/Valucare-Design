@@ -34,6 +34,9 @@ to the shell:
   **Rates & Affiliations** landings.
 - **`pndesk-service.js`** — the two Service Operations journeys: inpatient liaison (5 steps)
   and APE/ECU (5 steps), plus the Service Operations landing.
+- **`pndesk-wizard.js`** — the full-page **Add New Provider** six-step onboarding wizard
+  (draft model, routing, step shell, per-step forms, Payee and Doctor drawers, review &
+  submit, and the directory "Drafts in progress" resume panel). See §2b.
 - Registered via `explore.js` (live department card, 3 demos) and `main.js` (`WORKSPACES` +
   sidebar nav + `VIEWS` loader). CSS for the expandable sections appended to `app/css/app.css`.
 
@@ -87,6 +90,59 @@ All walked in the live browser preview; console clean apart from the known, pre-
 | 10 | Rates & Affiliations landing: rate roll-up + hospital groups | Pass |
 | 11 | Explore live card shows 3 demos; shell nav + sidebar correct | Pass |
 | 12 | "Reset this demo" restores starting state; other demos untouched | Pass |
+
+## 2b. Add New Provider — full-page onboarding wizard
+
+The oversized "Add provider" modal (six tabs, nested modals, free-text remarks) was replaced
+with a **full-page six-step wizard** — `pndesk-wizard.js`, routed at
+`#/pn-desk/new/:draftId/:step` with a persistent step indicator. **No HMS3 field or business
+information was removed**; everything was reorganised, structured and validated. A draft is a
+superset of the provider shape plus wizard metadata, saved to `store.drafts` (`hms-pn:v1`);
+drafts become real providers only on submit.
+
+The six steps:
+
+1. **Provider Details** — Basic / Contact / Management, plus the new **Accreditation type**
+   (Umbrella vs Individual, with a "confirm the rule with the business" note) and live
+   duplicate detection. Group is required only for Umbrella (conditional field).
+2. **Accreditation & Documents** — accreditation details, an 8-item document checklist with
+   per-doc state / verify / expiry, the six-stage onboarding workflow and notes.
+3. **Financial & Payment Terms** — tax, payment terms, APE/ECU, system integration, and a
+   **distinct Payee vs Provider credit limit** with an inline Payee drawer (payees are not
+   assumed to equal the provider).
+4. **Discounts & Procedure Rates** — 12 structured discount rows (never assumed cumulative —
+   an explicit "Do these discounts stack? → Not confirmed with business" control), a CPT
+   procedure-rate table and room & board rates (hospitals only).
+5. **Accredited Doctors** — doctor table with an inline drawer: link an existing network
+   doctor or add new, facility-specific accreditation (multi-facility checkboxes, current
+   facility pre-selected), Umbrella vs Individual, and **deactivate-not-delete**.
+6. **Review & Submit** — per-section summaries with Edit jumps, a consolidated validation
+   summary, and Save draft / Submit for review (stays Pending) / Activate now (goes Active) →
+   confirmation → success overlay with a reference number.
+
+Global UX: autosave on every change and on navigation (debounced "Saving… / All changes
+saved"), an honest **position-aware step indicator** (Now / Upcoming / Done / Needs fix — never
+a false green check on an unvisited step), inline + consolidated validation, unsaved-work
+safety via Save & exit, a **Drafts in progress** panel on the directory for resume, and
+labelled simulations (letters, portal access and integrations are "simulated here — nothing is
+really sent").
+
+Verified end-to-end in the browser preview (console clean apart from the known preview-sandbox
+warning):
+
+| # | Scenario | Result |
+|---|----------|--------|
+| W1 | "Add provider" starts a draft; step indicator honest (1 Now, 2–6 Upcoming) | Pass |
+| W2 | Step 1 required-field + email + numeric validation; duplicate detection | Pass |
+| W3 | Conditional Group field appears only for Umbrella accreditation | Pass |
+| W4 | Step 3 Payee drawer adds a payee with a **distinct** ₱2,500,000 credit limit | Pass |
+| W5 | Step 4 discounts/CPT rows add & remove; "stack?" defaults to Not confirmed | Pass |
+| W6 | Step 5 doctor drawer adds a doctor with facility-specific affiliation | Pass |
+| W7 | Step 6 per-section summaries + Edit jumps + consolidated "Ready to submit" | Pass |
+| W8 | Activate → confirm → success overlay with reference number (PN-ACT-H-90001) | Pass |
+| W9 | Activated provider appears in the directory (H-90001, Active) with the doctor affiliated | Pass |
+| W10 | Draft persists across a full page reload | Pass |
+| W11 | Save & exit → "Drafts in progress" panel shows the draft with Resume | Pass |
 
 ## 3. Honesty
 

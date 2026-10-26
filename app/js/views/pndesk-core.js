@@ -19,7 +19,7 @@ export const GUIDE_KEY = "hms-pn-guide";
 const BASELINE = 1; // bump to force a reseed when the sample data shape changes
 
 // -------------------------------------------------------------- store plumbing
-function blank() { return { providers: {}, doctors: {}, inpatient: {}, ape: {}, seeded: 0 }; }
+function blank() { return { providers: {}, doctors: {}, inpatient: {}, ape: {}, drafts: {}, seeded: 0 }; }
 export function loadStore() {
   try { return JSON.parse(localStorage.getItem(STORE_KEY) || "null") || blank(); }
   catch (e) { return blank(); }
@@ -66,6 +66,23 @@ export function putApe(r) { const s = loadStore(); s.ape[r.id] = r; saveStore(s)
 
 export function resetInpatient(id) { const fresh = SEED_INPATIENT().find((c) => c.id === id); if (!fresh) return null; putInpatient(fresh); return fresh; }
 export function resetApe(id) { const fresh = SEED_APE().find((r) => r.id === id); if (!fresh) return null; putApe(fresh); return fresh; }
+
+// -------------------------------------------------------------- Add-Provider drafts
+// The Add New Provider wizard saves its work-in-progress as a draft so the team can
+// stop and resume. Drafts live alongside the seeded data but are NOT providers until
+// the wizard submits — keeping the directory honest. The store may predate this key,
+// so every accessor tolerates a missing `drafts` map.
+export const allDrafts = () => Object.values(loadStore().drafts || {});
+export const getDraft = (id) => (loadStore().drafts || {})[id] || null;
+export function putDraft(d) { const s = loadStore(); (s.drafts = s.drafts || {})[d.id] = d; saveStore(s); }
+export function deleteDraft(id) { const s = loadStore(); if (s.drafts) { delete s.drafts[id]; saveStore(s); } }
+// Readable, collision-safe draft id (timestamp in base36 + a short counter).
+export function newDraftId() {
+  const base = "PND-" + Date.now().toString(36).toUpperCase().slice(-6);
+  let id = base, n = 1;
+  while (getDraft(id)) id = `${base}-${n++}`;
+  return id;
+}
 
 // -------------------------------------------------------------- small helpers
 export const stamp = () => new Date().toISOString();

@@ -21,6 +21,7 @@ import {
 } from "./pndesk-core.js";
 import { highlightNav, backBar, protoConcept } from "./pndesk-ui.js";
 import { renderService } from "./pndesk-service.js";
+import { renderWizard, startDraft, draftsPanel } from "./pndesk-wizard.js";
 
 export async function render(main, { parts, query }) {
   ensureSeeded();
@@ -31,6 +32,8 @@ export async function render(main, { parts, query }) {
   // APE chooser. Clear stale toasts once per navigation to those screens (not on the
   // in-place search/tab re-renders, which call the render fns directly).
   if (!sub || sub === "directory" || sub === "operations") document.getElementById("toasts")?.replaceChildren();
+  // The full-page Add New Provider wizard (#/pn-desk/new/:id/:step) replaces the old modal.
+  if (sub === "new") return renderWizard(main, { parts, query });
   if (sub === "provider") return renderProvider(main, parts[2], parts[3] || "overview");
   if (sub === "doctors") return renderDoctors(main, query);
   if (sub === "doctor") return renderDoctor(main, parts[2]);
@@ -113,6 +116,8 @@ function renderDirectory(main, query) {
         ${Object.keys(PROVIDER_STATUS).map((s) => html`<option value="${s}" ${statusFilter === s ? "selected" : ""}>${s} (${counts[s] || 0})</option>`)}</select>
     </div>
 
+    ${draftsPanel()}
+
     ${rows.length
       ? html`<div class="tbl-wrap mt"><table class="tbl rowlink cardify"><thead><tr>
           <th>Provider Code</th><th>Type</th><th>Short Name</th><th>Provider Name</th><th>Contact Number</th><th>Location</th><th>Status</th><th>Last Updated By</th><th>Details</th></tr></thead>
@@ -127,7 +132,7 @@ function renderDirectory(main, query) {
   const pq = main.querySelector("#pq");
   bindLiveSearch(pq, (value) => renderDirectory(main, { ...query, q: value }));
   main.querySelector("#sfSel").onchange = (e) => renderDirectory(main, { ...query, status: e.target.value });
-  main.querySelector("#addProv").onclick = () => addProvider();
+  main.querySelector("#addProv").onclick = () => startDraft();
   main.querySelector("#resetDemo").onclick = async () => {
     if (!(await confirmDialog("Reset this demo?", "Restores the Provider & Network sample data to its starting state. Other demos (Sales, Actuarial, MDA) are untouched.", { confirm: "Reset", kind: "danger" }))) return;
     resetDemo(); toast("Provider & Network demo reset.", "ok"); renderDirectory(main, {});
@@ -149,51 +154,8 @@ function providerRow(p) {
     <td><span class="linklike">Open ›</span></td></tr>`;
 }
 
-// Add a provider — a lightweight sample; new providers start Pending with a blank
-// requirements checklist so the accreditation journey has somewhere to begin.
-async function addProvider() {
-  const result = await dialog({
-    title: "Add sample provider",
-    body: html`<p class="tiny">Enter a few details to identify this provider. Accreditation requirements can be reviewed next; no real record is created.</p>
-      <div class="field mt"><label for="pnNewType">Provider type</label><select id="pnNewType" name="type" class="inp"><option>Clinic</option><option>Hospital</option></select></div>
-      <div class="field mt"><label for="pnNewName">Provider name</label><input id="pnNewName" name="name" class="inp" value="New Sample Clinic" autocomplete="off"></div>
-      <div class="field mt"><label for="pnNewLocation">Location</label><input id="pnNewLocation" name="location" class="inp" value="Quezon City"></div>
-      <div class="field mt"><label for="pnNewContact">Contact number</label><input id="pnNewContact" name="contact" class="inp" value="+63 2 0000 0000"></div>`,
-    actions: [{ label: "Cancel" }, { label: "Create sample provider", kind: "primary", value: "create" }],
-    onOpen: (dlg) => {
-      const type = dlg.querySelector("#pnNewType"), name = dlg.querySelector("#pnNewName");
-      type.onchange = () => { if (/^New Sample (Clinic|Hospital)$/.test(name.value)) name.value = `New Sample ${type.value}`; };
-    },
-  });
-  if (result?.action !== "create") return;
-  const v = result.values;
-  const type = v.type === "Hospital" ? "Hospital" : "Clinic";
-  const name = v.name.trim() || `New Sample ${type}`;
-  const prefix = type === "Hospital" ? "H" : "C";
-  let number = 90001;
-  while (getProvider(`${prefix}-${number}`)) number += 1;
-  const code = `${prefix}-${number}`;
-  const p = {
-    code, type, shortName: name.slice(0, 28), providerName: name,
-    contactNumber: v.contact.trim() || "+63 2 0000 0000", location: v.location.trim() || "Quezon City", region: "NCR", tier: type, category: type === "Hospital" ? "Secondary" : "Primary care",
-    status: "Pending", statusReason: "New accreditation — requirements outstanding.", statusEffective: DEMO_NOW_ISO,
-    updatedBy: "You (demo)", group: "HG-INDY", tin: "—", email: "—", website: "—", address: "—", bedCapacity: 0, emergency: false, operatingHours: "—",
-    contract: { no: "(draft)", start: null, end: null, signedBy: null, renewalDue: null },
-    requirements: [
-      { key: "dti-sec", label: "SEC/DTI registration", state: "missing", detail: "Not yet provided." },
-      { key: "doh-license", label: "DOH license to operate", state: "missing", detail: "Not yet provided." },
-      { key: "mayor-permit", label: "Mayor's / business permit", state: "missing", detail: "Not yet provided." },
-      { key: "mou", label: "Signed MOA / agreement", state: "missing", detail: "Not yet provided." },
-      { key: "bir-2303", label: "BIR Form 2303", state: "missing", detail: "Not yet provided." },
-    ],
-    discounts: [], payee: { name: "—", mode: "—", bank: "—", account: "—", terms: "—" },
-    roomRates: [], cptRates: [], apeRate: null, ecuRate: null, vcLive: false, history: [],
-  };
-  log(p, "Provider added as a sample — accreditation pending.", "You (demo)");
-  putProvider(p);
-  toast("Sample provider added — start its accreditation.", "ok");
-  go(`#/pn-desk/provider/${code}/accreditation`);
-}
+// The full-page Add New Provider wizard now owns provider creation — see pndesk-wizard.js.
+// The directory's "Add provider" button calls startDraft() to open it.
 
 // ============================================================== Provider profile
 // Essentials first; everything else in clearly named expandable sections. Nothing from
