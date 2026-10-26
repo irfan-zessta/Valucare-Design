@@ -69,8 +69,20 @@ export const DEPARTMENTS = [
     desc: "Billing and collection setup." },
   { key: "accounts", name: "Accounts", icon: "folder", status: "soon",
     desc: "Account servicing and records." },
-  { key: "claims", name: "Claims", icon: "file", status: "soon",
-    desc: "Claims intake and adjudication." },
+  {
+    key: "claims", name: "Claims", icon: "file", status: "live",
+    desc: "Receive and batch, process, check and post, reimburse, then forward for payment.",
+    demos: [
+      { key: "claims-straight", name: "Provider claim — straight through", status: "live", href: "#/claims-desk/process/SB-A1/member",
+        desc: "Receive an outpatient bill, batch it, process, check, post, forward and watch the payment status." },
+      { key: "claims-correction", name: "Provider claim — correction", status: "live", href: "#/claims-desk/process/SB-B1/member",
+        desc: "Process with a missing document, have the reviewer return it, correct and resubmit." },
+      { key: "claims-reimburse", name: "Member reimbursement", status: "live", href: "#/claims-desk/reimburse/SB-C1/intake",
+        desc: "Capture, check documents and the filing date, decide, then have a reviewer post it." },
+      { key: "claims-home", name: "Claims home (all five work areas)", status: "live", href: "#/claims-desk",
+        desc: "Start from the Claims landing with all five work areas and the other claim types." },
+    ],
+  },
   { key: "ccd", name: "CCD", icon: "check", status: "soon",
     desc: "Acknowledge the downstream handover." },
   {

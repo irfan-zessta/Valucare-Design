@@ -1176,3 +1176,80 @@ tr.qc-row>td{background:var(--surface-muted)}
   border:1px solid var(--border);border-radius:var(--r-sm);text-decoration:none;color:var(--text);background:var(--surface)}
 .draft-row:hover{background:var(--surface-muted)}
 .draft-row .dr-main{display:flex;flex-direction:column;gap:2px}
+
+/* ============================================================== Claims desk */
+.sec-title{font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--text-muted);margin:0}
+.sec-title.mt,.mt.sec-title{margin-top:20px}
+
+/* Claims home — work areas */
+.area-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.area-card{display:flex;align-items:center;gap:12px;padding:14px;text-decoration:none;color:var(--text);
+  border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface);transition:background .12s,border-color .12s}
+.area-card:hover{background:var(--surface-muted);border-color:var(--border-strong)}
+.area-n{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;
+  font-size:12px;font-weight:700;color:var(--on-accent);background:var(--accent)}
+.area-ic{flex:none;color:var(--text-muted);display:grid;place-items:center}
+.area-main{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.area-main b{font-size:14px}
+.area-card .count{flex:none;min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:grid;place-items:center;
+  font-size:12px;font-weight:600;color:var(--on-accent);background:var(--accent)}
+
+/* Claims home — scenarios */
+.scenario-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.scenario-card{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--border);
+  border-radius:var(--r-lg);background:var(--surface)}
+.scenario-card .grow{display:flex;flex-direction:column;gap:3px}
+.scenario-card b{font-size:14px}
+.scenario-card .btn{align-self:flex-start}
+
+/* Other claim types */
+.other-link{display:inline-flex;align-items:center;gap:8px;padding:12px 14px;text-decoration:none;color:var(--text);
+  border:1px dashed var(--border-strong);border-radius:var(--r-lg);background:var(--surface);width:100%}
+.other-link:hover{background:var(--surface-muted)}
+.other-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.other-card{padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface)}
+.other-card b{font-size:13px}
+.other-card p{margin:4px 0 0}
+
+/* Receive worklist bits */
+.linkpill{border:0;cursor:pointer;font:inherit}
+
+/* Processing — member mini-card & net line */
+.mini-card{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);
+  border-radius:var(--r-sm);background:var(--surface-muted)}
+.mini-card .grow{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.net-line{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;
+  border-radius:var(--r-sm);background:var(--surface-muted);border:1px solid var(--border)}
+.net-line.ok{background:var(--success-soft);border-color:var(--success)}
+.net-line.warn{background:var(--warning-soft);border-color:var(--warning)}
+.net-line b{font-variant-numeric:tabular-nums}
+
+/* Check & post — side-by-side + acting identity */
+.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:860px){.review-grid{grid-template-columns:1fr}}
+.mc-actor{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.mc-actor .grow{flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px}
+.seg.sm button{padding:4px 10px;font-size:12px}
+.seg.sm button.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow-xs);font-weight:600}
+.anytime-bar{flex-wrap:wrap}
+
+/* Reimbursement — decision cards + checkboxes */
+.decision-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:700px){.decision-cards{grid-template-columns:1fr}}
+.dec-card{display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;padding:14px;
+  border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface);cursor:pointer;font:inherit;color:var(--text)}
+.dec-card:hover{background:var(--surface-muted)}
+.dec-card b{display:inline-flex;align-items:center;gap:6px;font-size:14px}
+.dec-card.ok{border-color:var(--success)}
+.dec-card.ok b{color:var(--success)}
+.dec-card.warn{border-color:var(--warning)}
+.dec-card.warn b{color:var(--warning)}
+.dec-card.danger{border-color:var(--danger)}
+.dec-card.danger b{color:var(--danger)}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;cursor:pointer}
+.chk input{margin:0}
+
+/* Acronym gloss — explained at first use */
+abbr.gloss{text-decoration:underline dotted;text-underline-offset:2px;cursor:help;text-decoration-thickness:1px}
+.docset{border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.docset legend{font-size:12px;color:var(--text-muted);padding:0 4px}

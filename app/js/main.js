@@ -136,6 +136,20 @@ const WORKSPACES = {
     search: (q) => `#/pn-desk/directory?q=${encodeURIComponent(q)}`,
     searchPlaceholder: "Search providers by code, name or location",
   },
+  "claims-desk": {
+    key: "claims-desk", dept: "Claims", name: "Claims", home: "#/claims-desk",
+    routes: ["claims-desk"],
+    nav: [
+      { key: "home", label: "Claims Home", icon: "home", href: "#/claims-desk" },
+      { key: "receive", label: "Receive & batch", icon: "inbox", href: "#/claims-desk/receive" },
+      { key: "queue", label: "My processing queue", icon: "tasks", href: "#/claims-desk/queue" },
+      { key: "review", label: "Check & post", icon: "check", href: "#/claims-desk/review" },
+      { key: "reimburse", label: "Reimbursements", icon: "user", href: "#/claims-desk/reimburse" },
+      { key: "forward", label: "Forwarding & payment", icon: "building", href: "#/claims-desk/forward" },
+    ],
+    search: (q) => `#/claims-desk/receive?q=${encodeURIComponent(q)}`,
+    searchPlaceholder: "Search batches by number, provider or member",
+  },
 };
 
 // Which workspace owns this route? Falls back to the New Business desk for shared
@@ -305,6 +319,7 @@ const VIEWS = {
   "actuarial-desk": () => import("./views/actuarial-desk.js"),
   "mda-desk": () => import("./views/mda-desk.js"),
   "pn-desk": () => import("./views/pn-desk.js"),
+  "claims-desk": () => import("./views/claims-desk.js"),
   tasks: () => import("./views/tasks.js"),
   accounts: () => import("./views/accounts.js"),
   reports: () => import("./views/reports.js"),
