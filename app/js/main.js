@@ -123,6 +123,19 @@ const WORKSPACES = {
     search: (q) => `#/mda-desk/queue/toprocess?q=${encodeURIComponent(q)}`,
     searchPlaceholder: "Search requests by reference or account",
   },
+  "pn-desk": {
+    key: "pn-desk", dept: "Provider Networks", name: "Provider & Network", home: "#/pn-desk/directory",
+    routes: ["pn-desk"],
+    nav: [
+      { key: "demos", label: "Demos", icon: "tasks", href: "#/explore/provider-networks" },
+      { key: "directory", label: "Provider Directory", icon: "building", href: "#/pn-desk/directory" },
+      { key: "accreditation", label: "Accreditation & Contracts", icon: "file", href: "#/pn-desk/accreditation" },
+      { key: "rates", label: "Rates & Affiliations", icon: "chart", href: "#/pn-desk/rates" },
+      { key: "operations", label: "Service Operations", icon: "briefcase", href: "#/pn-desk/operations" },
+    ],
+    search: (q) => `#/pn-desk/directory?q=${encodeURIComponent(q)}`,
+    searchPlaceholder: "Search providers by code, name or location",
+  },
 };
 
 // Which workspace owns this route? Falls back to the New Business desk for shared
@@ -291,6 +304,7 @@ const VIEWS = {
   create: () => import("./views/create.js"),
   "actuarial-desk": () => import("./views/actuarial-desk.js"),
   "mda-desk": () => import("./views/mda-desk.js"),
+  "pn-desk": () => import("./views/pn-desk.js"),
   tasks: () => import("./views/tasks.js"),
   accounts: () => import("./views/accounts.js"),
   reports: () => import("./views/reports.js"),

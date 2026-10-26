@@ -73,8 +73,18 @@ export const DEPARTMENTS = [
     desc: "Claims intake and adjudication." },
   { key: "ccd", name: "CCD", icon: "check", status: "soon",
     desc: "Acknowledge the downstream handover." },
-  { key: "provider-networks", name: "Provider Networks", icon: "building", status: "soon",
-    desc: "Hospital and provider network management." },
+  {
+    key: "provider-networks", name: "Provider Networks", icon: "building", status: "live",
+    desc: "Accredit and maintain the hospital and provider network, run inpatient liaison and APE/ECU.",
+    demos: [
+      { key: "pn-directory", name: "Provider Network accreditation & maintenance", status: "live", href: "#/pn-desk/directory",
+        desc: "Find or add a hospital or clinic, review accreditation, manage affiliated doctors and commercial terms, and see its rates." },
+      { key: "pn-inpatient", name: "Inpatient Liaison", status: "live", href: "#/pn-desk/operations?tab=inpatient",
+        desc: "Walk a confinement from admission request and initial LOA through to final bill review, final LOA and discharge." },
+      { key: "pn-ape", name: "APE / ECU", status: "live", href: "#/pn-desk/operations?tab=ape",
+        desc: "Check a member, schedule an APE or ECU with a provider and rate, issue a sample LOE and record results." },
+    ],
+  },
 ];
 
 const deptByKey = (k) => DEPARTMENTS.find((d) => d.key === k) || null;
