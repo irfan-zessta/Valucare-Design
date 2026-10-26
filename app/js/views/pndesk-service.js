@@ -16,8 +16,10 @@ import {
   ILC_STEPS, ilcStatus, ilcNext, ilcHref, issueInitialLoa, logVisit, reviewFinalBill, issueFinalLoa,
   newInpatientId, newInpatientCase, sampleAdmission, sampleFinalBill, coverageCheck, inpatientDocuments,
   reviewAdmission, saveAdmission, toNum, getProvider,
-  APE_STEPS, apeStatus, apeNext, apeHref, apeKindLabel, apePackages, allProviders,
-  confirmApeMember, checkApePrior, priorInPolicyYear, scheduleApe, issueLoe, completeApe,
+  APE_STEPS, apeStatus, apeNext, apeHref, apeKindLabel, apePackages, allProviders, putApe,
+  newApeId, newApeCase, sampleApeMember, apeCoverageSummary, saveApeMember, confirmApeMember,
+  apeScenario, apePriorForScenario, apePriorOutcome, setApePrior, scheduleApe, issueLoe,
+  sampleApeResults, completeApe, apeDocuments,
   log, peso, plural, fmtD, DEMO_NOW_ISO,
 } from "./pndesk-core.js";
 import {
@@ -42,7 +44,9 @@ function renderOperations(main, query) {
   main.innerHTML = html`
     <div class="page-head"><div><h1>Service Operations</h1>
       <p class="muted">Day-to-day provider-network cases: inpatient liaison and APE/ECU. Each row shows the status and the next action — open one to walk the journey.</p></div>
-      <div class="ph-actions">${tab === "inpatient" ? html`<button type="button" class="btn primary" id="newIlc">${icon("plus", 15)} New inpatient case</button>` : ""}</div></div>
+      <div class="ph-actions">${tab === "inpatient"
+        ? html`<button type="button" class="btn primary" id="newIlc">${icon("plus", 15)} New inpatient case</button>`
+        : html`<button type="button" class="btn primary" id="newApe">${icon("plus", 15)} New APE request</button><button type="button" class="btn ghost" id="newEcu">${icon("plus", 15)} New ECU request</button>`}</div></div>
 
     <div class="seg mt" role="tablist" aria-label="Service type">
       <button role="tab" class="${tab === "inpatient" ? "on" : ""}" aria-selected="${tab === "inpatient"}" data-tab="inpatient">Inpatient Liaison <span class="cnt">${inpatient.length}</span></button>
@@ -64,9 +68,9 @@ function renderOperations(main, query) {
         <td><b>${r.id}</b></td>
         <td><span class="pill ${r.kind === "ECU" ? "info" : "neutral"} plain">${r.kind}</span></td>
         <td class="tiny">${fmtD(r.date)}</td>
-        <td class="tiny">${r.batchNo}</td>
-        <td>${r.member.name}<div class="tiny">${r.member.policyNo}</div></td>
-        <td class="tiny">${r.member.accountName}</td>
+        <td class="tiny">${r.batchNo || "—"}</td>
+        <td>${r.member.name || html`<span class="tiny muted">New request — details pending</span>`}<div class="tiny">${r.member.policyNo || ""}</div></td>
+        <td class="tiny">${r.member.accountName || "—"}</td>
         <td class="num">${r.amount != null ? peso(r.amount) : "—"}</td>
         <td>${pill(st.label, st.tone)}</td>
         <td>${ns ? html`<span class="linklike">${ns.label} ›</span>` : html`<span class="tiny">Completed</span>`}</td></tr>`; })}</tbody></table></div>`}
@@ -80,6 +84,14 @@ function renderOperations(main, query) {
     toast("New inpatient case created.", "ok");
     go(`#/pn-desk/inpatient/${id}/admission`);
   });
+  const createApe = (kind) => {
+    const id = newApeId(kind);
+    putApe(newApeCase(id, kind));
+    toast(`New ${kind} request created.`, "ok");
+    go(`#/pn-desk/ape/${id}/member`);
+  };
+  main.querySelector("#newApe")?.addEventListener("click", () => createApe("APE"));
+  main.querySelector("#newEcu")?.addEventListener("click", () => createApe("ECU"));
   main.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => go(`#/pn-desk/operations?tab=${b.dataset.tab}`)));
   main.querySelectorAll("[data-href]").forEach((tr) => {
     tr.onclick = () => go(tr.dataset.href);
@@ -387,6 +399,7 @@ function ilcCompletionSummary(c) {
 const APE_DEFS = {
   steps: APE_STEPS, next: apeNext, status: apeStatus,
   stepHref: (r, k) => `#/pn-desk/ape/${r.id}/${k}`,
+  docs: apeDocuments,
   doneTitle: "Request completed — results recorded.",
   doneWhy: "The member was confirmed, eligibility checked, a provider and package scheduled, the LOE issued and the results recorded.",
 };
@@ -401,11 +414,13 @@ function renderApeCase(main, id, step) {
     ${backBar([{ label: "Service Operations", href: "#/pn-desk/operations?tab=ape" }, { label: "APE / ECU" }, { label: r.id }])}
     ${caseHead(r, APE_DEFS, {
       eyebrow: apeKindLabel(r.kind) + " · " + r.id,
-      title: r.member.name,
+      title: r.member.name || `New ${r.kind} request`,
       refs: [
-        `Date ${fmtD(r.date)}`, `Batch ${r.batchNo}`, `Policy ${r.member.policyNo}`,
-        `Account ${r.member.account} · ${r.member.accountName}`,
-      ],
+        r.date ? `Date ${fmtD(r.date)}` : null,
+        r.batchNo ? `Batch ${r.batchNo}` : null,
+        r.member.policyNo ? `Policy ${r.member.policyNo}` : null,
+        r.member.account ? `Account ${r.member.account}${r.member.accountName ? " · " + r.member.accountName : ""}` : null,
+      ].filter(Boolean),
     })}
     ${nextStrip(r, APE_DEFS)}
     ${stepsNav(r, APE_DEFS, step)}
@@ -423,115 +438,269 @@ function renderApeCase(main, id, step) {
   };
 }
 
+// Shown when an APE/ECU step is opened out of order — never fabricates a completed state.
+function apeGuard(host, ctx, msg, toKey) {
+  const to = APE_STEPS.find((s) => s.key === toKey);
+  host.innerHTML = html`<div class="panel"><div class="pb">
+    <div class="note info"><b>Do this step first.</b> ${msg}</div>
+    <div class="savebar"><div></div><button type="button" class="btn primary" id="apeGoto">Go to ${to.label} ›</button></div>
+  </div></div>`.s;
+  host.querySelector("#apeGoto").onclick = () => ctx.goStep(toKey);
+}
+// One obvious primary action at the bottom of each step.
+function apeSaveBar(label) {
+  return html`<div class="savebar mt"><div></div><button type="button" class="btn primary" id="apePrimary">${label} ›</button></div>`;
+}
+// A compact strip that keeps the chosen service visible on every step.
+function apeServiceChip(r) {
+  return html`<p class="tiny"><span class="pill ${r.kind === "ECU" ? "info" : "neutral"} plain">${r.kind}</span> <b>${apeKindLabel(r.kind)}</b> · request ${r.id}</p>`;
+}
+
 function renderApeStep(host, ctx) {
-  const r = ctx.rec, step = ctx.step;
-  const member = html`<dl class="dl cols">
-    <div><dt>Member</dt><dd>${r.member.name}</dd></div>
-    <div><dt>Policy no.</dt><dd>${r.member.policyNo}</dd></div>
-    <div><dt>Account</dt><dd>${r.member.account} · ${r.member.accountName}</dd></div>
-    <div><dt>Request</dt><dd>${apeKindLabel(r.kind)}</dd></div></dl>`;
+  const r = ctx.rec, step = ctx.step, w = r.wf;
+  const kind = r.kind;
 
+  // ---- Step 1 · Member & request ------------------------------------------
   if (step === "member") {
-    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Member & account</h2></div><div class="pb">
-      ${member}
-      <dl class="dl cols mt">
-        <div><dt>Request date</dt><dd>${fmtD(r.date)}</dd></div>
-        <div><dt>Batch number</dt><dd>${r.batchNo}</dd></div>
-      </dl>
-      <p class="tiny mt note info">APE (Annual Physical Exam) and ECU (Executive Check-Up) are tracked as distinct services with their own package catalogues.</p>
-      ${r.wf.memberChecked ? html`<p class="tiny mt">${icon("check", 14)} Member and account confirmed.</p>` : ""}
-    </div></div>`.s;
-    wireNext(ctx, APE_DEFS, () => { confirmApeMember(r); toast("Member confirmed.", "ok"); go(`#/pn-desk/ape/${r.id}/prior`); });
-    return;
-  }
-
-  if (step === "prior") {
-    const duplicate = priorInPolicyYear(r);
-    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Prior ${r.kind} check</h2></div><div class="pb">
-      <p class="tiny">Check whether this member already had ${apeKindLabel(r.kind)} this policy year before scheduling.</p>
-      <div class="note ${duplicate ? "warn" : "info"} mt">
-        ${r.prior?.last ? html`<b>${duplicate ? `Possible same-year duplicate ${r.kind}` : `Prior ${r.kind} was in an earlier year`} — ${fmtD(r.prior.last)}.</b> ${r.prior.note || ""} ${duplicate ? "Do not schedule another without a documented exception." : "This is not a same-year duplicate."}`
-          : html`<b>No prior ${r.kind} this policy year.</b> ${r.prior?.note || "Member is eligible to schedule."}`}
+    const cc = apeCoverageSummary(r);
+    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Member & request</h2>
+      <button type="button" class="btn ghost sm" id="apeSample" title="Fill this form with realistic demo data">${icon("plus", 13)} Load sample data</button></div><div class="pb">
+      ${apeServiceChip(r)}
+      ${whatYouDo(`Enter the member and request details for this ${kind} request (or load sample data), review the illustrative coverage summary, then confirm. Opening the page does not confirm it.`)}
+      <p class="tiny note info"><b>APE vs ECU.</b> APE (Annual Physical Exam) is the standard yearly check; ECU (Executive Check-Up) is the broader executive package. This request is fixed as <b>${apeKindLabel(kind)}</b> — the two are tracked separately with their own packages and letters.</p>
+      <div class="grid2 mt">
+        <div class="field"><label for="amName">Member name</label><input id="amName" class="inp" value="${r.member.name || ""}"></div>
+        <div class="field"><label for="amPolicy">Policy no.</label><input id="amPolicy" class="inp" value="${r.member.policyNo || ""}"></div>
+        <div class="field"><label for="amAcct">Account no.</label><input id="amAcct" class="inp" value="${r.member.account || ""}"></div>
+        <div class="field"><label for="amAcctName">Account name</label><input id="amAcctName" class="inp" value="${r.member.accountName || ""}"></div>
+        <div class="field"><label for="amDate">Request date</label><input type="date" id="amDate" class="inp" value="${r.date || DEMO_NOW_ISO}"></div>
+        <div class="field"><label for="amBatch">Batch number <span class="tiny muted">(optional)</span></label><input id="amBatch" class="inp" value="${r.batchNo || ""}"></div>
       </div>
-      ${r.wf.priorChecked ? html`<p class="tiny mt">${icon("check", 14)} Eligibility checked.</p>` : ""}
+      <div class="note ${cc.tone} mt" id="amCheck">${apeCoverageHtml(cc)}</div>
+      ${w.memberChecked ? html`<p class="tiny mt">${icon("check", 14)} Member and request confirmed.</p>` : ""}
+      ${apeSaveBar("Confirm and continue")}
     </div></div>`.s;
-    wireNext(ctx, APE_DEFS, () => {
-      if (duplicate) { toast(`A prior ${r.kind} exists in this policy year. Resolve the exception before scheduling.`, "err"); return; }
-      checkApePrior(r); toast("Eligibility checked.", "ok"); go(`#/pn-desk/ape/${r.id}/schedule`);
+    const readForm = () => ({
+      name: host.querySelector("#amName").value.trim(), policyNo: host.querySelector("#amPolicy").value.trim(),
+      account: host.querySelector("#amAcct").value.trim(), accountName: host.querySelector("#amAcctName").value.trim(),
+      date: host.querySelector("#amDate").value, batchNo: host.querySelector("#amBatch").value.trim(),
     });
+    host.querySelector("#apeSample").onclick = () => { saveApeMember(r, sampleApeMember(kind)); toast("Sample data loaded.", "ok"); ctx.refresh(); };
+    const primary = () => {
+      const d = readForm();
+      if (!d.name || (!d.policyNo && !d.account)) { toast("Enter at least the member name and a policy or account number.", "err"); return; }
+      confirmApeMember(r, d); toast("Member confirmed.", "ok"); ctx.goStep("prior");
+    };
+    host.querySelector("#apePrimary").onclick = primary;
+    wireNext(ctx, APE_DEFS, primary);
     return;
   }
 
+  // ---- Step 2 · Prior-service check ---------------------------------------
+  if (step === "prior") {
+    if (!w.memberChecked) return apeGuard(host, ctx, `Confirm the member & request before checking prior ${kind}.`, "member");
+    // Local demo state: which scenario to illustrate, and the review reason for a duplicate.
+    let scenario = apeScenario(r);
+    let exceptionReason = r.prior?.exception || "";
+    const segBtn = (key, label) => html`<button type="button" role="tab" data-sc="${key}" class="${scenario === key ? "on" : ""}" aria-selected="${scenario === key}">${label}</button>`;
+    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Prior-service check</h2></div><div class="pb">
+      ${apeServiceChip(r)}
+      ${whatYouDo(`Check whether this member already had an ${kind} this policy year before you schedule. An ${kind} in an earlier year is not a duplicate — only a same-policy-year ${kind} is.`)}
+      <p class="tiny muted">Demo scenario — choose what the prior-service lookup should show:</p>
+      <div class="seg" role="tablist" aria-label="Prior-service scenario">
+        ${segBtn("none", "No prior service")}
+        ${segBtn("earlier", "Prior service in an earlier year")}
+        ${segBtn("duplicate", "Possible same-year duplicate")}
+      </div>
+      <div id="apePriorOut" class="mt"></div>
+      ${apeSaveBar("Record check and continue")}
+    </div></div>`.s;
+    const out = host.querySelector("#apePriorOut");
+    const draw = () => {
+      const prior = apePriorForScenario(kind, scenario, r.date);
+      const o = apePriorOutcome({ ...r, prior });
+      out.innerHTML = html`
+        <div class="note ${o.tone}"><b>${o.headline}.</b> ${o.detail}
+          ${prior.last ? html`<div class="tiny mt">On record: ${fmtD(prior.last)} · ${prior.source}.</div>` : ""}</div>
+        ${o.requiresReview ? html`<div class="field mt"><label for="apeExc">Review reason (required to proceed with a possible duplicate)</label>
+          <textarea id="apeExc" rows="2" placeholder="e.g. First ${kind} was incomplete — repeat authorised by account handler; reference ...">${exceptionReason}</textarea>
+          <div class="help">A same-policy-year duplicate is not scheduled silently — your reason is recorded as an exception on the request.</div></div>` : ""}
+        ${w.priorChecked ? html`<p class="tiny mt">${icon("check", 14)} Prior-service check recorded.</p>` : ""}`.s;
+      if (o.requiresReview) out.querySelector("#apeExc").oninput = (e) => (exceptionReason = e.target.value);
+    };
+    draw();
+    host.querySelectorAll("[data-sc]").forEach((b) => (b.onclick = () => {
+      scenario = b.dataset.sc;
+      host.querySelectorAll("[data-sc]").forEach((x) => { const on = x.dataset.sc === scenario; x.classList.toggle("on", on); x.setAttribute("aria-selected", on); });
+      draw();
+    }));
+    const primary = () => {
+      if (scenario === "duplicate" && !exceptionReason.trim()) {
+        toast("Enter a review reason before continuing with a possible same-year duplicate.", "err");
+        out.querySelector("#apeExc")?.focus();
+        return;
+      }
+      setApePrior(r, { scenario, exceptionReason });
+      toast(scenario === "duplicate" ? "Duplicate flagged — review reason recorded." : "Prior-service check recorded.", "ok");
+      ctx.goStep("schedule");
+    };
+    host.querySelector("#apePrimary").onclick = primary;
+    wireNext(ctx, APE_DEFS, primary);
+    return;
+  }
+
+  // ---- Step 3 · Provider, package & schedule ------------------------------
   if (step === "schedule") {
-    const kind = r.kind;
-    // Accredited providers that can do this service (have the relevant rate).
+    if (!w.priorChecked) return apeGuard(host, ctx, "Run the prior-service check before scheduling.", "prior");
     const provs = allProviders().filter((p) => p.status === "Active" && (kind === "ECU" ? p.ecuRate != null : p.apeRate != null));
     const pkgs = apePackages(kind);
     const selProv = r.provider?.code || (provs[0]?.code || "");
     const selPkg = r.package?.code || (pkgs[0]?.code || "");
     const selDate = r.scheduledDate || DEMO_NOW_ISO;
-    const selRate = r.rate != null ? r.rate : (pkgs.find((p) => p.code === selPkg)?.rate ?? "");
-    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Schedule & rate</h2></div><div class="pb">
-      <div class="dl cols">
+    const curPkg = pkgs.find((p) => p.code === selPkg) || pkgs[0];
+    const catalog = curPkg?.rate ?? "";
+    const selRate = r.rate != null ? r.rate : catalog;
+    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Provider, package & schedule</h2></div><div class="pb">
+      ${apeServiceChip(r)}
+      ${whatYouDo(`Choose an accredited provider, an ${kind} package, a schedule date and the applicable rate. Changing the package resets the rate to its catalogue rate — you can still override it with a reason.`)}
+      <div class="grid2">
         <div class="field"><label for="apProv">Accredited provider</label>
           <select id="apProv" class="inp">${provs.map((p) => html`<option value="${p.code}" ${p.code === selProv ? "selected" : ""}>${p.providerName} (${p.location})</option>`)}</select></div>
         <div class="field"><label for="apPkg">${kind} package</label>
           <select id="apPkg" class="inp">${pkgs.map((p) => html`<option value="${p.code}" ${p.code === selPkg ? "selected" : ""}>${p.name} — ${peso(p.rate)}</option>`)}</select></div>
         <div class="field"><label for="apDate">Schedule date</label><input type="date" id="apDate" class="inp" value="${selDate}"></div>
-        <div class="field"><label for="apRate">Applicable rate (₱)</label><input type="text" id="apRate" class="inp" inputmode="decimal" value="${selRate}"></div>
+        <div class="field"><label for="apRate">Applicable rate (₱)</label><input type="text" id="apRate" class="inp" inputmode="decimal" value="${selRate}">
+          <div class="help" id="apRateSrc"></div></div>
       </div>
-      <p class="tiny mt note info">Rates are illustrative — confirm against the provider's accredited ${kind} rate before production.</p>
-      ${r.wf.scheduled ? html`<p class="tiny mt">${icon("check", 14)} Scheduled at ${r.provider?.name} · ${fmtD(r.scheduledDate)} · ${peso(r.rate)}.</p>` : ""}
+      <div class="note info mt" id="apIncludes"></div>
+      <div class="field mt" id="apOverrideWrap" style="display:none"><label for="apOverride">Rate override reason</label>
+        <input id="apOverride" class="inp" value="${r.rateOverride?.reason || ""}" placeholder="e.g. Negotiated corporate rate for this account">
+        <div class="help">The entered rate differs from the package catalogue rate — this is a clearly labelled demo override.</div></div>
+      ${w.scheduled ? html`<p class="tiny mt">${icon("check", 14)} Scheduled at ${r.provider?.name} · ${fmtD(r.scheduledDate)} · ${peso(r.rate)}${r.rateOverride ? " (demo override)" : ""}.</p>` : ""}
+      ${apeSaveBar("Confirm schedule and continue")}
     </div></div>`.s;
-    // Keep the rate in step with the chosen package (user may still override).
-    const pkgSel = host.querySelector("#apPkg"), rateInp = host.querySelector("#apRate");
-    pkgSel.onchange = () => { const p = pkgs.find((x) => x.code === pkgSel.value); if (p) rateInp.value = p.rate; };
-    wireNext(ctx, APE_DEFS, () => {
-      const providerCode = host.querySelector("#apProv").value;
-      const date = host.querySelector("#apDate").value;
-      const rate = Number(rateInp.value);
-      if (!providerCode || !pkgSel.value || !date || !rateInp.value.trim() || !Number.isFinite(rate) || rate < 0) {
+    const provSel = host.querySelector("#apProv"), pkgSel = host.querySelector("#apPkg"), rateInp = host.querySelector("#apRate");
+    const incl = host.querySelector("#apIncludes"), rateSrc = host.querySelector("#apRateSrc");
+    const overWrap = host.querySelector("#apOverrideWrap");
+    const pkgOf = () => pkgs.find((p) => p.code === pkgSel.value) || curPkg;
+    const syncOverride = () => {
+      const base = pkgOf()?.rate;
+      const entered = toNum(rateInp.value);
+      const overridden = entered != null && base != null && entered !== base;
+      overWrap.style.display = overridden ? "" : "none";
+      rateSrc.textContent = overridden
+        ? `Demo override — catalogue rate for this package is ${peso(base)}.`
+        : `Illustrative sample rate from the ${kind} package catalogue.`;
+    };
+    const drawPkg = () => { const p = pkgOf(); incl.innerHTML = html`<b>Included in ${p.name}.</b> ${p.includes || "Package contents per contract."}`.s; };
+    drawPkg(); syncOverride();
+    pkgSel.onchange = () => { const p = pkgOf(); if (p) rateInp.value = p.rate; drawPkg(); syncOverride(); };
+    rateInp.oninput = syncOverride;
+    const primary = () => {
+      const providerCode = provSel.value, date = host.querySelector("#apDate").value;
+      const rate = toNum(rateInp.value);
+      if (!providerCode || !pkgSel.value || !date || rate == null || rate < 0) {
         toast("Choose a provider, package and date, and enter a valid non-negative rate.", "err");
-        (!providerCode ? host.querySelector("#apProv") : !date ? host.querySelector("#apDate") : rateInp).focus();
+        (!providerCode ? provSel : !date ? host.querySelector("#apDate") : rateInp).focus();
         return;
       }
-      scheduleApe(r, { providerCode, packageCode: pkgSel.value, date, rate });
-      toast("Scheduled.", "ok"); go(`#/pn-desk/ape/${r.id}/loe`);
-    });
+      const base = pkgOf()?.rate;
+      const overrideReason = host.querySelector("#apOverride")?.value.trim() || "";
+      if (base != null && rate !== base && !overrideReason) { toast("Enter a reason for the rate override, or use the package rate.", "err"); overWrap.style.display = ""; host.querySelector("#apOverride").focus(); return; }
+      scheduleApe(r, { providerCode, packageCode: pkgSel.value, date, rate, overrideReason });
+      toast("Scheduled.", "ok"); ctx.goStep("loe");
+    };
+    host.querySelector("#apePrimary").onclick = primary;
+    wireNext(ctx, APE_DEFS, primary);
     return;
   }
 
+  // ---- Step 4 · Letter of Eligibility -------------------------------------
   if (step === "loe") {
-    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Issue LOE</h2></div><div class="pb">
-      ${demoPreview("Issuing the Letter of Eligibility notifies the provider that the member may proceed.")}
-      <dl class="dl cols mt">
-        <div><dt>Provider</dt><dd>${r.provider?.name || "—"}</dd></div>
-        <div><dt>Package</dt><dd>${r.package?.name || "—"}</dd></div>
-        <div><dt>Schedule date</dt><dd>${r.scheduledDate ? fmtD(r.scheduledDate) : "—"}</dd></div>
-        <div><dt>Amount</dt><dd>${r.amount != null ? peso(r.amount) : "—"}</dd></div>
-      </dl>
-      ${r.loe ? html`<div class="note info mt"><b>LOE ${r.loe.no}</b> issued ${fmtD(r.loe.issued)} (Demo preview).
+    if (!w.scheduled) return apeGuard(host, ctx, "Select the provider, package and schedule before issuing the LOE.", "schedule");
+    const loeLines = [["Member", r.member.name], ["Policy no.", r.member.policyNo || "—"], ["Account", r.member.accountName || "—"], ["Service", apeKindLabel(kind)], ["Provider", r.provider?.name || "—"], ["Package", r.package?.name || "—"], ["Schedule date", r.scheduledDate ? fmtD(r.scheduledDate) : "—"], ["Applicable rate", r.rate != null ? peso(r.rate) : "—"]];
+    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Letter of Eligibility (LOE)</h2></div><div class="pb">
+      ${apeServiceChip(r)}
+      ${whatYouDo("Review the Letter of Eligibility (LOE) — the letter that tells the provider this member may proceed with the service — then issue the sample LOE. It is never issued automatically.")}
+      ${r.loe ? "" : demoPreview("Issuing the LOE creates a sample letter and simulates sharing it with the provider.")}
+      <div class="panel mt"><div class="pb">
+        <p class="eyebrow">LOE preview ${r.loe ? `· ${r.loe.no}` : "· draft"}</p>
+        <dl class="dl cols">${loeLines.map(([k2, v]) => html`<div><dt>${k2}</dt><dd>${v}</dd></div>`)}</dl>
+      </div></div>
+      ${r.loe ? html`<div class="note ok mt"><b>LOE ${r.loe.no}</b> issued ${fmtD(r.loe.issued)} · shared with ${r.provider?.name || "the provider"} (simulated).
         <button type="button" class="btn ghost sm" id="viewLoe">View letter</button></div>` : ""}
+      ${apeSaveBar(r.loe ? "Continue to completion" : "Issue sample LOE")}
     </div></div>`.s;
-    if (r.loe) host.querySelector("#viewLoe").onclick = () => previewLetter({ title: `LOE ${r.loe.no}`, kind: `${apeKindLabel(r.kind)} — Letter of Eligibility`,
-      lines: [["LOE no.", r.loe.no], ["Member", r.member.name], ["Policy no.", r.member.policyNo], ["Account", r.member.accountName], ["Provider", r.provider?.name || "—"], ["Package", r.package?.name || "—"], ["Schedule date", r.scheduledDate ? fmtD(r.scheduledDate) : "—"], ["Amount", r.amount != null ? peso(r.amount) : "—"]] });
-    wireNext(ctx, APE_DEFS, () => { issueLoe(r); toast("Sample LOE issued (Demo preview).", "ok"); go(`#/pn-desk/ape/${r.id}/results`); });
+    if (r.loe) host.querySelector("#viewLoe").onclick = () => previewLetter({ title: `Letter of Eligibility ${r.loe.no}`, kind: `${apeKindLabel(kind)} — Letter of Eligibility`, lines: loeLines });
+    const primary = () => {
+      if (r.loe) { ctx.goStep("results"); return; }
+      issueLoe(r); toast("Sample LOE issued (demo preview).", "ok"); ctx.goStep("results");
+    };
+    host.querySelector("#apePrimary").onclick = primary;
+    wireNext(ctx, APE_DEFS, primary);
     return;
   }
 
+  // ---- Step 5 · Completion & results --------------------------------------
   if (step === "results") {
-    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Completion & results</h2></div><div class="pb">
-      <dl class="dl cols">
-        <div><dt>Status</dt><dd>${apeStatus(r).label}</dd></div>
-        <div><dt>Provider</dt><dd>${r.provider?.name || "—"}</dd></div>
-        <div><dt>Schedule date</dt><dd>${r.scheduledDate ? fmtD(r.scheduledDate) : "—"}</dd></div>
-        <div><dt>Amount</dt><dd>${r.amount != null ? peso(r.amount) : "—"}</dd></div>
-      </dl>
-      ${r.results ? html`<div class="note info mt"><b>Completed ${fmtD(r.results.completedDate)}.</b> Result: ${r.results.status}. <div class="tiny mt">${r.results.findings}</div></div>`
-        : html`<p class="tiny mt">Record completion once the provider submits results. Sample results will be attached.</p>`}
-      ${protoConcept("Tracking completion and results inside the same request — rather than a separate spreadsheet — is proposed so the APE/ECU journey has no dead end.")}
+    if (!w.loeIssued) return apeGuard(host, ctx, "Issue the sample LOE before recording completion.", "loe");
+    const res = r.results || {};
+    const done = !!w.completed;
+    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Completion & results</h2>
+      ${done ? "" : html`<button type="button" class="btn ghost sm" id="apeSampleRes" title="Fill the results with sample data">${icon("plus", 13)} Load sample results</button>`}</div><div class="pb">
+      ${apeServiceChip(r)}
+      ${whatYouDo("Record whether the member attended, the actual service date, the completion status, the provider reference and a short result note. Nothing is marked complete until you save.")}
+      <div class="grid2 mt">
+        <div class="field"><label for="arAttended">Member attended?</label>
+          <select id="arAttended" class="inp" ${done ? "disabled" : ""}><option value="yes" ${res.attended !== "no" ? "selected" : ""}>Yes — attended</option><option value="no" ${res.attended === "no" ? "selected" : ""}>No — did not attend</option></select></div>
+        <div class="field"><label for="arDate">Actual service date</label><input type="date" id="arDate" class="inp" value="${res.serviceDate || r.scheduledDate || DEMO_NOW_ISO}" ${done ? "disabled" : ""}></div>
+        <div class="field"><label for="arStatus">Completion status</label><input id="arStatus" class="inp" value="${res.status || ""}" placeholder="${kind === "ECU" ? "Completed — executive check-up done" : "Completed — physical exam done"}" ${done ? "disabled" : ""}></div>
+        <div class="field"><label for="arRef">Provider reference</label><input id="arRef" class="inp" value="${res.providerRef || ""}" placeholder="e.g. ${r.provider?.code || "PRV"}-${r.id.slice(-4)}" ${done ? "disabled" : ""}></div>
+      </div>
+      <div class="field mt"><label for="arNote">Result / remarks</label><textarea id="arNote" rows="3" ${done ? "disabled" : ""}>${res.findings || ""}</textarea></div>
+      ${done ? apeCompletionSummary(r) : apeSaveBar("Save completion & results")}
     </div></div>`.s;
-    wireNext(ctx, APE_DEFS, () => { completeApe(r); toast("Completion recorded.", "ok"); ctx.refresh(); });
+    if (!done) {
+      const readForm = () => ({
+        attended: host.querySelector("#arAttended").value, serviceDate: host.querySelector("#arDate").value,
+        status: host.querySelector("#arStatus").value.trim(), providerRef: host.querySelector("#arRef").value.trim(),
+        findings: host.querySelector("#arNote").value.trim(),
+      });
+      host.querySelector("#apeSampleRes").onclick = () => {
+        const s = sampleApeResults(r);
+        host.querySelector("#arAttended").value = s.attended; host.querySelector("#arDate").value = s.serviceDate;
+        host.querySelector("#arStatus").value = s.status; host.querySelector("#arRef").value = s.providerRef;
+        host.querySelector("#arNote").value = s.findings;
+        toast("Sample results loaded — edit as needed, then save.", "ok");
+      };
+      const primary = () => {
+        const d = readForm();
+        if (d.attended !== "no" && !d.status && !d.findings) { toast("Add a completion status or result note before saving (or load sample results).", "err"); return; }
+        completeApe(r, d); toast("Completion recorded.", "ok"); ctx.refresh();
+      };
+      host.querySelector("#apePrimary").onclick = primary;
+      wireNext(ctx, APE_DEFS, primary);
+    }
     return;
   }
+}
+
+// Plain-language coverage summary block for the member step.
+function apeCoverageHtml(cc) {
+  if (!cc.ok) return html`<b>Member & coverage check.</b> ${cc.note}`;
+  return html`<b>${cc.headline}.</b> <dl class="dl cols mt">${cc.lines.map(([k, v]) => html`<div><dt>${k}</dt><dd>${v}</dd></div>`)}</dl><div class="tiny">${cc.note}</div>`;
+}
+// Completion recap shown on a completed request — the whole journey in one place.
+function apeCompletionSummary(r) {
+  const ck = (t) => html`<li>${icon("check", 13)} ${t}</li>`;
+  const scenario = apeScenario(r);
+  const priorLine = scenario === "duplicate" ? `Prior check — possible same-year duplicate, reviewed${r.prior?.exception ? " (reason on file)" : ""}.`
+    : scenario === "earlier" ? `Prior check — last ${r.kind} in an earlier policy year.` : `Prior check — no same-policy-year ${r.kind}.`;
+  return html`<div class="panel mt"><div class="ph"><h2>Request summary</h2></div><div class="pb"><ul class="plain-list tiny">
+    ${ck(`${apeKindLabel(r.kind)} request — ${r.member.name}, ${r.member.policyNo || "—"}.`)}
+    ${ck(priorLine)}
+    ${ck(`Scheduled — ${r.provider?.name || "provider"}, ${r.package?.name || "package"}, ${fmtD(r.scheduledDate)}, ${peso(r.rate || 0)}${r.rateOverride ? " (demo override)" : ""}.`)}
+    ${ck(`LOE ${r.loe?.no || "—"} issued ${fmtD(r.loe?.issued)}.`)}
+    ${ck(`Outcome — member ${r.results?.attended === "no" ? "did not attend" : "attended"}; ${r.results?.status || "recorded"} (${fmtD(r.results?.serviceDate)}).`)}
+  </ul><p class="tiny mt">Open <b>Documents</b> for the LOE and <b>History</b> for the full timestamped trail.</p></div></div>`;
 }

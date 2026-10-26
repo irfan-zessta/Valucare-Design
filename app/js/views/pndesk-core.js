@@ -78,7 +78,21 @@ export function resetInpatient(id) {
   putInpatient(c);
   return c;
 }
-export function resetApe(id) { const fresh = SEED_APE().find((r) => r.id === id); if (!fresh) return null; putApe(fresh); return fresh; }
+export function resetApe(id) {
+  const fresh = SEED_APE().find((r) => r.id === id);
+  if (fresh) { putApe(fresh); return fresh; }
+  // A presenter-created request has no seed to restore — clear its progress but keep the
+  // member/request details they entered, so "Reset" still returns it to step 1.
+  const r = getApe(id);
+  if (!r) return null;
+  r.prior = { scenario: "none", last: null, note: "", source: "", exception: "" };
+  r.provider = null; r.package = null; r.scheduledDate = null; r.rate = null; r.amount = null;
+  r.rateOverride = null; r.loe = null; r.results = null;
+  r.wf = { _v: 1, memberChecked: false, priorChecked: false, scheduled: false, loeIssued: false, completed: false };
+  r.history = [{ at: stamp(), text: "Request reset to start.", actor: "You (demo)" }];
+  putApe(r);
+  return r;
+}
 
 // -------------------------------------------------------------- Add-Provider drafts
 // The Add New Provider wizard saves its work-in-progress as a draft so the team can
@@ -370,11 +384,11 @@ export function inpatientDocuments(c) {
 // issue a sample LOE → track completion & results. APE (Annual Physical Exam) and ECU
 // (Executive Check-Up) are kept DISTINCT: different package catalogues and labels.
 export const APE_STEPS = [
-  { key: "member",   n: 1, label: "Member & Account" },
-  { key: "prior",    n: 2, label: "Prior Check" },
-  { key: "schedule", n: 3, label: "Schedule & Rate" },
+  { key: "member",   n: 1, label: "Member & request" },
+  { key: "prior",    n: 2, label: "Prior check" },
+  { key: "schedule", n: 3, label: "Provider & schedule" },
   { key: "loe",      n: 4, label: "Issue LOE" },
-  { key: "results",  n: 5, label: "Completion & Results" },
+  { key: "results",  n: 5, label: "Completion & results" },
 ];
 export const apeKindLabel = (k) => (k === "ECU" ? "Executive Check-Up (ECU)" : "Annual Physical Exam (APE)");
 export function ensureApeWf(r) {
@@ -402,20 +416,156 @@ export function apeNext(r) {
 }
 export const apeHref = (r) => { const ns = apeNext(r); return `#/pn-desk/ape/${r.id}/${ns ? ns.step : "results"}`; };
 
-export function confirmApeMember(r) { ensureApeWf(r).memberChecked = true; log(r, "Member and account confirmed.", "APE/ECU Coordinator"); putApe(r); return r; }
-export function checkApePrior(r) { ensureApeWf(r).priorChecked = true; log(r, r.prior?.last ? `Prior ${r.kind} found (${fmtD(r.prior.last)}).` : `No prior ${r.kind} this policy year — eligible.`, "APE/ECU Coordinator"); putApe(r); return r; }
+// ---- new / blank requests -------------------------------------------------
+// Readable, collision-safe request id. Keeps the APE-/ECU-YEAR-#### shape and the "9###"
+// prefix marks a presenter-created request (so it never clashes with a seeded number).
+export function newApeId(kind) {
+  const k = kind === "ECU" ? "ECU" : "APE";
+  const base = `${k}-2026-` + ("9" + Date.now().toString().slice(-3));
+  let id = base, n = 1;
+  while (getApe(id)) id = `${base}-${n++}`;
+  return id;
+}
+// A brand-new request starts empty at the member step — nothing is checked, scheduled or
+// issued until the presenter does it. The chosen service (APE vs ECU) is fixed at creation.
+export function newApeCase(id, kind) {
+  const k = kind === "ECU" ? "ECU" : "APE";
+  return {
+    id, kind: k, date: DEMO_NOW_ISO, batchNo: "",
+    member: { name: "", policyNo: "", account: "", accountName: "" },
+    prior: { scenario: "none", last: null, source: "", note: "", exception: "" },
+    provider: null, package: null, scheduledDate: null, rate: null, amount: null, rateOverride: null,
+    loe: null, results: null,
+    wf: { _v: 1, memberChecked: false, priorChecked: false, scheduled: false, loeIssued: false, completed: false },
+    history: [{ at: stamp(), text: `New ${apeKindLabel(k)} request created.`, actor: "You (demo)" }],
+  };
+}
+// One-click illustrative member the presenter can load (and then edit) on step 1. APE and
+// ECU get DISTINCT sample members so the two journeys never look like the same person.
+export function sampleApeMember(kind) {
+  if (kind === "ECU") return {
+    name: "Patricia L. Guevarra", policyNo: "VC-PLN-880320", account: "ACC-BL-0231", accountName: "Brightlane Hospitality Group",
+    date: DEMO_NOW_ISO, batchNo: "ECU-BATCH-2026-10",
+  };
+  return {
+    name: "Rafael C. Domingo", policyNo: "VC-PLN-770145", account: "ACC-NL-0442", accountName: "Northwind Logistics Corp.",
+    date: DEMO_NOW_ISO, batchNo: "APE-BATCH-2026-10-A",
+  };
+}
+// Short illustrative member & coverage summary shown on the member step — no real
+// eligibility system is queried; this only reads what is on the request.
+export function apeCoverageSummary(r) {
+  const hasMember = !!((r.member?.name || "").trim() && ((r.member?.policyNo || "").trim() || (r.member?.account || "").trim()));
+  if (!hasMember) return { ok: false, tone: "info", lines: [], note: "Enter the member and policy (or load sample data) to see the coverage summary. Illustrative only — no real eligibility system is checked." };
+  return {
+    ok: true, tone: "ok", headline: "Eligible — policy active (illustrative)",
+    lines: [
+      ["Member", r.member.name],
+      ["Policy no.", r.member.policyNo || "—"],
+      ["Account", (r.member.account || "—") + (r.member.accountName ? " · " + r.member.accountName : "")],
+      ["Benefit", apeKindLabel(r.kind) + " — one per policy year"],
+    ],
+    note: "Illustrative result only — no real eligibility system was checked.",
+  };
+}
+
+// ---- editable engines -----------------------------------------------------
+// Map a flat form payload onto the request shape.
+function applyApeMember(r, d) {
+  if (!d) return;
+  r.member = { name: d.name ?? d.memberName ?? "", policyNo: d.policyNo ?? "", account: d.account ?? "", accountName: d.accountName ?? "" };
+  if (d.date != null) r.date = d.date;
+  if (d.batchNo != null) r.batchNo = d.batchNo;
+}
+// Save entered member details without yet marking the request confirmed.
+export function saveApeMember(r, d) { ensureApeWf(r); applyApeMember(r, d); putApe(r); return r; }
+// Record that the member & request were actually confirmed (only on the presenter's action).
+export function confirmApeMember(r, d) {
+  ensureApeWf(r);
+  if (d) applyApeMember(r, d);
+  r.wf.memberChecked = true;
+  log(r, `Member and request confirmed — ${r.member.name || "member"} · ${apeKindLabel(r.kind)}.`, "APE/ECU Coordinator");
+  putApe(r);
+  return r;
+}
+
+// Prior-service check. The scenario drives a plain-language outcome and NEVER confuses a
+// previous-year visit with a same-year duplicate. APE and ECU are checked separately — the
+// outcome always names the service, and only looks for prior visits of the SAME service.
 export const priorInPolicyYear = (r) => !!r.prior?.last && String(r.prior.last).slice(0, 4) === String(r.date).slice(0, 4);
-export function scheduleApe(r, { providerCode, packageCode, date, rate }) {
+// Derive the scenario for a request that predates the scenario field (seeded samples).
+export function apeScenario(r) {
+  if (r.prior?.scenario) return r.prior.scenario;
+  if (!r.prior?.last) return "none";
+  return priorInPolicyYear(r) ? "duplicate" : "earlier";
+}
+// Build the prior record for a chosen demo scenario, relative to the request's year.
+export function apePriorForScenario(kind, scenario, reqDateIso) {
+  const year = +(String(reqDateIso || DEMO_NOW_ISO).slice(0, 4)) || 2026;
+  if (scenario === "earlier") return {
+    scenario, last: `${year - 1}-03-12`, source: `${kind} records — previous policy year`,
+    note: `Prior ${kind} was in an earlier policy year (${year - 1}). Eligible this year.`, exception: "",
+  };
+  if (scenario === "duplicate") return {
+    scenario, last: `${year}-04-08`, source: `${kind} records — current policy year`,
+    note: `Possible same-policy-year duplicate — an ${kind} is already on record for ${year}. Review required before scheduling.`, exception: "",
+  };
+  return {
+    scenario: "none", last: null, source: `${kind} records — current policy year`,
+    note: `No same-policy-year ${kind} found. Member is eligible.`, exception: "",
+  };
+}
+// UI-friendly outcome for the current request state.
+export function apePriorOutcome(r) {
+  const scenario = apeScenario(r);
+  const k = r.kind;
+  if (scenario === "duplicate") return { scenario, tone: "warn", requiresReview: true, headline: `Possible same-policy-year duplicate — review required`, detail: `An ${k} is already on record for this policy year (${fmtD(r.prior?.last)}). Do not schedule a duplicate without a documented reason.` };
+  if (scenario === "earlier") return { scenario, tone: "ok", requiresReview: false, headline: `Prior ${k} was in an earlier policy year`, detail: `Last ${k} was ${fmtD(r.prior?.last)} — an earlier policy year. The member is eligible this year.` };
+  return { scenario, tone: "ok", requiresReview: false, headline: `No same-policy-year ${k} found`, detail: `No ${k} is on record for this policy year. The member is eligible.` };
+}
+// Record the prior-service check. A duplicate is NOT allowed to silently proceed — the
+// caller must supply a review reason, which is stored as an exception.
+export function setApePrior(r, { scenario = "none", exceptionReason = "" } = {}) {
+  ensureApeWf(r);
+  const prior = apePriorForScenario(r.kind, scenario, r.date);
+  prior.exception = (exceptionReason || "").trim();
+  r.prior = prior;
+  r.wf.priorChecked = true;
+  if (scenario === "duplicate") {
+    log(r, prior.exception
+      ? `Prior-service check: possible same-year duplicate — review exception recorded: ${prior.exception}`
+      : `Prior-service check: possible same-year ${r.kind} duplicate flagged for review.`, "APE/ECU Coordinator");
+  } else if (scenario === "earlier") {
+    log(r, `Prior-service check: last ${r.kind} was ${fmtD(prior.last)} (earlier policy year). Eligible.`, "APE/ECU Coordinator");
+  } else {
+    log(r, `Prior-service check: no same-policy-year ${r.kind} found. Eligible.`, "APE/ECU Coordinator");
+  }
+  putApe(r);
+  return r;
+}
+
+// Select provider, package, date and the applicable rate. Changing the package resets the
+// displayed rate to the catalogue rate; a different entered rate is kept only as a clearly
+// labelled demo override carrying its reason.
+export function scheduleApe(r, { providerCode, packageCode, date, rate, overrideReason } = {}) {
   ensureApeWf(r);
   const prov = getProvider(providerCode);
-  const pkg = (apePackages(r.kind).find((p) => p.code === packageCode)) || null;
-  r.provider = prov ? { code: prov.code, name: prov.providerName } : r.provider;
-  r.package = pkg ? { code: pkg.code, name: pkg.name } : r.package;
-  r.scheduledDate = date || r.scheduledDate;
-  r.rate = rate != null ? Number(rate) : (pkg ? pkg.rate : r.rate);
+  const pkg = apePackages(r.kind).find((p) => p.code === packageCode) || null;
+  if (prov) r.provider = { code: prov.code, name: prov.providerName };
+  if (pkg) r.package = { code: pkg.code, name: pkg.name, includes: pkg.includes, catalogRate: pkg.rate };
+  if (date) r.scheduledDate = date;
+  const base = pkg ? pkg.rate : (r.package?.catalogRate ?? toNum(r.rate));
+  const entered = toNum(rate);
+  if (entered != null && base != null && entered !== base) {
+    r.rate = entered;
+    r.rateOverride = { amount: entered, reason: (overrideReason || "").trim(), catalogRate: base };
+  } else {
+    r.rate = entered != null ? entered : base;
+    r.rateOverride = null;
+  }
   r.amount = r.rate;
   r.wf.scheduled = true;
-  log(r, `Scheduled at ${r.provider?.name} — ${r.package?.name}, ${fmtD(r.scheduledDate)}, ${peso(r.rate)}.`, "APE/ECU Coordinator");
+  log(r, `Scheduled at ${r.provider?.name || "provider"} — ${r.package?.name || "package"}, ${fmtD(r.scheduledDate)}, ${peso(r.rate || 0)}${r.rateOverride ? " (demo override: " + (r.rateOverride.reason || "no reason given") + ")" : ""}.`, "APE/ECU Coordinator");
   putApe(r);
   return r;
 }
@@ -423,31 +573,75 @@ export function issueLoe(r) {
   ensureApeWf(r);
   r.loe = { no: r.id.replace(/^(APE|ECU)/, "LOE"), issued: DEMO_NOW_ISO, deliveredPreview: true };
   r.wf.loeIssued = true;
-  log(r, `Sample LOE ${r.loe.no} issued to ${r.provider?.name} (Demo preview).`, "APE/ECU Coordinator");
+  log(r, `Sample LOE ${r.loe.no} issued for ${apeKindLabel(r.kind)} (demo preview).`, "APE/ECU Coordinator");
+  log(r, `Sample LOE ${r.loe.no} shared with ${r.provider?.name || "the provider"} (simulated — no real letter sent).`, "System (simulated)");
   putApe(r);
   return r;
 }
-export function completeApe(r) {
+// A sample, editable set of completion results the presenter can load on the final step.
+export function sampleApeResults(r) {
+  const ecu = r.kind === "ECU";
+  return {
+    attended: "yes",
+    serviceDate: r.scheduledDate || DEMO_NOW_ISO,
+    status: ecu ? "Completed — executive check-up done" : "Completed — physical exam done",
+    providerRef: (r.provider?.code || "PRV") + "-" + r.id.slice(-4),
+    findings: ecu
+      ? "Sample results. Executive panel unremarkable; lifestyle counselling given; routine annual follow-up advised."
+      : "Sample results. Fit to work; no significant findings; routine annual follow-up advised.",
+  };
+}
+// Record completion & results — only on the presenter's save, never on page load.
+export function completeApe(r, data = {}) {
   ensureApeWf(r);
+  const s = { ...(r.results || {}), ...data };
+  r.results = {
+    attended: s.attended === "no" ? "no" : "yes",
+    serviceDate: s.serviceDate || r.scheduledDate || DEMO_NOW_ISO,
+    status: (s.status || "").trim() || (r.kind === "ECU" ? "Completed — executive check-up done" : "Completed — physical exam done"),
+    providerRef: (s.providerRef || "").trim(),
+    findings: (s.findings || "").trim() || "Results recorded (demo).",
+    completedDate: DEMO_NOW_ISO,
+  };
   r.wf.completed = true;
-  r.results = r.results || { status: "Normal — no significant findings", completedDate: DEMO_NOW_ISO, findings: "Sample results. Fit to work; routine follow-up advised." };
-  r.results.completedDate = r.results.completedDate || DEMO_NOW_ISO;
-  log(r, `Completion recorded — results: ${r.results.status}.`, "APE/ECU Coordinator");
+  log(r, `Completion recorded — member ${r.results.attended === "no" ? "did not attend" : "attended"}; ${r.results.status}.`, "APE/ECU Coordinator");
   putApe(r);
   return r;
 }
 
 // Distinct package catalogues (APE vs ECU) — illustrative demo rates, confirm per contract.
+// `includes` is a plain-language summary shown when a package is selected.
 export function apePackages(kind) {
   if (kind === "ECU") return [
-    { code: "ECU-EXEC", name: "Executive Comprehensive", rate: 7800 },
-    { code: "ECU-CARD", name: "Executive + Cardiac Panel", rate: 11200 },
-    { code: "ECU-ONCO", name: "Executive + Cancer Markers", rate: 13500 },
+    { code: "ECU-EXEC", name: "Executive Comprehensive", rate: 7800, includes: "History & PE, CBC, urinalysis, FBS, lipid profile, chest X-ray, ECG and abdominal ultrasound." },
+    { code: "ECU-CARD", name: "Executive + Cardiac Panel", rate: 11200, includes: "Everything in Executive Comprehensive, plus treadmill stress test, 2D echo and cardiac markers." },
+    { code: "ECU-ONCO", name: "Executive + Cancer Markers", rate: 13500, includes: "Everything in Executive Comprehensive, plus a tumour-marker panel and specialist read." },
   ];
   return [
-    { code: "APE-BASIC", name: "Basic APE (CBC, UA, FA, CXR)", rate: 1450 },
-    { code: "APE-STD",   name: "Standard APE (+ ECG, FBS)", rate: 2200 },
-    { code: "APE-PLUS",  name: "APE Plus (+ Lipid, Chest PA/Lat)", rate: 3100 },
+    { code: "APE-BASIC", name: "Basic APE (CBC, UA, FA, CXR)", rate: 1450, includes: "History & physical exam, CBC, urinalysis, fecalysis and chest X-ray." },
+    { code: "APE-STD",   name: "Standard APE (+ ECG, FBS)", rate: 2200, includes: "Basic APE, plus ECG and fasting blood sugar (FBS)." },
+    { code: "APE-PLUS",  name: "APE Plus (+ Lipid, Chest PA/Lat)", rate: 3100, includes: "Standard APE, plus a lipid profile and chest PA/Lateral X-ray." },
+  ];
+}
+
+// Derive the Documents list from request state so it stays honest: items the presenter has
+// not yet produced are labelled "Not received". The LOE row carries the letter lines so the
+// drawer can preview a sample Letter of Eligibility.
+export function apeDocuments(r) {
+  const w = ensureApeWf(r);
+  const scenario = apeScenario(r);
+  const priorText = scenario === "duplicate"
+    ? `Possible same-policy-year duplicate — flagged for review.`
+    : scenario === "earlier" ? `Prior ${r.kind} in an earlier policy year (${fmtD(r.prior?.last)}).`
+    : `No same-policy-year ${r.kind}.`;
+  const lo = r.loe;
+  return [
+    { key: "request", name: `${apeKindLabel(r.kind)} request`, supplied: !!w.memberChecked, source: "Captured in this request", note: "Not received — confirm the member & request." },
+    { key: "prior", name: "Prior-service check result", supplied: !!w.priorChecked, source: w.priorChecked ? priorText : "", note: "Not received — run the prior-service check." },
+    { key: "schedule", name: "Provider, package & schedule", supplied: !!w.scheduled, source: w.scheduled ? `${r.provider?.name || "provider"} · ${r.package?.name || "package"} · ${fmtD(r.scheduledDate)} · ${peso(r.rate || 0)}` : "", note: "Not received — select provider, package & schedule." },
+    { key: "loe", name: "Letter of Eligibility (LOE)", supplied: !!lo, source: lo ? `${lo.no} · issued ${fmtD(lo.issued)}` : "", note: "Not received — issue the sample LOE.",
+      letter: lo ? { title: `Letter of Eligibility ${lo.no}`, kind: `${apeKindLabel(r.kind)} — Letter of Eligibility`, lines: [["LOE no.", lo.no], ["Member", r.member?.name || "—"], ["Policy no.", r.member?.policyNo || "—"], ["Service", apeKindLabel(r.kind)], ["Provider", r.provider?.name || "—"], ["Package", r.package?.name || "—"], ["Schedule", fmtD(r.scheduledDate)], ["Applicable rate", peso(r.rate || 0)]] } : null },
+    { key: "results", name: "Completion & results", supplied: !!w.completed, source: w.completed ? `${r.results?.status || "recorded"} · ${fmtD(r.results?.serviceDate)}` : "", note: "Not received — record completion & results." },
   ];
 }
 

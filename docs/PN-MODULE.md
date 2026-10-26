@@ -68,11 +68,15 @@ to the shell:
   One case holds member / hospital / documents / history / next action; it is editable, saved in
   the browser and reopens at its real next action. Initial and final LOAs are distinct and
   labelled as such. Steps complete only on presenter action, never on page open. See §2c.
-- **APE / ECU (Service Operations):** member & account → prior-check → schedule & rate (provider
-  / package / date / rate, rate syncs to package) → **issue sample LOE** → completion &
-  results. **APE and ECU are kept distinct** (separate eyebrows, batches and package/rate
-  catalogues). HMS3 identifiers preserved: date, batch number, policy number, member, account,
-  hospital, amount, status.
+- **APE / ECU (Service Operations):** a hands-on, presenter-driven journey — **New APE request**
+  and **New ECU request** from the worklist → editable member & account (or Load sample) →
+  scenario-driven prior-check (earlier-year ≠ duplicate; same-year duplicate gated by a required
+  review reason) → provider / package / date / rate (rate syncs to package, clearly-labelled demo
+  override) → **issue sample LOE** → completion & results. **APE and ECU are kept distinct**
+  (own sample members, eyebrows, batches, package/rate catalogues, prior wording, LOE and
+  completion wording — no cross-leakage). Editable, saved in the browser, reopens at its real next
+  action; steps complete only on presenter action, never on page open. HMS3 identifiers preserved:
+  date, batch number, policy number, member, account, hospital, amount, status. See §2d.
 
 ## 2. Tested scenarios and results
 
@@ -212,6 +216,68 @@ Walked end-to-end in the live preview (console clean apart from the known previe
 | I10 | Documents drawer: supplied items + distinct LOA letter previews; missing items labelled **"Not received"**, never verified | Pass |
 | I11 | History drawer: full timestamped trail, simulated actors separate from presenter | Pass |
 | I12 | Reopen ILC-2026-9039 → all data / documents / statuses / history consistent; ILC-0007 still ready-to-start, ILC-0011 still discharged | Pass |
+
+## 2d. APE / ECU — hands-on, presenter-driven demo
+
+The Service Operations APE / ECU journey (`pndesk-service.js` + engines in `pndesk-core.js`,
+`#/pn-desk/operations?tab=ape`) was turned into a believable, **hands-on** demo that works
+equally well for **both** an Annual Physical Exam (APE) and an Executive Check-Up (ECU). The two
+share one workspace but stay **visibly distinct** — their own sample members, batches, package and
+rate catalogues, prior-service wording, LOE labelling and completion wording. Illustrative only
+(nothing is really sent, scheduled, approved or paid); everything is saved in the browser. Inpatient
+Liaison, the other Provider & Network demos and CSA were not touched.
+
+What changed:
+
+- **Worklist** carries both a prominent **New APE request** and a **New ECU request** button, plus
+  Status + Next-action columns. Seeded sample requests remain as varied-state examples
+  (APE-2026-0231 new, APE-2026-0244 scheduled, ECU-2026-0059 LOE issued). A new request appears
+  with its own number (`APE-/ECU-2026-9###`), correct service type, status and next action.
+- **Editable, resumable request.** A new request starts at *Member & request* and reopens at its
+  real next action; a step, letter or history entry is created **only on presenter action**, never on
+  page open. Nothing is auto-issued or auto-completed.
+- **Step 1 — Member & request:** editable form (member / policy / account / request date / optional
+  batch) or **Load sample data**; the APE-vs-ECU distinction is explained in plain language and the
+  service type is fixed and visible; a short illustrative coverage summary is shown; the presenter
+  must **explicitly confirm** (opening the page does not confirm it).
+- **Step 2 — Prior-service check:** a **demo scenario selector** (No prior service / Prior service in
+  an earlier year / Possible same-year duplicate) drives plain-language outcomes; an earlier-year
+  service is **not** treated as a duplicate; a **possible same-policy-year duplicate** shows a
+  review-required warning and **cannot proceed silently** — a documented review reason is required and
+  recorded as an exception. APE and ECU checks read in their own wording.
+- **Step 3 — Provider, package & schedule:** accredited provider + APE/ECU package + date +
+  illustrative rate; the package's contents are listed; changing the package resets the rate to its
+  catalogue value; entering a different rate reveals a **clearly-labelled demo override** whose reason
+  is required and recorded.
+- **Step 4 — Letter of Eligibility:** a readable LOE draft preview is built from the member / provider
+  / package / schedule / rate; **Issue sample LOE** creates a numbered LOE and simulates the provider
+  handoff (labelled a demo preview, never auto-issued on load).
+- **Step 5 — Completion & results:** record attendance, actual service date, completion status,
+  provider reference and a result note; **Load sample results** fills editable values; nothing is
+  completed until the presenter saves; a completion summary recaps the whole request.
+- **Orientation & honesty:** the 5-step indicator keeps clear active / Done / To-do states; each step
+  carries a "What you do here" sentence; APE / ECU / LOE are glossed on first mention; the compact
+  header keeps member / account / service type / request number visible; **Documents** labels anything
+  missing as **"Not received"** (never verified) and previews the LOE letter; **History** keeps
+  simulated actors separate from the presenter.
+
+Both journeys walked independently end-to-end in the live preview (console clean apart from the known
+preview-sandbox warning):
+
+| # | Scenario | Result |
+|---|----------|--------|
+| A1 | Worklist shows **New APE request** + **New ECU request** buttons, kind/status/next-action per row | Pass |
+| A2 | APE-2026-9485 full path: member → prior (no prior) → schedule (Basic APE, ₱1,450) → LOE → results → COMPLETE | Pass |
+| A3 | ECU-2026-9732 full path with **ECU-specific** package (Executive Comprehensive, ₱7,800) and LOE — **zero APE leakage** in labels, packages, prior wording, completion wording | Pass |
+| A4 | ECU sample member (Patricia L. Guevarra / Brightlane) distinct from APE sample (Rafael C. Domingo / Northwind) | Pass |
+| A5 | Prior check: earlier-year service **not** flagged as duplicate; same-policy-year duplicate shows review-required warning | Pass |
+| A6 | Same-year duplicate **blocks silent progress** — "Record check and continue" refused until a review reason is entered; reason recorded as exception | Pass |
+| A7 | Rate override: entering a rate ≠ catalogue reveals the override-reason field, requires a reason, and is labelled "demo override" in LOE + summary | Pass |
+| A8 | Issue sample LOE builds a correct, service-labelled letter preview; never auto-issued on load; simulated provider handoff recorded | Pass |
+| A9 | Completion status/results wording is ECU-specific for ECU ("executive check-up done") and APE-specific for APE | Pass |
+| A10 | Return to unfinished request (APE-2026-0244, Scheduled) resumes at step 4 Issue LOE with steps 1–3 Done | Pass |
+| A11 | Page refresh on completed ECU-2026-9732 → Completed status + all data / step states intact | Pass |
+| A12 | Documents drawer: 5 honest rows (request / prior / schedule / LOE+letter / results), missing items **"Not received"**, LOE letter viewable | Pass |
 
 ## 3. Honesty
 
