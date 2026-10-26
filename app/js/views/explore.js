@@ -104,6 +104,8 @@ export async function render(root, { parts }) {
 }
 
 function renderDepartments(root) {
+  // A result from another demo should not follow the presenter into the chooser.
+  document.getElementById("toasts")?.replaceChildren();
   document.title = "Explore the HMS experience";
   root.innerHTML = html`
     <div class="explore">
@@ -143,6 +145,7 @@ function deptCard(d) {
 function renderDemos(root, deptKey) {
   const dept = deptByKey(deptKey);
   if (!dept || !dept.demos) { go("#/explore"); return; }
+  document.getElementById("toasts")?.replaceChildren();
   document.title = `${dept.name} demos · Explore the HMS experience`;
   root.innerHTML = html`
     <div class="explore">

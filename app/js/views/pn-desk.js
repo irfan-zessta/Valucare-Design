@@ -1,6 +1,7 @@
 // Provider & Network desk — entry router + the record screens:
 //   • Provider Directory — the search-first list (the familiar HMS3 "Network Provider"
-//     list, same eight columns).
+//     list: Provider Code, Type, Short Name, Provider Name, Contact Number, Location,
+//     Status, Last Updated By and Details — nine columns).
 //   • Provider profile — essentials first, then clearly named expandable sections that
 //     retain everything from HMS3's Providers Info, Other Info, Discount Info, Accredited
 //     Doctors, Payee's Info and CPT Rates tabs. One page, no confusing tab jumps.
@@ -11,10 +12,10 @@
 //
 // Everything is a self-contained client-demo (localStorage, no backend), additive to the
 // existing Sales / Actuarial / MDA desks.
-import { html, raw, go, prefs, toast, confirmDialog } from "../core.js";
+import { html, raw, go, toast, confirmDialog, dialog, readDialog } from "../core.js";
 import { icon, pill, emptyState } from "../components.js";
 import {
-  ensureSeeded, resetDemo, allProviders, getProvider, putProvider, allDoctors, getDoctor,
+  ensureSeeded, resetDemo, allProviders, getProvider, putProvider, allDoctors, getDoctor, putDoctor,
   PROVIDER_STATUS, statusTone, REQ_STATE, outstandingReqs, providerNext, peso, plural, fmtD,
   daysBetween, DEMO_NOW_ISO, HOSPITAL_GROUPS, log,
 } from "./pndesk-core.js";
@@ -25,6 +26,11 @@ export async function render(main, { parts, query }) {
   ensureSeeded();
   document.getElementById("pn-guide")?.remove();
   const sub = parts[1];
+  // A success message from one screen must not follow the user onto a landing/chooser
+  // screen — e.g. "Final LOA issued" must never show on the Provider Directory or the
+  // APE chooser. Clear stale toasts once per navigation to those screens (not on the
+  // in-place search/tab re-renders, which call the render fns directly).
+  if (!sub || sub === "directory" || sub === "operations") document.getElementById("toasts")?.replaceChildren();
   if (sub === "provider") return renderProvider(main, parts[2], parts[3] || "overview");
   if (sub === "doctors") return renderDoctors(main, query);
   if (sub === "doctor") return renderDoctor(main, parts[2]);
@@ -38,13 +44,39 @@ export async function render(main, { parts, query }) {
 }
 
 // ============================================================== Provider Directory
-// Search-first list with HMS3's eight columns: Provider Code, Provider Type, Short Name,
-// Provider Name, Contact Number, Location, Last Updated By, Details.
+// Search-first list with HMS3's nine columns: Provider Code, Provider Type, Short Name,
+// Provider Name, Contact Number, Location, Status, Last Updated By, Details.
 const PTYPE_TABS = ["all", "Hospital", "Clinic"];
+function bindLiveSearch(input, render) {
+  input.oninput = () => {
+    clearTimeout(input._t);
+    input._t = setTimeout(() => {
+      const focused = document.activeElement === input;
+      const start = input.selectionStart, end = input.selectionEnd;
+      render(input.value);
+      if (focused) {
+        const replacement = document.getElementById(input.id);
+        replacement?.focus();
+        try { replacement?.setSelectionRange(start, end); } catch (e) { /* unsupported input type */ }
+      }
+    }, 150);
+  };
+}
+function bindRowLinks(main) {
+  main.querySelectorAll("[data-href]").forEach((row) => {
+    row.onclick = () => go(row.dataset.href);
+    row.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        go(row.dataset.href);
+      }
+    };
+  });
+}
 function renderDirectory(main, query) {
   const q = (query.q || "").toLowerCase();
   const typeTab = PTYPE_TABS.includes(query.type) ? query.type : "all";
-  const statusFilter = prefs.get("pn:status", "all");
+  const statusFilter = query.status && PROVIDER_STATUS[query.status] ? query.status : "all";
   const all = allProviders();
   const counts = {
     Active: all.filter((p) => p.status === "Active").length,
@@ -91,16 +123,16 @@ function renderDirectory(main, query) {
 
   highlightNav("directory");
   document.title = "Provider Directory · Provider & Network";
-  main.querySelectorAll("[data-type]").forEach((b) => (b.onclick = () => go(`#/pn-desk/directory?type=${b.dataset.type}${query.q ? "&q=" + encodeURIComponent(query.q) : ""}`)));
+  main.querySelectorAll("[data-type]").forEach((b) => (b.onclick = () => renderDirectory(main, { ...query, type: b.dataset.type })));
   const pq = main.querySelector("#pq");
-  pq.oninput = () => { clearTimeout(pq._t); pq._t = setTimeout(() => renderDirectory(main, { ...query, q: pq.value }), 150); };
-  main.querySelector("#sfSel").onchange = (e) => { prefs.set("pn:status", e.target.value); renderDirectory(main, query); };
-  main.querySelector("#addProv").onclick = () => addProvider(main);
+  bindLiveSearch(pq, (value) => renderDirectory(main, { ...query, q: value }));
+  main.querySelector("#sfSel").onchange = (e) => renderDirectory(main, { ...query, status: e.target.value });
+  main.querySelector("#addProv").onclick = () => addProvider();
   main.querySelector("#resetDemo").onclick = async () => {
     if (!(await confirmDialog("Reset this demo?", "Restores the Provider & Network sample data to its starting state. Other demos (Sales, Actuarial, MDA) are untouched.", { confirm: "Reset", kind: "danger" }))) return;
     resetDemo(); toast("Provider & Network demo reset.", "ok"); renderDirectory(main, {});
   };
-  main.querySelectorAll("[data-href]").forEach((tr) => (tr.onclick = () => go(tr.dataset.href)));
+  bindRowLinks(main);
 }
 
 function providerRow(p) {
@@ -119,11 +151,31 @@ function providerRow(p) {
 
 // Add a provider — a lightweight sample; new providers start Pending with a blank
 // requirements checklist so the accreditation journey has somewhere to begin.
-function addProvider(main) {
-  const code = "C-" + (90000 + Math.floor((allProviders().length + 1) * 7)).toString().slice(0, 5);
+async function addProvider() {
+  const result = await dialog({
+    title: "Add sample provider",
+    body: html`<p class="tiny">Enter a few details to identify this provider. Accreditation requirements can be reviewed next; no real record is created.</p>
+      <div class="field mt"><label for="pnNewType">Provider type</label><select id="pnNewType" name="type" class="inp"><option>Clinic</option><option>Hospital</option></select></div>
+      <div class="field mt"><label for="pnNewName">Provider name</label><input id="pnNewName" name="name" class="inp" value="New Sample Clinic" autocomplete="off"></div>
+      <div class="field mt"><label for="pnNewLocation">Location</label><input id="pnNewLocation" name="location" class="inp" value="Quezon City"></div>
+      <div class="field mt"><label for="pnNewContact">Contact number</label><input id="pnNewContact" name="contact" class="inp" value="+63 2 0000 0000"></div>`,
+    actions: [{ label: "Cancel" }, { label: "Create sample provider", kind: "primary", value: "create" }],
+    onOpen: (dlg) => {
+      const type = dlg.querySelector("#pnNewType"), name = dlg.querySelector("#pnNewName");
+      type.onchange = () => { if (/^New Sample (Clinic|Hospital)$/.test(name.value)) name.value = `New Sample ${type.value}`; };
+    },
+  });
+  if (result?.action !== "create") return;
+  const v = result.values;
+  const type = v.type === "Hospital" ? "Hospital" : "Clinic";
+  const name = v.name.trim() || `New Sample ${type}`;
+  const prefix = type === "Hospital" ? "H" : "C";
+  let number = 90001;
+  while (getProvider(`${prefix}-${number}`)) number += 1;
+  const code = `${prefix}-${number}`;
   const p = {
-    code, type: "Clinic", shortName: "New Clinic", providerName: "New Sample Clinic",
-    contactNumber: "+63 2 0000 0000", location: "—", region: "NCR", tier: "Clinic", category: "Primary care",
+    code, type, shortName: name.slice(0, 28), providerName: name,
+    contactNumber: v.contact.trim() || "+63 2 0000 0000", location: v.location.trim() || "Quezon City", region: "NCR", tier: type, category: type === "Hospital" ? "Secondary" : "Primary care",
     status: "Pending", statusReason: "New accreditation — requirements outstanding.", statusEffective: DEMO_NOW_ISO,
     updatedBy: "You (demo)", group: "HG-INDY", tin: "—", email: "—", website: "—", address: "—", bedCapacity: 0, emergency: false, operatingHours: "—",
     contract: { no: "(draft)", start: null, end: null, signedBy: null, renewalDue: null },
@@ -141,7 +193,6 @@ function addProvider(main) {
   putProvider(p);
   toast("Sample provider added — start its accreditation.", "ok");
   go(`#/pn-desk/provider/${code}/accreditation`);
-  void main;
 }
 
 // ============================================================== Provider profile
@@ -248,6 +299,7 @@ function renderProvider(main, code, openTab) {
     <details class="disc mt" ${open("doctors")}><summary><span class="disc-t">Affiliated doctors</span><span class="tiny muted">HMS3 · Accredited Doctors · ${plural(doctors.length, "doctor")}</span></summary>
       <div class="disc-b">
         <p class="tiny">These affiliations are specific to <b>${p.shortName}</b>. A doctor's general accreditation status does not imply they are affiliated here.</p>
+        <button type="button" class="btn ghost sm mt" id="addAffiliation">${icon("plus", 14)} Add doctor affiliation</button>
         ${doctors.length ? html`<div class="tbl-wrap mt"><table class="tbl rowlink"><thead><tr><th>Doctor Code</th><th>Doctor Name</th><th>Specialization</th><th>Privileges</th><th>Affiliation at this facility</th></tr></thead>
           <tbody>${doctors.map(({ d, aff }) => html`<tr data-href="#/pn-desk/doctor/${d.code}" tabindex="0">
             <td><b>${d.code}</b></td><td>${d.name}</td><td class="tiny">${d.specialization}</td><td class="tiny">${aff.privileges || "—"}</td>
@@ -259,9 +311,11 @@ function renderProvider(main, code, openTab) {
     <!-- Expandable: rates, discounts, payee (Rates & Affiliations group) -->
     <details class="disc mt" ${open("rates")}><summary><span class="disc-t">Rates, discounts & payee</span><span class="tiny muted">HMS3 · Room & Rates · CPT Rates · Discount Info · Payee's Info</span></summary>
       <div class="disc-b">
+        <button type="button" class="btn ghost sm" id="editTerms">${icon("file", 14)} Edit sample commercial terms</button>
         <dl class="dl cols">
           <div><dt>APE rate</dt><dd>${p.apeRate != null ? peso(p.apeRate) : "—"}</dd></div>
           <div><dt>ECU rate</dt><dd>${p.ecuRate != null ? peso(p.ecuRate) : "—"}</dd></div>
+          <div><dt>Rates effective</dt><dd>${p.ratesEffective ? fmtD(p.ratesEffective) : "—"}</dd></div>
         </dl>
         ${p.roomRates?.length ? html`<h3 class="tiny mt">Room & board rates</h3>
           <table class="tbl"><thead><tr><th>Room type</th><th class="num">Rate / day</th></tr></thead>
@@ -289,9 +343,79 @@ function renderProvider(main, code, openTab) {
   document.title = `${p.shortName} · Provider & Network`;
   // Next action jumps to the relevant section (opens it) rather than running a hidden step.
   main.querySelector("#provNext").onclick = () => go(`#/pn-desk/provider/${code}/${next.tab}`);
+  main.querySelector("#addAffiliation").onclick = () => addAffiliation(code);
+  main.querySelector("#editTerms").onclick = () => editTerms(code);
   main.querySelectorAll("[data-req]").forEach((b) => (b.onclick = () => markReq(code, b.dataset.req)));
   main.querySelectorAll("[data-act]").forEach((b) => (b.onclick = () => providerAction(code, b.dataset.act)));
-  main.querySelectorAll("[data-href]").forEach((tr) => (tr.onclick = () => go(tr.dataset.href)));
+  bindRowLinks(main);
+}
+
+async function addAffiliation(code) {
+  const p = getProvider(code);
+  if (!p) return;
+  const available = allDoctors().filter((d) => !(d.affiliations || []).some((a) => a.providerCode === code));
+  if (!available.length) { toast("All sample doctors are already affiliated here."); return; }
+  const result = await dialog({
+    title: `Affiliate a doctor with ${p.shortName}`,
+    body: html`<p class="tiny">This adds an affiliation at this facility only. The doctor's general accreditation is unchanged.</p>
+      <div class="field mt"><label for="pnAffDoctor">Doctor</label><select id="pnAffDoctor" name="doctor" class="inp">${available.map((d) => html`<option value="${d.code}">${d.name} · ${d.specialization}</option>`)}</select></div>
+      <div class="field mt"><label for="pnAffPrivileges">Privileges</label><input id="pnAffPrivileges" name="privileges" class="inp" value="Consultation"></div>`,
+    actions: [{ label: "Cancel" }, { label: "Add affiliation", kind: "primary", value: "add" }],
+  });
+  if (result?.action !== "add") return;
+  const d = getDoctor(result.values.doctor);
+  if (!d || (d.affiliations || []).some((a) => a.providerCode === code)) return;
+  d.affiliations = [...(d.affiliations || []), { providerCode: code, status: "Active", since: DEMO_NOW_ISO, privileges: result.values.privileges.trim() || "Consultation" }];
+  putDoctor(d);
+  log(p, `${d.name} affiliated with this facility (sample).`, "Provider Network Officer");
+  putProvider(p);
+  toast("Doctor affiliation added.", "ok");
+  go(`#/pn-desk/provider/${code}/doctors`);
+}
+
+async function editTerms(code) {
+  const p = getProvider(code);
+  if (!p) return;
+  const parseRate = (value) => value.trim() === "" ? null : Number(value);
+  const badRate = (n) => n != null && (!Number.isFinite(n) || n < 0);
+  const result = await dialog({
+    title: `Edit sample terms · ${p.shortName}`,
+    body: html`<p class="tiny">Demo-only changes. Confirm rates against the signed agreement before production.</p>
+      <div class="error-summary" id="pnTermsErr" role="alert" hidden></div>
+      <div class="field mt"><label for="pnApeRate">APE rate (₱)</label><input id="pnApeRate" name="apeRate" class="inp" inputmode="decimal" value="${p.apeRate ?? ""}"></div>
+      <div class="field mt"><label for="pnEcuRate">ECU rate (₱)</label><input id="pnEcuRate" name="ecuRate" class="inp" inputmode="decimal" value="${p.ecuRate ?? ""}"></div>
+      <div class="field mt"><label for="pnRatesEffective">Rates effective</label><input id="pnRatesEffective" name="ratesEffective" type="date" class="inp" value="${p.ratesEffective || DEMO_NOW_ISO}"></div>
+      <div class="field mt"><label for="pnPayee">Payee name</label><input id="pnPayee" name="payee" class="inp" value="${p.payee?.name === "—" ? "" : p.payee?.name || ""}"></div>
+      <div class="field mt"><label for="pnPayMode">Payment mode</label><select id="pnPayMode" name="mode" class="inp">${["—", "Bank transfer", "Cheque", "PESONet"].map((m) => html`<option value="${m}" ${p.payee?.mode === m ? "selected" : ""}>${m}</option>`)}</select></div>`,
+    actions: [{ label: "Cancel" }, { label: "Save sample terms", kind: "primary", value: "save" }],
+    // Rate validation lives here (not in the action's `validate`) because DEMO_BYPASS
+    // strips dialog `validate` callbacks. onOpen runs after the default wiring, so this
+    // Save handler wins — keeping the form open with the user's entries on a bad rate.
+    onOpen: (dlg, close) => {
+      const saveBtn = [...dlg.querySelectorAll(".df .btn")].find((b) => b.textContent.trim() === "Save sample terms");
+      const errEl = dlg.querySelector("#pnTermsErr");
+      saveBtn.onclick = () => {
+        const vals = readDialog(dlg);
+        if (badRate(parseRate(vals.apeRate)) || badRate(parseRate(vals.ecuRate))) {
+          errEl.hidden = false;
+          errEl.innerHTML = `<h2>Check this form</h2><p>Rates must be zero or a positive number.</p>`;
+          errEl.focus?.();
+          return;
+        }
+        close({ action: "save", values: vals });
+      };
+    },
+  });
+  if (result?.action !== "save") return;
+  const v = result.values;
+  const apeRate = parseRate(v.apeRate), ecuRate = parseRate(v.ecuRate);
+  p.apeRate = apeRate; p.ecuRate = ecuRate;
+  p.ratesEffective = v.ratesEffective || DEMO_NOW_ISO;
+  p.payee = { ...(p.payee || {}), name: v.payee.trim() || "—", mode: v.mode };
+  log(p, "Sample rates and payee terms updated.", "Provider Network Officer");
+  putProvider(p);
+  toast("Sample commercial terms saved.", "ok");
+  go(`#/pn-desk/provider/${code}/rates`);
 }
 
 function markReq(code, key) {
@@ -348,8 +472,8 @@ function renderDoctors(main, query) {
   highlightNav("directory");
   document.title = "Doctors · Provider & Network";
   const dq = main.querySelector("#dq");
-  dq.oninput = () => { clearTimeout(dq._t); dq._t = setTimeout(() => renderDoctors(main, { ...query, q: dq.value }), 150); };
-  main.querySelectorAll("[data-href]").forEach((tr) => (tr.onclick = () => go(tr.dataset.href)));
+  bindLiveSearch(dq, (value) => renderDoctors(main, { ...query, q: value }));
+  bindRowLinks(main);
 }
 
 function renderDoctor(main, code) {
@@ -379,7 +503,7 @@ function renderDoctor(main, code) {
     <p class="tiny mt"><a href="#/pn-desk/doctors">${icon("collapse", 13)} Back to doctors</a></p>`.s;
   highlightNav("directory");
   document.title = `${d.name} · Provider & Network`;
-  main.querySelectorAll("[data-href]").forEach((tr) => (tr.onclick = () => go(tr.dataset.href)));
+  bindRowLinks(main);
 }
 
 // ============================================================== Accreditation & Contracts landing
@@ -418,8 +542,8 @@ function renderAccreditation(main, query) {
   highlightNav("accreditation");
   document.title = "Accreditation & Contracts · Provider & Network";
   const aq = main.querySelector("#aq");
-  aq.oninput = () => { clearTimeout(aq._t); aq._t = setTimeout(() => renderAccreditation(main, { ...query, q: aq.value }), 150); };
-  main.querySelectorAll("[data-href]").forEach((tr) => (tr.onclick = () => go(tr.dataset.href)));
+  bindLiveSearch(aq, (value) => renderAccreditation(main, { ...query, q: value }));
+  bindRowLinks(main);
 }
 
 // ============================================================== Rates & Affiliations landing
@@ -453,6 +577,6 @@ function renderRates(main, query) {
   highlightNav("rates");
   document.title = "Rates & Affiliations · Provider & Network";
   const rq = main.querySelector("#rq");
-  rq.oninput = () => { clearTimeout(rq._t); rq._t = setTimeout(() => renderRates(main, { ...query, q: rq.value }), 150); };
-  main.querySelectorAll("[data-href]").forEach((tr) => (tr.onclick = () => go(tr.dataset.href)));
+  bindLiveSearch(rq, (value) => renderRates(main, { ...query, q: value }));
+  bindRowLinks(main);
 }

@@ -28,7 +28,17 @@ export function saveStore(s) { try { localStorage.setItem(STORE_KEY, JSON.string
 
 export function ensureSeeded() {
   const s = loadStore();
-  if (s.seeded !== BASELINE) seed();
+  if (s.seeded !== BASELINE) { seed(); return; }
+  // Correct the one contradictory seeded APE example without resetting any
+  // presenter progress or other Provider & Network records already in the browser.
+  const sample = s.ape?.["APE-2026-0244"];
+  if (sample?.prior?.last === "2026-02-14") {
+    sample.prior = { last: "2025-02-14", note: "Completed in the previous policy year." };
+    saveStore(s);
+  } else if (sample?.prior?.last === "2025-02-14" && sample.prior.note !== "Completed in the previous policy year.") {
+    sample.prior.note = "Completed in the previous policy year.";
+    saveStore(s);
+  }
 }
 export function seed() {
   const s = blank();
@@ -242,6 +252,7 @@ export const apeHref = (r) => { const ns = apeNext(r); return `#/pn-desk/ape/${r
 
 export function confirmApeMember(r) { ensureApeWf(r).memberChecked = true; log(r, "Member and account confirmed.", "APE/ECU Coordinator"); putApe(r); return r; }
 export function checkApePrior(r) { ensureApeWf(r).priorChecked = true; log(r, r.prior?.last ? `Prior ${r.kind} found (${fmtD(r.prior.last)}).` : `No prior ${r.kind} this policy year — eligible.`, "APE/ECU Coordinator"); putApe(r); return r; }
+export const priorInPolicyYear = (r) => !!r.prior?.last && String(r.prior.last).slice(0, 4) === String(r.date).slice(0, 4);
 export function scheduleApe(r, { providerCode, packageCode, date, rate }) {
   ensureApeWf(r);
   const prov = getProvider(providerCode);
@@ -567,7 +578,7 @@ function SEED_APE() {
     {
       id: "APE-2026-0244", kind: "APE", date: "2026-10-23", batchNo: "APE-BATCH-2026-10-A",
       member: { name: "Daniel R. Ong", policyNo: "VC-PLN-551244", account: "ACC-NL-0442", accountName: "Northwind Logistics Corp." },
-      prior: { last: "2026-02-14", note: "Prior APE completed 14 Feb 2026 — check policy-year rule before re-scheduling." },
+      prior: { last: "2025-02-14", note: "Completed in the previous policy year." },
       provider: { code: "C-00317", name: "WellPoint Diagnostic Clinic — Ortigas" }, package: { code: "APE-STD", name: "Standard APE (+ ECG, FBS)" },
       scheduledDate: "2026-10-28", rate: 2200, amount: 2200, loe: null, results: null, history: [],
       wf: { _v: 1, memberChecked: true, priorChecked: true, scheduled: true, loeIssued: false, completed: false },

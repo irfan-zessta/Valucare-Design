@@ -15,7 +15,7 @@ import {
   allInpatient, getInpatient, putInpatient, resetInpatient, allApe, getApe, resetApe,
   ILC_STEPS, ilcStatus, ilcNext, ilcHref, issueInitialLoa, logVisit, reviewFinalBill, issueFinalLoa,
   APE_STEPS, apeStatus, apeNext, apeHref, apeKindLabel, apePackages, allProviders,
-  confirmApeMember, checkApePrior, scheduleApe, issueLoe, completeApe,
+  confirmApeMember, checkApePrior, priorInPolicyYear, scheduleApe, issueLoe, completeApe,
   log, peso, plural, fmtD, DEMO_NOW_ISO,
 } from "./pndesk-core.js";
 import {
@@ -68,11 +68,19 @@ function renderOperations(main, query) {
         <td>${pill(st.label, st.tone)}</td>
         <td>${ns ? html`<span class="linklike">${ns.label} ›</span>` : html`<span class="tiny">Completed</span>`}</td></tr>`; })}</tbody></table></div>`}
 
-    <p class="tiny mt"><a href="#/pn-desk/directory">${icon("collapse", 13)} Provider Directory</a> · Sample cases, each starting at its first step. Open one and use its primary button to walk the journey.</p>`.s;
+    <p class="tiny mt"><a href="#/pn-desk/directory">${icon("collapse", 13)} Provider Directory</a> · Sample cases may be new, in progress or complete. Open a row to continue at its next action.</p>`.s;
   highlightNav("operations");
   document.title = "Service Operations · Provider & Network";
   main.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => go(`#/pn-desk/operations?tab=${b.dataset.tab}`)));
-  main.querySelectorAll("[data-href]").forEach((tr) => (tr.onclick = () => go(tr.dataset.href)));
+  main.querySelectorAll("[data-href]").forEach((tr) => {
+    tr.onclick = () => go(tr.dataset.href);
+    tr.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        go(tr.dataset.href);
+      }
+    };
+  });
 }
 
 // ============================================================== Inpatient liaison workspace
@@ -273,15 +281,19 @@ function renderApeStep(host, ctx) {
   }
 
   if (step === "prior") {
+    const duplicate = priorInPolicyYear(r);
     host.innerHTML = html`<div class="panel"><div class="ph"><h2>Prior ${r.kind} check</h2></div><div class="pb">
       <p class="tiny">Check whether this member already had ${apeKindLabel(r.kind)} this policy year before scheduling.</p>
-      <div class="note ${r.prior?.last ? "warn" : "info"} mt">
-        ${r.prior?.last ? html`<b>Prior ${r.kind} found — ${fmtD(r.prior.last)}.</b> ${r.prior.note || ""} Check the policy-year rule before scheduling another.`
+      <div class="note ${duplicate ? "warn" : "info"} mt">
+        ${r.prior?.last ? html`<b>${duplicate ? `Possible same-year duplicate ${r.kind}` : `Prior ${r.kind} was in an earlier year`} — ${fmtD(r.prior.last)}.</b> ${r.prior.note || ""} ${duplicate ? "Do not schedule another without a documented exception." : "This is not a same-year duplicate."}`
           : html`<b>No prior ${r.kind} this policy year.</b> ${r.prior?.note || "Member is eligible to schedule."}`}
       </div>
       ${r.wf.priorChecked ? html`<p class="tiny mt">${icon("check", 14)} Eligibility checked.</p>` : ""}
     </div></div>`.s;
-    wireNext(ctx, APE_DEFS, () => { checkApePrior(r); toast("Eligibility checked.", "ok"); go(`#/pn-desk/ape/${r.id}/schedule`); });
+    wireNext(ctx, APE_DEFS, () => {
+      if (duplicate) { toast(`A prior ${r.kind} exists in this policy year. Resolve the exception before scheduling.`, "err"); return; }
+      checkApePrior(r); toast("Eligibility checked.", "ok"); go(`#/pn-desk/ape/${r.id}/schedule`);
+    });
     return;
   }
 
@@ -310,7 +322,15 @@ function renderApeStep(host, ctx) {
     const pkgSel = host.querySelector("#apPkg"), rateInp = host.querySelector("#apRate");
     pkgSel.onchange = () => { const p = pkgs.find((x) => x.code === pkgSel.value); if (p) rateInp.value = p.rate; };
     wireNext(ctx, APE_DEFS, () => {
-      scheduleApe(r, { providerCode: host.querySelector("#apProv").value, packageCode: pkgSel.value, date: host.querySelector("#apDate").value, rate: rateInp.value });
+      const providerCode = host.querySelector("#apProv").value;
+      const date = host.querySelector("#apDate").value;
+      const rate = Number(rateInp.value);
+      if (!providerCode || !pkgSel.value || !date || !rateInp.value.trim() || !Number.isFinite(rate) || rate < 0) {
+        toast("Choose a provider, package and date, and enter a valid non-negative rate.", "err");
+        (!providerCode ? host.querySelector("#apProv") : !date ? host.querySelector("#apDate") : rateInp).focus();
+        return;
+      }
+      scheduleApe(r, { providerCode, packageCode: pkgSel.value, date, rate });
       toast("Scheduled.", "ok"); go(`#/pn-desk/ape/${r.id}/loe`);
     });
     return;

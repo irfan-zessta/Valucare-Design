@@ -75,7 +75,7 @@ All walked in the live browser preview; console clean apart from the known, pre-
 
 | # | Scenario | Result |
 |---|----------|--------|
-| 1 | Directory renders 8 columns + status, type tabs, status filter, counts | Pass |
+| 1 | Directory renders 9 columns (incl. Status), type tabs, status filter, counts | Pass |
 | 2 | Pending provider (H-00188) profile: status note, next-action strip, essentials, sections | Pass |
 | 3 | Accreditation "Mark received" mutates + persists (Mayor's permit → On file, counts update) | Pass |
 | 4 | Doctor profile (DR-1044) shows facility-specific affiliation table + general-status note | Pass |
