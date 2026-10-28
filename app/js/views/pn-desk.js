@@ -310,6 +310,18 @@ function renderProvider(main, code, openTab) {
   main.querySelectorAll("[data-req]").forEach((b) => (b.onclick = () => markReq(code, b.dataset.req)));
   main.querySelectorAll("[data-act]").forEach((b) => (b.onclick = () => providerAction(code, b.dataset.act)));
   bindRowLinks(main);
+
+  // Arriving via the next-action jump (e.g. "Review affiliations and rates") opens the
+  // relevant section — but it can sit below the fold, so the expand looks like nothing
+  // happened. Bring the opened section into view. A bare profile open defaults to
+  // "overview" and is left where it is.
+  if (openTab && openTab !== "overview") {
+    const target = [...main.querySelectorAll("details.disc")].find((d) => d.open);
+    if (target) {
+      target.style.scrollMarginTop = "80px";
+      requestAnimationFrame(() => target.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+  }
 }
 
 async function addAffiliation(code) {
