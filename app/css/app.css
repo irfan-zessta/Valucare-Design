@@ -1232,6 +1232,8 @@ tr.qc-row>td{background:var(--surface-muted)}
 .seg.sm button{padding:4px 10px;font-size:12px}
 .seg.sm button.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow-xs);font-weight:600}
 .anytime-bar{flex-wrap:wrap}
+tr.sob-mbl{border-top:2px solid var(--border);background:var(--surface-2,rgba(0,0,0,.02))}
+tr.sob-mbl td{font-weight:600}
 
 /* Reimbursement — decision cards + checkboxes */
 .decision-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}

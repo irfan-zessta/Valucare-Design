@@ -105,6 +105,7 @@ export function renderProcess(main, id, step) {
       <span class="tiny muted">Any time:</span>
       <button type="button" class="btn ghost sm" id="clDraft">${icon("file", 14)} Save draft</button>
       <button type="button" class="btn ghost sm" id="clPending">${icon("clock", 14)} Mark pending clarification</button>
+      <button type="button" class="btn ghost sm" id="clSob">${icon("tasks", 14)} View ${abbr("SOB")}</button>
       <button type="button" class="btn ghost sm" id="clAsk">${icon("help", 14)} Ask Sales / ${abbr("CCD")}</button>
     </div>
     ${b.pendingClarification ? html`<div class="note info mt tiny"><b>Pending clarification:</b> ${b.pendingClarification}</div>` : ""}
@@ -139,6 +140,7 @@ function wireAnytime(main, ctx) {
     if (r?.action !== "ok") return;
     setPendingClarification(getBatch(b.id), r.values.pcNote); toast("Marked pending clarification.", "ok"); ctx.refresh();
   };
+  main.querySelector("#clSob").onclick = () => showSob(getBatch(b.id));
   main.querySelector("#clAsk").onclick = async () => {
     const r = await dialog({ title: "Ask Sales / CCD", body: html`${demoPreview("This sends a question to another team from inside the claim.")}
       <div class="field mt"><label for="qTo">Ask</label><select id="qTo" name="qTo" class="inp"><option value="CCD">CCD (Customer Care Department)</option><option value="Sales">Sales</option></select></div>
@@ -147,6 +149,36 @@ function wireAnytime(main, ctx) {
     const v = r.values; askQuestion(getBatch(b.id), v.qTo, v.qText); toast("Question sent (simulated).", "ok"); ctx.refresh();
   };
   main.querySelector("#clSimReply")?.addEventListener("click", () => { simulateReply(getBatch(b.id)); toast("Reply received (simulated).", "ok"); ctx.refresh(); });
+}
+
+// Read-only look at the member's Schedule of Benefits (SOB), available at any point in
+// processing — not just on the benefit step. Shows each covered benefit with its limit,
+// amount used and remaining; the MBL row is the overall ceiling. Viewing never changes
+// anything. Sample plan data; no real eligibility system is queried.
+function showSob(b) {
+  const m = getMember(b.member.policyNo);
+  if (!m || !m.sob?.length) {
+    dialog({ title: "Schedule of Benefits", body: html`<div class="note warn tiny">No Schedule of Benefits is on file for this member yet. Find and confirm the member on <b>Member &amp; coverage</b> first.</div>`, actions: [{ label: "Close", kind: "primary", value: "ok" }] });
+    return;
+  }
+  const row = (x) => {
+    const remaining = Math.max(0, x.limit - x.used);
+    const isMbl = x.code === "MBL";
+    return html`<tr${isMbl ? raw(' class="sob-mbl"') : ""}>
+      <td>${x.name}${x.special ? html`<div class="tiny muted">${x.note || "Special procedure — paid from its own inner limit."}</div>` : isMbl ? html`<div class="tiny muted">Overall ceiling for the policy year.</div>` : ""}</td>
+      <td class="num tiny">${peso(x.limit)}</td>
+      <td class="num tiny">${peso(x.used)}</td>
+      <td class="num"><b>${peso(remaining)}</b></td></tr>`;
+  };
+  dialog({
+    title: `Schedule of Benefits — ${m.name}`,
+    body: html`<p class="tiny muted">Policy ${m.policyNo} · ${m.accountName || m.account || ""}. The member's covered benefits and remaining limits under their plan. Read-only — viewing does not change the claim. Sample plan data.</p>
+      <div class="tbl-wrap mt"><table class="tbl"><thead><tr>
+        <th>Benefit</th><th class="num">Limit</th><th class="num">Used</th><th class="num">Remaining</th></tr></thead>
+        <tbody>${m.sob.map(row)}</tbody></table></div>`,
+    actions: [{ label: "Close", kind: "primary", value: "ok" }],
+    wide: true,
+  });
 }
 
 function renderProcStep(host, ctx) {
