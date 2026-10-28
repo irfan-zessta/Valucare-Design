@@ -211,7 +211,8 @@ function renderProcStep(host, ctx) {
   // ---- Step 2 · Diagnosis & benefit (SOB) ---------------------------------
   if (step === "clinical") {
     const sob = m ? m.sob : [];
-    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Diagnosis &amp; benefit</h2></div><div class="pb">
+    host.innerHTML = html`<div class="panel"><div class="ph"><h2>Diagnosis &amp; benefit</h2>
+      <button type="button" class="btn ghost sm" id="clSampleDx">${icon("plus", 13)} Load sample data</button></div><div class="pb">
       ${whatYouDo(html`Enter the diagnosis and procedure, then pick the matching benefit from the member's ${abbr("SOB")}. The remaining benefit and any inner limit are shown so you select the right one.`)}
       <div class="grid2 mt">
         <div class="field"><label for="dx">Diagnosis</label><input id="dx" class="inp" value="${e.diagnosis || ""}" placeholder="e.g. Acute bronchitis (J20.9)"></div>
@@ -233,6 +234,11 @@ function renderProcStep(host, ctx) {
       if (x.special && !host.querySelector("#special").value) host.querySelector("#special").value = x.note;
     };
     host.querySelector("#ben").onchange = renderBen; renderBen();
+    host.querySelector("#clSampleDx").onclick = () => {
+      const s = sampleEncoding(b); const bb = getBatch(b.id);
+      Object.assign(bb.enc, { diagnosis: s.diagnosis, procedure: s.procedure, benefitCode: s.benefitCode, benefitName: s.benefitName, special: s.special });
+      putBatch(bb); toast("Sample data loaded.", "ok"); ctx.refresh();
+    };
     host.querySelector("#clPrimary").onclick = () => {
       const code = host.querySelector("#ben").value;
       if (!code) { toast("Select a benefit from the SOB.", "err"); return; }
