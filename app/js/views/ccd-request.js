@@ -35,7 +35,7 @@ import {
 import {
   highlightNav, backBar, caseHead, nextStrip, wireNext, stepsNav, renderGuideCard, wireHead,
   roleSwitcher, wireRoleSwitcher, alertList, simNote, illus, demoPreview, whatYouDo, saveBar,
-  previewLetter, abbr,
+  previewLetter, abbr, sampleBtn, fillForm,
 } from "./ccd-ui.js";
 
 // -------------------------------------------------------------- journey defs
@@ -109,8 +109,20 @@ function stepReceive(body, ctx) {
         <div class="field"><label for="rDesc">Description</label><input id="rDesc" class="inp" value="${r.description || ""}" placeholder="What is being requested?"></div>
       </div>
       ${illus("A hospital caller can add several patients under one request on the next step — the hospital details here are entered only once.")}
+      <div class="row tight mt">${sampleBtn("rSample", "Load sample request")}</div>
       ${saveBar("Save & find the member")}
     </div>`.s;
+  body.querySelector("#rSample").onclick = () => {
+    const f = allFacilities()[0];
+    fillForm(body, {
+      "#rChannel": "hotline", "#rType": "outpatient",
+      "#rCaller": f ? `${f.name} — front desk` : "Member (direct)",
+      "#rContact": "(02) 8123-4567",
+      "#rFacility": f ? f.code : "",
+      "#rDesc": "Outpatient consultation and laboratory for a member seen today.",
+    });
+    toast("Sample request loaded.", "ok");
+  };
   document.getElementById("clPrimary").onclick = () => {
     saveReceive(r, {
       channel: body.querySelector("#rChannel").value, type: body.querySelector("#rType").value,
@@ -501,8 +513,21 @@ export async function specialApprovalDialog(ctx) {
         <div class="field"><label for="spCharge">Charge to</label><select id="spCharge" name="spCharge" class="inp"><option>HMO (goodwill)</option><option>Member (co-pay)</option><option>Account / company</option></select></div>
         <div class="field"><label for="spApprover">Authoriser</label><select id="spApprover" name="spApprover" class="inp"><option>Ramon Castillo (CCD Head)</option><option>Grace Lim (Team Leader)</option></select></div>
         <div class="field grow2"><label for="spEvidence">Example evidence attachment</label><input id="spEvidence" name="spEvidence" class="inp" placeholder="e.g. prescription + medical abstract (example only)"></div>
-      </div>`,
+      </div>
+      <div class="row tight mt">${sampleBtn("spSample")}</div>`,
     actions: [{ label: "Cancel" }, { label: "Send to authoriser", kind: "primary", value: "ok" }],
+    onOpen: (dlg) => {
+      dlg.querySelector("#spSample").onclick = () => {
+        fillForm(dlg, {
+          "#spReason": "Benefit inner limit exhausted for this coverage year; member needs continued treatment.",
+          "#spAmount": "1200",
+          "#spCharge": "HMO (goodwill)",
+          "#spApprover": "Ramon Castillo (CCD Head)",
+          "#spEvidence": "Prescription + medical abstract (example only)",
+        });
+        toast("Sample details loaded.", "ok");
+      };
+    },
   });
   if (r2?.action !== "ok") return;
   const v = r2.values;
@@ -526,8 +551,22 @@ export async function newRequestDialog(main) {
         <div class="field"><label for="nContact">Contact</label><input id="nContact" name="nContact" class="inp" placeholder="phone, email or Viber"></div>
         <div class="field"><label for="nFacility">Facility</label><select id="nFacility" name="nFacility" class="inp"><option value="">— none / member direct —</option>${allFacilities().map((f) => html`<option value="${f.code}">${f.name} · ${f.tier}</option>`)}</select></div>
         <div class="field"><label for="nDesc">Description</label><input id="nDesc" name="nDesc" class="inp" placeholder="What is being requested?"></div>
-      </div>`,
+      </div>
+      <div class="row tight mt">${sampleBtn("nSample", "Load sample request")}</div>`,
     actions: [{ label: "Cancel" }, { label: "Create request", kind: "primary", value: "ok" }],
+    onOpen: (dlg) => {
+      dlg.querySelector("#nSample").onclick = () => {
+        const f = allFacilities()[0];
+        fillForm(dlg, {
+          "#nChannel": "hotline", "#nType": "outpatient",
+          "#nCaller": f ? `${f.name} — front desk` : "Member (direct)",
+          "#nContact": "(02) 8123-4567",
+          "#nFacility": f ? f.code : "",
+          "#nDesc": "Outpatient consultation and laboratory for a member seen today.",
+        });
+        toast("Sample request loaded.", "ok");
+      };
+    },
   });
   if (r?.action !== "ok") return;
   const v = r.values;
@@ -547,8 +586,21 @@ export async function newInquiryDialog(main) {
         <div class="field"><label for="qMember">Member (optional)</label><input id="qMember" name="qMember" class="inp" placeholder="Name"></div>
         <div class="field"><label for="qPolicy">Policy no. (optional)</label><input id="qPolicy" name="qPolicy" class="inp" placeholder="VC-…"></div>
         <div class="field grow2"><label for="qNotes">Notes</label><textarea id="qNotes" name="qNotes" class="inp" rows="2" placeholder="What did they ask?"></textarea></div>
-      </div>`,
+      </div>
+      <div class="row tight mt">${sampleBtn("qSample", "Load sample inquiry")}</div>`,
     actions: [{ label: "Cancel" }, { label: "Log inquiry", kind: "primary", value: "ok" }],
+    onOpen: (dlg) => {
+      dlg.querySelector("#qSample").onclick = () => {
+        fillForm(dlg, {
+          "#qCat": INQUIRY_CATEGORIES[0],
+          "#qChannel": "hotline",
+          "#qMember": "Antonio B. Cruz",
+          "#qPolicy": "VC-640318",
+          "#qNotes": "Member asked whether an annual executive check-up is covered this year.",
+        });
+        toast("Sample inquiry loaded.", "ok");
+      };
+    },
   });
   if (r?.action !== "ok") return;
   const v = r.values;

@@ -23,6 +23,7 @@ import {
 } from "./ccd-core.js";
 import {
   highlightNav, backBar, roleSwitcher, wireRoleSwitcher, demoPreview, simNote, illus, protoConcept, abbr, previewLetter,
+  sampleBtn, fillForm,
 } from "./ccd-ui.js";
 import { renderRequest, newRequestDialog } from "./ccd-request.js";
 import { renderConfinement } from "./ccd-inpatient.js";
@@ -219,8 +220,17 @@ function renderApprovals(main, query) {
     const act = b.dataset.act;
     const r = await dialog({ title: `${act === "approve" ? "Approve" : "Decline"} special approval`, body: html`
       ${illus(`${a.reason} · ${peso(a.amount)} · charge to ${a.chargeTo}.`)}
-      <div class="field mt"><label for="apNote">Note (optional)</label><textarea id="apNote" name="apNote" class="inp" rows="2" placeholder="Reason / conditions"></textarea></div>`,
-      actions: [{ label: "Cancel" }, { label: act === "approve" ? "Approve" : "Decline", kind: act === "approve" ? "primary" : "danger", value: "ok" }] });
+      <div class="field mt"><label for="apNote">Note (optional)</label><textarea id="apNote" name="apNote" class="inp" rows="2" placeholder="Reason / conditions"></textarea></div>
+      <div class="row tight mt">${sampleBtn("apSample", "Load sample note")}</div>`,
+      actions: [{ label: "Cancel" }, { label: act === "approve" ? "Approve" : "Decline", kind: act === "approve" ? "primary" : "danger", value: "ok" }],
+      onOpen: (dlg) => {
+        dlg.querySelector("#apSample").onclick = () => {
+          fillForm(dlg, { "#apNote": act === "approve"
+            ? "Approved as a one-time goodwill exception; charge as noted. Member to be advised of limit for next cycle."
+            : "Declined — outside plan coverage this cycle. Member advised of alternatives and next-cycle reset." });
+          toast("Sample note loaded.", "ok");
+        };
+      } });
     if (r?.action !== "ok") return;
     decideApproval(a, act === "approve" ? "approved" : "declined", r.values.apNote);
     toast(`Special approval ${act === "approve" ? "approved" : "declined"}.`, "ok");

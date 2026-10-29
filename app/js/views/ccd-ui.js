@@ -265,3 +265,25 @@ export const whatYouDo = (text) => html`<p class="tiny note info"><b>What you do
 export function saveBar(label, id = "clPrimary") {
   return html`<div class="savebar mt"><div></div><button type="button" class="btn primary" id="${id}">${label} ›</button></div>`;
 }
+
+// -------------------------------------------------------------- sample-data affordance
+// A presentation convenience: one click fills a form with plausible, internally-consistent
+// sample values so a presenter never has to type during a demo. Sample data HELPS, never
+// blocks — every field stays editable afterwards. `sampleBtn` renders the ghost button;
+// `fillForm` sets the values (keyed by CSS selector) within a scope (a step body or a live
+// dialog element) and fires input/change so any dependent UI (totals, dependent selects)
+// recomputes.
+export function sampleBtn(id = "sampleFill", label = "Load sample data") {
+  return html`<button type="button" class="btn ghost sm" id="${id}">${icon("sparkle", 14)} ${label}</button>`;
+}
+export function fillForm(scope, map) {
+  if (!scope) return;
+  Object.entries(map).forEach(([sel, val]) => {
+    const el = scope.querySelector(sel);
+    if (!el) return;
+    if (el.type === "checkbox") el.checked = !!val;
+    else el.value = val == null ? "" : String(val);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}

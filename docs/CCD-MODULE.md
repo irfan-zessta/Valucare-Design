@@ -139,6 +139,11 @@ auto-acts.
 
 All sample cases are internally consistent against a single demo "now" (2026-10-29).
 Creating a request does **not** open an unrelated preloaded case. Back/forward preserve
-data. Sample data helps, never blocks ("Load sample member/data" where useful). Any
-real-time sync, email, Viber, document extraction or calculation automation is explicitly
-labelled **simulated in this prototype**. `resetDemo()` restores the seeded state.
+data. Sample data helps, never blocks: **every form carries a one-click "Load sample …"
+affordance** so a presenter never has to type live — the intake (receive) step, the New
+request / New inquiry / Special approval / New admission / Record amendment dialogs, and the
+approve-/decline-note dialog. Each fills plausible, internally-consistent values and leaves
+every field editable (shared `sampleBtn` / `fillForm` helpers in `ccd-ui.js`; dialogs wire
+the button through the `dialog()` `onOpen(dlg)` callback). Any real-time sync, email, Viber,
+document extraction or calculation automation is explicitly labelled **simulated in this
+prototype**. `resetDemo()` restores the seeded state.

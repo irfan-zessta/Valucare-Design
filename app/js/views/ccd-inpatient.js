@@ -28,6 +28,7 @@ import {
 import {
   highlightNav, backBar, caseHead, nextStrip, wireNext, stepsNav, renderGuideCard, wireHead,
   alertList, simNote, illus, demoPreview, whatYouDo, saveBar, previewLetter, abbr,
+  sampleBtn, fillForm,
 } from "./ccd-ui.js";
 
 // -------------------------------------------------------------- journey defs
@@ -340,8 +341,18 @@ async function amendDialog(ctx) {
     title: "Record an amendment", wide: true,
     body: html`${illus("An amendment adjusts the same confinement on the same approval code — never a second unrelated LOA. It is versioned so the trail is clear.")}
       <div class="field mt"><label for="amReason">Reason</label><input id="amReason" name="amReason" class="inp" placeholder="e.g. additional day, supplementary procedure"></div>
-      <div class="field mt"><label for="amDelta">Adjustment amount</label><input id="amDelta" name="amDelta" class="inp num" placeholder="0.00"></div>`,
+      <div class="field mt"><label for="amDelta">Adjustment amount</label><input id="amDelta" name="amDelta" class="inp num" placeholder="0.00"></div>
+      <div class="row tight mt">${sampleBtn("amSample")}</div>`,
     actions: [{ label: "Cancel" }, { label: "Record amendment", kind: "primary", value: "ok" }],
+    onOpen: (dlg) => {
+      dlg.querySelector("#amSample").onclick = () => {
+        fillForm(dlg, {
+          "#amReason": "Additional hospital day — extended confinement",
+          "#amDelta": "8000",
+        });
+        toast("Sample amendment loaded.", "ok");
+      };
+    },
   });
   if (r?.action !== "ok") return;
   amendConfinement(c, r.values.amReason, r.values.amDelta);
@@ -377,8 +388,23 @@ export async function newAdmissionDialog(main) {
         <div class="field"><label for="nDate">Admission date</label><input id="nDate" name="nDate" type="date" class="inp" value="${DEMO_NOW_ISO}"></div>
         <div class="field"><label for="nAmt">Initial guarantee amount</label><input id="nAmt" name="nAmt" class="inp num" placeholder="0.00"></div>
       </div>
-      <label class="chk mt"><input type="checkbox" id="nApp" name="nApp"> Needs supervisor approval before the Initial LOA</label>`,
+      <label class="chk mt"><input type="checkbox" id="nApp" name="nApp"> Needs supervisor approval before the Initial LOA</label>
+      <div class="row tight mt">${sampleBtn("nSample", "Load sample admission")}</div>`,
     actions: [{ label: "Cancel" }, { label: "Create admission", kind: "primary", value: "ok" }],
+    onOpen: (dlg) => {
+      dlg.querySelector("#nSample").onclick = () => {
+        fillForm(dlg, {
+          "#nMember": members[0] ? members[0].policyNo : "",
+          "#nFac": hospitals[0] ? hospitals[0].code : "",
+          "#nDx": "Community-acquired pneumonia (J18.9)",
+          "#nRoom": "Semi-private room",
+          "#nDate": DEMO_NOW_ISO,
+          "#nAmt": "60000",
+          "#nApp": true,
+        });
+        toast("Sample admission loaded.", "ok");
+      };
+    },
   });
   if (r?.action !== "ok") return;
   const v = r.values;
