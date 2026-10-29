@@ -1255,3 +1255,72 @@ tr.sob-mbl td{font-weight:600}
 abbr.gloss{text-decoration:underline dotted;text-underline-offset:2px;cursor:help;text-decoration-thickness:1px}
 .docset{border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
 .docset legend{font-size:12px;color:var(--text-muted);padding:0 4px}
+
+/* ============================================================== Customer Care (CCD) desk */
+.row.between{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.field.grow2{grid-column:1 / -1}
+.step-body{display:block}
+.card.pad{padding:16px}
+
+/* demo role switcher (presentation only) */
+.role-switch{display:inline-flex;align-items:center;gap:8px}
+.role-switch .rs-cap{display:inline-flex;align-items:center;gap:5px;color:var(--text-muted);white-space:nowrap}
+.role-switch select{font:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)}
+
+/* member search + patient picker */
+.result-list,.pick-list,.check-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.result-row,.pick-row,.check-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);
+  border-radius:var(--r-sm);background:var(--surface)}
+.result-row .grow,.pick-row .grow{flex:1;min-width:0}
+.pick-row.on{border-color:var(--accent);background:var(--surface-muted)}
+.check-row .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.check-row .al-ic{flex:none;color:var(--text-muted);display:grid;place-items:center}
+
+/* coverage — two-up layout + financial view */
+.split-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+@media(max-width:860px){.split-2{grid-template-columns:1fr}}
+.fin-card .fin-head{display:flex;flex-direction:column;gap:10px}
+.fin-big{display:flex;flex-direction:column;gap:2px;padding:12px;border-radius:var(--r-sm);background:var(--surface-muted);border:1px solid var(--border)}
+.fin-big b{font-size:24px;font-variant-numeric:tabular-nums}
+.mini-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.mini-tbl td{padding:5px 2px}
+.mini-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+.mini-tbl tr.rule td{border-top:1px solid var(--border);padding-top:8px}
+.num.neg{color:var(--danger)}
+
+/* service lines + eligibility checks */
+.svc-tbl td{vertical-align:top}
+.svc-tbl .inp.sm{width:100%;min-width:90px}
+.svc-alert-group{margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
+.svc-alert-group:first-child{border-top:0;margin-top:0;padding-top:0}
+.sag-head{color:var(--text-muted);margin-bottom:4px}
+.alert-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.alert-row{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);
+  border-left-width:3px;border-radius:var(--r-sm);background:var(--surface)}
+.alert-row .al-ic{flex:none;display:grid;place-items:center;margin-top:1px}
+.alert-row .al-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.alert-row .al-word{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 7px;border-radius:10px}
+.alert-row.tone-danger{border-left-color:var(--danger)}
+.alert-row.tone-danger .al-ic{color:var(--danger)}
+.alert-row.tone-danger .al-word{color:var(--danger);background:var(--danger-soft)}
+.alert-row.tone-warn{border-left-color:var(--warning)}
+.alert-row.tone-warn .al-ic{color:var(--warning)}
+.alert-row.tone-warn .al-word{color:var(--warning);background:var(--warning-soft)}
+.alert-row.tone-ok{border-left-color:var(--success)}
+.alert-row.tone-ok .al-ic{color:var(--success)}
+.alert-row.tone-ok .al-word{color:var(--success);background:var(--success-soft)}
+.alert-row.tone-info{border-left-color:var(--info)}
+.alert-row.tone-info .al-ic{color:var(--info)}
+.alert-row.tone-info .al-word{color:var(--info);background:var(--info-soft)}
+
+/* done / success cards */
+.done-card{text-align:left}
+.done-card h2{margin:10px 0 2px}
+.done-badge{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:var(--success);background:var(--success-soft)}
+.done-badge.warn{color:var(--warning);background:var(--warning-soft)}
+
+/* reports KPIs */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.kpi-card{display:flex;flex-direction:column;gap:2px;padding:14px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface)}
+.kpi-v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi-card b{font-size:13px}

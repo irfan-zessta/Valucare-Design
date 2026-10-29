@@ -150,6 +150,22 @@ const WORKSPACES = {
     search: (q) => `#/claims-desk/receive?q=${encodeURIComponent(q)}`,
     searchPlaceholder: "Search batches by number, provider or member",
   },
+  "ccd-desk": {
+    key: "ccd-desk", dept: "CCD", name: "Customer Care", home: "#/ccd-desk",
+    routes: ["ccd-desk"],
+    nav: [
+      { key: "home", label: "Dashboard", icon: "home", href: "#/ccd-desk" },
+      { key: "new", label: "New Request", icon: "plus", href: "#/ccd-desk?new=1" },
+      { key: "outpatient", label: "Outpatient / Dental", icon: "inbox", href: "#/ccd-desk/outpatient" },
+      { key: "admissions", label: "Admissions", icon: "building", href: "#/ccd-desk/admissions" },
+      { key: "discharges", label: "Pending Discharges", icon: "clock", href: "#/ccd-desk/discharges" },
+      { key: "approvals", label: "Approvals", icon: "check", href: "#/ccd-desk/approvals" },
+      { key: "inquiries", label: "Inquiries", icon: "help", href: "#/ccd-desk/inquiries" },
+      { key: "reports", label: "Reports", icon: "chart", href: "#/ccd-desk/reports" },
+    ],
+    search: (q) => `#/ccd-desk/outpatient?q=${encodeURIComponent(q)}`,
+    searchPlaceholder: "Search by member, card, policy or approval code",
+  },
 };
 
 // Which workspace owns this route? Falls back to the New Business desk for shared
@@ -320,6 +336,7 @@ const VIEWS = {
   "mda-desk": () => import("./views/mda-desk.js"),
   "pn-desk": () => import("./views/pn-desk.js"),
   "claims-desk": () => import("./views/claims-desk.js"),
+  "ccd-desk": () => import("./views/ccd-desk.js"),
   tasks: () => import("./views/tasks.js"),
   accounts: () => import("./views/accounts.js"),
   reports: () => import("./views/reports.js"),

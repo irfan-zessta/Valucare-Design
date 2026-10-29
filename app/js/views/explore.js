@@ -83,8 +83,20 @@ export const DEPARTMENTS = [
         desc: "Start from the Claims landing with all five work areas and the other claim types." },
     ],
   },
-  { key: "ccd", name: "CCD", icon: "check", status: "soon",
-    desc: "Acknowledge the downstream handover." },
+  {
+    key: "ccd", name: "Customer Care", icon: "check", status: "live",
+    desc: "Verify members, check benefits and issue LOAs for outpatient, dental and inpatient care, plus special approvals and inquiries.",
+    demos: [
+      { key: "ccd-op", name: "Outpatient / dental LOA", status: "live", href: "#/ccd-desk/request/SR-A1/member",
+        desc: "Receive a request, verify the member, review coverage, enter services, approve some lines and disapprove others, then issue the LOA." },
+      { key: "ccd-ip", name: "Inpatient admission → discharge", status: "live", href: "#/ccd-desk/confinement/SB-B1/admit",
+        desc: "Capture an admission, get supervisor approval, issue the Initial LOA, then enter the final SOA and issue the Final LOA with the same approval code." },
+      { key: "ccd-exc", name: "Exception & special approval", status: "live", href: "#/ccd-desk/request/SR-C1/member",
+        desc: "See why an exhausted benefit can't be approved normally, then route a special approval with an authoriser and evidence." },
+      { key: "ccd-home", name: "Customer Care dashboard", status: "live", href: "#/ccd-desk",
+        desc: "Start from the landing with all the work areas, the demo role switcher and recent requests." },
+    ],
+  },
   {
     key: "provider-networks", name: "Provider Networks", icon: "building", status: "live",
     desc: "Accredit and maintain the hospital and provider network, run inpatient liaison and APE/ECU.",
