@@ -198,9 +198,14 @@ export function wireHead(ctx) {
 // -------------------------------------------------------------- misc small bits
 export const simNote = (text) => html`<div class="note sim"><b>Simulated.</b> ${text}</div>`;
 export const illus = (text) => html`<div class="note info"><b>Illustrative sample.</b> ${text}</div>`;
+// A compact before/after note that makes the time-saving benefit visible without a big
+// marketing panel (§4). Two short lines, nothing more.
+export const beforeAfter = (before, after) => html`<div class="note info ba-note">
+  <div class="tiny"><b>Before:</b> ${before}</div>
+  <div class="tiny"><b>After:</b> ${after}</div></div>`;
 export function validationPill(v) {
-  if (v === "ready") return pill("Ready to process", "ok");
-  if (v === "attention") return pill("Needs attention", "warn");
+  if (v === "ready") return pill("Ready", "ok");
+  if (v === "attention") return pill("Needs clarification", "warn");
   if (v === "excluded") return pill("Excluded", "neutral");
   return pill(v, "neutral");
 }

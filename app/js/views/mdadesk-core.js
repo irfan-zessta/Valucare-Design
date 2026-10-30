@@ -15,7 +15,7 @@ import { money, int } from "../core.js";
 
 export const STORE_KEY = "hms-mda:v1";
 export const GUIDE_KEY = "hms-mda-guide";
-const BASELINE = 3; // bump to force a reseed when the sample data shape changes
+const BASELINE = 4; // bump to force a reseed when the sample data shape changes
 
 // -------------------------------------------------------------- store plumbing
 export function loadStore() {
@@ -259,9 +259,17 @@ export function validateMembers(r) {
     if (!x.dob) issues.push(issue("dob", "Date of birth missing", "Age eligibility and the FA population cannot be assessed.", "Enter the date of birth from the member file."));
     if (x.planCode && planCodes.length && !planCodes.includes(x.planCode))
       issues.push(issue("planCode", `Plan code ${x.planCode} is not on this account`, "The plan must exist on the account's approved plan list before benefits can be applied.", `Use one of: ${planCodes.join(", ")}, or request the plan from Sales.`));
+    // Overage check is driven by THIS ACCOUNT's illustrative eligibility rule — children and
+    // other dependents can carry different limits, and the limit can differ by account (§3).
     const age = ageFrom(x.dob);
-    if (x.memberType === "Dependent" && age != null && age > 60 && !x.overrideReason)
-      issues.push(issue("dob", `Dependent age ${age} is over the eligibility guide (60)`, "Overage dependents need an account-rule decision before enrolment.", "Confirm the account's overage rule, then override with a reason or exclude the row."));
+    if (x.memberType === "Dependent" && age != null && !x.overrideReason) {
+      const elig = acct.eligibility || { dependentMaxAge: 60, childMaxAge: 21 };
+      const rel = (x.membership && x.membership.relationship) || "Dependent";
+      const isChild = /child|son|daughter/i.test(rel);
+      const limit = isChild ? elig.childMaxAge : elig.dependentMaxAge;
+      if (limit != null && age > limit)
+        issues.push(issue("dob", `${isChild ? "Child" : "Dependent"} age ${age} is over the eligibility limit (${limit}) for ${acct.name || "this account"}`, `This account's illustrative eligibility rule allows ${isChild ? "children" : "dependents"} up to age ${limit} — other accounts may differ. Overage dependents need an account-rule decision before enrolment.`, "Confirm the account's eligibility rule, then override with a documented reason or exclude the row."));
+    }
     // Duplicate candidates — surfaced for human review, never merged by name (§9).
     x.duplicateOf = null;
     const dupe = m.find((o) => o !== x && o.validation !== "excluded" && sameName(o.name, x.name) && o.memberType === x.memberType);
@@ -303,6 +311,46 @@ function ageFrom(dob) { if (!dob) return null; const d = new Date(dob); if (isNa
 // Case / punctuation / suffix-insensitive name comparison for duplicate candidates.
 function norm(s) { return String(s || "").toLowerCase().replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, "").replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim(); }
 function sameName(a, b) { return !!a && !!b && norm(a) === norm(b); }
+
+// -------------------------------------------------------------- plan codes & benefits (§2)
+// MDA does NOT create or price plans — they come from the linked account / Sales setup. These
+// helpers only READ the account's approved plan list and copy its values onto a member record.
+export const eligibilityOf = (r) => (r && r.account && r.account.eligibility) || { dependentMaxAge: 60, childMaxAge: 21 };
+export function planByCode(acct, code) { return (((acct && acct.planCodes) || []).find((p) => p.code === code)) || null; }
+export function planCodesFor(acct) { return ((acct && acct.planCodes) || []); }
+// Selecting an approved plan code fills the member's Room & Board, MBL, premium and benefit
+// summary from the account plan — the single source of truth. Returns the plan, or null if
+// the code is not on the account. Records which plan code each value came from (planSource).
+export function applyPlanToMember(m, code, acct) {
+  const p = planByCode(acct, code);
+  if (!p) return null;
+  m.planCode = code;
+  m.plan = { ...(m.plan || {}), room: p.room, mbl: p.mbl, benefit: p.benefit, planSource: code, fromAccountPlan: true };
+  m.financial = { ...(m.financial || {}), premium: p.premium };
+  return p;
+}
+
+// -------------------------------------------------------------- incoming endorsement (§1)
+// The client endorsement that reaches MDA at the start of a New Closed Account / Additional
+// Member request. "Load sample endorsement" LINKS it to the MDA request so the same reference
+// and documents appear here without any re-entry. This is a labelled demo simulation — there
+// is no live Client Portal or Sales connection.
+export function linkEndorsement(r) {
+  const e = r.endorsement;
+  if (!e) return r;
+  e.linked = true;
+  e.linkedAt = stamp();
+  // Carry the endorsement's documents into the request if they are not already attached — the
+  // reference and member-data file flow straight through (no re-typing).
+  r.documents = r.documents || [];
+  const have = (key) => r.documents.some((d) => d.key === key);
+  if (!have("endorsement")) r.documents.unshift({ key: "endorsement", name: "Client endorsement / closing notice", supplied: true, source: e.source });
+  if (!have("memberdata")) r.documents.push({ key: "memberdata", name: e.memberDataFile || "Member data file (prescribed format)", supplied: true, source: `${e.source} (member file)` });
+  if (!have("sob") && e.sobRef) r.documents.push({ key: "sob", name: `Schedule of Benefits + plan codes (${e.sobRef})`, supplied: true, source: "Account setup" });
+  log(r, `Endorsement received and linked to MDA request — ${e.requestRef} from ${e.source}. Member-data file and Schedule of Benefits attached automatically; nothing re-typed.`, e.source);
+  putReq(r);
+  return r;
+}
 
 // -------------------------------------------------------------- working-day calc (§14)
 // Plain-language cancellation effectivity from the request-received timestamp, the
@@ -839,19 +887,26 @@ function mkMember(o) {
   };
 }
 function stdAccount(o) {
+  const elig = o.eligibility || { dependentMaxAge: 60, childMaxAge: 21 };
   return {
     name: o.name, code: o.code, subaccount: o.subaccount || "Main",
     contractStart: o.contractStart || "2026-11-01", contractEnd: o.contractEnd || "2027-10-31",
     salesEndorsement: o.salesEndorsement || `Sales endorsement / closing notice ${o.code}-END`,
+    // Each plan code carries the benefit values that flow onto a member when it is selected:
+    // Room & Board entitlement, MBL, annual premium and a one-line benefit summary. The three
+    // sample plans are deliberately distinct so a plan change is visibly obvious (§2).
     planCodes: o.planCodes || [
-      { code: "STD-PR", name: "Standard · Principal", room: "Semi-private", mbl: "₱200,000", premium: 18500 },
-      { code: "STD-DP", name: "Standard · Dependent", room: "Semi-private", mbl: "₱200,000", premium: 14200 },
-      { code: "PRM-PR", name: "Premium · Principal", room: "Private", mbl: "₱300,000", premium: 26750 },
+      { code: "STD-PR", name: "Standard · Principal", room: "Semi-private", mbl: "₱200,000", premium: 18500, benefit: "Inpatient + outpatient at the standard network, ER and basic APE. Dental not included." },
+      { code: "STD-DP", name: "Standard · Dependent", room: "Ward (shared)", mbl: "₱150,000", premium: 14200, benefit: "Dependent inpatient + outpatient at the standard network and ER. No dental, no APE." },
+      { code: "PRM-PR", name: "Premium · Principal", room: "Private", mbl: "₱300,000", premium: 26750, benefit: "Enhanced inpatient + outpatient at the extended network, ER, APE and preventive dental included." },
     ],
     sob: o.sob || STANDARD_SOB,
     premiumBreakdown: o.premiumBreakdown || "Principal ₱18,500 · Dependent ₱14,200 · Premium plan ₱26,750 (annual, illustrative)",
     deliveryAddress: o.deliveryAddress || `HR Office, ${o.name}`,
-    rulesNote: o.rulesNote || "Account rules: overage dependent limit 60 (confirm per account); PEC standard; mid-contract plan change requires policy confirmation.",
+    // Eligibility is a SAMPLE ACCOUNT RULE, not a universal ValuCare rule — it can differ by
+    // account, so the overage-dependent check reads it per account (§3). Illustrative only.
+    eligibility: elig,
+    rulesNote: o.rulesNote || `Account rules (illustrative, per account): dependents up to age ${elig.dependentMaxAge}, children up to age ${elig.childMaxAge}; PEC standard; mid-contract plan change requires policy confirmation.`,
   };
 }
 export const STANDARD_SOB = [
@@ -885,14 +940,31 @@ function fam(specs, eff) {
 }
 
 // A clean new-account / additional-member request.
-function peopleReq({ id, type, ref, scenario, acct, requester, received, eff, specs, documents, historyText }) {
-  const members = fam(specs, eff);
+function peopleReq({ id, type, ref, scenario, acct, requester, received, eff, specs, documents, historyText, endorsement, members: customMembers }) {
+  const members = customMembers || fam(specs, eff);
   return {
     id, type, reference: ref, scenario, account: acct,
     requester, receivedAt: received, effectiveDate: eff, premiumTotal: sumPremium(members),
     assignedTo: "analyst", priority: "standard", waitingOn: null, members,
+    endorsement: endorsement || mkEndorsement({ acct, ref, received, requester, type }),
     documents: documents || [{ key: "memberdata", name: "Member data file (prescribed format)", supplied: true, source: requester }],
     history: [{ at: received, text: historyText || "Request received with member data.", actor: "Sales" }],
+  };
+}
+// Build the incoming client endorsement that reaches MDA (§1). Source is the Client Portal for
+// Client-HR-originated requests, or Sales for Sales-originated ones. `linked` starts false so the
+// presenter can demonstrate "Load sample endorsement" linking it to the MDA request.
+function mkEndorsement({ acct, ref, received, requester, type }) {
+  const fromSales = /sales/i.test(requester || "");
+  return {
+    source: fromSales ? "Sales" : "Client Portal",
+    receivedDate: String(received || "").slice(0, 10),
+    client: acct.name,
+    requestRef: ref,
+    memberDataFile: `${acct.code}-memberdata-${type === "additional" ? "add" : "nb"}.xlsx`,
+    planCodes: (acct.planCodes || []).map((p) => p.code),
+    sobRef: `SOB-${(acct.code || "").split("-").slice(-1)[0] || "000"}`,
+    linked: false,
   };
 }
 
@@ -962,14 +1034,16 @@ function restoreReq({ id, type, ref, scenario, acct, requester, received, data, 
 }
 
 // Account fixtures reused across the demos.
+// Eligibility rules deliberately DIFFER by account so the overage check is visibly
+// account-specific, never a single universal "age 60" rule (§3).
 const ACCT = {
-  summit: () => stdAccount({ name: "Summit Retail Partners", code: "ACC-SR-0318" }),
-  harborview: () => stdAccount({ name: "Harborview Shipping Lines", code: "ACC-HS-0407" }),
-  greenfield: () => stdAccount({ name: "Greenfield Agritech Corp", code: "ACC-GA-0521" }),
-  metroline: () => stdAccount({ name: "Metroline Transit Services", code: "ACC-MT-0633" }),
-  pinnacle: () => stdAccount({ name: "Pinnacle Software Labs", code: "ACC-PS-0749" }),
-  coralbay: () => stdAccount({ name: "Coral Bay Resorts", code: "ACC-CB-0852" }),
-  ironwood: () => stdAccount({ name: "Ironwood Construction Group", code: "ACC-IW-0968" }),
+  summit: () => stdAccount({ name: "Summit Retail Partners", code: "ACC-SR-0318", eligibility: { dependentMaxAge: 60, childMaxAge: 21 } }),
+  harborview: () => stdAccount({ name: "Harborview Shipping Lines", code: "ACC-HS-0407", eligibility: { dependentMaxAge: 65, childMaxAge: 23 } }),
+  greenfield: () => stdAccount({ name: "Greenfield Agritech Corp", code: "ACC-GA-0521", eligibility: { dependentMaxAge: 60, childMaxAge: 21 } }),
+  metroline: () => stdAccount({ name: "Metroline Transit Services", code: "ACC-MT-0633", eligibility: { dependentMaxAge: 60, childMaxAge: 21 } }),
+  pinnacle: () => stdAccount({ name: "Pinnacle Software Labs", code: "ACC-PS-0749", eligibility: { dependentMaxAge: 60, childMaxAge: 25 } }),
+  coralbay: () => stdAccount({ name: "Coral Bay Resorts", code: "ACC-CB-0852", eligibility: { dependentMaxAge: 60, childMaxAge: 21 } }),
+  ironwood: () => stdAccount({ name: "Ironwood Construction Group", code: "ACC-IW-0968", eligibility: { dependentMaxAge: 60, childMaxAge: 21 } }),
 };
 
 // Append the four-or-so extra scenarios that bring every type up to five demos.
@@ -998,8 +1072,15 @@ function addExtraScenarios(reqs) {
     { n: "Benedict Salazar", dob: "1983-01-26", plan: "STD-PR", dep: [{ n: "Rosa Salazar", dob: "1985-08-17", rel: "Spouse" }, { n: "Timmy Salazar", dob: "2018-04-03", rel: "Child" }] },
     { n: "Rowena Pascual", dob: "1992-12-09", plan: "STD-PR" },
   ] }));
+  // Validation showcase — one valid member, one over-age dependent (against Summit's age-60 rule),
+  // and one dependent whose principal link does not resolve in this request (§3, acceptance test c).
+  reqs.push(peopleReq({ id: "MDA-2026-1024", type: "new-closed", ref: "REQ-NB-2026-1024", scenario: "New closed account — validation showcase (over-age dependent + unresolved principal)", acct: ACCT.summit(), requester: "Marco Reyes (Sales)", received: "2026-10-16T10:00:00Z", eff: "2026-11-01", documents: nbDocs, historyText: "Request received from Sales with endorsement and member data.", members: [
+    mkMember({ name: "Daniel Ortega", memberType: "Principal", principalRef: "P-001", dob: "1984-03-20", planCode: "STD-PR", effectivity: "2026-11-01", employeeRef: "EMP-1101", premium: 18500 }),
+    mkMember({ name: "Rosa Ortega", memberType: "Dependent", principalRef: "P-001", dob: "1956-05-10", planCode: "STD-DP", effectivity: "2026-11-01", relationship: "Spouse", premium: 14200 }),
+    mkMember({ name: "Mia Flores", memberType: "Dependent", principalRef: "P-909", dob: "2016-08-02", planCode: "STD-DP", effectivity: "2026-11-01", relationship: "Child", premium: 14200 }),
+  ] }));
 
-  // ---- ADDITIONAL / NEW MEMBER (+2 → 5) ----
+  // ---- ADDITIONAL / NEW MEMBER (+3 → 6) ----
   reqs.push(peopleReq({ id: "MDA-2026-1040", type: "additional", ref: "REQ-ADD-2026-1040", scenario: "Additional members — software team", acct: ACCT.pinnacle(), requester: "Client HR (Pinnacle)", received: "2026-10-20T15:00:00Z", eff: "2026-11-15", documents: [{ key: "memberdata", name: "Additional member list", supplied: true, source: "Client HR" }], historyText: "Additional-member request received from Client HR.", specs: [
     { n: "Arturo Gutierrez", dob: "1989-04-18", plan: "STD-PR" },
     { n: "Melissa Yuzon", dob: "1986-10-27", plan: "PRM-PR" },
@@ -1008,6 +1089,15 @@ function addExtraScenarios(reqs) {
     { n: "Cecilia Guevarra", dob: "1990-02-14", plan: "STD-PR", dep: [{ n: "Mia Guevarra", dob: "2019-07-21", rel: "Child" }] },
     { n: "Nathaniel Ong", dob: "1985-11-03", plan: "STD-PR" },
     { n: "Diana Prieto", dob: "1993-05-16", plan: "STD-PR" },
+  ] }));
+  // Validation showcase on Pinnacle (child age limit 25, not the usual 21) — a 24-year-old child is
+  // READY here but would be flagged on a 21-limit account, proving the rule is account-specific; plus
+  // an over-age spouse needing a decision and a dependent with an unresolved principal link (§3).
+  reqs.push(peopleReq({ id: "MDA-2026-1042", type: "additional", ref: "REQ-ADD-2026-1042", scenario: "Additional members — validation showcase (account-specific age rule, over-age spouse, unresolved principal)", acct: ACCT.pinnacle(), requester: "Client HR (Pinnacle)", received: "2026-10-18T09:40:00Z", eff: "2026-11-15", documents: [{ key: "memberdata", name: "Additional member list", supplied: true, source: "Client HR" }], historyText: "Additional-member request received from Client HR.", members: [
+    mkMember({ name: "Arturo Vega", memberType: "Principal", principalRef: "P-101", dob: "1986-07-12", planCode: "STD-PR", effectivity: "2026-11-15", employeeRef: "EMP-2201", premium: 18500 }),
+    mkMember({ name: "Bea Vega", memberType: "Dependent", principalRef: "P-101", dob: "2002-02-10", planCode: "STD-DP", effectivity: "2026-11-15", relationship: "Child", premium: 14200 }),
+    mkMember({ name: "Carlo Vega", memberType: "Dependent", principalRef: "P-101", dob: "1957-01-01", planCode: "STD-DP", effectivity: "2026-11-15", relationship: "Spouse", premium: 14200 }),
+    mkMember({ name: "Dina Lim", memberType: "Dependent", principalRef: "P-808", dob: "2015-09-09", planCode: "STD-DP", effectivity: "2026-11-15", relationship: "Child", premium: 14200 }),
   ] }));
 
   // ---- RENEWAL MEMBER (+4 → 5) ----
@@ -1082,6 +1172,7 @@ function SAMPLE_REQUESTS() {
     requester: "Marco Reyes (Sales)", receivedAt: "2026-10-20T09:10:00Z",
     effectiveDate: "2026-11-01", premiumTotal: 132200,
     assignedTo: "analyst", priority: "standard", waitingOn: null,
+    endorsement: { source: "Client Portal", receivedDate: "2026-10-20", client: "Northwind Logistics Corp", requestRef: "REQ-NB-2026-1001", memberDataFile: "Northwind-memberdata-2026-11.xlsx", planCodes: ["STD-PR", "STD-DP", "PRM-PR"], sobRef: "SOB-NW-0192", linked: false },
     members: [
       mkMember({ name: "Antonio Cruz", memberType: "Principal", principalRef: "P-001", dob: "1985-03-12", planCode: "STD-PR", effectivity: "2026-11-01", employeeRef: "EMP-1001", premium: 18500 }),
       mkMember({ name: "Maria Cruz", memberType: "Dependent", principalRef: "P-001", dob: "1988-07-02", planCode: "STD-DP", effectivity: "2026-11-01", relationship: "Spouse", premium: 14200 }),
@@ -1105,6 +1196,7 @@ function SAMPLE_REQUESTS() {
     requester: "Client HR (Brightlane)", receivedAt: "2026-10-21T10:30:00Z",
     effectiveDate: "2026-11-15", premiumTotal: 51200,
     assignedTo: "analyst", priority: "standard", waitingOn: null,
+    endorsement: { source: "Client Portal", receivedDate: "2026-10-21", client: "Brightlane Hospitality Group", requestRef: "REQ-ADD-2026-1002", memberDataFile: "Brightlane-additional-members.xlsx", planCodes: ["STD-PR", "STD-DP", "PRM-PR"], sobRef: "SOB-BL-0231", linked: false },
     members: [
       mkMember({ name: "Jose Ramirez", memberType: "Principal", principalRef: "P-101", dob: "1983-06-14", planCode: "STD-PR", effectivity: "2026-11-15", employeeRef: "EMP-2101", premium: 18500 }),
       mkMember({ name: "Jose Ramirez Jr.", memberType: "Principal", principalRef: "P-102", dob: "1983-06-14", planCode: "STD-PR", effectivity: "2026-11-15", employeeRef: "EMP-2102", premium: 18500 }),

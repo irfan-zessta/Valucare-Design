@@ -1125,6 +1125,23 @@ details[open]>summary{margin-bottom:4px}
 .qc-detail h3{margin:0 0 6px}
 tr.qc-row>td{background:var(--surface-muted)}
 
+/* MDA enhancements — incoming endorsement, Before/After note, plan preview (§1/§2/§4).
+   All token-driven so the monochrome palette drives them; labelled demo simulations. */
+.endorsement-card{border-left:3px solid var(--warning)}
+.endorsement-card.linked{border-left-color:var(--success)}
+.endorsement-card .ph h2{display:inline-flex;align-items:center;gap:7px}
+/* Before / After — a compact two-line benefit note, never a marketing panel */
+.ba-note{display:grid;gap:3px}
+.ba-note .tiny b{color:var(--text)}
+/* "From this plan" preview — values sourced from the account's Schedule of Benefits */
+.plan-preview{border:1px dashed var(--border-strong);border-radius:var(--r-sm);background:var(--surface-muted);padding:10px 12px;margin-top:8px}
+.plan-preview.empty{border-style:dashed;background:transparent}
+.plan-preview.empty .tiny{color:var(--text-subtle);margin:0}
+.plan-preview .pp-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.plan-preview .pp-grid{margin-top:8px}
+.plan-preview .pp-grid dd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pill.neutral.plain.src{font-size:10.5px;letter-spacing:.02em;opacity:.85}
+
 /* Provider & Network — expandable profile sections (<details class="disc">).
    One scrollable profile, no tab jumps: essentials stay visible, specialist
    groups collapse. Token-driven so the monochrome/semantic palette drives it. */

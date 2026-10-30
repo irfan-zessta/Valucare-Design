@@ -17,10 +17,11 @@ import {
   processRequest, simulate, nextStep, stepsFor, typeLabel, typeShort, peso, plural, config,
   cancellationEffectivity, resetRequest, roleLabelFor, completionState, REQUEST_TYPES, isService,
   fmtManila, fmtManilaDate, cardStageActor,
+  planByCode, planCodesFor, applyPlanToMember, eligibilityOf, linkEndorsement,
 } from "./mdadesk-core.js";
 import {
   highlightNav, backBar, recHead, nextStrip, stepsNav, wireNext, wireHead, renderGuideCard,
-  drawer, simNote, illus, validationPill,
+  drawer, simNote, illus, validationPill, beforeAfter,
 } from "./mdadesk-ui.js";
 
 export async function renderRequest(main, id, step) {
@@ -220,6 +221,7 @@ function stepRequest(ctx) {
   const r = ctx.rec;
   const a = r.account || {};
   return html`
+    ${r.endorsement ? endorsementCard(r) : ""}
     <div class="panel"><div class="ph"><h2>Review request</h2><span class="pill info">Step 1</span></div><div class="pb">
       <p class="tiny">${reviewHelp(r)}</p>
 
@@ -240,6 +242,37 @@ function stepRequest(ctx) {
       ${illus("Loading sample data fills only this request and never touches another case. You are asked before anything already entered is replaced.")}
     </div></div>`;
 }
+// The incoming client endorsement that reaches MDA (§1). Before it is linked, the presenter
+// clicks "Load sample endorsement" and its reference + documents flow into this MDA request with
+// no re-entry. This is a labelled demo simulation — not a live Client Portal or Sales connection.
+function endorsementCard(r) {
+  const e = r.endorsement;
+  const linked = !!e.linked;
+  return html`<div class="panel endorsement-card ${linked ? "linked" : ""}">
+    <div class="ph"><h2>${icon("inbox", 16)} Incoming endorsement</h2>
+      ${linked ? pill("Received & linked", "ok") : pill("Awaiting link", "warn")}</div>
+    <div class="pb">
+      <p class="tiny">${linked
+        ? "This client endorsement is linked to the MDA request. Its reference and documents came through automatically — nothing was re-typed."
+        : `A client endorsement has arrived from ${e.source}. Load it to link the request reference and documents into this MDA request without re-keying anything.`}</p>
+      <dl class="dl mt">
+        <div><dt>Source</dt><dd>${e.source} <span class="tiny">(demo simulation — not a live portal connection)</span></dd></div>
+        <div><dt>Received</dt><dd>${fmtManilaDate(e.receivedDate)}</dd></div>
+        <div><dt>Client / account</dt><dd>${e.client} · ${r.account?.code || "—"}</dd></div>
+        <div><dt>Request reference</dt><dd><b>${e.requestRef}</b>${linked ? html` <span class="tiny">→ MDA ${r.reference || r.id}</span>` : ""}</dd></div>
+        <div><dt>Member-data file</dt><dd>${e.memberDataFile}</dd></div>
+        <div><dt>Approved plan codes</dt><dd>${(e.planCodes || []).join(" · ") || "—"}</dd></div>
+        <div><dt>Schedule of Benefits</dt><dd>${e.sobRef || "—"}</dd></div>
+      </dl>
+      ${beforeAfter(
+        "The analyst re-typed the reference, re-attached the member-data file and chased the Schedule of Benefits by email.",
+        "The endorsement links straight into the MDA request — reference, member file and SOB arrive together, ready to review."
+      )}
+      ${linked
+        ? simNote("Endorsement linked. The reference and documents now appear in this request and in the Documents drawer. No live message was sent or received.")
+        : html`<div class="row tight mt"><button type="button" class="btn primary sm" id="loadEndorsement">${icon("download", 14)} Load sample endorsement</button></div>`}
+    </div></div>`;
+}
 function reviewHelp(r) {
   if (r.type === "new-closed") return "This request begins with a Sales endorsement. Review the account code, contract dates, plan codes and Schedule of Benefits that Sales and account setup supplied — MDA reviews and uses them, it does not recreate pricing.";
   if (r.type === "cancellation") return "Review the cancellation request, reason and received time. The working-day effectivity is calculated for you on the next step.";
@@ -258,6 +291,7 @@ function linkedRefs(r) {
     <div><dt>Received</dt><dd>${fmtManila(r.receivedAt)}</dd></div>
     ${a.planCodes ? html`<div><dt>Plan codes</dt><dd>${a.planCodes.map((p) => p.code).join(" · ")}</dd></div>` : ""}
     ${a.premiumBreakdown ? html`<div><dt>Premium breakdown</dt><dd class="tiny">${a.premiumBreakdown}</dd></div>` : ""}
+    ${a.eligibility ? html`<div><dt>Eligibility rule</dt><dd class="tiny">Dependents up to age ${a.eligibility.dependentMaxAge} · children up to age ${a.eligibility.childMaxAge} <span class="pill neutral plain">this account</span> — illustrative, can differ by account</dd></div>` : ""}
     ${a.rulesNote ? html`<div><dt>Account rules</dt><dd class="tiny">${a.rulesNote}</dd></div>` : ""}
   </dl>
   ${a.sob ? html`<details class="mt"><summary>Schedule of Benefits (${plural((a.sob || []).length, "line")})</summary>
@@ -300,6 +334,11 @@ function typeDetail(r) {
 }
 function wireRequest(ctx) {
   const r = ctx.rec;
+  document.getElementById("loadEndorsement")?.addEventListener("click", () => {
+    linkEndorsement(r);
+    toast("Sample endorsement loaded and linked — reference and documents carried over (simulated).", "ok");
+    ctx.refresh();
+  });
   document.getElementById("loadSample")?.addEventListener("click", async () => {
     if (!(await confirmDialog("Load sample data?", "Restores this request's sample members and documents to their starting state. Only this request is affected — no other case is opened or overwritten.", { confirm: "Load sample", kind: "primary" }))) return;
     const fresh = resetRequest(r.id);
@@ -327,14 +366,20 @@ async function addMemberDialog(ctx) {
       <div class="field"><label for="nmType">Member type</label><select id="nmType" name="memberType" class="inp"><option>Principal</option><option>Dependent</option></select></div>
       <div class="field"><label for="nmPrin">Principal reference</label><input id="nmPrin" name="principalRef" class="inp" placeholder="e.g. P-001 (required for dependents)"></div>
       <div class="field"><label for="nmDob">Date of birth</label><input id="nmDob" name="dob" type="date" class="inp"></div>
-      <div class="field"><label for="nmPlan">Plan code</label><input id="nmPlan" name="planCode" class="inp" placeholder="${(r.account?.planCodes || []).map((p) => p.code).join(" / ")}"></div>
-      <p class="tiny">New rows are validated with the same checks as the rest — a missing field or plan surfaces as "needs attention", it does not block the batch.</p>`,
+      <div class="field"><label for="nmPlan">Approved plan code</label><select id="nmPlan" name="planCode" class="inp">${planOptions(r.account, null)}</select></div>
+      <div id="nmPreview">${planPreviewPanel(r.account, null)}</div>
+      <p class="tiny">Choosing a plan code fills Room &amp; Board, MBL, premium and benefits from the account's Schedule of Benefits. New rows are validated with the same checks — a missing field or plan surfaces as "needs attention", it does not block the batch.</p>`,
     actions: [{ label: "Cancel" }, { label: "Add member", kind: "primary", value: "ok" }],
+    onOpen: (dlg) => {
+      const sel = dlg.querySelector("#nmPlan");
+      const prev = dlg.querySelector("#nmPreview");
+      sel?.addEventListener("change", () => { if (prev) prev.innerHTML = planPreviewPanel(r.account, sel.value).s; });
+    },
   });
   if (!res || res.action !== "ok" || !res.values.name) return;
   const v = res.values;
   r.members = r.members || [];
-  r.members.push({
+  const nm = {
     id: "M" + (r.members.length + 1) + "-" + Math.max(1, r.members.length),
     name: v.name, memberType: v.memberType, principalRef: v.principalRef || null, dob: v.dob || null,
     planCode: v.planCode || null, effectivity: r.effectiveDate || r.account?.contractStart || null, expiry: null,
@@ -344,8 +389,15 @@ async function addMemberDialog(ctx) {
     plan: { room: "Semi-private", hospital: "Standard network", mbl: "₱200,000", pec: "Standard", dental: "Not included", fa: "Eligible", fromAccountPlan: true },
     financial: { premium: null, paymentMode: "Annual", processingFee: 0, accessFee: 0, idFee: 0, dentalFee: 0 },
     contact: { address: "—", province: "Metro Manila", contactNo: "—", branch: "Head office", philhealth: "—", vessel: null, notes: "Added manually" },
-  });
-  log(r, `Added member "${v.name}" manually.`); putReq(r);
+  };
+  r.members.push(nm);
+  // Populate benefits + premium straight from the chosen plan code so the new row carries
+  // account-sourced values rather than placeholder defaults (§2).
+  if (v.planCode) applyPlanToMember(nm, v.planCode, r.account);
+  log(r, v.planCode
+    ? `Added member "${v.name}" manually; plan ${v.planCode} filled Room & Board, MBL, premium and benefits (source ${v.planCode}).`
+    : `Added member "${v.name}" manually.`);
+  putReq(r);
   toast("Member added.", "ok"); ctx.refresh();
 }
 
@@ -355,9 +407,15 @@ function stepData(ctx) {
   if (r.wf?.processed) return stepDataProcessed(ctx);
   const rc = reconcile(r);
   const members = r.members || [];
+  const elig = eligibilityOf(r);
   return html`
     <div class="panel"><div class="ph"><h2>Member Data</h2><span class="pill info">Step 2</span></div><div class="pb">
-      <p class="tiny">Resolve any row that needs attention. Valid rows can proceed while held rows stay held — nothing is auto-merged by name. Select a member's name for full details.</p>
+      <p class="tiny">Resolve any row that needs attention. Valid rows can proceed while held rows stay held — nothing is auto-merged by name. Select a member's name for full details, where choosing an approved plan code fills benefits and premium.</p>
+      <div class="note info mt"><div><b>This account's eligibility rule (illustrative):</b> dependents up to age ${elig.dependentMaxAge}, children up to age ${elig.childMaxAge}. Each row's DOB and dependent age is checked against <b>this account's</b> rule — other accounts can differ, so the limit is never a fixed age.</div></div>
+      ${beforeAfter(
+        "Benefits and premium were keyed by hand per member, and an over-age dependent was easy to miss.",
+        "Plan codes fill benefits and premium from the account's Schedule of Benefits, and every row is checked against this account's eligibility rule before you confirm."
+      )}
       ${reconBar(rc)}
       <div class="tbl-wrap mt"><table class="tbl"><thead><tr>
         <th>Member name</th><th>Type</th><th>Principal ref</th><th>DOB</th><th>Plan</th><th>Effectivity</th><th>Validation</th></tr></thead>
@@ -427,7 +485,7 @@ function memberRow(m) {
 function wireData(ctx) {
   const r = ctx.rec;
   const find = (id) => (r.members || []).find((m) => m.id === id);
-  document.querySelectorAll("[data-drawer]").forEach((b) => (b.onclick = () => memberDrawer(find(b.dataset.drawer), r)));
+  document.querySelectorAll("[data-drawer]").forEach((b) => (b.onclick = () => memberDrawer(find(b.dataset.drawer), r, ctx)));
   document.querySelectorAll("[data-fix]").forEach((b) => (b.onclick = () => fixDialog(ctx, find(b.dataset.fix))));
   document.querySelectorAll("[data-exclude]").forEach((b) => (b.onclick = () => excludeDialog(ctx, find(b.dataset.exclude))));
   document.querySelectorAll("[data-clarify]").forEach((b) => (b.onclick = () => clarifyDialog(ctx, find(b.dataset.clarify))));
@@ -440,21 +498,86 @@ function wireData(ctx) {
   });
   document.getElementById("addMember2")?.addEventListener("click", () => addMemberDialog(ctx));
 }
-function memberDrawer(m, r) {
+// The "From this plan" preview (§2). The approved plan code is the single source of truth —
+// it fills Room & Board, MBL, premium and the benefit summary straight from the account's
+// Schedule of Benefits, and every populated value is labelled with the source plan code so
+// it is obvious where it came from. MDA uses the plan; it never creates or prices one.
+function planPreviewPanel(acct, code) {
+  const p = planByCode(acct, code);
+  if (!p) return html`<div class="plan-preview empty"><p class="tiny">Select an approved plan code to preview its Room &amp; Board, MBL, premium and benefit summary before applying.</p></div>`;
+  const src = html`<span class="pill neutral plain src">${p.code}</span>`;
+  return html`<div class="plan-preview">
+    <div class="pp-head"><b>From this plan</b> <span class="tiny">— filled from the account's Schedule of Benefits</span> ${src}</div>
+    <dl class="dl pp-grid mt">
+      <div><dt>Room &amp; Board</dt><dd>${p.room} ${src}</dd></div>
+      <div><dt>MBL</dt><dd>${p.mbl} ${src}</dd></div>
+      <div><dt>Premium</dt><dd>${peso(p.premium)} ${src}</dd></div>
+      <div><dt>Benefit summary</dt><dd class="tiny">${p.benefit || "—"} ${src}</dd></div>
+    </dl></div>`;
+}
+function planOptions(acct, selected) {
+  return html`<option value="">— select approved plan code —</option>
+    ${planCodesFor(acct).map((p) => html`<option value="${p.code}" ${p.code === selected ? "selected" : ""}>${p.code} · ${p.room} · ${p.mbl} · ${peso(p.premium)}</option>`)}`;
+}
+function memberDrawer(m, r, ctx) {
   if (!m) return;
   const g = (title, rows) => html`<h3 class="tiny mt">${title}</h3><dl class="dl">${rows.map(([k, v]) => html`<div><dt>${k}</dt><dd>${v ?? "—"}</dd></div>`)}</dl>`;
   const fap = m.plan?.fromAccountPlan ? html` <span class="tiny">(From account plan)</span>` : "";
+  const editable = !r.wf?.processed && !isService(r.type);
+  // When the request is still editable, the Plan & benefits block becomes an interactive
+  // plan picker with a live "From this plan" preview and an Apply action; once committed it
+  // reverts to the frozen read-only view.
+  const planBlock = editable
+    ? html`<h3 class="tiny mt">Plan &amp; benefits</h3>
+        <p class="tiny">Choosing an approved plan code fills Room &amp; Board, MBL, premium and the benefit summary from the account's Schedule of Benefits. MDA does not create or price plans.</p>
+        <div class="field"><label for="drPlan">Approved plan code</label>
+          <select id="drPlan" class="inp">${planOptions(r.account, m.planCode)}</select></div>
+        <div id="drPreview">${planPreviewPanel(r.account, m.planCode)}</div>
+        <div class="row tight mt"><button type="button" class="btn primary sm" id="drApply">${icon("check", 14)} Apply plan to this member</button></div>
+        <dl class="dl mt"><div><dt>Current room entitlement</dt><dd>${m.plan?.room ?? "—"}${fap}</dd></div>
+          <div><dt>Current MBL</dt><dd>${m.plan?.mbl ?? "—"}</dd></div>
+          <div><dt>Current premium</dt><dd>${m.financial?.premium != null ? peso(m.financial.premium) : "—"}</dd></div>
+          <div><dt>Hospital / network</dt><dd>${m.plan?.hospital ?? "—"}</dd></div>
+          <div><dt>Dental</dt><dd>${m.plan?.dental ?? "—"}</dd></div>
+          <div><dt>Financial Assistance</dt><dd>${m.plan?.fa ?? "—"}</dd></div></dl>`
+    : g("Plan & benefits", [[html`Plan code${fap}`, m.planCode], ["Room entitlement", m.plan?.room], ["Hospital / network", m.plan?.hospital], ["MBL", m.plan?.mbl], ["PEC", m.plan?.pec], ["Dental", m.plan?.dental], ["Financial Assistance", m.plan?.fa]]);
   drawer(m.name || "Member", html`
     <p class="tiny">Full member detail. Specialised fields sit under "More details" — not every field is required for every account.</p>
     ${g("Identity", [["Name", m.name], ["Suffix", m.identity?.suffix], ["Date of birth", m.dob ? fmtDate(m.dob) : null], ["Gender", m.identity?.gender], ["Civil status", m.identity?.civilStatus], ["Employee reference", m.identity?.employeeRef]])}
     ${g("Membership", [["Account / subaccount", `${r.account?.name || ""} · ${m.membership?.subaccount || "Main"}`], ["Member type", m.memberType], ["Relationship", m.membership?.relationship], ["Principal reference", m.principalRef], ["Effectivity", m.effectivity ? fmtDate(m.effectivity) : null], ["Status", m.status]])}
-    ${g("Plan & benefits", [[html`Plan code${fap}`, m.planCode], ["Room entitlement", m.plan?.room], ["Hospital / network", m.plan?.hospital], ["MBL", m.plan?.mbl], ["PEC", m.plan?.pec], ["Dental", m.plan?.dental], ["Financial Assistance", m.plan?.fa]])}
+    ${planBlock}
     ${g("Financial", [["Premium", m.financial?.premium != null ? peso(m.financial.premium) : null], ["Payment mode", m.financial?.paymentMode], ["Processing fee", peso(m.financial?.processingFee || 0)], ["Access fee", peso(m.financial?.accessFee || 0)], ["ID fee", peso(m.financial?.idFee || 0)], ["Dental fee", peso(m.financial?.dentalFee || 0)]])}
     <details class="mt"><summary>More details — Contact & other</summary>
       <dl class="dl mt"><div><dt>Address</dt><dd>${m.contact?.address || "—"}</dd></div><div><dt>Province</dt><dd>${m.contact?.province || "—"}</dd></div>
         <div><dt>Contact no.</dt><dd>${m.contact?.contactNo || "—"}</dd></div><div><dt>Branch</dt><dd>${m.contact?.branch || "—"}</dd></div>
         <div><dt>PhilHealth</dt><dd>${m.contact?.philhealth || "—"}</dd></div>${m.contact?.vessel ? html`<div><dt>Vessel</dt><dd>${m.contact.vessel}</dd></div>` : ""}
-        <div><dt>Notes</dt><dd>${m.contact?.notes || "—"}</dd></div></dl></details>`);
+        <div><dt>Notes</dt><dd>${m.contact?.notes || "—"}</dd></div></dl></details>`,
+    (bodyEl, close) => {
+      if (!editable) return;
+      const sel = bodyEl.querySelector("#drPlan");
+      const prev = bodyEl.querySelector("#drPreview");
+      sel?.addEventListener("change", () => { if (prev) prev.innerHTML = planPreviewPanel(r.account, sel.value).s; });
+      bodyEl.querySelector("#drApply")?.addEventListener("click", async () => {
+        const code = sel?.value;
+        if (!code) { toast("Select an approved plan code first.", "info"); return; }
+        if (code === m.planCode && m.plan?.fromAccountPlan) { toast(`This member is already on plan ${code}.`, "info"); return; }
+        const p = planByCode(r.account, code);
+        // Never silently overwrite a member that already carries plan values — confirm first (§2).
+        const hadValues = m.planCode && (m.plan?.room || m.financial?.premium != null);
+        if (hadValues && m.planCode !== code) {
+          const ok = await confirmDialog("Change this member's plan?",
+            `This replaces ${m.name}'s current plan ${m.planCode} (${m.plan?.room || "—"}, MBL ${m.plan?.mbl || "—"}, premium ${m.financial?.premium != null ? peso(m.financial.premium) : "—"}) with ${code} (${p.room}, MBL ${p.mbl}, premium ${peso(p.premium)}). Benefits and premium update together — nothing is applied silently.`,
+            { confirm: "Change plan", kind: "primary" });
+          if (!ok) return;
+        }
+        applyPlanToMember(m, code, r.account);
+        log(r, `Plan ${code} applied to ${m.name} — Room & Board (${p.room}), MBL (${p.mbl}), premium (${peso(p.premium)}) and benefits filled from the account's Schedule of Benefits (source ${code}).`, "MDA Analyst");
+        validateMembers(r);
+        toast(`Plan ${code} applied — benefits and premium updated from the account plan.`, "ok");
+        close();
+        ctx.refresh();
+      });
+    });
 }
 async function fixDialog(ctx, m) {
   if (!m) return;
@@ -463,14 +586,37 @@ async function fixDialog(ctx, m) {
     title: `Correct ${m.name || "member"}`,
     body: html`<div class="field"><label for="fxName">Name</label><input id="fxName" name="name" class="inp" value="${m.name || ""}"></div>
       <div class="field"><label for="fxDob">Date of birth</label><input id="fxDob" name="dob" type="date" class="inp" value="${m.dob || ""}"></div>
-      <div class="field"><label for="fxPlan">Plan code</label><input id="fxPlan" name="planCode" class="inp" value="${m.planCode || ""}" placeholder="${(r.account?.planCodes || []).map((p) => p.code).join(" / ")}"></div>
+      <div class="field"><label for="fxPlan">Approved plan code</label><select id="fxPlan" name="planCode" class="inp">${planOptions(r.account, m.planCode)}</select></div>
+      <div id="fxPreview">${planPreviewPanel(r.account, m.planCode)}</div>
       <div class="field"><label for="fxPrin">Principal reference</label><input id="fxPrin" name="principalRef" class="inp" value="${m.principalRef || ""}"></div>
-      <p class="tiny">The checks re-run when you save, so a corrected row can move straight to "ready".</p>`,
+      <p class="tiny">Choosing a plan code fills Room &amp; Board, MBL, premium and benefits from the account's Schedule of Benefits. The checks re-run when you save, so a corrected row can move straight to "ready".</p>`,
     actions: [{ label: "Cancel" }, { label: "Save correction", kind: "primary", value: "ok" }],
+    onOpen: (dlg) => {
+      const sel = dlg.querySelector("#fxPlan");
+      const prev = dlg.querySelector("#fxPreview");
+      sel?.addEventListener("change", () => { if (prev) prev.innerHTML = planPreviewPanel(r.account, sel.value).s; });
+    },
   });
   if (!res || res.action !== "ok") return;
-  Object.assign(m, { name: res.values.name, dob: res.values.dob || null, planCode: res.values.planCode || null, principalRef: res.values.principalRef || null });
-  log(r, `Inline correction applied to ${m.name}.`); validateMembers(r);
+  const v = res.values;
+  const newCode = v.planCode || null;
+  const planChanged = newCode !== (m.planCode || null);
+  const hadValues = m.planCode && (m.plan?.room || m.financial?.premium != null);
+  // A plan change that replaces existing values needs an explicit confirmation (§2).
+  if (planChanged && newCode && hadValues) {
+    const p = planByCode(r.account, newCode);
+    const ok = await confirmDialog("Change this member's plan?",
+      `This replaces ${m.name}'s current plan ${m.planCode} with ${newCode} (${p.room}, MBL ${p.mbl}, premium ${peso(p.premium)}). Benefits and premium update together — nothing is applied silently.`,
+      { confirm: "Change plan", kind: "primary" });
+    if (!ok) return;
+  }
+  Object.assign(m, { name: v.name, dob: v.dob || null, principalRef: v.principalRef || null });
+  if (newCode) applyPlanToMember(m, newCode, r.account);
+  else m.planCode = null;
+  log(r, planChanged && newCode
+    ? `Inline correction applied to ${m.name}; plan ${newCode} filled Room & Board, MBL, premium and benefits (source ${newCode}).`
+    : `Inline correction applied to ${m.name}.`);
+  validateMembers(r);
   toast("Correction saved.", "ok"); ctx.refresh();
 }
 async function excludeDialog(ctx, m) {

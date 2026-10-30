@@ -184,3 +184,61 @@ Actuarial (2) and MDA (8 demos) and loads the other departments normally — no 
 **Known preview-only noise:** the console shows repeated `history.replaceState is not a
 function` — a limitation of the embedded preview sandbox, caught by a try/finally in
 `main.js` so navigation never wedges (navigation worked throughout). Not a code regression.
+
+## 6. Enhancement pass — endorsement intake, plan-driven benefits, eligibility validation (Oct 2026)
+
+A focused enhancement pass on the two front-line journeys — **New / Closed Account** and
+**Additional / New Member** — to make the demo tell a clearer story about where member data
+comes from, how plan codes fill benefits, and how each row is checked before confirmation.
+**Additive only:** the forward flow (Receive endorsement → Review request → Review member
+data → Check & confirm → Track completion), request IDs, member records, documents, Billing
+handoff and completion tracking are all preserved; the other MDA journeys are unchanged.
+Everything stays a browser-only demo on editable sample data — no real portal, Billing or
+Sales connection. Code lives in `mdadesk-workspace.js` (render/wiring) and `mdadesk-core.js`
+(`linkEndorsement`, `eligibilityOf`, `planByCode`/`planCodesFor`, `applyPlanToMember`,
+`validateMembers`); styles appended to `app/css/app.css`.
+
+**(1) Client endorsement reaches MDA.** The Review Request step opens with an **Incoming
+endorsement** card showing source (Client Portal or Sales), received date, client/account,
+request reference, member-data file, approved plan codes and the linked Schedule of Benefits.
+A **Load sample endorsement** button links it; afterwards the *same* reference and documents
+appear in the MDA request with no re-entry, the card turns green ("Received & linked"), and a
+History event **"Endorsement received and linked to MDA request"** is written. The card is
+labelled a **demo simulation**, not a live portal connection.
+
+**(2) Plan code fills member benefits and premium.** In the member drawer (and in the
+Add-member and inline-correction dialogs) the approved plan code is a selector; choosing a
+code renders a compact **"From this plan"** preview — Room & Board, MBL, premium and the
+benefit summary — with the **source plan code shown as a pill beside every populated value**,
+updated immediately on change. The sample plans carry deliberately distinct values so the
+change is obvious: `STD-PR` Semi-private / ₱200,000 / ₱18,500 · `STD-DP` Ward (shared) /
+₱150,000 / ₱14,200 · `PRM-PR` Private / ₱300,000 / ₱26,750. Applying over a confirmed record
+shows a **confirmation dialog** naming the old and new plan ("Benefits and premium update
+together — nothing is applied silently"); MDA **does not create or price plans** — it reads
+the account's Schedule of Benefits.
+
+**(3) Validate before confirming members.** Review Member Data shows per-member **Ready /
+Needs clarification / Excluded**. The age check runs against the **selected account's
+illustrative eligibility rule** (`eligibilityOf`), never a fixed age — proven in-browser:
+Summit Retail Partners allows children to 21, Pinnacle Software Labs allows children to 25, so
+a 24-year-old child is *Ready* at Pinnacle but would flag at Summit. The engine also verifies
+dependent relationship + link to a valid principal, flags unapproved plan codes, and retains
+the duplicate-candidate check. Every flag states **what is wrong, why it matters, and the next
+action**, with per-row **Inline correction / Request clarification / Exclude / Override with
+reason**. Over-age dependents can be **overridden with a documented reason + visible review
+flag**; a dependent with no principal is **never auto-merged and never given a dummy
+principal** (correction/clarification/exclude only).
+
+**(4) Time-saving benefit made visible.** A small **Before / After** note sits near the
+endorsement card and the member table (not a marketing panel), and a **timestamped History
+entry** is written whenever values are populated/changed or an override is applied, naming the
+**source** (plan code, or endorsement).
+
+**Acceptance — verified in-browser (Oct 2026):**
+
+| Test | Record | Result |
+|------|--------|--------|
+| (a) Load a sample endorsement; it links the correct MDA request with no retyping | MDA-2026-1024 (New/Closed, Summit) | Pass — card → green "Received & linked", reference carried over, History event written |
+| (b) Each plan code visibly changes Room & Board, MBL and premium together | MDA-2026-1024 drawer | Pass — STD-PR → PRM-PR updated preview live; overwrite confirm named both plans; table showed PRM-PR / Ready |
+| (c) A valid member, an over-age dependent needing an account-rule decision, and a dependent with an unresolved principal link | MDA-2026-1042 (Additional, Pinnacle) | Pass — Arturo *Ready*; **Bea (24) *Ready* under Pinnacle's age-25 rule**; Carlo (69) flags over-60 with Why/Fix + Override; Dina (P-808) flags unresolved principal, no override offered |
+| (d) Correct/document issues, confirm only ready members, decisions + data sources persist after reopening | MDA-2026-1042 | Pass — override applied with reason (3 ready + 1 held); after reload Carlo stays *Ready*, plan-source pills remain in the drawer, and History records the override with actor, Manila timestamp and reason |
