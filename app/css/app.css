@@ -559,6 +559,26 @@ abbr[title]{text-decoration:underline dotted;text-underline-offset:2px;cursor:he
 .dept-card.soon:hover .dept-ic{color:var(--text-muted)}
 @media (max-width:640px){.explore-grid{grid-template-columns:1fr}}
 
+/* ---------- admin dashboard (read-only overview) ---------- */
+.admin-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.admin-sample{flex:none;margin-top:6px;font-size:11.5px;font-weight:600;color:var(--text-subtle);background:var(--surface-muted);border:1px solid var(--border);border-radius:999px;padding:3px 11px}
+.admin-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:32px}
+.admin-stat{display:flex;flex-direction:column;gap:2px;border:1px solid var(--border);background:var(--surface);border-radius:var(--r);padding:16px}
+.admin-stat-ic{width:34px;height:34px;display:grid;place-items:center;border-radius:var(--r-sm);background:var(--surface-muted);color:var(--text-muted);margin-bottom:8px}
+.admin-stat-n{font-size:28px;font-weight:700;letter-spacing:-.01em;line-height:1.1}
+.admin-stat-l{font-size:12.5px;color:var(--text-muted)}
+.admin-section{margin-bottom:32px}
+.admin-h{font-size:16px;font-weight:700;margin-bottom:12px}
+.admin-attention{list-style:none;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.admin-attention li{display:flex;align-items:center;gap:12px;padding:14px 16px}
+.admin-attention li+li{border-top:1px solid var(--border)}
+.aa-ic{flex:none;color:var(--warning)}
+.aa-body{flex:1;min-width:0;line-height:1.35}
+.aa-body b{display:block;font-size:13.5px;font-weight:600}
+.aa-body span{display:block;font-size:12.5px;color:var(--text-muted);margin-top:1px}
+.admin-attention .pill{flex:none}
+@media (max-width:640px){.admin-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-head{flex-direction:column;gap:8px}}
+
 /* ---------- contextual topbar (breadcrumb + switch demo) ---------- */
 .topbar .crumbs{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-subtle);white-space:nowrap;min-width:0}
 .topbar .crumbs a{color:var(--text-subtle);text-decoration:none}

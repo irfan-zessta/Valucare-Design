@@ -374,6 +374,18 @@ async function route(force = false) {
     return;
   }
 
+  // The Admin Dashboard is a product-wide overview, so it also renders outside the
+  // operational shell straight into root — like the chooser, not a desk workspace.
+  if (parts[0] === "admin") {
+    shellWs = null;
+    const seq = ++renderSeq;
+    disposeForms();
+    const mod = await import("./views/admin-desk.js");
+    if (seq !== renderSeq) return;
+    await mod.render(root, { parts, query });
+    return;
+  }
+
   const ws = workspaceForRoute(parts);
   let key = parts[0];
   if (key === "new-business" && parts[1] === "create") key = "create";

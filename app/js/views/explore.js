@@ -15,6 +15,8 @@ import { icon } from "../components.js";
 // exists; "soon" means not built yet. A department with a `demos` array shows a
 // second selection screen; otherwise a live department opens its workspace directly.
 export const DEPARTMENTS = [
+  { key: "admin", name: "Admin", icon: "grid", status: "live", href: "#/admin",
+    desc: "A simple overview of activity across HMS." },
   {
     key: "sales", name: "Sales", icon: "briefcase", status: "live",
     desc: "Corporate and IFG new business and renewals.",
