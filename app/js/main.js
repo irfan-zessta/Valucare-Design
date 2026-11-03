@@ -166,6 +166,18 @@ const WORKSPACES = {
     search: (q) => `#/ccd-desk/outpatient?q=${encodeURIComponent(q)}`,
     searchPlaceholder: "Search by member, card, policy or approval code",
   },
+  "bc-desk": {
+    key: "bc-desk", dept: "BC", name: "Billing & Collections", home: "#/bc-desk",
+    routes: ["bc-desk"],
+    nav: [
+      { key: "home", label: "Dashboard", icon: "home", href: "#/bc-desk" },
+      { key: "billing", label: "Billing", icon: "inbox", href: "#/bc-desk/billing" },
+      { key: "collections", label: "Collections", icon: "tasks", href: "#/bc-desk/collections" },
+      { key: "cycles", label: "Upcoming cycles", icon: "clock", href: "#/bc-desk/cycles" },
+    ],
+    search: (q) => `#/bc-desk/billing?q=${encodeURIComponent(q)}`,
+    searchPlaceholder: "Search by account, SOA, invoice or owner",
+  },
 };
 
 // Which workspace owns this route? Falls back to the New Business desk for shared
@@ -337,6 +349,7 @@ const VIEWS = {
   "pn-desk": () => import("./views/pn-desk.js"),
   "claims-desk": () => import("./views/claims-desk.js"),
   "ccd-desk": () => import("./views/ccd-desk.js"),
+  "bc-desk": () => import("./views/bc-desk.js"),
   tasks: () => import("./views/tasks.js"),
   accounts: () => import("./views/accounts.js"),
   reports: () => import("./views/reports.js"),

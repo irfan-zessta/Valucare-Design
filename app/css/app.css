@@ -1384,3 +1384,56 @@ abbr.gloss{text-decoration:underline dotted;text-underline-offset:2px;cursor:hel
 .kpi-card{display:flex;flex-direction:column;gap:2px;padding:14px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface)}
 .kpi-v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
 .kpi-card b{font-size:13px}
+
+/* Billing & Collections (BC) desk.
+   Reuses .crumbs-sm, .rec-head, .rec-next, .steps-nav/.step-tab, .stage-row/.stage,
+   .seg, .tbl/.cardify/.rowlink, .kpi-grid/.kpi-card, .pick-list/.pick-row, .dl, .doclist,
+   .timeline, .note, .savebar, .role-switch, .field and the drawer. Only the bits below
+   are new — all token-driven, so they follow the active palette. */
+
+/* The one-timeline strip: endorsement → SOA → review → ONS → sent → collections → paid. */
+.bc-timeline{margin-top:14px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface)}
+.bc-stages{margin:0}
+.bc-stages .stage{display:inline-flex;align-items:center;gap:4px;font-size:12px}
+.bc-stages .stage.done{color:var(--text);border-color:var(--border-strong);background:var(--surface-muted)}
+.bc-stages .stage.done svg{color:var(--success)}
+.bc-stages .stage.on{color:var(--text);border-color:var(--text);background:var(--surface-muted);font-weight:600}
+.bc-tl-meta{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:10px;color:var(--text-muted)}
+.bc-tl-meta b{color:var(--text-subtle);font-weight:500}
+
+/* Reference-number chips gathered on an endorsement — no retyping. */
+.ref-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ref-chip{font-size:12px;padding:3px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface-muted);color:var(--text-muted);font-variant-numeric:tabular-nums}
+
+/* The readable, reconciling calculation tables (pro-rata, installments, fees). */
+.tbl.calc{font-variant-numeric:tabular-nums}
+.tbl.calc td{padding:8px 12px}
+.tbl.calc td:last-child{text-align:right;white-space:nowrap}
+.tbl.calc td.strong,.tbl.calc tr.sum td{font-weight:600;color:var(--text)}
+.tbl.calc tr.sum td{border-top:1px solid var(--border-strong)}
+.tbl.calc tr.sum.total td{border-top:2px solid var(--text);font-weight:700}
+
+/* TPA health-fund panel — pending exposure / IBNR is a clearly-labelled estimate. */
+.fund-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.fund-cell{display:flex;flex-direction:column;gap:3px;padding:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+.fund-cell b{font-size:17px;font-variant-numeric:tabular-nums}
+.fund-cell.est{background:var(--warning-soft)}
+.fund-cell.rem{background:var(--surface-muted);border-color:var(--border-strong)}
+.fund-cell.low{background:var(--danger-soft);border-color:var(--danger)}
+
+/* Split / consolidation options and the simulated ONS upload file chip. */
+.split-opts{display:flex;flex-direction:column;gap:8px}
+.chip-opt{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;cursor:pointer}
+.chip-opt:hover{border-color:var(--border-strong);background:var(--surface-muted)}
+.file-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px dashed var(--border-strong);border-radius:var(--r);background:var(--surface-muted);font-variant-numeric:tabular-nums}
+.file-chip svg{color:var(--text-muted)}
+
+/* Dashboard count cards are links; the open dispute card gets an accent edge. */
+.kpi-card.linkcard{cursor:pointer;transition:border-color .12s,background .12s}
+.kpi-card.linkcard:hover{border-color:var(--border-strong);background:var(--surface-muted)}
+.dispute-open{border-color:var(--danger);box-shadow:inset 3px 0 0 var(--danger)}
+
+/* Worklist filters — inline label + control. */
+.filters{align-items:flex-end}
+.field.inline{display:flex;flex-direction:column;gap:3px;min-width:160px}
+.field.inline select,.field.inline input{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)}
