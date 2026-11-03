@@ -19,7 +19,7 @@ import { money, int } from "../core.js";
 export const STORE_KEY = "hms-ccd:v1";
 export const GUIDE_KEY = "hms-ccd-guide";
 export const ROLE_KEY = "hms-ccd-role";
-const BASELINE = 1; // bump to force a reseed when the sample data shape changes
+const BASELINE = 2; // bump to force a reseed when the sample data shape changes
 
 export const DEMO_NOW_ISO = "2026-10-29"; // one demo "now" so ages and dates agree
 
@@ -344,8 +344,8 @@ export const REQ_TYPES = {
 export const reqTypeLabel = (k) => (REQ_TYPES[k] || {}).label || k;
 
 export const REQ_STEPS = [
-  { key: "receive", n: 1, label: "Receive request" },
-  { key: "member", n: 2, label: "Find & verify member" },
+  { key: "member", n: 1, label: "Find & verify member" },
+  { key: "receive", n: 2, label: "Receive request" },
   { key: "coverage", n: 3, label: "Review coverage" },
   { key: "service", n: 4, label: "Service details & checks" },
   { key: "decide", n: 5, label: "Decide & communicate" },
@@ -361,8 +361,8 @@ function ensureReq(r) {
 }
 
 export function reqNext(r) {
-  if (!r.done.receive) return { step: "receive", label: "Capture the request", owner: "CCD Agent", sentence: "Capture the channel, caller, facility, request type and description." };
   if (!r.done.member) return { step: "member", label: "Find & verify the member", owner: "CCD Agent", sentence: "Search for the member, confirm identity against similar names, and run the verification checklist." };
+  if (!r.done.receive) return { step: "receive", label: "Capture the request", owner: "CCD Agent", sentence: "Capture the channel, caller, facility, request type and description." };
   if (!r.done.coverage) return { step: "coverage", label: "Review coverage", owner: "CCD Agent", sentence: "Review the member's own SOB, status, entitlements and the financial view in one place." };
   if (!r.done.service) return { step: "service", label: "Enter service details & review checks", owner: "CCD Agent", sentence: "Enter the facility, doctor, diagnosis and procedure, then read the plain-language eligibility checks." };
   if (!r.done.decide) return { step: "decide", label: "Decide & communicate", owner: "CCD Agent", sentence: "Approve, disapprove with a reason, or request a special approval — then issue the LOA or response." };
@@ -374,8 +374,8 @@ export function reqStatus(r) {
   if (r.decision === "disapproved") return { label: "Disapproved", tone: "danger" };
   if (r.decision === "special") return { label: "Special approval requested", tone: "warn" };
   if (r.done.service) return { label: "Ready to decide", tone: "info" };
-  if (r.done.member) return { label: "In review", tone: "info" };
-  if (r.done.receive) return { label: "Member pending", tone: "warn" };
+  if (r.done.receive) return { label: "In review", tone: "info" };
+  if (r.done.member) return { label: "Request pending", tone: "warn" };
   return { label: "New", tone: "neutral" };
 }
 export const REQ = {
@@ -759,7 +759,7 @@ function SEED_REQUESTS() {
     createdAt: addDays(N, 0), owner: "Dana Reyes", ownerRole: "op",
     members: [{ policyNo: "VC-640318", name: "Antonio B. Cruz", company: "Northwind Logistics Corp." }],
     primaryPolicy: "VC-640318", lines: [], loas: [], decision: "", decisionReason: "",
-    done: { receive: true, member: false, coverage: false, service: false, decide: false },
+    done: { receive: false, member: false, coverage: false, service: false, decide: false },
     history: [{ at: stamp(), text: "Request logged via Hotline — St. Lucia Medical Center.", actor: "Dana Reyes" }],
   }));
 
@@ -770,7 +770,7 @@ function SEED_REQUESTS() {
     createdAt: addDays(N, 0), owner: "Dana Reyes", ownerRole: "op",
     members: [{ policyNo: "VC-882200", name: "Noel D. Aquino", company: "Brightlane Hospitality Group" }],
     primaryPolicy: "VC-882200", lines: [], loas: [], decision: "", decisionReason: "",
-    done: { receive: true, member: false, coverage: false, service: false, decide: false },
+    done: { receive: false, member: false, coverage: false, service: false, decide: false },
     history: [{ at: stamp(), text: "Request logged via Viber — member direct.", actor: "Dana Reyes" }],
   }));
 

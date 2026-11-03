@@ -2,12 +2,12 @@
 // (outpatient / dental LOA) and Scenario C (exception & inquiry).
 //
 // The journey never sends the user backward and always keeps one obvious primary action:
-//   1. Receive request    — channel, caller, facility, request type, description; one
-//                            request ID; a hospital caller can add several patients under
-//                            one request without re-entering the hospital details.
-//   2. Find & verify       — one search field (card / policy / name / link / approval code);
+//   1. Find & verify       — one search field (card / policy / name / link / approval code);
 //                            results distinguish similar names by company, DOB and status;
-//                            a small verification checklist.
+//                            a small verification checklist. The member is identified first.
+//   2. Receive request     — channel, caller, facility, request type, description, under one
+//                            request ID; a hospital caller can add several patients to this
+//                            request without re-entering the hospital details.
 //   3. Review coverage     — the SELECTED member's own SOB, status, entitlements and the
 //                            financial view (limit · used by posted claims · open LOA
 //                            commitments · available) side by side.
@@ -98,7 +98,7 @@ export function renderRequest(main, id, step) {
 function stepReceive(body, ctx) {
   const r = ctx.rec;
   body.innerHTML = html`
-    ${whatYouDo("Confirm how the request arrived and who is calling, the facility involved, the type of request and a short description. This creates one request with a single ID and history.")}
+    ${whatYouDo("With the member identified, record how the request arrived and who is calling, the facility involved, the type of request and a short description — all kept under this one request ID and history.")}
     <div class="card pad">
       <div class="grid2">
         <div class="field"><label for="rChannel">Channel</label><select id="rChannel" class="inp">${CHANNELS.map((c) => html`<option value="${c[0]}" ${r.channel === c[0] ? raw("selected") : ""}>${c[1]}</option>`)}</select></div>
@@ -108,9 +108,9 @@ function stepReceive(body, ctx) {
         <div class="field"><label for="rFacility">Facility</label><select id="rFacility" class="inp"><option value="">— none / member direct —</option>${allFacilities().map((f) => html`<option value="${f.code}" ${r.facilityCode === f.code ? raw("selected") : ""}>${f.name} · ${f.tier}</option>`)}</select></div>
         <div class="field"><label for="rDesc">Description</label><input id="rDesc" class="inp" value="${r.description || ""}" placeholder="What is being requested?"></div>
       </div>
-      ${illus("A hospital caller can add several patients under one request on the next step — the hospital details here are entered only once.")}
+      ${illus("A hospital caller can cover several patients under this one request — they were identified on the previous step, so the hospital details here are entered only once.")}
       <div class="row tight mt">${sampleBtn("rSample", "Load sample request")}</div>
-      ${saveBar("Save & find the member")}
+      ${saveBar("Save & review coverage")}
     </div>`.s;
   body.querySelector("#rSample").onclick = () => {
     const f = allFacilities()[0];
@@ -163,7 +163,7 @@ function stepMember(body, ctx) {
           <span class="al-ic" aria-hidden="true">${icon(c.ok ? "check" : "alert", 16)}</span>
           <div class="grow"><b>${c.label}</b><span class="tiny">${c.note}</span></div>
           <span class="pill ${c.ok ? "ok" : "warn"} plain">${c.ok ? "Confirmed" : "Check"}</span></li>`)}</ul>
-        ${saveBar("Confirm member & review coverage")}
+        ${saveBar("Confirm member & receive the request")}
       </div>` : ""}`.s;
 
     // search wiring
@@ -192,7 +192,7 @@ function stepMember(body, ctx) {
     };
     body.querySelectorAll("[data-prim]").forEach((b) => (b.onclick = () => { setPrimaryMember(r, b.dataset.prim); render(); }));
     body.querySelectorAll("[data-rm]").forEach((b) => (b.onclick = () => { removeRequestMember(r, b.dataset.rm); if (r.primaryPolicy === b.dataset.rm) setPrimaryMember(r, r.members[0]?.policyNo); render(); }));
-    if (prim) document.getElementById("clPrimary").onclick = () => { completeMemberStep(r); toast("Member verified.", "ok"); ctx.goStep("coverage"); };
+    if (prim) document.getElementById("clPrimary").onclick = () => { completeMemberStep(r); toast("Member verified.", "ok"); ctx.goStep("receive"); };
   };
   render();
 }
@@ -570,7 +570,7 @@ export async function newRequestDialog(main) {
   });
   if (r?.action !== "ok") return;
   const v = r.values;
-  const rec = createRequest({ channel: v.nChannel, type: v.nType, callerName: v.nCaller, callerContact: v.nContact, facilityCode: v.nFacility, description: v.nDesc, receive: true });
+  const rec = createRequest({ channel: v.nChannel, type: v.nType, callerName: v.nCaller, callerContact: v.nContact, facilityCode: v.nFacility, description: v.nDesc });
   toast(`Request ${rec.id} created.`, "ok");
   go(REQ.requestAt(rec.id, "member"));
 }
