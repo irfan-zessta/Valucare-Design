@@ -29,7 +29,7 @@ import {
   addRequestMember, removeRequestMember, setPrimaryMember, primaryMember, saveReceive,
   completeMemberStep, completeCoverageStep, sampleLines, setLines, issueLoa, disapproveAll,
   sendLoa, benefitName, benefitLine, innerLines, mblView, perIllness, serviceAlerts,
-  hasBlocker, alertTone, ICD10, CPT, ROOMS, createSpecialApproval, createInquiry,
+  hasBlocker, alertTone, ICD10, CPT, ROOMS, BENEFIT_DEFAULTS, cptFor, createSpecialApproval, createInquiry,
   INQUIRY_CATEGORIES, peso, fmtD, toNum, currentRole, allApprovals, putApproval,
 } from "./ccd-core.js";
 import {
@@ -265,16 +265,28 @@ function stepService(body, ctx) {
   // Working copy of lines (seed from existing or empty).
   let lines = (r.lines && r.lines.length) ? JSON.parse(JSON.stringify(r.lines)) : [];
   const benefitOpts = (m.sob || []).filter((x) => x.code !== "MBL");
+  // Choosing a benefit pre-fills the service and diagnosis (ICD-10) and narrows the
+  // procedure menu to that benefit; the amount is always left blank for manual entry.
+  const applyBenefitDefaults = (l) => {
+    const d = BENEFIT_DEFAULTS[l.benefitCode];
+    l.dental = d ? !!d.dental : l.benefitCode === "DENTAL";
+    if (!d) return;
+    l.service = d.service;
+    l.diagnosis = d.diagnosis;
+  };
 
   const facility = getFacility(r.facilityCode);
+  // Specialty box should reflect the doctor already chosen, so the two fields stay in sync.
   const render = () => {
+    const curDoc = (r.facilityCode && r.doctorId) ? doctorsAt(r.facilityCode, "").find((d) => d.id === r.doctorId) : null;
+    const curSpec = curDoc ? curDoc.specialty : "";
     body.innerHTML = html`
-      ${whatYouDo("Enter the facility, the doctor (filtered to that facility and specialty), and each requested service with its diagnosis and procedure. The checks below update as you go — read them before deciding.")}
+      ${whatYouDo("Pick the facility and specialty — the doctor is selected for you. For each service, choose the benefit and the service name and diagnosis fill in automatically; pick the procedure from the menu and enter the amount. The checks below update as you go — read them before deciding.")}
       <div class="card pad">
         <div class="grid2">
           <div class="field"><label for="sFac">Facility</label><select id="sFac" class="inp"><option value="">— select —</option>${allFacilities().map((f) => html`<option value="${f.code}" ${r.facilityCode === f.code ? raw("selected") : ""}>${f.name}</option>`)}</select>
             <span class="tiny muted" id="sFacAddr">${facility ? `${facility.tier} · ${facility.address}` : ""}</span></div>
-          <div class="field"><label for="sSpec">Doctor specialty</label><select id="sSpec" class="inp"><option value="">— any —</option>${(r.facilityCode ? specialtiesAt(r.facilityCode) : []).map((s) => html`<option value="${s}">${s}</option>`)}</select></div>
+          <div class="field"><label for="sSpec">Doctor specialty</label><select id="sSpec" class="inp"><option value="">— any —</option>${(r.facilityCode ? specialtiesAt(r.facilityCode) : []).map((s) => html`<option value="${s}" ${s === curSpec ? raw("selected") : ""}>${s}</option>`)}</select></div>
           <div class="field"><label for="sDoc">Doctor</label><select id="sDoc" class="inp"><option value="">— select —</option></select></div>
         </div>
       </div>
@@ -283,14 +295,14 @@ function stepService(body, ctx) {
         <div class="row between"><h3 class="sec-title">Requested services</h3>
           <div class="row tight"><button type="button" class="btn ghost sm" id="sSample">${icon("sparkle", 14)} Load sample services</button><button type="button" class="btn sm" id="sAdd">${icon("plus", 14)} Add line</button></div></div>
         <datalist id="icdList">${ICD10.map((d) => html`<option value="${d.code} — ${d.desc}"></option>`)}</datalist>
-        <datalist id="cptList">${CPT.map((d) => html`<option value="${d.code} — ${d.desc}"></option>`)}</datalist>
+        ${lines.map((l, i) => html`<datalist id="cptList-${i}">${cptFor(l.benefitCode).map((d) => html`<option value="${d.code} — ${d.desc}"></option>`)}</datalist>`)}
         ${lines.length ? html`<div class="tbl-wrap mt"><table class="tbl svc-tbl"><thead><tr>
           <th>Service</th><th>Benefit</th><th>Diagnosis (ICD-10)</th><th>Procedure (CPT/RVS)</th><th class="num">Amount</th><th></th></tr></thead>
           <tbody>${lines.map((l, i) => html`<tr>
             <td><input class="inp sm" data-f="service" data-i="${i}" value="${l.service || ""}" placeholder="Service"></td>
             <td><select class="inp sm" data-f="benefitCode" data-i="${i}">${benefitOpts.map((b) => html`<option value="${b.code}" ${l.benefitCode === b.code ? raw("selected") : ""}>${b.name}</option>`)}</select></td>
             <td><input class="inp sm" list="icdList" data-f="diagnosis" data-i="${i}" value="${l.diagnosis || ""}" placeholder="Search ICD-10"></td>
-            <td><input class="inp sm" list="cptList" data-f="procedure" data-i="${i}" value="${l.procedure || ""}" placeholder="Search CPT/RVS"></td>
+            <td><input class="inp sm" list="cptList-${i}" data-f="procedure" data-i="${i}" value="${l.procedure || ""}" placeholder="Choose CPT/RVS"></td>
             <td><input class="inp sm num" data-f="amount" data-i="${i}" value="${l.amount != null ? l.amount : ""}" placeholder="0.00"></td>
             <td><button type="button" class="iconbtn" data-del="${i}" aria-label="Remove line">${icon("trash", 15)}</button></td></tr>`)}</tbody></table></div>`
           : html`<p class="tiny muted mt">No services yet. Add a line, or load the sample set for this request type.</p>`}
@@ -318,18 +330,26 @@ function stepService(body, ctx) {
       specSel.innerHTML = html`<option value="">— any —</option>${(facSel.value ? specialtiesAt(facSel.value) : []).map((s) => html`<option value="${s}">${s}</option>`)}`.s;
       fillDoctors(); refreshAlerts();
     };
-    specSel.onchange = fillDoctors;
+    specSel.onchange = () => {
+      // Picking a specialty auto-selects the first matching doctor at this facility.
+      if (facSel.value && specSel.value) {
+        const docs = doctorsAt(facSel.value, specSel.value);
+        if (docs.length) { r.doctorId = docs[0].id; putRequest(r); }
+      }
+      fillDoctors();
+    };
     docSel.onchange = () => { r.doctorId = docSel.value; putRequest(r); };
     fillDoctors();
 
     // line edits
     body.querySelectorAll("[data-f]").forEach((el) => (el.oninput = () => {
-      const i = +el.dataset.i; lines[i][el.dataset.f] = el.dataset.f === "amount" ? el.value : el.value;
-      if (el.dataset.f === "benefitCode") lines[i].dental = el.value === "DENTAL";
+      const i = +el.dataset.i; lines[i][el.dataset.f] = el.value;
+      // Choosing a benefit fills the service + diagnosis and narrows the procedure menu.
+      if (el.dataset.f === "benefitCode") { applyBenefitDefaults(lines[i]); render(); return; }
       refreshAlerts();
     }));
     body.querySelectorAll("[data-del]").forEach((b) => (b.onclick = () => { lines.splice(+b.dataset.del, 1); render(); }));
-    body.querySelector("#sAdd").onclick = () => { lines.push({ id: "L" + (lines.length + 1), policyNo: m.policyNo, service: "", benefitCode: benefitOpts[0].code, diagnosis: "", procedure: "", amount: "" }); render(); };
+    body.querySelector("#sAdd").onclick = () => { const nl = { id: "L" + (lines.length + 1), policyNo: m.policyNo, service: "", benefitCode: benefitOpts[0].code, diagnosis: "", procedure: "", amount: "" }; applyBenefitDefaults(nl); lines.push(nl); render(); };
     body.querySelector("#sSample").onclick = () => { lines = sampleLines(r); toast("Sample services loaded.", "ok"); render(); };
 
     const refreshAlerts = () => {

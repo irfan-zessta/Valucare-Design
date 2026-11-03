@@ -261,17 +261,66 @@ export const ICD10 = [
   { code: "H25.9", desc: "Age-related cataract, unspecified" },
   { code: "N39.0", desc: "Urinary tract infection, site not specified" },
 ];
+// Each CPT/RVS entry carries a `group` so the Procedure field can offer a rich menu
+// filtered to the chosen benefit (consult / lab / surgery / cataract / dental / room).
 export const CPT = [
-  { code: "99213", desc: "Outpatient consultation, established patient", rvs: 3 },
-  { code: "80053", desc: "Comprehensive metabolic panel", rvs: 2 },
-  { code: "85025", desc: "Complete blood count (CBC) with differential", rvs: 1 },
-  { code: "71046", desc: "Chest X-ray, 2 views", rvs: 2 },
-  { code: "44970", desc: "Laparoscopic appendectomy", rvs: 12 },
-  { code: "66984", desc: "Cataract surgery with intraocular lens", rvs: 14 },
-  { code: "D1110", desc: "Oral prophylaxis (cleaning) — adult", rvs: 1 },
-  { code: "D7140", desc: "Simple tooth extraction", rvs: 2 },
-  { code: "D3330", desc: "Endodontic therapy (root canal), molar", rvs: 6 },
+  // Consultations & professional
+  { code: "99213", desc: "Outpatient consultation, established patient", rvs: 3, group: "consult" },
+  { code: "99214", desc: "Outpatient consultation, detailed / complex", rvs: 4, group: "consult" },
+  { code: "99203", desc: "Outpatient consultation, new patient", rvs: 3, group: "consult" },
+  { code: "99385", desc: "Preventive / executive check-up visit", rvs: 3, group: "consult" },
+  { code: "90471", desc: "Immunization administration", rvs: 1, group: "consult" },
+  { code: "99091", desc: "Follow-up / care management", rvs: 2, group: "consult" },
+  // Laboratory, imaging & diagnostics
+  { code: "80053", desc: "Comprehensive metabolic panel", rvs: 2, group: "lab" },
+  { code: "85025", desc: "Complete blood count (CBC) with differential", rvs: 1, group: "lab" },
+  { code: "80061", desc: "Lipid panel", rvs: 2, group: "lab" },
+  { code: "82947", desc: "Fasting blood sugar (FBS)", rvs: 1, group: "lab" },
+  { code: "81001", desc: "Urinalysis, automated with microscopy", rvs: 1, group: "lab" },
+  { code: "84443", desc: "Thyroid stimulating hormone (TSH)", rvs: 2, group: "lab" },
+  { code: "71046", desc: "Chest X-ray, 2 views", rvs: 2, group: "lab" },
+  { code: "76700", desc: "Ultrasound, abdomen, complete", rvs: 3, group: "lab" },
+  { code: "93000", desc: "Electrocardiogram (ECG), complete", rvs: 1, group: "lab" },
+  { code: "74177", desc: "CT abdomen & pelvis with contrast", rvs: 6, group: "lab" },
+  // Surgery / inpatient hospital services
+  { code: "44970", desc: "Laparoscopic appendectomy", rvs: 12, group: "surgery" },
+  { code: "47562", desc: "Laparoscopic cholecystectomy", rvs: 13, group: "surgery" },
+  { code: "49505", desc: "Repair of inguinal hernia", rvs: 9, group: "surgery" },
+  { code: "58150", desc: "Total abdominal hysterectomy", rvs: 15, group: "surgery" },
+  { code: "27447", desc: "Total knee arthroplasty", rvs: 20, group: "surgery" },
+  { code: "99231", desc: "Subsequent inpatient hospital care, per day", rvs: 2, group: "surgery" },
+  // Special procedure — cataract
+  { code: "66984", desc: "Cataract surgery with intraocular lens", rvs: 14, group: "cataract" },
+  { code: "66982", desc: "Complex cataract surgery with IOL", rvs: 16, group: "cataract" },
+  // Dental
+  { code: "D1110", desc: "Oral prophylaxis (cleaning) — adult", rvs: 1, group: "dental" },
+  { code: "D7140", desc: "Simple tooth extraction", rvs: 2, group: "dental" },
+  { code: "D3330", desc: "Endodontic therapy (root canal), molar", rvs: 6, group: "dental" },
+  { code: "D2740", desc: "Crown — porcelain / ceramic", rvs: 5, group: "dental" },
+  { code: "D2391", desc: "Resin composite filling, one surface", rvs: 2, group: "dental" },
+  // Room & board
+  { code: "99221", desc: "Initial inpatient hospital care, per day", rvs: 3, group: "room" },
 ];
+
+// When a benefit is chosen on a service line, the service name and diagnosis (ICD-10)
+// pre-fill from here, and the Procedure field's menu narrows to the matching CPT groups.
+// The amount is always left blank for manual entry. Diagnosis strings match the ICD-10
+// datalist format ("code — description") so the field reads consistently.
+export const BENEFIT_DEFAULTS = {
+  "OP-CONSULT":  { service: "Outpatient consultation",         diagnosis: "J06.9 — Acute upper respiratory infection, unspecified", groups: ["consult"] },
+  "OP-LAB":      { service: "Laboratory & diagnostics",        diagnosis: "E78.5 — Hyperlipidemia, unspecified",                    groups: ["lab"] },
+  "DENTAL":      { service: "Dental procedure",                diagnosis: "K02.9 — Dental caries, unspecified",                     groups: ["dental"], dental: true },
+  "SP-CATARACT": { service: "Cataract surgery",                diagnosis: "H25.9 — Age-related cataract, unspecified",               groups: ["cataract", "surgery"] },
+  "IP-ROOM":     { service: "Inpatient room & board",          diagnosis: "J18.9 — Pneumonia, unspecified organism",                groups: ["room"] },
+  "IP-HOSPITAL": { service: "Inpatient hospital services",     diagnosis: "K35.80 — Acute appendicitis, unspecified",                groups: ["surgery"] },
+  "PF":          { service: "Professional fee",                diagnosis: "I10 — Essential (primary) hypertension",                  groups: ["consult", "surgery"] },
+};
+// CPT/RVS options relevant to a benefit (falls back to the full list when unmapped).
+export function cptFor(benefitCode) {
+  const g = (BENEFIT_DEFAULTS[benefitCode] || {}).groups;
+  if (!g || !g.length) return CPT.slice();
+  return CPT.filter((c) => g.includes(c.group));
+}
 
 // ============================================================== eligibility checks (plain-language alerts)
 // Produce plain-language alerts for a proposed service. Each alert carries a level
