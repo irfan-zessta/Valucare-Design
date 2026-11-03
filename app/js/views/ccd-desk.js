@@ -18,7 +18,7 @@ import {
   ensureSeeded, resetDemo, allRequests, getRequest, allConfinements, getConfinement,
   allApprovals, getApproval, allInquiries, getInquiry, allMembers, getFacility, getDoctor,
   reqStatus, reqNext, reqTypeLabel, channelLabel, CHANNELS, REQ_TYPES, createRequest, REQ,
-  CONF_STATUS, decideApproval, updateInquiry, peso, plural, fmtD, DEMO_NOW_ISO, primaryMember,
+  CONF_STATUS, decideApproval, updateInquiry, logInquiryContact, peso, plural, fmtD, DEMO_NOW_ISO, primaryMember,
   currentRole, mblView,
 } from "./ccd-core.js";
 import {
@@ -45,7 +45,7 @@ export async function render(main, { parts, query }) {
 
 // ============================================================== CCD dashboard
 const AREAS = [
-  { key: "new", icon: "plus", title: "New request", href: "#/ccd-desk?new=1", desc: "Receive a call, email or Viber message and start a request — the five-step journey from verification to LOA." },
+  { key: "new", icon: "plus", title: "New request", href: "#/ccd-desk?new=1", desc: "Receive a call, email or Viber message and start a request — the guided journey from member verification to LOA." },
   { key: "outpatient", icon: "inbox", title: "Outpatient / dental requests", href: "#/ccd-desk/outpatient", desc: "Consultations, laboratory, diagnostics and dental LOAs." },
   { key: "admissions", icon: "building", title: "Inpatient admissions", href: "#/ccd-desk/admissions", desc: "Admission requests, initial LOAs and active confinements." },
   { key: "discharges", icon: "clock", title: "Pending discharges", href: "#/ccd-desk/discharges", desc: "Active confinements awaiting the final statement of account and final LOA." },
@@ -165,7 +165,7 @@ function renderAdmissions(main, query) {
 }
 function confinementRow(c) {
   const st = { admitted: { l: "Active confinement", t: "info" }, "for-approval": { l: "For supervisor approval", t: "warn" }, "pending-discharge": { l: "Pending discharge", t: "warn" }, discharged: { l: "Discharged", t: "ok" } }[c.status] || { l: c.status, t: "neutral" };
-  return html`<tr class="rowlink" data-open="#/ccd-desk/confinement/${c.id}/${c.status === "pending-discharge" ? "discharge" : c.status === "discharged" ? "summary" : "admit"}" tabindex="0">
+  return html`<tr class="rowlink" data-open="#/ccd-desk/confinement/${c.id}/${c.status === "pending-discharge" || c.status === "discharged" ? "discharge" : "admit"}" tabindex="0">
     <td><b>${c.id}</b></td><td class="tiny">${c.member}</td>
     <td class="tiny">${getFacility(c.facilityCode)?.name || c.facilityCode}</td>
     <td class="tiny">${c.admittingDiagnosis}</td><td class="tiny">${c.room}</td>
@@ -207,8 +207,8 @@ function renderApprovals(main, query) {
       <th>Reference</th><th>Member</th><th>Reason</th><th>Amount</th><th>Charge to</th><th>Approver</th><th>Status</th><th></th></tr></thead>
       <tbody>${rows.map((a) => html`<tr>
         <td><b>${a.id}</b></td><td class="tiny">${a.member}</td>
-        <td class="tiny">${a.reason}</td><td class="num">${peso(a.amount)}</td>
-        <td class="tiny">${a.chargeTo}</td><td class="tiny">${a.approver}</td>
+        <td class="tiny">${a.reason}${a.guaranteeDoc ? html`<div class="tiny muted">${icon("file", 11)} ${a.guaranteeDoc}</div>` : ""}</td><td class="num">${peso(a.amount)}</td>
+        <td class="tiny">${a.whoPays || a.chargeTo}</td><td class="tiny">${a.approver}</td>
         <td>${pill(a.status === "pending" ? "Pending" : a.status === "approved" ? "Approved" : "Declined", a.status === "approved" ? "ok" : a.status === "declined" ? "danger" : "warn")}</td>
         <td class="row tight">${a.status === "pending" ? html`<button type="button" class="btn sm primary" data-ap="${a.id}" data-act="approve">Approve</button><button type="button" class="btn sm" data-ap="${a.id}" data-act="decline">Decline</button>` : html`<button type="button" class="btn ghost sm" data-view="${a.id}">View</button>`}</td></tr>`)}</tbody></table></div>`
       : emptyState({ icon: "check", title: "No special approvals", body: "Requests for special approval appear here." })}
@@ -239,8 +239,9 @@ function renderApprovals(main, query) {
   main.querySelectorAll("[data-view]").forEach((b) => (b.onclick = () => {
     const a = getApproval(b.dataset.view);
     previewLetter({ title: `Special approval ${a.id}`, kind: "Special approval record — demo preview", lines: [
-      ["Member", a.member], ["Reason", a.reason], ["Amount", peso(a.amount)], ["Charge to", a.chargeTo],
-      ["Approver", a.approver], ["Evidence", a.evidence || "—"], ["Status", a.status], ["Decision note", a.decisionNote || "—"],
+      ["Member", a.member], ["Reason", a.reason], ["Amount requested", peso(a.amount)],
+      ["Guarantee letter", a.guaranteeDoc || "—"], ["Who pays the excess", a.whoPays || a.chargeTo],
+      ["Approver", a.approver], ["Evidence", a.evidence || "—"], ["Status", a.status], ["Decision", a.decisionNote || "—"],
     ] });
   }));
 }
@@ -251,20 +252,34 @@ function renderInquiries(main, query) {
   main.innerHTML = html`
     ${backBar([{ label: "Inquiries" }])}
     <div class="page-head"><div><h1>Inquiries</h1>
-      <p class="muted">Member and provider questions logged with a category, notes and status. Prior contact history stays attached to the member.</p></div>
+      <p class="muted">A lightweight log for coverage questions, member-not-found follow-ups, or anything that doesn't need an LOA — with a reason, notes, owner, status and contact history so another agent can continue.</p></div>
       <div class="ph-actions"><button type="button" class="btn primary" id="newInq">${icon("plus", 15)} Log inquiry</button></div></div>
+    ${protoConcept("Whether a separate inquiry log is needed at all is still open — final scope to confirm with the CCD team.")}
     ${rows.length ? html`<div class="tbl-wrap mt"><table class="tbl cardify"><thead><tr>
-      <th>Reference</th><th>Category</th><th>Member</th><th>Channel</th><th>Notes</th><th>Status</th><th></th></tr></thead>
-      <tbody>${rows.map((q) => html`<tr>
-        <td><b>${q.id}</b></td><td class="tiny">${q.category}</td><td class="tiny">${q.member || "—"}</td>
-        <td class="tiny">${channelLabel(q.channel)}</td><td class="tiny">${q.notes}</td>
+      <th>Reference</th><th>Reason</th><th>Member</th><th>Owner</th><th>Last contact</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows.map((q) => { const last = (q.contactHistory || [])[0]; return html`<tr>
+        <td><b>${q.id}</b><div class="tiny muted">${channelLabel(q.channel)}</div></td>
+        <td class="tiny">${q.reason || q.category}<div class="tiny muted">${q.notes || ""}</div></td>
+        <td class="tiny">${q.member || "—"}</td>
+        <td class="tiny">${q.owner || "—"}</td>
+        <td class="tiny">${last ? html`${last.summary}<div class="tiny muted">${fmtD(last.at)} · ${last.by || ""}</div>` : "—"}</td>
         <td>${pill(q.status === "open" ? "Open" : "Resolved", q.status === "open" ? "warn" : "ok")}</td>
-        <td class="row tight">${q.status === "open" ? html`<button type="button" class="btn sm" data-inq="${q.id}">Mark resolved</button>` : ""}</td></tr>`)}</tbody></table></div>`
+        <td class="row tight">${q.status === "open" ? html`<button type="button" class="btn ghost sm" data-logc="${q.id}">Log contact</button><button type="button" class="btn sm" data-inq="${q.id}">Mark resolved</button>` : html`<button type="button" class="btn ghost sm" data-logc="${q.id}">Log contact</button>`}</td></tr>`; })}</tbody></table></div>`
       : emptyState({ icon: "help", title: "No inquiries", body: "Logged inquiries appear here." })}`.s;
   highlightNav("inquiries");
   document.title = "Inquiries · Customer Care";
   main.querySelector("#newInq").onclick = () => import("./ccd-request.js").then((m) => m.newInquiryDialog(main));
   main.querySelectorAll("[data-inq]").forEach((b) => (b.onclick = () => { updateInquiry(getInquiry(b.dataset.inq), "resolved"); toast("Inquiry marked resolved.", "ok"); renderInquiries(main, query); }));
+  main.querySelectorAll("[data-logc]").forEach((b) => (b.onclick = async () => {
+    const q = getInquiry(b.dataset.logc);
+    const r = await dialog({ title: `Log follow-up contact · ${q.id}`, wide: true, body: html`${illus("Record a follow-up contact so another agent can continue this inquiry.")}
+      <div class="grid2 mt"><div class="field"><label for="lcChannel">Channel</label><select id="lcChannel" name="lcChannel" class="inp">${CHANNELS.map((c) => html`<option value="${c[0]}" ${c[0] === q.channel ? raw("selected") : ""}>${c[1]}</option>`)}</select></div>
+        <div class="field grow2"><label for="lcNote">What happened</label><textarea id="lcNote" name="lcNote" class="inp" rows="2" spellcheck="true" placeholder="Summary of the follow-up"></textarea></div></div>`,
+      actions: [{ label: "Cancel" }, { label: "Log contact", kind: "primary", value: "ok" }] });
+    if (r?.action !== "ok") return;
+    logInquiryContact(q, r.values.lcChannel, r.values.lcNote);
+    toast("Follow-up contact logged.", "ok"); renderInquiries(main, query);
+  }));
 }
 
 // ============================================================== Reports

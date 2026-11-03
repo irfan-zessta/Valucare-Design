@@ -2,34 +2,37 @@
   "pointAndEdit": {
     "priorityPaths": {
       "prefer": [
-        "app/js/views/**/*.js",
-        "app/js/main.js",
+        "app/index.html",
+        "app/js/views/**",
         "app/js/components.js",
-        "app/css/app.css",
-        "app/index.html"
+        "app/js/main.js",
+        "app/css/**"
       ],
       "deprioritize": [
         "app/js/core.js",
-        "app/js/preview.js",
-        "assets/**/*",
-        "hms3-nb/**/*"
+        "app/js/demo-store.js",
+        "app/js/demo-journey.js",
+        "app/js/guidance.js",
+        "app/js/guide.js",
+        "app/js/preview.js"
       ],
       "exclude": [
-        "server/**/*",
-        "tests/**/*",
-        "docs/**/*",
-        "app/preview/**/*",
-        ".figma/**/*",
-        ".git/**/*",
-        "*.md",
-        "*.sh",
-        ".claude/**/*"
+        "**/*.figma.ts",
+        "**/*.figma.tsx",
+        "**/*.figma.js",
+        "**/*.figma.jsx",
+        "**/*.figma.template.*",
+        ".git/**",
+        "node_modules/**",
+        "docs/**",
+        "app/preview/**",
+        "tests/**",
+        "**/*.test.*",
+        "**/*.spec.*"
       ]
     },
     "libraryPaths": {
-      "local": [
-        "app/js/components.js"
-      ],
+      "local": [],
       "external": []
     },
     "pathClassification": {
@@ -37,40 +40,52 @@
     },
     "exclusions": [
       {
-        "glob": "server/**/*",
-        "reason": "Python backend API and domain logic — not UI source and cannot serve as a point-and-edit anchor."
+        "glob": "**/*.figma.ts",
+        "reason": "Figma mapping files are not UI source anchors."
       },
       {
-        "glob": "tests/**/*",
-        "reason": "Python automated test suite — not UI source."
+        "glob": "**/*.figma.tsx",
+        "reason": "Figma mapping files are not UI source anchors."
       },
       {
-        "glob": "docs/**/*",
-        "reason": "Markdown documentation files — not UI source."
+        "glob": "**/*.figma.js",
+        "reason": "Figma mapping files are not UI source anchors."
       },
       {
-        "glob": "app/preview/**/*",
-        "reason": "Canned JSON fixture files for the static Vercel preview backend — data files, not UI source."
+        "glob": "**/*.figma.jsx",
+        "reason": "Figma mapping files are not UI source anchors."
       },
       {
-        "glob": ".figma/**/*",
-        "reason": "Figma Make configuration and generated files — not UI source anchors."
+        "glob": "**/*.figma.template.*",
+        "reason": "Figma mapping files are not UI source anchors."
       },
       {
-        "glob": ".git/**/*",
-        "reason": "Git internals — not source files."
+        "glob": ".git/**",
+        "reason": "Version control internals."
       },
       {
-        "glob": "*.md",
-        "reason": "Markdown documentation at the repo root — not UI source."
+        "glob": "node_modules/**",
+        "reason": "Installed dependencies, not project UI source."
       },
       {
-        "glob": "*.sh",
-        "reason": "Shell launcher scripts — tooling, not UI source."
+        "glob": "docs/**",
+        "reason": "Documentation, not rendered UI."
       },
       {
-        "glob": ".claude/**/*",
-        "reason": "Claude Code configuration and memory files — tooling, not UI source."
+        "glob": "app/preview/**",
+        "reason": "Static preview fixture data, not UI source."
+      },
+      {
+        "glob": "tests/**",
+        "reason": "Test files are not UI source anchors."
+      },
+      {
+        "glob": "**/*.test.*",
+        "reason": "Test files are not UI source anchors."
+      },
+      {
+        "glob": "**/*.spec.*",
+        "reason": "Test files are not UI source anchors."
       }
     ],
     "generated": {
@@ -78,9 +93,9 @@
       "source": "setup-agent.point-and-edit-path-classifier",
       "prompt": "same-turn-setup-subagent-v5",
       "model": "claude-sonnet-4-6",
-      "createdAt": "2026-10-16T00:00:00Z",
-      "confidence": 0.95,
-      "explanation": "The app/ directory is the sole active frontend with an unambiguous module boundary: view files in app/js/views/ are the primary UI anchors, app/js/components.js is the only local shared-component library, and all non-UI paths (Python server, tests, docs, legacy assets/, hms3-nb/ snapshot, and JSON fixtures) are straightforwardly classifiable."
+      "createdAt": "2026-11-03T00:00:00Z",
+      "confidence": 0.6,
+      "explanation": "Vanilla JS SPA under app/ was clearly identified from a file listing, but I did not inspect the tests, docs or preview folders directly, and found no verified shared library."
     }
   }
 }

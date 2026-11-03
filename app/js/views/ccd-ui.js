@@ -12,7 +12,7 @@
 // ever sent.
 import { html, raw, go, fmtDateTime, dialog, announce } from "../core.js";
 import { icon, pill } from "../components.js";
-import { GUIDE_KEY, fmtD, ACRONYMS, ROLES, currentRole, setRole, alertTone, alertWord } from "./ccd-core.js";
+import { GUIDE_KEY, fmtD, ACRONYMS, ROLES, currentRole, setRole, alertTone, alertWord, sampleSob, benefitLine, peso } from "./ccd-core.js";
 
 // -------------------------------------------------------------- sidebar highlight
 export function highlightNav(key) {
@@ -170,6 +170,20 @@ export function documentsDrawer(rec, docs) {
       const d = docs.find((x) => x.key === b.dataset.prev);
       if (d && d.letter) previewLetter(d.letter); else previewDoc(d, rec);
     })));
+}
+// Open the SAMPLE Schedule of Benefits beside the case. When a member is passed, each line
+// also shows that member's live balance (computed against these same figures, so they agree).
+export function sobDrawer(m) {
+  const sob = sampleSob();
+  drawer(`Sample Schedule of Benefits — ${sob.plan}`, html`
+    <p class="tiny">${sob.meta.note}</p>
+    <div class="note info mt"><b>Pre-existing (account policy).</b> ${sob.meta.preExisting}</div>
+    <div class="tbl-wrap mt"><table class="tbl"><thead><tr><th>Benefit</th><th class="num">Limit</th>${m ? html`<th class="num">Available${m.name ? ` · ${m.name.split(" ")[0]}` : ""}</th>` : ""}</tr></thead>
+      <tbody>${sob.lines.map((l) => { const bl = m && l.code !== "MBL" ? benefitLine(m, l.code) : null; return html`<tr>
+        <td>${l.name}${l.special ? html` <span class="pill info plain">own inner limit</span>` : ""}${l.note ? html`<div class="tiny muted">${l.note}</div>` : ""}</td>
+        <td class="num">${peso(l.limit)}</td>
+        ${m ? html`<td class="num">${bl ? peso(bl.available) : "—"}</td>` : ""}</tr>`; })}</tbody></table></div>
+    <p class="tiny muted mt">Room entitlement on this plan: ${sob.meta.roomEntitlement}. Illustrative sample — figures are for the demo only.</p>`);
 }
 export function activityDrawer(rec) {
   const items = rec.history || [];
