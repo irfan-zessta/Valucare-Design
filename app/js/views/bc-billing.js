@@ -23,7 +23,7 @@ import {
   getBill, resetBill, BILL, BILL_STEPS, billNext, billStatus, kindLabel, kindTag,
   proRata, installments, tpaAccess, tpaUtil, tpaFund, getConfig,
   acceptEndorsement, returnEndorsement, prepareSoa, approveSoa, downloadUpload, receiveBi,
-  sendInvoice, uploadFileName, isSupervisor, peso, fmtD, currentRole, round2,
+  sendInvoice, uploadFileName, peso, fmtD, currentRole, round2,
 } from "./bc-core.js";
 import {
   highlightNav, backBar, caseHead, timelineStrip, nextStrip, wireNext, stepsNav, checkList,
@@ -276,10 +276,9 @@ function splitCard() {
 function stepReview(body, ctx) {
   const b = ctx.rec;
   const cur = currentRole();
-  const sameAsPreparer = cur.who === b.preparer;
-  const canApprove = isSupervisor() && !sameAsPreparer;
+  const canApprove = true;
   body.innerHTML = html`
-    ${whatYouDo("A Billing Supervisor reviews the prepared SOA before it goes to ONS. The approver must be a different person from the preparer.")}
+    ${whatYouDo("Review the prepared SOA before it goes to ONS, then approve it.")}
     <div class="card pad">
       <h3 class="sec-title">SOA ${b.soaNo} — for approval</h3>
       <dl class="dl mt">
@@ -293,9 +292,7 @@ function stepReview(body, ctx) {
     <div class="card pad mt">
       <h3 class="sec-title">Approval</h3>
       <p class="tiny">Acting as <b>${cur.who}</b> — ${cur.full}.</p>
-      ${!isSupervisor() ? html`<div class="note warn mt"><b>Approval needs a supervisor.</b> Switch the demo role (top of the dashboard) to a Billing Supervisor to approve. This visible queue replaces personal logs.</div>`
-        : sameAsPreparer ? html`<div class="note warn mt"><b>Preparer and approver must differ.</b> You prepared this SOA — switch to a different supervisor to approve it.</div>`
-        : html`<div class="note info mt"><b>Ready to approve.</b> You are a different person from the preparer (${b.preparer}).</div>`}
+      <div class="note info mt"><b>Ready to approve.</b> Review the prepared SOA (by ${b.preparer || "—"}), then approve it to send to ONS.</div>
     </div>
     <div class="savebar mt"><div></div>
       <button type="button" class="btn primary" id="bcPrimary" ${canApprove ? "" : raw("disabled")}>Approve SOA ›</button></div>`.s;
