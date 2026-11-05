@@ -83,8 +83,6 @@ export const DEPARTMENTS = [
         desc: "Start from the two-tab landing with the billing and collections worklists, upcoming cycles and the demo role switcher." },
     ],
   },
-  { key: "accounts", name: "Accounts", icon: "folder", status: "soon",
-    desc: "Account servicing and records." },
   {
     key: "claims", name: "Claims", icon: "file", status: "live",
     desc: "Receive and batch, process, check and post, reimburse, then forward for payment.",

@@ -10,10 +10,11 @@
 import { html, raw, go, toast, confirmDialog } from "../core.js";
 import { icon, pill, emptyState } from "../components.js";
 import {
-  ensureSeeded, resetDemo, allBills, getBill, allCycles, getConfig,
-  billStatus, billNext, collectionStatus, inCollections, kindLabel, kindTag,
+  ensureSeeded, resetDemo, resetBill, allBills, getBill, allCycles, getConfig,
+  billStatus, billNext, collectionStatus, collectionFlags, isOverdue, isDueSoon,
+  inCollections, kindLabel, kindTag,
   billingUnitOf, outstanding, ageBucket, AGING_LABELS, daysToDue, peso, fmtD, plural,
-  currentRole, BILL, BILLING_UNITS,
+  currentRole, BILL, BILLING_UNITS, SCENARIO_DATE_LABEL,
 } from "./bc-core.js";
 import {
   highlightNav, backBar, roleSwitcher, wireRoleSwitcher, simNote, illus, toConfirm, boundary, abbr,
@@ -43,23 +44,24 @@ export function billBucket(b) {
   if (!b.done.send) return "tosend";
   return null; // sent → collections
 }
-export function collectBucket(b) {
-  if (b.closed) return "closed";
-  if (b.dispute && b.dispute.open) return "dispute";
-  if (b.awaitingTreasury) return "awaiting";
-  if ((b.advices || []).some((a) => !a.remitted)) return "advice";
-  if ((b.promises || []).some((p) => p.open)) return "promise";
-  const dtd = daysToDue(b.dueDate);
-  if (dtd != null && dtd < 0) return "overdue";
-  if (dtd != null && dtd <= 7) return "duesoon";
-  return "onterms";
-}
+// Collections membership is PREDICATE-based and may overlap — an invoice can be Overdue AND
+// have a Promise to pay. The Overdue list is therefore exactly the qualifying invoices
+// (outstanding + past due), never hidden behind a workflow status.
+export const COLLECT_PREDICATES = {
+  duesoon: (b) => isDueSoon(b),
+  overdue: (b) => isOverdue(b),
+  promise: (b) => (b.promises || []).some((p) => p.open),
+  dispute: (b) => !!(b.dispute && (b.dispute.open || b.dispute.status === "under-review")),
+  advice: (b) => (b.advices || []).some((a) => !a.remitted),
+  awaiting: (b) => !!b.awaitingTreasury,
+};
+export function inCollectBucket(b, key) { const p = COLLECT_PREDICATES[key]; return p ? !!p(b) : false; }
 const BILLING_BUCKETS = [
   { key: "new", label: "New endorsements", icon: "inbox" },
   { key: "returned", label: "Returned for clarification", icon: "alert" },
   { key: "draft", label: "Draft SOAs", icon: "file" },
   { key: "approval", label: "For approval", icon: "check" },
-  { key: "ons", label: "Ready for ONS", icon: "upload" },
+  { key: "ons", label: "Ready for Oracle NetSuite", icon: "upload" },
   { key: "tosend", label: "Invoice ready to send", icon: "arrowr" },
 ];
 const COLLECT_BUCKETS = [
@@ -68,7 +70,7 @@ const COLLECT_BUCKETS = [
   { key: "promise", label: "Promises to pay", icon: "history" },
   { key: "dispute", label: "Disputes", icon: "help" },
   { key: "advice", label: "Payment advice received", icon: "inbox" },
-  { key: "awaiting", label: "Awaiting Treasury / ONS", icon: "building" },
+  { key: "awaiting", label: "Awaiting Treasury / Oracle NetSuite", icon: "building" },
 ];
 
 const billingBills = () => allBills().filter((b) => !inCollections(b));
@@ -76,22 +78,21 @@ const collectionBills = () => allBills().filter((b) => inCollections(b));
 
 // ============================================================== dashboard
 const DEMOS = [
-  { key: "1", title: "1 · Corporate premium billing", desc: "An MDA-endorsed mid-period member addition: accept the endorsement, read a reconciling pro-rated calculation, generate the SOA number, build the client attachment, get supervisor approval, create the ONS upload & BI, then send.", go: () => go(BILL.billAt("SB-C1", "endorsement")), label: "Start corporate billing" },
-  { key: "2", title: "2 · IFG bill-first", desc: "A proposal where payment is validated first: Accounting validates the deposit, MDA endorses the paid list, then Billing prepares the invoice with a quarterly installment schedule. Membership is never shown active before payment validation.", go: () => go(BILL.billAt("SB-I1", "endorsement")), label: "Start IFG billing" },
-  { key: "3", title: "3 · TPA billing", desc: "Two examples on one fund-managed account: network / ID-fee billing from an endorsed list, and utilization / replenishment billing from Claims data with a transparent admin fee + VAT and a health-fund panel. Diagnosis and medical detail stay hidden from the client attachment.", go: () => go(BILL.billAt("SB-T1", "endorsement")), label: "Start TPA billing" },
-  { key: "4", title: "4 · Collections & adjustment", desc: "Open a sent invoice in Collections: see aging, log a promise or payment advice, prepare the BCF handoff to Treasury, and work a dispute where a client reports a cancelled member — branching to a credit memo (open invoice) or a refund review (paid invoice).", go: () => go(BILL.collect("CO-9005")), label: "Start collections" },
+  { key: "1", title: "1 · Corporate premium billing", bill: "SB-C1", desc: "An MDA-endorsed mid-period member addition: accept the endorsement, read a reconciling pro-rated calculation, generate the SOA number, build the client attachment, continue as the Billing Supervisor to approve, create the Oracle NetSuite upload & BI, then send." },
+  { key: "2", title: "2 · IFG bill-first", bill: "SB-I1", desc: "A proposal where payment is validated first: Accounting validates the deposit, MDA endorses the paid list, then Billing raises one annual invoice with a quarterly installment schedule. Membership is never shown active before payment validation." },
+  { key: "3", title: "3 · TPA billing", bill: "SB-T1", desc: "Two examples on one fund-managed account: network / ID-fee billing from an endorsed list, and utilization / replenishment billing from Claims data with a transparent admin fee + VAT and a health-fund panel. Diagnosis and medical detail stay hidden from the client attachment." },
+  { key: "4", title: "4 · Collections & adjustments", collect: "CO-9005", desc: "Open a sent invoice in Collections: see aging and workflow flags, log a promise or payment advice, prepare the BCF handoff to Treasury, and work a dispute where a client reports a cancelled member — routed to a credit memo (open invoice) or a refund review (paid invoice), under review until decided." },
 ];
 
 function needsAttention() {
   const items = [];
   collectionBills().forEach((b) => {
-    const bk = collectBucket(b);
-    if (bk === "dispute") items.push({ b, why: "Dispute open", tone: "danger", href: BILL.collect(b.id) });
-    else if (bk === "overdue") items.push({ b, why: `Overdue ${Math.abs(daysToDue(b.dueDate))}d`, tone: "danger", href: BILL.collect(b.id) });
-    else if (bk === "advice") items.push({ b, why: "Payment advice to remit (BCF)", tone: "warn", href: BILL.collect(b.id) });
-    else if (bk === "awaiting") items.push({ b, why: "Awaiting Treasury / ONS receipt", tone: "warn", href: BILL.collect(b.id) });
+    if (isOverdue(b)) items.push({ b, why: `Overdue ${Math.abs(daysToDue(b.dueDate))}d`, tone: "danger", href: BILL.collect(b.id) });
+    else if (COLLECT_PREDICATES.dispute(b)) items.push({ b, why: "Dispute to work", tone: "danger", href: BILL.collect(b.id) });
+    else if (COLLECT_PREDICATES.advice(b)) items.push({ b, why: "Payment advice to remit (BCF)", tone: "warn", href: BILL.collect(b.id) });
+    else if (COLLECT_PREDICATES.awaiting(b)) items.push({ b, why: "Awaiting Oracle NetSuite receipt", tone: "warn", href: BILL.collect(b.id) });
   });
-  billingBills().forEach((b) => { if (b.returned) items.push({ b, why: "Returned to MDA", tone: "danger", href: BILL.bill(b) }); });
+  billingBills().forEach((b) => { if (b.returned) items.push({ b, why: `Returned to ${b.returnedTo || b.endorsedBy || "source"}`, tone: "danger", href: BILL.bill(b) }); });
   return items.slice(0, 6);
 }
 
@@ -102,12 +103,13 @@ function renderHome(main, query) {
   const att = needsAttention();
 
   const billingCounts = BILLING_BUCKETS.map((k) => ({ ...k, n: bBills.filter((b) => billBucket(b) === k.key).length }));
-  const collectCounts = COLLECT_BUCKETS.map((k) => ({ ...k, n: cBills.filter((b) => collectBucket(b) === k.key).length }));
+  const collectCounts = COLLECT_BUCKETS.map((k) => ({ ...k, n: cBills.filter((b) => inCollectBucket(b, k.key)).length }));
   const totalOutstanding = cBills.reduce((s, b) => s + outstanding(b), 0);
 
   main.innerHTML = html`
     <div class="page-head"><div><h1>Billing &amp; Collections</h1>
-      <p class="muted">One timeline per bill, from endorsement to payment. HMS prepares the ${abbr("SOA")} and the ${abbr("ONS")} upload file; ONS creates the official invoice (${abbr("BI")}) and Treasury / ONS issues the receipt (${abbr("OR")}). Everything here is sample data — no real invoice, upload, email or remittance is ever sent.</p></div>
+      <p class="muted">One timeline per bill, from endorsement to payment. HMS prepares the ${abbr("SOA")} and the ${abbr("ONS")} upload file; Oracle NetSuite (${abbr("ONS")}) creates the official invoice (${abbr("BI")}) and Treasury / Oracle NetSuite issues the receipt (${abbr("OR")}). Everything here is sample data — no real invoice, upload, email or remittance is ever sent.</p>
+      <p class="tiny muted mt">${icon("clock", 12)} Scenario date: <b>${SCENARIO_DATE_LABEL}</b> — every due date, aging and countdown is calculated from this one date.</p></div>
       <div class="ph-actions">${roleSwitcher()}
         <button type="button" class="btn ghost sm" id="resetDemo">${icon("history", 15)} Reset this demo</button></div></div>
 
@@ -139,17 +141,33 @@ function renderHome(main, query) {
     ${tab === "billing" ? billingTable(bBills.slice(0, 8)) : collectTable(cBills.slice(0, 8))}
 
     <h2 class="sec-title mt">Guided demos <span class="tiny muted">· start to finish</span></h2>
+    <p class="tiny muted">Resume a demo where it is, or start a fresh sample run of just that journey — completed examples elsewhere are left untouched.</p>
     <div class="scenario-grid mt">${DEMOS.map((s) => html`<div class="scenario-card">
       <div class="grow"><b>${s.title}</b><p class="tiny">${s.desc}</p></div>
-      <button type="button" class="btn sm primary" data-demo="${s.key}">${s.label} ›</button></div>`)}</div>
+      <div class="row tight">
+        <button type="button" class="btn sm primary" data-resume="${s.key}">Resume ›</button>
+        <button type="button" class="btn sm" data-fresh="${s.key}">Start fresh</button>
+      </div></div>`)}</div>
 
-    <p class="tiny mt">${simNote("Acronyms are explained at first use: SOA (Statement of Account), BI (Billing Invoice, from ONS), BCF (Billing Collection Form), ONS (the official billing system), OR (Official Receipt). ONS sync, reminders, PDF generation, calculations, lapsation and reactivation are all simulated prototype behaviour.")}</p>`.s;
+    <p class="tiny mt">${simNote("Acronyms are explained at first use: SOA (Statement of Account), BI (Billing Invoice, from Oracle NetSuite), BCF (Billing Collection Form), ONS (Oracle NetSuite — the official billing system), OR (Official Receipt). Oracle NetSuite sync, reminders, PDF generation, calculations, lapsation and reactivation are all simulated prototype behaviour.")}</p>`.s;
 
   highlightNav("home");
   document.title = "Billing & Collections";
   wireRoleSwitcher(() => renderHome(main, query));
   main.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => renderHome(main, { ...query, tab: b.dataset.tab })));
-  main.querySelectorAll("[data-demo]").forEach((b) => (b.onclick = () => { const d = DEMOS.find((x) => x.key === b.dataset.demo); if (d) d.go(); }));
+  main.querySelectorAll("[data-resume]").forEach((btn) => (btn.onclick = () => {
+    const d = DEMOS.find((x) => x.key === btn.dataset.resume); if (!d) return;
+    if (d.collect) return go(BILL.collect(d.collect));
+    const b = getBill(d.bill); if (b) go(BILL.bill(b));
+  }));
+  main.querySelectorAll("[data-fresh]").forEach((btn) => (btn.onclick = async () => {
+    const d = DEMOS.find((x) => x.key === btn.dataset.fresh); if (!d) return;
+    const id = d.bill || d.collect;
+    if (!(await confirmDialog("Start a fresh sample run?", "Resets just this demo's sample bill to its starting state. Other demos and completed examples are untouched.", { confirm: "Start fresh" }))) return;
+    resetBill(id); toast("Fresh sample loaded.", "ok");
+    if (d.collect) return go(BILL.collect(id));
+    go(BILL.billAt(id, "endorsement"));
+  }));
   main.querySelectorAll("[data-open]").forEach((el) => (el.onclick = () => go(el.dataset.open)));
   main.querySelector("#resetDemo").onclick = async () => {
     if (!(await confirmDialog("Reset this demo?", "Restores the Billing & Collections sample data to its starting state. Other demos (Sales, Actuarial, MDA, Provider Networks, Claims, Customer Care) are untouched.", { confirm: "Reset", kind: "danger" }))) return;
@@ -174,16 +192,16 @@ function billingTable(rows) {
 function collectTable(rows) {
   if (!rows.length) return emptyState({ icon: "inbox", title: "Nothing here", body: "No invoices match this view." });
   return html`<div class="tbl-wrap mt"><table class="tbl cardify rowlink"><thead><tr>
-    <th>Invoice (BI)</th><th>Account</th><th>Amount</th><th>Outstanding</th><th>Due</th><th>Aging</th><th>Status</th><th>Last synced</th></tr></thead>
-    <tbody>${rows.map((b) => { const st = collectionStatus(b); const dtd = daysToDue(b.dueDate); return html`<tr class="rowlink" data-open="${BILL.collect(b.id)}" tabindex="0">
+    <th>Invoice (BI)</th><th>Account</th><th>Owner</th><th>Amount</th><th>Outstanding</th><th>Due</th><th>Aging</th><th>Status &amp; flags</th></tr></thead>
+    <tbody>${rows.map((b) => { const st = collectionStatus(b); const flags = collectionFlags(b); const dtd = daysToDue(b.dueDate); return html`<tr class="rowlink" data-open="${BILL.collect(b.id)}" tabindex="0">
       <td><b>${b.biNo || b.id}</b><div class="tiny muted">${b.soaNo || ""}</div></td>
       <td class="tiny">${b.account.name}</td>
+      <td class="tiny">${b.owner || "—"}</td>
       <td class="num">${peso(b.total)}</td>
       <td class="num">${peso(outstanding(b))}</td>
-      <td class="tiny">${fmtD(b.dueDate)}${dtd != null && dtd < 0 ? html`<div class="tiny danger">${Math.abs(dtd)}d overdue</div>` : dtd != null && dtd <= 7 ? html`<div class="tiny warn">in ${dtd}d</div>` : ""}</td>
+      <td class="tiny">${fmtD(b.dueDate)}${isOverdue(b) ? html`<div class="tiny danger">${Math.abs(dtd)}d overdue</div>` : dtd != null && dtd >= 0 && dtd <= 7 ? html`<div class="tiny warn">in ${dtd}d</div>` : ""}</td>
       <td class="tiny">${AGING_LABELS[ageBucket(b)]}</td>
-      <td>${pill(st.label, st.tone)}</td>
-      <td class="tiny muted">${b.lastSync ? "synced" : "—"}</td></tr>`; })}</tbody></table></div>`;
+      <td>${pill(st.label, st.tone)}${flags.map((f) => html` ${pill(f.label, f.tone)}`)}</td></tr>`; })}</tbody></table></div>`;
 }
 
 // -------------------------------------------------------------- full worklists
@@ -191,13 +209,13 @@ function renderWorklist(main, query, side) {
   const isBilling = side === "billing";
   const buckets = isBilling ? BILLING_BUCKETS : COLLECT_BUCKETS;
   const all = isBilling ? billingBills() : collectionBills();
-  const bucketOf = isBilling ? billBucket : collectBucket;
+  const matches = (b, key) => isBilling ? billBucket(b) === key : inCollectBucket(b, key);
   const activeBucket = query.bucket && buckets.some((b) => b.key === query.bucket) ? query.bucket : "all";
   const unit = query.unit && BILLING_UNITS.includes(query.unit) ? query.unit : "";
   const q = (query.q || "").toLowerCase().trim();
 
   let rows = all.slice();
-  if (activeBucket !== "all") rows = rows.filter((b) => bucketOf(b) === activeBucket);
+  if (activeBucket !== "all") rows = rows.filter((b) => matches(b, activeBucket));
   if (unit) rows = rows.filter((b) => billingUnitOf(b) === unit);
   if (q) rows = rows.filter((b) => [b.id, b.soaNo, b.biNo, b.account.name, kindLabel(b.kind), b.account.code].some((x) => String(x || "").toLowerCase().includes(q)));
   rows.sort((a, b) => String(a.dueDate || a.createdAt).localeCompare(String(b.dueDate || b.createdAt)));
@@ -205,11 +223,11 @@ function renderWorklist(main, query, side) {
   main.innerHTML = html`
     ${backBar([{ label: isBilling ? "Billing worklist" : "Collections worklist" }])}
     <div class="page-head"><div><h1>${isBilling ? "Billing worklist" : "Collections worklist"}</h1>
-      <p class="muted">${isBilling ? "Every bill before its invoice is sent — new endorsements, returns, draft SOAs, items for approval and items ready for ONS." : "Every sent invoice — due dates, aging, follow-up history and the next action. A stale or unavailable sync is never shown as “paid”."}</p></div></div>
+      <p class="muted">${isBilling ? "Every bill before its invoice is sent — new endorsements, returns, draft SOAs, items for approval and items ready for Oracle NetSuite." : "Every sent invoice — due dates, aging, follow-up history and the next action. A stale or unavailable sync is never shown as “paid”."}</p></div></div>
 
     <div class="seg mt wrap" role="tablist" aria-label="Filter">
       <button role="tab" class="${activeBucket === "all" ? "on" : ""}" aria-selected="${activeBucket === "all"}" data-bucket="all">All <span class="cnt">${all.length}</span></button>
-      ${buckets.map((k) => { const n = all.filter((b) => bucketOf(b) === k.key).length; return html`<button role="tab" class="${activeBucket === k.key ? "on" : ""}" aria-selected="${activeBucket === k.key}" data-bucket="${k.key}">${k.label} <span class="cnt">${n}</span></button>`; })}
+      ${buckets.map((k) => { const n = all.filter((b) => matches(b, k.key)).length; return html`<button role="tab" class="${activeBucket === k.key ? "on" : ""}" aria-selected="${activeBucket === k.key}" data-bucket="${k.key}">${k.label} <span class="cnt">${n}</span></button>`; })}
     </div>
 
     <div class="row tight mt filters">

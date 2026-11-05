@@ -22,8 +22,9 @@ import { icon, pill, successOverlay } from "../components.js";
 import {
   getBill, resetBill, BILL, BILL_STEPS, billNext, billStatus, kindLabel, kindTag,
   proRata, installments, tpaAccess, tpaUtil, tpaFund, getConfig,
-  acceptEndorsement, returnEndorsement, prepareSoa, approveSoa, downloadUpload, receiveBi,
-  sendInvoice, uploadFileName, peso, fmtD, currentRole, round2,
+  acceptEndorsement, returnEndorsement, receiveCorrectedEndorsement, prepareSoa, approveSoa,
+  returnSoa, downloadUpload, receiveBi, PREPARER, APPROVER,
+  sendInvoice, uploadFileName, peso, fmtD, round2,
 } from "./bc-core.js";
 import {
   highlightNav, backBar, caseHead, timelineStrip, nextStrip, wireNext, stepsNav, checkList,
@@ -38,7 +39,7 @@ const defs = {
   status: (b) => billStatus(b),
   stepHref: (b, k) => BILL.billAt(b.id, k),
   doneTitle: "The invoice has been sent.",
-  doneWhy: "The SOA is approved, the official ONS invoice (BI) is linked and the invoice is sent. Collections now tracks it — with its due date, aging and follow-up history.",
+  doneWhy: "The SOA is approved, the official Oracle NetSuite (ONS) invoice (BI) is linked and the invoice is sent. Collections now tracks it — with its due date, aging and follow-up history.",
   docs: (b) => billDocs(b),
 };
 function billDocs(b) {
@@ -48,9 +49,9 @@ function billDocs(b) {
   ];
   if (b.soaNo) docs.push({ key: "soa", name: `Statement of Account ${b.soaNo}`, supplied: true, source: `Prepared by ${b.preparer || "Billing"}`, letter: soaLetter(b) });
   if (b.attachment) docs.push({ key: "att", name: "Client attachment", supplied: true, source: "Built from account template", letter: attachmentLetter(b) });
-  if (b.uploadDownloaded) docs.push({ key: "upl", name: uploadFileName(b), supplied: true, source: "ONS upload file (simulated)" });
-  if (b.biNo) docs.push({ key: "bi", name: `ONS Billing Invoice ${b.biNo}`, supplied: true, source: "Created by ONS", letter: invoiceLetter(b) });
-  else docs.push({ key: "bi", name: "ONS Billing Invoice (BI)", supplied: false, note: "Not yet created by ONS." });
+  if (b.uploadDownloaded) docs.push({ key: "upl", name: uploadFileName(b), supplied: true, source: "Oracle NetSuite upload file (simulated)" });
+  if (b.biNo) docs.push({ key: "bi", name: `Oracle NetSuite Billing Invoice ${b.biNo}`, supplied: true, source: "Created by Oracle NetSuite", letter: invoiceLetter(b) });
+  else docs.push({ key: "bi", name: "Oracle NetSuite Billing Invoice (BI)", supplied: false, note: "Not yet created by Oracle NetSuite." });
   return docs;
 }
 
@@ -107,8 +108,9 @@ function stepEndorsement(body, ctx) {
   if (b.kind === "ifg") checks.unshift({ ok: !!e.paymentValidated, label: "Payment validated (bill-first)", note: e.paymentValidated ? "Deposit validated by Accounting before endorsement" : "Payment not yet validated — do not bill" });
 
   body.innerHTML = html`
-    ${whatYouDo("Read exactly what was endorsed — carried straight from MDA / Claims, so nothing is retyped. Accept it to start the SOA, or return it to MDA with a clear reason.")}
-    ${b.returned ? html`<div class="note danger"><b>Returned to MDA.</b> ${b.returnReason} — re-open when the corrected endorsement comes back.</div>` : ""}
+    ${whatYouDo(`Read exactly what was endorsed — carried straight from ${b.endorsedBy || "MDA / Claims"}, so nothing is retyped. Accept it to start the SOA, or return it to ${b.endorsedBy || "the source team"} with a clear reason.`)}
+    ${b.returned ? html`<div class="note danger"><b>Returned to ${b.returnedTo || b.endorsedBy || "the source team"}.</b> ${b.returnReason}
+      <div class="row tight mt"><button type="button" class="btn sm" id="bcReceiveCorrected">${icon("inbox", 14)} Receive corrected endorsement (simulated)</button></div></div>` : ""}
     <div class="grid2">
       <div class="card pad">
         <h3 class="sec-title">Endorsement <span class="tiny muted">· from ${b.endorsedBy}</span></h3>
@@ -136,28 +138,43 @@ function stepEndorsement(body, ctx) {
       ${a.notes ? html`<p class="tiny muted mt">${icon("help", 12)} ${a.notes}</p>` : ""}</div>
 
     <div class="savebar mt">
-      <button type="button" class="btn ghost" id="bcReturn">${icon("arrowr", 14)} Return to MDA…</button>
+      <button type="button" class="btn ghost" id="bcReturn">${icon("arrowr", 14)} Return to ${b.endorsedBy || "source team"}…</button>
       <button type="button" class="btn primary" id="bcPrimary">Accept endorsement & prepare SOA ›</button></div>`.s;
 
+  document.getElementById("bcReceiveCorrected")?.addEventListener("click", () => {
+    receiveCorrectedEndorsement(b);
+    toast(`Corrected endorsement received from ${b.returnedTo || b.endorsedBy || "source team"}.`, "ok");
+    ctx.refresh();
+  });
   document.getElementById("bcPrimary").onclick = () => {
     acceptEndorsement(b);
     toast("Endorsement accepted.", "ok");
     ctx.goStep("soa");
   };
   document.getElementById("bcReturn").onclick = async () => {
+    const team = b.endorsedBy || "MDA";
     const r = await dialog({
-      title: "Return endorsement to MDA", body: html`
-        ${illus("Returning keeps the bill but sends it back to MDA for clarification — it will appear under “Returned for clarification”.")}
+      title: `Return endorsement to ${team}`, body: html`
+        ${illus(`Returning keeps the bill but sends it back to ${team} for clarification — it will appear under “Returned for clarification”, and ${team} can send a corrected endorsement back.`)}
         <div class="field mt"><label for="rr">Reason</label><textarea id="rr" name="rr" class="inp" rows="3" placeholder="What needs clarifying?"></textarea></div>
         <div class="row tight mt">${sampleBtn("rrS", "Load sample reason")}</div>`,
-      actions: [{ label: "Cancel" }, { label: "Return to MDA", kind: "danger", value: "ok" }],
-      onOpen: (dlg) => { dlg.querySelector("#rrS").onclick = () => fillForm(dlg, { "#rr": "Member movement list and the signed SOB count do not match (list shows 3, SOB addendum shows 2). Please reconcile and re-endorse." }); },
+      actions: [{ label: "Cancel" }, { label: `Return to ${team}`, kind: "danger", value: "ok" }],
+      onOpen: (dlg) => { dlg.querySelector("#rrS").onclick = () => fillForm(dlg, { "#rr": sampleReturnReason(b) }); },
     });
     if (r?.action !== "ok") return;
     returnEndorsement(b, r.values.rr);
-    toast("Returned to MDA.", "ok");
+    toast(`Returned to ${team}.`, "ok");
     ctx.refresh();
   };
+}
+
+// A return reason that fits the actual case — never a "3 vs 2 members" reason on a
+// 310-member TPA account.
+function sampleReturnReason(b) {
+  if (b.kind === "ifg") return "The validated-deposit reference on the paid member list does not match the deposit advice. Please reconcile and re-endorse before we bill.";
+  if (b.kind === "tpa-access") return `The endorsed member count (${(b.endorsement && b.endorsement.memberCount) || b.account.memberCount}) needs confirming against the latest active list before we bill the access / ID fees.`;
+  if (b.kind === "tpa-util") return "The utilization export total needs confirming against the reconciled Claims figure before we bill the admin fee.";
+  return "Member movement list and the signed SOB count do not match (list shows 3, SOB addendum shows 2). Please reconcile and re-endorse.";
 }
 
 // ============================================================== Step 2 — prepare SOA
@@ -165,14 +182,15 @@ function stepSoa(body, ctx) {
   const b = ctx.rec;
   body.innerHTML = html`
     ${whatYouDo("Read the calculation (it reconciles line by line), generate the internal SOA number and build the client attachment from this account's saved template — with the correct policy and member numbers already filled in.")}
+    ${b.reviewReturn ? html`<div class="note warn"><b>Returned by ${b.reviewReturn.by} (Billing Supervisor).</b> ${b.reviewReturn.comment} — revise and re-submit.</div>` : ""}
     ${calcCard(b)}
     ${attachmentCard(b)}
     ${b.kind === "corporate" ? splitCard() : ""}
-    ${saveBar(b.done.soa ? "SOA prepared — continue to review" : "Generate SOA number & build attachment")}`.s;
+    ${saveBar(b.done.soa ? "SOA prepared — continue as Billing Supervisor" : "Generate SOA & continue as Billing Supervisor")}`.s;
 
   document.getElementById("bcPrimary").onclick = () => {
     prepareSoa(b, { note: `Client attachment for ${b.account.name}`, builtAt: new Date().toISOString() });
-    toast(`SOA ${b.soaNo} prepared.`, "ok");
+    toast(`SOA ${b.soaNo} prepared by ${PREPARER.who}.`, "ok");
     ctx.goStep("review");
   };
 }
@@ -207,13 +225,21 @@ function corpCalc(b) {
 
 function ifgCalc(b) {
   const s = installments(b);
-  return html`<div class="card pad mt"><h3 class="sec-title">IFG installment schedule <span class="tiny muted">· ${s.frequency}</span></h3>
-    ${illus("Bill-first: the deposit was validated before this endorsement, so this invoice is the first installment. The schedule reconciles to the annual premium.")}
-    <table class="tbl calc mt"><tbody>${row("Annual premium (family)", peso(s.annual))}${row(`${s.frequency} installment`, peso(s.each))}</tbody></table>
+  const paidCount = b.ifg.paidCount || 0;
+  const dueNow = s.rows[paidCount] || s.rows[0];
+  return html`<div class="card pad mt"><h3 class="sec-title">IFG annual invoice &amp; installment schedule <span class="tiny muted">· ${s.frequency}</span></h3>
+    ${illus("Bill-first: one annual invoice is raised and billed in installments. The deposit was validated by Accounting before this endorsement, so the first installment is already covered.")}
+    <table class="tbl calc mt"><tbody>
+      ${row("Annual premium (family)", peso(s.annual), true)}
+      ${row(`${s.frequency} installment`, peso(s.each))}
+      ${row(html`First installment <span class="tiny muted">(validated deposit)</span>`, peso(s.rows[0].amount))}
+      ${row(html`This annual invoice total`, peso(s.annual), true)}
+      ${row(html`Installment due now <span class="tiny muted">(#${dueNow.n}, ${fmtD(dueNow.due)})</span>`, peso(dueNow.amount))}
+    </tbody></table>
     <table class="tbl mt"><thead><tr><th>#</th><th>Due date</th><th class="num">Amount</th><th>Status</th></tr></thead>
       <tbody>${s.rows.map((r) => html`<tr><td>${r.n}</td><td class="tiny">${fmtD(r.due)}</td><td class="num">${peso(r.amount)}</td>
-        <td>${r.paid ? pill("Paid (deposit)", "ok") : r.n === (b.ifg.paidCount || 0) + 1 ? pill("This invoice", "info") : pill("Upcoming", "neutral")}</td></tr>`)}</tbody></table>
-    ${boundary("Membership activates only after payment validation — never before. The schedule above shows upcoming installments Collections will track.")}</div>`;
+        <td>${r.paid ? pill("Paid — validated deposit", "ok") : r.n === paidCount + 1 ? pill("Due next", "info") : pill("Upcoming", "neutral")}</td></tr>`)}</tbody></table>
+    ${boundary("The annual invoice (₱" + Math.round(s.annual).toLocaleString() + ") is distinct from the installment due now (₱" + Math.round(dueNow.amount).toLocaleString() + "). Membership activates only after payment validation — never before.")}</div>`;
 }
 
 function accessCalc(b) {
@@ -275,59 +301,77 @@ function splitCard() {
 // ============================================================== Step 3 — supervisor review
 function stepReview(body, ctx) {
   const b = ctx.rec;
-  const cur = currentRole();
-  const canApprove = true;
+  const approved = !!b.done.review;
   body.innerHTML = html`
-    ${whatYouDo("Review the prepared SOA before it goes to ONS, then approve it.")}
+    ${whatYouDo("You are now continuing as the Billing Supervisor — no need to go back to the dashboard or switch roles. Review the prepared SOA and approve it, or return it to the preparer with a comment.")}
     <div class="card pad">
-      <h3 class="sec-title">SOA ${b.soaNo} — for approval</h3>
+      <h3 class="sec-title">SOA ${b.soaNo} — supervisor review</h3>
       <dl class="dl mt">
         <div><dt>Account</dt><dd>${b.account.name} · ${kindTag(b.kind)}</dd></div>
-        <div><dt>Prepared by</dt><dd>${b.preparer || "—"} <span class="tiny muted">(Billing Specialist)</span></dd></div>
+        <div><dt>Prepared by</dt><dd>${b.preparer || PREPARER.who} <span class="tiny muted">(Billing Specialist)</span></dd></div>
+        <div><dt>Reviewer</dt><dd>${APPROVER.who} <span class="tiny muted">(Billing Supervisor — a different person)</span></dd></div>
         <div><dt>Total</dt><dd><b>${peso(b.total)}</b></dd></div>
       </dl>
       <div class="row tight mt"><button type="button" class="btn ghost sm" id="bcPrevSoa">${icon("file", 14)} Preview SOA</button></div>
     </div>
 
-    <div class="card pad mt">
-      <h3 class="sec-title">Approval</h3>
-      <p class="tiny">Acting as <b>${cur.who}</b> — ${cur.full}.</p>
-      <div class="note info mt"><b>Ready to approve.</b> Review the prepared SOA (by ${b.preparer || "—"}), then approve it to send to ONS.</div>
-    </div>
-    <div class="savebar mt"><div></div>
-      <button type="button" class="btn primary" id="bcPrimary" ${canApprove ? "" : raw("disabled")}>Approve SOA ›</button></div>`.s;
+    ${approved
+      ? html`<div class="card pad mt"><div class="note ok mt"><b>Approved by ${b.approver}.</b> The SOA is cleared — continue to the Oracle NetSuite (ONS) handoff.</div></div>
+        <div class="savebar mt"><div></div><button type="button" class="btn primary" id="bcPrimary">Continue to Oracle NetSuite handoff ›</button></div>`
+      : html`<div class="card pad mt">
+          <h3 class="sec-title">Awaiting supervisor review</h3>
+          <div class="note info mt"><b>Maker–checker.</b> ${PREPARER.who} prepared this SOA; ${APPROVER.who} approves it — two different recorded people. Approving here records ${APPROVER.who} as the approver.</div>
+        </div>
+        <div class="savebar mt">
+          <button type="button" class="btn ghost" id="bcReturnSoa">${icon("arrowr", 14)} Return with comment…</button>
+          <button type="button" class="btn primary" id="bcPrimary">Approve as Billing Supervisor (${APPROVER.who}) ›</button></div>`}`.s;
 
   document.getElementById("bcPrevSoa").onclick = () => previewLetter(soaLetter(b));
   const p = document.getElementById("bcPrimary");
-  if (p && canApprove) p.onclick = () => { approveSoa(b); toast("SOA approved.", "ok"); ctx.goStep("ons"); };
+  if (p) p.onclick = () => {
+    if (!b.done.review) { approveSoa(b); toast(`SOA approved by ${b.approver}.`, "ok"); ctx.refresh(); return; }
+    ctx.goStep("ons");
+  };
+  document.getElementById("bcReturnSoa")?.addEventListener("click", async () => {
+    const r = await dialog({
+      title: "Return SOA to the preparer", body: html`
+        ${illus("Returning sends the SOA back to the preparer with your comment — it stays in the same case, no dashboard trip.")}
+        <div class="field mt"><label for="rc">Comment to ${b.preparer || PREPARER.who}</label><textarea id="rc" name="rc" class="inp" rows="3" placeholder="What should be changed?"></textarea></div>
+        <div class="row tight mt">${sampleBtn("rcS", "Load sample comment")}</div>`,
+      actions: [{ label: "Cancel" }, { label: "Return to preparer", kind: "danger", value: "ok" }],
+      onOpen: (dlg) => { dlg.querySelector("#rcS").onclick = () => fillForm(dlg, { "#rc": "Please show the per-branch split on the client attachment before this goes to Oracle NetSuite." }); },
+    });
+    if (r?.action !== "ok") return;
+    returnSoa(b, r.values.rc); toast("SOA returned to the preparer.", "ok"); ctx.goStep("soa");
+  });
 }
 
 // ============================================================== Step 4 — ONS upload & invoice
 function stepOns(body, ctx) {
   const b = ctx.rec;
   body.innerHTML = html`
-    ${whatYouDo("Download the ONS upload file for the approved SOA, then record the official Billing Invoice (BI) number ONS creates and link it to this SOA.")}
-    ${boundary(html`<b>HMS prepares the SOA and the upload file. ONS creates the official, BIR-compliant invoice (the BI number).</b> HMS never posts directly to ONS and never produces the official invoice itself.`)}
+    ${whatYouDo("Download the Oracle NetSuite (ONS) upload file for the approved SOA, then record the official Billing Invoice (BI) number Oracle NetSuite creates and link it to this SOA.")}
+    ${boundary(html`<b>HMS prepares the SOA and the upload file. Oracle NetSuite (ONS) creates the official, BIR-compliant invoice (the BI number).</b> HMS never posts directly to Oracle NetSuite and never produces the official invoice itself.`)}
     <div class="grid2 mt">
       <div class="card pad">
-        <h3 class="sec-title">1 · ONS upload file</h3>
+        <h3 class="sec-title">1 · Oracle NetSuite upload file</h3>
         <p class="tiny">A machine-readable file with the correct member numbers — no broken export, no manual re-keying.</p>
         <div class="file-chip mt">${icon("file", 16)} <b>${uploadFileName(b)}</b></div>
-        <div class="row tight mt"><button type="button" class="btn ${b.uploadDownloaded ? "ghost" : "primary"} sm" id="bcDl">${icon("download", 14)} ${b.uploadDownloaded ? "Downloaded — download again" : "Download ONS upload file"}</button></div>
+        <div class="row tight mt"><button type="button" class="btn ${b.uploadDownloaded ? "ghost" : "primary"} sm" id="bcDl">${icon("download", 14)} ${b.uploadDownloaded ? "Downloaded — download again" : "Download upload file"}</button></div>
         ${b.uploadDownloaded ? html`<p class="tiny ok mt">${icon("check", 12)} Upload file generated (simulated).</p>` : ""}
       </div>
       <div class="card pad">
-        <h3 class="sec-title">2 · Official invoice from ONS</h3>
-        <p class="tiny">Simulate the ONS handoff: ONS creates the official invoice and returns a BI number, which we link to SOA ${b.soaNo}.</p>
-        ${b.biNo ? html`<div class="note info mt"><b>BI ${b.biNo}</b> received from ONS and linked to ${b.soaNo}.</div>`
-          : html`<div class="row tight mt"><button type="button" class="btn primary sm" id="bcBi" ${b.uploadDownloaded ? "" : raw("disabled")}>${icon("building", 14)} Simulate ONS invoice (receive BI)</button></div>
+        <h3 class="sec-title">2 · Official invoice from Oracle NetSuite</h3>
+        <p class="tiny">Simulate the Oracle NetSuite handoff: it creates the official invoice and returns a BI number, which we link to SOA ${b.soaNo}.</p>
+        ${b.biNo ? html`<div class="note info mt"><b>BI ${b.biNo}</b> received from Oracle NetSuite and linked to ${b.soaNo}.</div>`
+          : html`<div class="row tight mt"><button type="button" class="btn primary sm" id="bcBi" ${b.uploadDownloaded ? "" : raw("disabled")}>${icon("building", 14)} Simulate Oracle NetSuite invoice (receive BI)</button></div>
             ${!b.uploadDownloaded ? html`<p class="tiny muted mt">Download the upload file first.</p>` : ""}`}
       </div>
     </div>
     ${saveBar(b.biNo ? "Continue to send the invoice" : "Receive the BI to continue", "bcPrimary")}`.s;
 
-  document.getElementById("bcDl").onclick = () => { downloadUpload(b); toast("ONS upload file generated.", "ok"); ctx.refresh(); };
-  document.getElementById("bcBi")?.addEventListener("click", () => { receiveBi(b); toast(`BI ${b.biNo} received from ONS.`, "ok"); ctx.refresh(); });
+  document.getElementById("bcDl").onclick = () => { downloadUpload(b); toast("Upload file generated.", "ok"); ctx.refresh(); };
+  document.getElementById("bcBi")?.addEventListener("click", () => { receiveBi(b); toast(`BI ${b.biNo} received from Oracle NetSuite.`, "ok"); ctx.refresh(); });
   const p = document.getElementById("bcPrimary");
   if (p) p.onclick = () => { if (!b.biNo) { toast("Receive the BI number first.", "warn"); return; } ctx.goStep("send"); };
 }
@@ -358,7 +402,7 @@ function stepSend(body, ctx) {
       tone: "ok", heading: "Invoice sent",
       lead: `${b.biNo} · ${peso(b.total)} to ${b.account.name}. Due ${fmtD(b.dueDate)} — now tracked in Collections.`,
       statusPill: { label: "Sent · in Collections", tone: "info" },
-      note: "Simulated — nothing was really sent. HMS prepared the SOA and upload file; ONS created the official invoice.",
+      note: "Simulated — nothing was really sent. HMS prepared the SOA and upload file; Oracle NetSuite created the official invoice.",
       primary: { label: "Open in Collections", href: BILL.collect(b.id) },
       secondary: { label: "Billing dashboard", href: BILL.home },
     });
@@ -380,8 +424,8 @@ function attachmentLetter(b) {
     lines: [["Template", b.account.attachmentTemplate || "—"], ["Policy / plan", b.account.planCode], ["Medical detail", b.kind.startsWith("tpa") ? "Hidden from client-facing attachment" : "Not applicable"], ["Note", (b.attachment && b.attachment.note) || "—"]] };
 }
 function invoiceLetter(b) {
-  return { title: `Billing Invoice ${b.biNo || ""}`, kind: "Official invoice (created by ONS) + attachment", ribbon: "DEMO PREVIEW — the official invoice is created by ONS, not HMS",
-    lines: [["BI number (ONS)", b.biNo || "—"], ["Linked SOA (HMS)", b.soaNo || "—"], ["Account", b.account.name], ["Amount", peso(b.total)], ["Deliver to", b.account.billingContact], ["Terms", `${b.account.termDays} days`]] };
+  return { title: `Billing Invoice ${b.biNo || ""}`, kind: "Official invoice (created by Oracle NetSuite) + attachment", ribbon: "DEMO PREVIEW — the official invoice is created by Oracle NetSuite, not HMS",
+    lines: [["BI number (Oracle NetSuite)", b.biNo || "—"], ["Linked SOA (HMS)", b.soaNo || "—"], ["Account", b.account.name], ["Amount", peso(b.total)], ["Deliver to", b.account.billingContact], ["Terms", `${b.account.termDays} days`]] };
 }
 
 export { defs as billDefs };

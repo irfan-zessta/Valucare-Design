@@ -19,9 +19,13 @@ import { money, int } from "../core.js";
 export const STORE_KEY = "hms-bc:v1";
 export const GUIDE_KEY = "hms-bc-guide";
 export const ROLE_KEY = "hms-bc-role";
-const BASELINE = 1; // bump to force a reseed when the sample data shape changes
+const BASELINE = 2; // bump to force a reseed when the sample data shape changes
 
-export const DEMO_NOW_ISO = "2026-11-03"; // one demo "now" so ages and dates agree
+// One demo "now" — a single, clearly-labelled scenario date used for EVERY calculation
+// (invoice dates, terms, due dates, days overdue, installment countdowns, upcoming cycles)
+// so no two screens disagree. Shown in the UI as "Scenario date".
+export const DEMO_NOW_ISO = "2026-11-03";
+export const SCENARIO_DATE_LABEL = "3 Nov 2026 (scenario date)";
 
 // -------------------------------------------------------------- demo roles
 // Only roles the source confirms sit INSIDE Billing & Collections. A demo role switcher
@@ -30,8 +34,8 @@ export const DEMO_NOW_ISO = "2026-11-03"; // one demo "now" so ages and dates ag
 // MDA, Claims, Accounting, Treasury and clients appear as HANDOFF PARTICIPANTS in the
 // records, never as interchangeable Billing users.
 export const ROLES = [
-  { key: "bspec", name: "Billing Specialist", full: "Billing Specialist", who: "Elena Santos", can: "Check endorsements, prepare the SOA and the ONS upload file." },
-  { key: "bsup", name: "Billing Supervisor", full: "Billing Supervisor / Asst. Supervisor", who: "Marco Reyes", can: "Review and approve SOAs before they go to ONS (a different person from the preparer)." },
+  { key: "bspec", name: "Billing Specialist", full: "Billing Specialist", who: "Elena Santos", can: "Check endorsements, prepare the SOA and the Oracle NetSuite (ONS) upload file." },
+  { key: "bsup", name: "Billing Supervisor", full: "Billing Supervisor / Asst. Supervisor", who: "Marco Reyes", can: "Review and approve SOAs before they go to Oracle NetSuite (a different person from the preparer)." },
   { key: "cspec", name: "Collection Specialist", full: "Collection Specialist", who: "Rita Flores", can: "Follow up invoices, log promises, disputes and payment advice." },
   { key: "csup", name: "Collection Supervisor", full: "Collection Supervisor", who: "Paolo Dizon", can: "Oversee the collections worklist and approve adjustments." },
   { key: "dmgr", name: "Department Manager", full: "Department Manager", who: "Grace Lim", can: "Oversee both billing and collections; sign off exceptions." },
@@ -44,8 +48,8 @@ export function setRole(key) { try { localStorage.setItem(ROLE_KEY, key); } catc
 // Explained at first use throughout the UI — plain language next to the HMS3 / finance term.
 export const ACRONYMS = {
   SOA: "Statement of Account — the billing summary Billing prepares and sends for a period or event.",
-  BI: "Billing Invoice — the official, BIR-compliant invoice number created by ONS (not by HMS).",
-  ONS: "Online System — the external official billing / accounting system that issues the invoice and receipt.",
+  BI: "Billing Invoice — the official, BIR-compliant invoice number created by Oracle NetSuite (not by HMS).",
+  ONS: "Oracle NetSuite — the external official billing / accounting system that issues the invoice and the receipt.",
   BCF: "Billing Collection Form — the internal form that hands a received payment to Treasury.",
   OR: "Official Receipt — the receipt Treasury / ONS issues once a payment is officially posted.",
   MBL: "Maximum Benefit Limit — the overall ceiling the plan will pay in a policy year.",
@@ -153,7 +157,7 @@ export const BILL_STEPS = [
   { key: "endorsement", n: 1, label: "Review endorsement", owner: "Billing Specialist" },
   { key: "soa", n: 2, label: "Prepare SOA", owner: "Billing Specialist" },
   { key: "review", n: 3, label: "Supervisor review", owner: "Billing Supervisor" },
-  { key: "ons", n: 4, label: "ONS upload & invoice", owner: "Billing Specialist" },
+  { key: "ons", n: 4, label: "Oracle NetSuite invoice", owner: "Billing Specialist" },
   { key: "send", n: 5, label: "Send invoice", owner: "Billing Specialist" },
 ];
 
@@ -163,45 +167,79 @@ function ensureBill(b) {
   b.promises = b.promises || [];
   b.disputes = b.disputes || [];
   b.advices = b.advices || [];
+  b.remittances = b.remittances || [];
   b.payments = b.payments || [];
+  b.creditMemos = b.creditMemos || [];
+  b.refunds = b.refunds || [];
   b.attachment = b.attachment || null;
+  // Owner is stored on the record, independent of the demo viewer.
+  if (!b.owner) b.owner = b.done.send ? "Rita Flores" : "Elena Santos";
   return b;
 }
 
 // What is the next billing action? Returns null once the invoice is sent (then it is a
 // collections record).
 export function billNext(b) {
-  if (b.returned) return { step: "endorsement", label: "Re-check the returned endorsement", owner: "Billing Specialist", sentence: "This endorsement was returned to MDA for clarification. Re-open it when the corrected endorsement comes back." };
+  if (b.returned) return { step: "endorsement", label: "Re-check the returned endorsement", owner: "Billing Specialist", sentence: `This endorsement was returned to ${b.returnedTo || b.endorsedBy || "the source team"} for clarification. Re-open it when the corrected endorsement comes back.` };
   if (!b.done.endorsement) return { step: "endorsement", label: "Check the endorsement", owner: "Billing Specialist", sentence: "Review what MDA / Sales / Claims endorsed. Accept it to start the SOA, or return it to MDA with a reason." };
   if (!b.done.soa) return { step: "soa", label: "Prepare the SOA", owner: "Billing Specialist", sentence: "Build the calculation and the client attachment from the saved account template, then generate the internal SOA number." };
-  if (!b.done.review) return { step: "review", label: "Send to supervisor review", owner: "Billing Supervisor", sentence: "A Billing Supervisor (a different person from the preparer) reviews and approves the SOA before it goes to ONS." };
-  if (!b.done.ons) return { step: "ons", label: "Create the ONS upload & invoice", owner: "Billing Specialist", sentence: "Download the ONS upload file, then record the official Billing Invoice (BI) number ONS creates." };
+  if (!b.done.review) return { step: "review", label: "Review & approve the SOA", owner: "Billing Supervisor", sentence: "Continuing as the Billing Supervisor (a different person from the preparer), review the prepared SOA and approve it — or return it with a comment — before it goes to Oracle NetSuite." };
+  if (!b.done.ons) return { step: "ons", label: "Create the Oracle NetSuite invoice", owner: "Billing Specialist", sentence: "Download the Oracle NetSuite (ONS) upload file, then record the official Billing Invoice (BI) number Oracle NetSuite creates." };
   if (!b.done.send) return { step: "send", label: "Send the invoice", owner: "Billing Specialist", sentence: "Preview the combined invoice and attachment, then mark it delivered with a timestamp." };
   return null;
 }
 
 export function billStatus(b) {
-  if (b.returned) return { label: "Returned to MDA", tone: "danger" };
+  if (b.returned) return { label: `Returned to ${b.returnedTo || b.endorsedBy || "source team"}`, tone: "danger" };
   if (!b.done.endorsement) return { label: "New endorsement", tone: "warn" };
   if (!b.done.soa) return { label: "Draft SOA", tone: "info" };
   if (!b.done.review) return { label: "For approval", tone: "warn" };
-  if (!b.done.ons) return { label: "Ready for ONS", tone: "info" };
+  if (!b.done.ons) return { label: "Ready for Oracle NetSuite", tone: "info" };
   if (!b.done.send) return { label: "Invoice ready to send", tone: "info" };
   // Sent → collections status
   return collectionStatus(b);
 }
 
-// Collections-side status for a sent invoice.
-export function collectionStatus(b) {
-  if (b.closed) return { label: "Paid & closed", tone: "ok" };
-  if (b.dispute && b.dispute.open) return { label: "In dispute", tone: "danger" };
-  if (b.awaitingTreasury) return { label: "Awaiting Treasury / ONS", tone: "warn" };
-  if ((b.advices || []).some((a) => !a.remitted)) return { label: "Payment advice received", tone: "info" };
-  if ((b.promises || []).some((p) => p.open)) return { label: "Promise to pay", tone: "info" };
+// Aging is computed from money + due date ONLY — never from a workflow status. An invoice
+// with an outstanding balance past its due date is overdue even if it also has a promise
+// to pay, an open dispute or a payment advice (those are separate badges).
+export function isOverdue(b) {
+  if (!b.done.send || b.closed) return false;
+  if (outstanding(b) <= 0) return false;
   const dtd = daysToDue(b.dueDate);
-  if (dtd != null && dtd < 0) return { label: `Overdue ${Math.abs(dtd)}d`, tone: "danger" };
+  return dtd != null && dtd < 0;
+}
+export function isDueSoon(b) {
+  if (!b.done.send || b.closed || outstanding(b) <= 0) return false;
+  const dtd = daysToDue(b.dueDate);
+  return dtd != null && dtd >= 0 && dtd <= 7;
+}
+
+// The FINANCIAL status of a sent invoice — driven by confirmed money and the due date only.
+export function financialStatus(b) {
+  if (b.closed) return { label: "Paid & closed", tone: "ok" };
+  const paid = paidTotal(b), out = outstanding(b);
+  if (out <= 0 && paid > 0) return { label: "Paid — awaiting OR", tone: "ok" };
+  const dtd = daysToDue(b.dueDate);
+  const overdue = out > 0 && dtd != null && dtd < 0;
+  if (paid > 0) return overdue ? { label: `Partially paid · overdue ${Math.abs(dtd)}d`, tone: "danger" } : { label: "Partially paid", tone: "warn" };
+  if (overdue) return { label: `Overdue ${Math.abs(dtd)}d`, tone: "danger" };
   if (dtd != null && dtd <= 7) return { label: "Due soon", tone: "warn" };
   return { label: "Sent · on terms", tone: "info" };
+}
+// Backwards-compatible name used by the worklists and header.
+export const collectionStatus = (b) => financialStatus(b);
+
+// Workflow badges shown SEPARATELY from (and alongside) the financial status.
+export function collectionFlags(b) {
+  const flags = [];
+  if (b.dispute && b.dispute.open) flags.push({ label: "In dispute", tone: "danger" });
+  else if (b.dispute && b.dispute.status === "under-review") flags.push({ label: "Dispute under review", tone: "warn" });
+  if ((b.promises || []).some((p) => p.open)) flags.push({ label: "Promise to pay", tone: "info" });
+  if ((b.advices || []).some((a) => !a.remitted)) flags.push({ label: "Advice received", tone: "info" });
+  if (b.awaitingTreasury) flags.push({ label: "Awaiting Oracle NetSuite", tone: "warn" });
+  if (b.reminderPaused) flags.push({ label: "Reminders paused", tone: "neutral" });
+  return flags;
 }
 
 // Is this bill in the billing phase (not yet sent) or the collections phase?
@@ -218,7 +256,9 @@ export const BILL = {
 export function paidTotal(b) { return (b.payments || []).reduce((s, p) => s + (toNum(p.amount) || 0), 0); }
 export function outstanding(b) {
   const inv = toNum(b.total) || 0;
-  const credited = (b.creditMemos || []).reduce((s, c) => s + (toNum(c.amount) || 0), 0);
+  // Only an ISSUED credit memo reduces the balance — one that is merely "under review"
+  // does not write anything off, so routing a dispute never settles the invoice.
+  const credited = (b.creditMemos || []).filter((c) => c.status === "issued").reduce((s, c) => s + (toNum(c.amount) || 0), 0);
   return Math.max(0, inv - paidTotal(b) - credited);
 }
 // Age a receivable from its due date into standard buckets.
@@ -316,7 +356,7 @@ export function tpaFund(b) {
 // Compute and cache the total for a bill from its kind-specific engine.
 export function computeTotal(b) {
   if (b.kind === "corporate") return proRata(b).total;
-  if (b.kind === "ifg") return installments(b).rows[0]?.amount || 0; // first installment is this invoice
+  if (b.kind === "ifg") return installments(b).annual; // ONE annual invoice, billed via the installment schedule
   if (b.kind === "tpa-access") return tpaAccess(b).total;
   if (b.kind === "tpa-util") return tpaUtil(b).total;
   return toNum(b.total) || 0;
@@ -331,37 +371,74 @@ export function acceptEndorsement(b) {
   putBill(b);
   return b;
 }
+// Return the endorsement to the ACTUAL source team (MDA or Claims — whoever endorsed it),
+// never a hard-coded team.
 export function returnEndorsement(b, reason) {
-  b.returned = true; b.returnReason = reason || "Clarification needed.";
+  const team = b.endorsedBy || "MDA";
+  b.returned = true; b.returnReason = reason || "Clarification needed."; b.returnedTo = team;
   b.done.endorsement = false;
-  log(b, `Endorsement returned to MDA — ${b.returnReason}`, currentRole().who);
+  log(b, `Endorsement returned to ${team} — ${b.returnReason}`, currentRole().who);
   putBill(b);
   return b;
 }
+// Simulate the source team sending back the corrected endorsement.
+export function receiveCorrectedEndorsement(b) {
+  const team = b.returnedTo || b.endorsedBy || "MDA";
+  b.returned = false; b.returnReason = "";
+  b.correctedAt = stamp();
+  log(b, `Corrected endorsement received back from ${team} (simulated) — ready to re-check.`, `${team} (handoff)`);
+  putBill(b);
+  return b;
+}
+// Named sample actors for the maker–checker. These are the RECORDED people and never
+// depend on the demo viewer, so the preparer (Elena Santos) and approver (Marco Reyes) are
+// always different recorded people — switching the demo role never rewrites who acted.
+export const PREPARER = { who: "Elena Santos", role: "bspec" };
+export const APPROVER = { who: "Marco Reyes", role: "bsup" };
+
 export function prepareSoa(b, attachment) {
   b.soaNo = b.soaNo || newSoaNo();
   b.total = computeTotal(b);
   if (attachment) b.attachment = attachment;
-  b.preparer = currentRole().who;
-  b.preparerRole = currentRole().key;
+  b.preparer = PREPARER.who;
+  b.preparerRole = PREPARER.role;
+  b.owner = b.owner || PREPARER.who;
+  b.reviewReturn = null;
   b.done.soa = true;
-  log(b, `SOA ${b.soaNo} prepared — total ${peso(b.total)}. Client attachment built from the ${b.account.name} template.`, currentRole().who);
+  log(b, `SOA ${b.soaNo} prepared by ${PREPARER.who} (Billing Specialist) — total ${peso(b.total)}. Client attachment built from the ${b.account.name} template.`, PREPARER.who);
   putBill(b);
   return b;
 }
 export const isSupervisor = () => ["bsup", "dmgr"].includes(currentRole().key);
 export function approveSoa(b) {
-  b.approver = currentRole().who;
-  b.approverRole = currentRole().key;
+  b.approver = APPROVER.who;
+  b.approverRole = APPROVER.role;
   b.approvedAt = stamp();
+  b.reviewReturn = null;
   b.done.review = true;
-  log(b, `SOA ${b.soaNo} approved by ${currentRole().who}. Preparer and approver are different people.`, currentRole().who);
+  log(b, `SOA ${b.soaNo} reviewed and approved by ${APPROVER.who} (Billing Supervisor) — prepared by ${b.preparer || PREPARER.who}.`, APPROVER.who);
+  putBill(b);
+  return b;
+}
+// Supervisor returns the SOA to the preparer with a comment (back to the Prepare step).
+export function returnSoa(b, comment) {
+  b.done.soa = false; b.done.review = false;
+  b.reviewReturn = { comment: comment || "Please revise and re-submit.", at: stamp(), by: APPROVER.who };
+  log(b, `SOA ${b.soaNo} returned to ${b.preparer || PREPARER.who} by ${APPROVER.who} (Billing Supervisor) — ${b.reviewReturn.comment}`, APPROVER.who);
+  putBill(b);
+  return b;
+}
+// Assign / reassign the collections owner — a named specialist, independent of the viewer.
+export function assignOwner(b, who) {
+  const prev = b.owner || "—";
+  b.owner = who;
+  log(b, `Owner changed from ${prev} to ${who}.`, currentRole().who);
   putBill(b);
   return b;
 }
 export function downloadUpload(b) {
   b.uploadDownloaded = true;
-  log(b, `ONS upload file ${uploadFileName(b)} generated (simulated download).`, currentRole().who);
+  log(b, `Oracle NetSuite (ONS) upload file ${uploadFileName(b)} generated (simulated download).`, currentRole().who);
   putBill(b);
   return b;
 }
@@ -370,20 +447,23 @@ export function receiveBi(b) {
   b.biNo = b.biNo || newBiNo();
   b.biAt = stamp();
   b.done.ons = true;
-  log(b, `Official Billing Invoice ${b.biNo} received from ONS and linked to SOA ${b.soaNo}. HMS prepared the SOA; ONS created the official invoice.`, "ONS (handoff)");
+  log(b, `Official Billing Invoice ${b.biNo} received from Oracle NetSuite (ONS) and linked to SOA ${b.soaNo}. HMS prepared the SOA; Oracle NetSuite created the official invoice.`, "Oracle NetSuite (handoff)");
   putBill(b);
   return b;
 }
+export const COLLECTIONS_OWNER = "Rita Flores";
 export function sendInvoice(b) {
   b.sentAt = stamp();
-  b.sentBy = currentRole().who;
+  b.sentBy = b.preparer || PREPARER.who;
   b.done.send = true;
-  // Set the collection clock from the account's payment terms.
+  // Set the collection clock from the account's payment terms — due date is always
+  // counted from the SENDING date (the scenario date), so terms and due date agree.
   const days = toNum((b.account && b.account.termDays)) || 30;
   b.invoiceDate = DEMO_NOW_ISO;
-  b.dueDate = b.dueDate || addDays(DEMO_NOW_ISO, days);
+  b.dueDate = addDays(DEMO_NOW_ISO, days);
+  b.owner = COLLECTIONS_OWNER; // collections owner, independent of the demo viewer
   b.lastSync = stamp();
-  log(b, `Invoice ${b.biNo} sent to ${b.account.billingContact || b.account.name} (simulated — nothing is really sent). Now tracked in Collections, due ${fmtD(b.dueDate)}.`, currentRole().who);
+  log(b, `Invoice ${b.biNo} sent to ${b.account.billingContact || b.account.name} (simulated — nothing is really sent). Now tracked in Collections, owned by ${COLLECTIONS_OWNER}, due ${fmtD(b.dueDate)}.`, b.sentBy);
   putBill(b);
   return b;
 }
@@ -401,53 +481,91 @@ export function addPromise(b, date, amount, note) {
   putBill(b);
   return b;
 }
+// Payment advice is PROVISIONAL — the client says they paid. It never increases the
+// confirmed-paid figure. Cash received and withholding (BIR 2307) are kept distinct.
 export function addAdvice(b, d) {
-  (b.advices = b.advices || []).unshift({ id: "A" + (b.advices.length + 1), amount: toNum(d.amount) || 0, ref: d.ref || "", method: d.method || "Bank deposit", docs: d.docs || [], note: d.note || "", remitted: false, at: stamp(), by: currentRole().who });
-  log(b, `Payment advice received — ${peso(toNum(d.amount) || 0)} via ${d.method || "bank deposit"}.`, currentRole().who);
+  const amount = toNum(d.amount) || 0;
+  const withholding = toNum(d.withholding) || 0;
+  const cash = toNum(d.cashReceived) != null ? toNum(d.cashReceived) : round2(amount - withholding);
+  (b.advices = b.advices || []).unshift({
+    id: "A" + ((b.advices || []).length + 1), amount, cashReceived: cash, withholding,
+    ref: d.ref || "", method: d.method || "Bank deposit", docs: d.docs || [], note: d.note || "",
+    remitted: false, applied: false, at: stamp(), by: b.owner || currentRole().who,
+  });
+  log(b, `Payment advice received — ${peso(amount)} via ${d.method || "bank deposit"} (provisional; not yet confirmed as paid).`, b.owner || currentRole().who);
   putBill(b);
   return b;
 }
-// Build a Billing Collection Form and hand the payment to Treasury (simulated).
+// Build a Billing Collection Form and hand the payment to Treasury. This creates a PENDING
+// remittance — it does NOT increase confirmed paid until Oracle NetSuite confirms application.
 export function remitToTreasury(b, advice) {
+  if (advice.remitted) return b; // already remitted — never double-remit the same advice
   const bcfNo = newBcfNo();
   advice.remitted = true; advice.bcfNo = bcfNo;
-  (b.payments = b.payments || []).unshift({ id: "PM" + (b.payments.length + 1), amount: advice.amount, bcfNo, method: advice.method, at: stamp(), by: currentRole().who, officialReceipt: null });
+  (b.remittances = b.remittances || []).unshift({ id: "RM" + ((b.remittances || []).length + 1), adviceId: advice.id, amount: advice.amount, cashReceived: advice.cashReceived, withholding: advice.withholding, bcfNo, method: advice.method, status: "awaiting", at: stamp(), by: b.owner || currentRole().who });
   b.awaitingTreasury = true;
-  log(b, `BCF ${bcfNo} prepared and remitted to Treasury for ${peso(advice.amount)} (simulated handoff). Awaiting Treasury / ONS to issue the Official Receipt.`, currentRole().who);
+  log(b, `BCF ${bcfNo} prepared and remitted to Treasury for ${peso(advice.amount)} (simulated handoff). Provisional — awaiting Oracle NetSuite to confirm application and issue the Official Receipt.`, b.owner || currentRole().who);
   putBill(b);
   return b;
 }
-// Simulate Treasury / ONS returning the official receipt + updated status.
+// Simulate Treasury / Oracle NetSuite confirming application + returning the official
+// receipt. Each pending remittance is applied EXACTLY ONCE (guarded by its status).
 export function treasuryPosts(b) {
-  b.awaitingTreasury = false;
-  const orNo = "OR-2026-" + String(1000 + (allBills().filter((x) => x.orNo).length + 1)).slice(-4);
-  (b.payments || []).forEach((p) => { if (!p.officialReceipt) p.officialReceipt = orNo; });
+  const pending = (b.remittances || []).filter((r) => r.status === "awaiting");
+  if (!pending.length) { b.awaitingTreasury = false; putBill(b); return b; }
+  const orNo = b.orNo || ("OR-2026-" + String(1000 + (allBills().filter((x) => x.orNo).length + 1)).slice(-4));
+  pending.forEach((r) => {
+    r.status = "applied"; r.officialReceipt = orNo; r.appliedAt = stamp();
+    const adv = (b.advices || []).find((a) => a.id === r.adviceId); if (adv) adv.applied = true;
+    (b.payments = b.payments || []).unshift({ id: "PM" + ((b.payments || []).length + 1), amount: r.amount, bcfNo: r.bcfNo, method: r.method, at: stamp(), by: "Treasury / Oracle NetSuite", officialReceipt: orNo, appliedFrom: r.adviceId });
+  });
   b.orNo = orNo;
+  b.awaitingTreasury = false;
   b.lastSync = stamp();
-  if (outstanding(b) <= 0) { b.closed = true; log(b, `Official Receipt ${orNo} issued by Treasury / ONS. Invoice fully paid and closed.`, "Treasury / ONS (handoff)"); }
-  else log(b, `Official Receipt ${orNo} issued by Treasury / ONS for the partial payment. Outstanding ${peso(outstanding(b))}.`, "Treasury / ONS (handoff)");
+  if (outstanding(b) <= 0) { b.closed = true; log(b, `Official Receipt ${orNo} issued by Treasury / Oracle NetSuite — payment confirmed and applied. Invoice fully paid and closed.`, "Treasury / Oracle NetSuite (handoff)"); }
+  else log(b, `Official Receipt ${orNo} issued by Treasury / Oracle NetSuite — payment confirmed and applied. Outstanding ${peso(outstanding(b))}.`, "Treasury / Oracle NetSuite (handoff)");
   putBill(b);
   return b;
 }
 // Open a dispute (e.g. a client reporting a cancelled member).
 export function openDispute(b, d) {
-  b.dispute = { open: true, reason: d.reason || "", member: d.member || "", amount: toNum(d.amount) || 0, raisedAt: stamp(), by: currentRole().who, resolution: "", branch: "" };
+  b.dispute = { open: true, status: "open", reason: d.reason || "", member: d.member || "", amount: toNum(d.amount) || 0, raisedAt: stamp(), by: b.owner || currentRole().who, resolution: "", branch: "" };
   (b.disputes = b.disputes || []).unshift({ ...b.dispute });
-  log(b, `Dispute opened against invoice ${b.biNo} — ${d.reason || ""}${d.member ? " (" + d.member + ")" : ""}.`, currentRole().who);
+  log(b, `Dispute opened against invoice ${b.biNo} — ${d.reason || ""}${d.member ? " (" + d.member + ")" : ""}.`, b.owner || currentRole().who);
   putBill(b);
   return b;
 }
-// Resolve a dispute down the correct branch — never automatic or final without approval.
-export function resolveDispute(b, branch, note) {
+// Route a dispute down the branch that MATCHES THE FINANCIAL STATUS. This moves it to
+// "Under review" — it is NEVER marked resolved and NO balance is written off here.
+export function routeDispute(b, branch, note) {
   if (!b.dispute) return b;
-  b.dispute.open = false; b.dispute.branch = branch; b.dispute.resolution = note || "";
-  b.dispute.resolvedAt = stamp(); b.dispute.resolvedBy = currentRole().who;
+  const who = b.owner || currentRole().who;
+  b.dispute.open = false; b.dispute.status = "under-review"; b.dispute.branch = branch;
+  b.dispute.routeNote = note || ""; b.dispute.routedAt = stamp(); b.dispute.routedBy = who;
   if (branch === "credit-memo") {
-    (b.creditMemos = b.creditMemos || []).unshift({ amount: b.dispute.amount, ref: "CM-request", note, at: stamp(), by: currentRole().who, status: "requested" });
-    log(b, `Dispute routed to a CREDIT MEMO request in ONS for ${peso(b.dispute.amount)} (the invoice is still open). Subject to rules and approval — not final here.`, currentRole().who);
+    (b.creditMemos = b.creditMemos || []).unshift({ amount: b.dispute.amount, ref: "CM-request", note: note || "", at: stamp(), by: who, status: "under-review" });
+    log(b, `Dispute routed to a CREDIT MEMO review in Oracle NetSuite for ${peso(b.dispute.amount)} (invoice still open). Under review — not final; no balance is written off yet.`, who);
   } else {
-    (b.refunds = b.refunds || []).unshift({ amount: b.dispute.amount, note, at: stamp(), by: currentRole().who, status: "under-review" });
-    log(b, `Dispute routed to PREMIUM REFUND review for ${peso(b.dispute.amount)} (the invoice is already paid). Subject to refund-eligibility rules and approval — not final here.`, currentRole().who);
+    (b.refunds = b.refunds || []).unshift({ amount: b.dispute.amount, note: note || "", at: stamp(), by: who, status: "under-review" });
+    log(b, `Dispute routed to a PREMIUM REFUND review for ${peso(b.dispute.amount)} (invoice already paid). Under review — subject to refund-eligibility rules and approval.`, who);
+  }
+  putBill(b);
+  return b;
+}
+// Record the decision + the simulated Oracle NetSuite / Treasury outcome → only now resolved.
+export function recordDisputeDecision(b, outcome, note) {
+  if (!b.dispute) return b;
+  b.dispute.status = "resolved"; b.dispute.outcome = outcome; b.dispute.resolution = note || "";
+  b.dispute.resolvedAt = stamp(); b.dispute.resolvedBy = currentRole().who;
+  if (b.dispute.branch === "credit-memo" && outcome === "approved") {
+    const cm = (b.creditMemos || [])[0];
+    if (cm) { cm.status = "issued"; cm.ref = "CM-2026-" + String(1000 + (allBills().filter((x) => (x.creditMemos || []).some((c) => c.status === "issued")).length + 1)).slice(-4); }
+    log(b, `Credit memo ${(b.creditMemos || [])[0]?.ref || ""} issued in Oracle NetSuite for ${peso(b.dispute.amount)} — the open invoice is reduced accordingly. ${note || ""}`, "Oracle NetSuite (handoff)");
+  } else if (b.dispute.branch === "refund" && outcome === "approved") {
+    const rf = (b.refunds || [])[0]; if (rf) rf.status = "approved";
+    log(b, `Premium refund approved by Treasury for ${peso(b.dispute.amount)} (simulated). ${note || ""}`, "Treasury (handoff)");
+  } else {
+    log(b, `Dispute decision recorded — ${outcome}. ${note || ""}`, currentRole().who);
   }
   putBill(b);
   return b;
@@ -605,14 +723,27 @@ function SEED_BILLS() {
     advices: [{ id: "A1", amount: 3584000, ref: "BPI-DEP-55210", method: "Bank deposit", docs: ["Deposit slip", "BIR Form 2307 (withholding)"], note: "Full settlement per client finance.", remitted: false, at: stamp(), by: "Rita Flores" }],
   }));
 
-  // A corporate invoice awaiting Treasury / ONS to post the official receipt.
+  // A corporate invoice remitted to Treasury — a PENDING remittance awaiting Oracle NetSuite
+  // confirmation. Nothing counts as confirmed-paid until the OR is returned.
   bills.push(sentBill({
     id: "CO-9004", kind: "corporate", acct: "ACC-CORP-0440",
     soaNo: "SOA-2026-0004", biNo: "BI-2026-01041", total: 96000,
     invoiceDate: addDays(N, -25), dueDate: addDays(N, -10),
     note: "Remitted to Treasury — awaiting the Official Receipt.",
-    payments: [{ id: "PM1", amount: 96000, bcfNo: "BCF-2026-0003", method: "Bank deposit", at: stamp(), by: "Rita Flores", officialReceipt: null }],
+    advices: [{ id: "A1", amount: 96000, cashReceived: 96000, withholding: 0, ref: "BPI-DEP-44120", method: "Bank deposit", docs: ["Deposit slip"], note: "Full settlement.", remitted: true, applied: false, bcfNo: "BCF-2026-0003", at: stamp(), by: "Rita Flores" }],
+    remittances: [{ id: "RM1", adviceId: "A1", amount: 96000, cashReceived: 96000, withholding: 0, bcfNo: "BCF-2026-0003", method: "Bank deposit", status: "awaiting", at: stamp(), by: "Rita Flores" }],
     awaitingTreasury: true,
+  }));
+
+  // A PARTIALLY PAID corporate invoice: ₱28,003.08 billed, ₱10,000 confirmed applied by
+  // Oracle NetSuite → outstanding ₱18,003.08. Supports a second payment on the balance.
+  bills.push(sentBill({
+    id: "CO-9006", kind: "corporate", acct: "ACC-CORP-0440",
+    soaNo: "SOA-2026-0008", biNo: "BI-2026-01205", total: 28003.08,
+    invoiceDate: addDays(N, -12), dueDate: addDays(N, 3),
+    note: "Mid-period addition invoice — a first partial payment has been confirmed.",
+    orNo: "OR-2026-1007",
+    payments: [{ id: "PM1", amount: 10000, bcfNo: "BCF-2026-0005", method: "Bank deposit", at: stamp(), by: "Treasury / Oracle NetSuite", officialReceipt: "OR-2026-1007", appliedFrom: "A0" }],
   }));
 
   // The DISPUTE record (Demo 4): client reports a cancelled member on an OPEN invoice.
@@ -639,10 +770,11 @@ function sentBill(d) {
     preparer: "Elena Santos", preparerRole: "bspec", approver: "Marco Reyes", approverRole: "bsup", approvedAt: addDays(N, -30),
     uploadDownloaded: true, biAt: addDays(N, -28),
     invoiceDate: d.invoiceDate, dueDate: d.dueDate, sentAt: d.invoiceDate, sentBy: "Elena Santos", lastSync: stamp(),
+    owner: d.owner || "Rita Flores",
     done: { endorsement: true, soa: true, review: true, ons: true, send: true },
-    promises: d.promises || [], advices: d.advices || [], payments: d.payments || [],
+    promises: d.promises || [], advices: d.advices || [], remittances: d.remittances || [], payments: d.payments || [],
     disputes: d.dispute ? [{ ...d.dispute }] : [], dispute: d.dispute || null,
-    awaitingTreasury: !!d.awaitingTreasury, closed: false,
+    awaitingTreasury: !!d.awaitingTreasury, closed: !!d.closed, orNo: d.orNo || null,
     attachment: { note: d.note || "", builtAt: addDays(N, -30) },
     history: [{ at: stamp(), text: `Invoice ${d.biNo} sent — now tracked in Collections, due ${fmtD(d.dueDate)}.`, actor: "Elena Santos" }],
     createdAt: addDays(N, -60),
@@ -655,7 +787,7 @@ function SEED_CYCLES() {
   return [
     { id: "CYC-1", account: "Northwind Logistics Corp.", unit: "Corporate", type: "Monthly premium", due: addDays(N, 12), note: "December cycle — 128 members." },
     { id: "CYC-2", account: "BrightCare TPA Health Fund", unit: "TPA", type: "Monthly utilization", due: addDays(N, 18), note: "November utilization — pending Claims export." },
-    { id: "CYC-3", account: "Reyes Family Group", unit: "IFG", type: "Quarterly installment", due: addDays(N, 75), note: "2nd installment — ₱12,000." },
+    { id: "CYC-3", account: "Reyes Family Group", unit: "IFG", type: "Quarterly installment", due: "2027-02-15", note: "2nd installment — ₱12,000 (schedule from the 15 Nov 2026 coverage start)." },
     { id: "CYC-4", account: "Summit Realty Inc.", unit: "Corporate", type: "Monthly premium", due: addDays(N, 9), note: "December cycle — 64 members." },
   ];
 }

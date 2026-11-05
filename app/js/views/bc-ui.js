@@ -83,10 +83,10 @@ const TIMELINE = [
   { key: "endorsement", label: "Endorsement", owner: "MDA / Claims → Billing" },
   { key: "soa", label: "SOA prepared", owner: "Billing Specialist" },
   { key: "review", label: "Supervisor review", owner: "Billing Supervisor" },
-  { key: "ons", label: "ONS invoice (BI)", owner: "ONS" },
+  { key: "ons", label: "Oracle NetSuite (BI)", owner: "Oracle NetSuite (ONS)" },
   { key: "send", label: "Invoice sent", owner: "Billing" },
   { key: "collect", label: "Collections", owner: "Collections" },
-  { key: "paid", label: "Paid (OR)", owner: "Treasury / ONS" },
+  { key: "paid", label: "Paid (OR)", owner: "Treasury / Oracle NetSuite" },
 ];
 function timelineReached(b, key) {
   if (key === "endorsement") return b.done.endorsement;
@@ -129,7 +129,7 @@ export function nextStrip(rec, defs) {
     return html`<section class="rec-next done" aria-label="Status">
       <div class="rn-main"><span class="eyebrow">Billing complete</span>
         <b>${defs.doneTitle || "The invoice has been sent."}</b>
-        <span class="rn-why">${defs.doneWhy || "The SOA is approved, the ONS invoice is linked and the invoice is sent. Collections now tracks it."}</span></div>
+        <span class="rn-why">${defs.doneWhy || "The SOA is approved, the Oracle NetSuite (ONS) invoice is linked and the invoice is sent. Collections now tracks it."}</span></div>
       <div class="rn-act"><button class="btn primary" id="bcToCollect">Open in Collections ›</button></div>
     </section>`;
   }
@@ -137,7 +137,7 @@ export function nextStrip(rec, defs) {
   return html`<section class="rec-next" aria-label="Next action">
     <div class="rn-main"><span class="eyebrow">Next action · Step ${idx + 1} of ${steps.length} · Owner: ${ns.owner}</span>
       <b>${ns.sentence}</b>
-      <span class="tiny">Illustrative demo · saved in this browser · the ONS upload, BI number, PDF generation, calculations and reminders are all simulated prototype behaviour.</span></div>
+      <span class="tiny">Illustrative demo · saved in this browser · the Oracle NetSuite (ONS) upload, BI number, PDF generation, calculations and reminders are all simulated prototype behaviour.</span></div>
     <div class="rn-act"><button class="btn primary" id="bcNext">${ns.label} ›</button></div>
   </section>`;
 }
@@ -204,7 +204,7 @@ export function drawer(title, bodyHtml, onMount) {
 export function documentsDrawer(rec, docs) {
   docs = docs || [];
   drawer("Documents & references on this bill", html`
-    <p class="tiny">Everything for this bill kept together — the endorsement, SOA, client attachment, ONS invoice, payment advice and notes. Sources are recorded; documents are <b>not</b> automatically verified. Items not yet produced show as <b>Not received</b>, never as verified. PDF generation and extraction are <b>simulated in this prototype</b>.</p>
+    <p class="tiny">Everything for this bill kept together — the endorsement, SOA, client attachment, Oracle NetSuite invoice, payment advice and notes. Sources are recorded; documents are <b>not</b> automatically verified. Items not yet produced show as <b>Not received</b>, never as verified. PDF generation and extraction are <b>simulated in this prototype</b>.</p>
     <div class="doclist mt">${docs.length ? docs.map((d) => html`<div class="doc-item ${d.supplied ? "" : "miss"}">
       <span class="doc-ic" aria-hidden="true">${icon(d.supplied ? "file" : "alert", 16)}</span>
       <div class="grow"><b>${d.name}</b><span class="tiny">${d.supplied ? (d.source || "Recorded as supplied") : (d.note || "Not received")}</span></div>
@@ -227,7 +227,7 @@ export function previewLetter({ title, kind, lines, ribbon }) {
       <div class="rnw-doc-body">
         <p class="eyebrow">${kind}</p>
         <dl class="dl mt">${lines.map((l) => html`<div><dt>${l[0]}</dt><dd>${l[1]}</dd></div>`)}</dl>
-        <p class="mt tiny">HMS prepares the SOA and the upload file; the official BIR-compliant invoice and receipt are created by ONS / Treasury. In production this document would be generated and delivered — here it only updates the demo record.</p>
+        <p class="mt tiny">HMS prepares the SOA and the upload file; the official BIR-compliant invoice and receipt are created by Oracle NetSuite (ONS) / Treasury. In production this document would be generated and delivered — here it only updates the demo record.</p>
       </div></div>`,
     actions: [{ label: "Close", kind: "primary", value: "ok" }],
   });
@@ -289,7 +289,7 @@ export const simNote = (text) => html`<div class="note sim"><b>Simulated.</b> ${
 export const illus = (text) => html`<div class="note info"><b>Illustrative sample.</b> ${text}</div>`;
 export const demoPreview = (text) => html`<div class="note warn"><b>Demo preview.</b> ${text} Nothing is really sent.</div>`;
 export const protoConcept = (text) => html`<div class="note info"><b>Prototype concept.</b> ${text} This is a proposed idea for discussion, not an existing HMS3 capability.</div>`;
-export const toConfirm = (text) => html`<div class="note warn"><b>To confirm with business / ONS team.</b> ${text} Not hard-coded as approved policy.</div>`;
+export const toConfirm = (text) => html`<div class="note warn"><b>To confirm with business / Oracle NetSuite (ONS) team.</b> ${text} Not hard-coded as approved policy.</div>`;
 export const boundary = (text) => html`<div class="note info"><b>Where the line is.</b> ${text}</div>`;
 export const whatYouDo = (text) => html`<p class="tiny note info"><b>What you do here.</b> ${text}</p>`;
 // One obvious primary action at the bottom of a step.

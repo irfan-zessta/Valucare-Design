@@ -12,10 +12,10 @@
 import { html, raw, go, toast, dialog, fmtDateTime } from "../core.js";
 import { icon, pill, emptyState } from "../components.js";
 import {
-  getBill, BILL, billStatus, collectionStatus, kindLabel, kindTag, outstanding, paidTotal,
-  ageBucket, AGING_LABELS, daysToDue, peso, fmtD, currentRole,
-  logContact, addPromise, addAdvice, remitToTreasury, treasuryPosts, openDispute,
-  resolveDispute, syncOns, DEMO_NOW_ISO,
+  getBill, BILL, billStatus, collectionStatus, financialStatus, collectionFlags, isOverdue,
+  kindLabel, kindTag, outstanding, paidTotal, ageBucket, AGING_LABELS, daysToDue, peso, fmtD,
+  currentRole, logContact, addPromise, addAdvice, remitToTreasury, treasuryPosts, openDispute,
+  routeDispute, recordDisputeDecision, assignOwner, syncOns, DEMO_NOW_ISO,
 } from "./bc-core.js";
 import {
   highlightNav, backBar, caseHead, timelineStrip, activityDrawer, documentsDrawer,
@@ -28,7 +28,7 @@ const collectDefs = {
 };
 function collectDocs(b) {
   const docs = [
-    { key: "bi", name: `ONS Billing Invoice ${b.biNo}`, supplied: true, source: "Created by ONS", letter: invoiceLetter(b) },
+    { key: "bi", name: `Billing Invoice ${b.biNo}`, supplied: true, source: "Created by Oracle NetSuite", letter: invoiceLetter(b) },
   ];
   (b.advices || []).forEach((a, i) => (a.docs || []).forEach((d, j) => docs.push({ key: `adv${i}-${j}`, name: d, supplied: true, source: `Payment advice ${a.ref || a.id}` })));
   if (!(b.advices || []).length) {
@@ -52,33 +52,41 @@ export function renderCollect(main, id) {
     ${caseHead(b, collectDefs, { eyebrow: `${kindLabel(b.kind)} · ${kindTag(b.kind)}`, title: b.biNo || b.id, refs: [b.account.name, b.soaNo, b.orNo].filter(Boolean) })}
     ${timelineStrip(b)}
 
+    ${b.closed ? html`<div class="card pad mt note ok">
+      <h3 class="sec-title">${icon("check", 16)} Billing completed successfully</h3>
+      <p class="mt"><b>${b.account.name}</b> → SOA ${b.soaNo} → BI ${b.biNo} → Payment ${peso(paidTotal(b))} → OR ${b.orNo}</p>
+      <div class="row tight mt"><a class="btn sm primary" href="${BILL.home}">Back to dashboard</a><a class="btn sm" href="${BILL.home}?tab=collections">Try another demo</a></div>
+    </div>` : ""}
+
     <div class="grid2 mt">
       <div class="card pad">
         <h3 class="sec-title">Invoice</h3>
         <dl class="dl mt">
-          <div><dt>Official invoice (ONS)</dt><dd>${b.biNo}</dd></div>
+          <div><dt>Official invoice (Oracle NetSuite)</dt><dd>${b.biNo}</dd></div>
           <div><dt>Internal SOA</dt><dd>${b.soaNo}</dd></div>
           <div><dt>Account</dt><dd>${b.account.name}</dd></div>
           <div><dt>Invoice amount</dt><dd><b>${peso(b.total)}</b></dd></div>
-          <div><dt>Paid so far</dt><dd>${peso(paidTotal(b))}</dd></div>
+          <div><dt>Confirmed paid</dt><dd>${peso(paidTotal(b))} <span class="tiny muted">(applied by Oracle NetSuite)</span></dd></div>
           <div><dt>Outstanding</dt><dd><b>${peso(out)}</b></dd></div>
-          <div><dt>Terms</dt><dd>${b.account.termDays} days</dd></div>
-          <div><dt>Due date</dt><dd>${fmtD(b.dueDate)} ${dtd != null && dtd < 0 ? pill(`${Math.abs(dtd)}d overdue`, "danger") : dtd != null && dtd <= 7 ? pill(`due in ${dtd}d`, "warn") : ""}</dd></div>
+          <div><dt>Terms</dt><dd>${b.account.termDays} days from sending</dd></div>
+          <div><dt>Due date</dt><dd>${fmtD(b.dueDate)} ${isOverdue(b) ? pill(`${Math.abs(dtd)}d overdue`, "danger") : dtd != null && dtd >= 0 && dtd <= 7 ? pill(`due in ${dtd}d`, "warn") : ""}</dd></div>
           <div><dt>Aging</dt><dd>${AGING_LABELS[ageBucket(b)]}</dd></div>
-          <div><dt>Owner</dt><dd>${currentRole().who} <span class="tiny muted">(Collections)</span></dd></div>
+          <div><dt>Owner</dt><dd>${b.owner || "—"} <span class="tiny muted">(Collections)</span> <button type="button" class="btn ghost xs" id="bcAssign">Assign…</button></dd></div>
         </dl>
         <div class="row tight mt"><button type="button" class="btn ghost sm" id="bcPrevInv">${icon("file", 14)} Preview invoice</button></div>
       </div>
 
       <div class="card pad">
         <h3 class="sec-title">Status &amp; sync</h3>
-        <div class="note ${st.tone === "danger" ? "danger" : st.tone === "warn" ? "warn" : "info"} mt"><b>${st.label}.</b> ${statusDetail(b)}</div>
+        <div class="note ${st.tone === "danger" ? "danger" : st.tone === "warn" ? "warn" : st.tone === "ok" ? "ok" : "info"} mt"><b>${st.label}.</b> ${statusDetail(b)}</div>
+        ${collectionFlags(b).length ? html`<div class="row tight mt wrap">${collectionFlags(b).map((f) => pill(f.label, f.tone))}</div>
+          <p class="tiny muted mt">These workflow flags are tracked <b>separately</b> from aging — an invoice can be overdue and have a promise to pay at the same time.</p>` : ""}
         <dl class="dl mt">
-          <div><dt>Last synced with ONS</dt><dd>${b.lastSync ? fmtDateTime(b.lastSync) : "—"}</dd></div>
-          <div><dt>Official receipt (OR)</dt><dd>${b.orNo || "— (Treasury / ONS issues this)"}</dd></div>
+          <div><dt>Last synced with Oracle NetSuite</dt><dd>${b.lastSync ? fmtDateTime(b.lastSync) : "—"}</dd></div>
+          <div><dt>Official receipt (OR)</dt><dd>${b.orNo || "— (Treasury / Oracle NetSuite issues this)"}</dd></div>
         </dl>
-        <div class="row tight mt"><button type="button" class="btn ghost sm" id="bcSync">${icon("history", 14)} Re-sync ONS status</button></div>
-        <p class="tiny muted mt">${icon("lock", 12)} A stale or unavailable sync is never shown as “paid”. The paid status only appears once Treasury / ONS returns an Official Receipt.</p>
+        <div class="row tight mt"><button type="button" class="btn ghost sm" id="bcSync">${icon("history", 14)} Re-sync Oracle NetSuite status</button></div>
+        <p class="tiny muted mt">${icon("lock", 12)} A stale or unavailable sync is never shown as “paid”. The paid status only appears once Treasury / Oracle NetSuite returns an Official Receipt.</p>
       </div>
     </div>
 
@@ -100,7 +108,7 @@ export function renderCollect(main, id) {
     <div class="row tight mt"><button type="button" class="btn ghost sm" data-bc-open="activity">${icon("history", 15)} Full history</button>
       <button type="button" class="btn ghost sm" data-bc-open="docs">${icon("folder", 15)} Documents</button></div>
 
-    <p class="tiny mt">${simNote("ONS sync, reminders, the BCF handoff, the Official Receipt, credit memos and refunds are all simulated prototype behaviour — nothing is really sent or posted.")}</p>`.s;
+    <p class="tiny mt">${simNote("Oracle NetSuite sync, reminders, the BCF handoff, the Official Receipt, credit memos and refunds are all simulated prototype behaviour — nothing is really sent or posted.")}</p>`.s;
 
   highlightNav("collections");
   document.title = `${b.biNo || b.id} · Collections`;
@@ -112,7 +120,8 @@ export function renderCollect(main, id) {
     else if (el.dataset.bcOpen === "guide") { /* no guide on collections detail */ }
   }));
   main.querySelector("#bcPrevInv").onclick = () => previewLetter(invoiceLetter(b));
-  main.querySelector("#bcSync").onclick = () => { syncOns(b); toast("Re-synced with ONS (simulated).", "ok"); ctx.refresh(); };
+  main.querySelector("#bcSync").onclick = () => { syncOns(b); toast("Re-synced with Oracle NetSuite (simulated).", "ok"); ctx.refresh(); };
+  main.querySelector("#bcAssign")?.addEventListener("click", () => assignDialog(ctx));
   main.querySelector("#bcCall").onclick = () => logCallDialog(ctx);
   main.querySelector("#bcPromise").onclick = () => promiseDialog(ctx);
   main.querySelector("#bcAdvice").onclick = () => adviceDialog(ctx);
@@ -121,14 +130,12 @@ export function renderCollect(main, id) {
 }
 
 function statusDetail(b) {
-  const st = collectionStatus(b);
-  if (st.label.startsWith("Overdue")) return "Past the due date — follow up for payment or a promise to pay.";
-  if (st.label === "Due soon") return "Approaching the due date — a reminder may be appropriate.";
-  if (st.label === "In dispute") return "A dispute is open against this invoice — resolve it before pursuing collection.";
-  if (st.label === "Awaiting Treasury / ONS") return "Payment handed to Treasury via a BCF — waiting for the Official Receipt.";
-  if (st.label === "Payment advice received") return "The client has advised payment — review and remit to Treasury.";
-  if (st.label === "Promise to pay") return "A promise to pay is recorded — follow up on the promised date.";
+  const st = financialStatus(b);
   if (st.label === "Paid & closed") return "Fully paid; the Official Receipt has been issued.";
+  if (st.label === "Paid — awaiting OR") return "Fully paid; awaiting the Official Receipt from Treasury / Oracle NetSuite.";
+  if (st.label.startsWith("Partially paid")) return `Part of the balance is confirmed paid; ${peso(outstanding(b))} remains outstanding. You can record another payment against the balance.`;
+  if (st.label.startsWith("Overdue")) return "Past the due date with an outstanding balance — follow up for payment or a promise to pay.";
+  if (st.label === "Due soon") return "Approaching the due date — a reminder may be appropriate.";
   return "Sent and within terms.";
 }
 
@@ -136,58 +143,82 @@ function statusDetail(b) {
 function disputeCard(b, ctx) {
   const d = b.dispute;
   if (!d) return "";
-  const out = outstanding(b);
-  const paidInvoice = out <= 0;
-  if (d.open) {
-    return html`<div class="card pad mt dispute-open">
-      <h3 class="sec-title">${icon("help", 16)} Dispute · open</h3>
-      ${illus("A dispute links to this original invoice and keeps the full audit trail — the reason, the amount, who raised it and when.")}
-      <dl class="dl mt">
-        <div><dt>Reason</dt><dd>${d.reason}</dd></div>
-        ${d.member ? html`<div><dt>Member in question</dt><dd>${d.member}</dd></div>` : ""}
-        <div><dt>Disputed amount</dt><dd>${peso(d.amount)}</dd></div>
-        <div><dt>Raised by</dt><dd>${d.by} · ${fmtDateTime(d.raisedAt)}</dd></div>
-        <div><dt>Linked invoice</dt><dd>${b.biNo} (${b.soaNo})</dd></div>
-      </dl>
-      <div class="note info mt"><b>Reconciliation.</b> Original billed amount ${peso(b.total)} · outstanding ${peso(out)}. ${paidInvoice ? "This invoice is already PAID." : "This invoice is still OPEN."}</div>
-      <p class="tiny mt"><b>Correct branch for this case:</b> ${paidInvoice
-        ? "the invoice is already paid, so an over-payment goes through a premium-refund review."
-        : "the invoice is still open, so a reduction is handled by a credit memo in ONS."}</p>
-      <div class="row tight mt">
-        <button type="button" class="btn sm ${paidInvoice ? "" : "primary"}" id="bcCredit">${icon("file", 14)} Route to credit memo (ONS)</button>
-        <button type="button" class="btn sm ${paidInvoice ? "primary" : ""}" id="bcRefund">${icon("file", 14)} Route to premium-refund review</button>
-      </div>
-      ${toConfirm("Neither a credit memo nor a refund is automatic or final here — both are subject to business rules and approval, and the credit memo / receipt is created in ONS / Treasury, not HMS.")}
+  const out = outstanding(b), paid = paidTotal(b);
+  const paidInvoice = out <= 0 && paid > 0;
+  const partial = paid > 0 && out > 0;
+  const recommended = paidInvoice ? "refund" : "credit-memo";
+  const facts = html`<dl class="dl mt">
+    <div><dt>Reason</dt><dd>${d.reason}</dd></div>
+    ${d.member ? html`<div><dt>Member in question</dt><dd>${d.member}</dd></div>` : ""}
+    <div><dt>Disputed amount</dt><dd>${peso(d.amount)}</dd></div>
+    ${d.cancelDate ? html`<div><dt>Cancellation / plan-change date</dt><dd>${fmtD(d.cancelDate)}</dd></div>` : ""}
+    <div><dt>Original billed</dt><dd>${peso(b.total)}</dd></div>
+    <div><dt>Confirmed payment</dt><dd>${peso(paid)}</dd></div>
+    <div><dt>Outstanding</dt><dd><b>${peso(out)}</b></dd></div>
+    <div><dt>Raised by</dt><dd>${d.by} · ${fmtDateTime(d.raisedAt)}</dd></div>
+    <div><dt>Linked invoice</dt><dd>${b.biNo} (${b.soaNo})</dd></div>
+  </dl>`;
+
+  if (d.status === "resolved") {
+    return html`<div class="card pad mt">
+      <h3 class="sec-title">${icon("check", 16)} Dispute · resolved</h3>
+      ${facts}
+      <div class="note ${d.outcome === "approved" ? "ok" : "warn"} mt"><b>Decision: ${d.outcome}.</b> Branch: ${d.branch === "credit-memo" ? "credit memo (Oracle NetSuite)" : "premium refund"}. ${d.resolution || ""}</div>
+      <p class="tiny muted mt">${icon("lock", 12)} Resolved by ${d.resolvedBy} · ${fmtDateTime(d.resolvedAt)}.${d.branch === "credit-memo" && d.outcome === "approved" ? " Credit memo issued in Oracle NetSuite — the open balance is reduced accordingly." : ""}</p>
     </div>`;
   }
-  return html`<div class="card pad mt">
-    <h3 class="sec-title">${icon("check", 16)} Dispute · resolved</h3>
-    <dl class="dl mt">
-      <div><dt>Reason</dt><dd>${d.reason}</dd></div>
-      <div><dt>Routed to</dt><dd>${d.branch === "credit-memo" ? "Credit memo request (ONS) — invoice was open" : "Premium-refund review — invoice was paid"}</dd></div>
-      <div><dt>Resolution note</dt><dd>${d.resolution || "—"}</dd></div>
-      <div><dt>Resolved by</dt><dd>${d.resolvedBy} · ${fmtDateTime(d.resolvedAt)}</dd></div>
-    </dl>
-    <p class="tiny muted mt">${icon("lock", 12)} Subject to approval and ONS / Treasury action — not final in HMS.</p>
+  if (d.status === "under-review") {
+    return html`<div class="card pad mt">
+      <h3 class="sec-title">${icon("help", 16)} Dispute · under review</h3>
+      ${illus("Routed to the correct branch and now UNDER REVIEW — it is not resolved and no balance has been written off. A recorded decision plus a simulated outcome is needed to close it.")}
+      ${facts}
+      <div class="note warn mt"><b>Under review — ${d.branch === "credit-memo" ? "credit memo (Oracle NetSuite)" : "premium refund"}.</b> ${d.routeNote || ""}</div>
+      <div class="row tight mt"><button type="button" class="btn sm primary" id="bcDecide">${icon("check", 14)} Record decision &amp; simulated outcome</button></div>
+      ${toConfirm("Approval thresholds and refund eligibility are configurable and to be confirmed with the business.")}
+    </div>`;
+  }
+  // open
+  return html`<div class="card pad mt dispute-open">
+    <h3 class="sec-title">${icon("help", 16)} Dispute · open</h3>
+    ${illus("A dispute links to this original invoice and keeps the full audit trail — the reason, amount, member, who raised it and when.")}
+    ${facts}
+    <div class="note info mt"><b>Financial status drives the branch.</b> ${paidInvoice
+      ? "This invoice is already PAID — an over-payment goes to a premium-refund review."
+      : partial
+        ? "This invoice is PARTIALLY PAID — the open balance is handled by a credit memo; a refund applies only to any paid portion, if approved."
+        : "This invoice is still OPEN — a reduction is handled by a credit memo in Oracle NetSuite."}</div>
+    <div class="row tight mt">
+      <button type="button" class="btn sm ${recommended === "credit-memo" ? "primary" : ""}" id="bcCredit">${icon("file", 14)} Route to credit-memo review</button>
+      <button type="button" class="btn sm ${recommended === "refund" ? "primary" : ""}" id="bcRefund">${icon("file", 14)} Route to premium-refund review</button>
+    </div>
+    ${toConfirm("Routing moves this to “Under review” — neither a credit memo nor a refund is final here; both need a recorded decision and a simulated Oracle NetSuite / Treasury outcome. No balance is written off on routing.")}
   </div>`;
 }
 
 // -------------------------------------------------------------- payment advice + BCF
 function adviceCard(b, ctx) {
   const advices = b.advices || [];
-  if (!advices.length && !b.awaitingTreasury && !(b.payments || []).length) return "";
+  const remittances = b.remittances || [];
+  const payments = b.payments || [];
+  if (!advices.length && !remittances.length && !payments.length) return "";
   return html`<div class="card pad mt">
     <h3 class="sec-title">Payment advice &amp; remittance</h3>
-    ${advices.length ? html`<ul class="pick-list mt">${advices.map((a) => html`<li class="pick-row">
-      <span class="grow"><b>${peso(a.amount)}</b> <span class="tiny muted">${a.method} · ${a.ref || "no ref"}${a.docs && a.docs.length ? " · " + a.docs.join(", ") : ""}</span></span>
-      ${a.remitted ? pill(`Remitted · BCF ${a.bcfNo}`, "ok") : html`<button type="button" class="btn sm primary" data-remit="${a.id}">Prepare BCF &amp; remit to Treasury</button>`}</li>`)}</ul>` : ""}
-    ${(b.payments || []).length ? html`<div class="mt"><span class="tiny muted">Remittances to Treasury</span>
-      <ul class="pick-list mt">${b.payments.map((p) => html`<li class="pick-row">
-        <span class="grow"><b>BCF ${p.bcfNo}</b> <span class="tiny muted">${peso(p.amount)} · ${p.method}</span></span>
-        ${p.officialReceipt ? pill(`OR ${p.officialReceipt}`, "ok") : pill("Awaiting OR from Treasury / ONS", "warn")}</li>`)}</ul></div>` : ""}
-    ${b.awaitingTreasury ? html`<div class="note warn mt"><b>Awaiting Treasury / ONS.</b> The BCF has been remitted; Treasury / ONS will return the Official Receipt and updated status.
-      <div class="row tight mt"><button type="button" class="btn sm" id="bcTreasury">${icon("building", 14)} Simulate Treasury / ONS posting (receive OR)</button></div></div>` : ""}
-    ${boundary("HMS prepares the BCF and hands the payment over. Treasury / ONS issues the official receipt — the demo only displays the returned status.")}
+    ${illus("Advice is PROVISIONAL and never counts as confirmed paid. A BCF remits it to Treasury; only when Oracle NetSuite confirms application does it become confirmed paid with an Official Receipt.")}
+    ${advices.length ? html`<div class="mt"><span class="tiny muted">Payment advice (provisional)</span>
+      <ul class="pick-list mt">${advices.map((a) => html`<li class="pick-row">
+        <span class="grow"><b>${peso(a.amount)}</b> <span class="tiny muted">${a.method} · ${a.ref || "no ref"} · cash ${peso(a.cashReceived)}${a.withholding ? " · withholding (2307) " + peso(a.withholding) : ""}${a.docs && a.docs.length ? " · " + a.docs.join(", ") : ""}</span></span>
+        ${a.applied ? pill("Confirmed applied", "ok") : a.remitted ? pill(`Remitted · BCF ${a.bcfNo}`, "warn") : html`<button type="button" class="btn sm primary" data-remit="${a.id}">Prepare BCF &amp; remit</button>`}</li>`)}</ul></div>` : ""}
+    ${remittances.length ? html`<div class="mt"><span class="tiny muted">Remittances to Treasury (via BCF)</span>
+      <ul class="pick-list mt">${remittances.map((r) => html`<li class="pick-row">
+        <span class="grow"><b>BCF ${r.bcfNo}</b> <span class="tiny muted">${peso(r.amount)} · ${r.method}</span></span>
+        ${r.status === "applied" ? pill(`Confirmed · OR ${r.officialReceipt}`, "ok") : pill("Awaiting Oracle NetSuite confirmation", "warn")}</li>`)}</ul></div>` : ""}
+    ${payments.length ? html`<div class="mt"><span class="tiny muted">Confirmed payments (applied by Oracle NetSuite)</span>
+      <ul class="pick-list mt">${payments.map((p) => html`<li class="pick-row">
+        <span class="grow"><b>${peso(p.amount)}</b> <span class="tiny muted">BCF ${p.bcfNo} · ${p.method}</span></span>
+        ${p.officialReceipt ? pill(`OR ${p.officialReceipt}`, "ok") : pill("Awaiting OR", "warn")}</li>`)}</ul></div>` : ""}
+    ${b.awaitingTreasury ? html`<div class="note warn mt"><b>Awaiting Oracle NetSuite.</b> A BCF is remitted; Treasury / Oracle NetSuite will confirm application and return the Official Receipt.
+      <div class="row tight mt"><button type="button" class="btn sm" id="bcTreasury">${icon("building", 14)} Simulate Treasury / Oracle NetSuite confirmation (receive OR)</button></div></div>` : ""}
+    ${boundary("HMS prepares the BCF and hands the payment over. Treasury / Oracle NetSuite confirms application and issues the official receipt — the demo only displays the returned status.")}
   </div>`;
 }
 
@@ -213,15 +244,29 @@ function wireCardActions(main, ctx) {
   }));
   main.querySelector("#bcTreasury")?.addEventListener("click", () => { treasuryPosts(b); toast(`Official Receipt ${b.orNo} received.`, "ok"); ctx.refresh(); });
   main.querySelector("#bcCredit")?.addEventListener("click", async () => {
-    const r = await noteDialog("Route to credit memo (ONS)", "A credit memo reduces an OPEN invoice. It is requested in ONS and needs approval — it is not created or finalised in HMS.", "The disputed member was cancelled before the period; request a credit memo for the pro-rated premium.");
+    const r = await noteDialog("Route to credit-memo review", "A credit memo reduces an OPEN balance. It is reviewed in Oracle NetSuite and needs approval — not created or finalised in HMS. Routing moves this to “Under review”; no balance is written off yet.", "The disputed member was cancelled before the period; request a credit memo for the pro-rated premium on the open balance.");
     if (r == null) return;
-    resolveDispute(b, "credit-memo", r); toast("Dispute routed to a credit-memo request.", "ok"); ctx.refresh();
+    routeDispute(b, "credit-memo", r); toast("Dispute routed — now under review.", "ok"); ctx.refresh();
   });
   main.querySelector("#bcRefund")?.addEventListener("click", async () => {
-    const r = await noteDialog("Route to premium-refund review", "A premium refund applies when the invoice is already PAID. It goes through a refund-eligibility review and approval — not final here.", "The invoice is settled; the cancelled member's premium goes to premium-refund review.");
+    const r = await noteDialog("Route to premium-refund review", "A premium refund applies to an already-PAID amount. It goes through refund-eligibility review and approval. Routing moves this to “Under review” — not final here.", "The paid portion for the cancelled member goes to premium-refund review.");
     if (r == null) return;
-    resolveDispute(b, "refund", r); toast("Dispute routed to premium-refund review.", "ok"); ctx.refresh();
+    routeDispute(b, "refund", r); toast("Dispute routed — now under review.", "ok"); ctx.refresh();
   });
+  main.querySelector("#bcDecide")?.addEventListener("click", () => decisionDialog(ctx));
+}
+
+async function decisionDialog(ctx) {
+  const b = ctx.rec;
+  const r = await dialog({
+    title: "Record dispute decision", body: html`
+      ${illus("Record the review decision and the simulated Oracle NetSuite / Treasury outcome. Only now is the dispute resolved — nothing was written off before this.")}
+      <div class="field"><label for="do">Decision</label><select id="do" name="do" class="inp"><option value="approved">Approved</option><option value="declined">Declined</option></select></div>
+      <div class="field mt"><label for="dn">Note / reference</label><textarea id="dn" name="dn" class="inp" rows="2" placeholder="Decision rationale or reference"></textarea></div>`,
+    actions: [{ label: "Cancel" }, { label: "Record decision", kind: "primary", value: "ok" }],
+  });
+  if (r?.action !== "ok") return;
+  recordDisputeDecision(b, r.values.do, r.values.dn); toast(`Dispute ${r.values.do}.`, "ok"); ctx.refresh();
 }
 
 // -------------------------------------------------------------- dialogs
@@ -249,22 +294,24 @@ async function promiseDialog(ctx) {
   addPromise(ctx.rec, r.values.pd, r.values.pa, r.values.pn); toast("Promise recorded.", "ok"); ctx.refresh();
 }
 async function adviceDialog(ctx) {
+  const out = outstanding(ctx.rec);
   const r = await dialog({
     title: "Log payment advice", body: html`
-      ${illus("The client advises they have paid. Attach the deposit slip / cheque and BIR Form 2307 where applicable, then prepare the BCF to remit to Treasury.")}
+      ${illus("The client advises they have paid (provisional — it does not count as confirmed paid yet). Cash received and the BIR 2307 withholding are recorded separately; together they settle the advised amount.")}
       <div class="grid2">
-        <div class="field"><label for="aa">Amount</label><input id="aa" name="aa" class="inp" value="${outstanding(ctx.rec)}"></div>
+        <div class="field"><label for="aa">Advised amount</label><input id="aa" name="aa" class="inp" value="${out}"></div>
         <div class="field"><label for="am">Method</label><select id="am" name="am" class="inp"><option>Bank deposit</option><option>Cheque</option><option>Bank transfer</option><option>Online payment</option></select></div>
+        <div class="field"><label for="aw">Withholding (BIR 2307)</label><input id="aw" name="aw" class="inp" value="0"></div>
         <div class="field"><label for="ar">Reference</label><input id="ar" name="ar" class="inp" placeholder="Deposit / cheque ref"></div>
-        <div class="field"><label for="a2">BIR 2307?</label><select id="a2" name="a2" class="inp"><option value="no">Not applicable</option><option value="yes">Yes — attached</option></select></div>
+        <div class="field"><label for="a2">BIR 2307 evidence?</label><select id="a2" name="a2" class="inp"><option value="no">Not applicable</option><option value="yes">Yes — attached</option></select></div>
       </div>
       <div class="field mt"><label for="an">Note</label><input id="an" name="an" class="inp" placeholder="Invoices covered, etc."></div>`,
     actions: [{ label: "Cancel" }, { label: "Record advice", kind: "primary", value: "ok" }],
   });
   if (r?.action !== "ok") return;
   const docs = ["Deposit slip / cheque"]; if (r.values.a2 === "yes") docs.push("BIR Form 2307");
-  addAdvice(ctx.rec, { amount: r.values.aa, method: r.values.am, ref: r.values.ar, docs, note: r.values.an });
-  toast("Payment advice recorded.", "ok"); ctx.refresh();
+  addAdvice(ctx.rec, { amount: r.values.aa, withholding: r.values.aw, method: r.values.am, ref: r.values.ar, docs, note: r.values.an });
+  toast("Payment advice recorded (provisional).", "ok"); ctx.refresh();
 }
 async function disputeDialog(ctx) {
   const r = await dialog({
@@ -292,11 +339,24 @@ async function noteDialog(title, lead, sample) {
   return r?.action === "ok" ? (r.values.nn || "") : null;
 }
 
+async function assignDialog(ctx) {
+  const b = ctx.rec;
+  const names = ["Rita Flores — Collection Specialist", "Carlos Mendez — Collection Specialist", "Paolo Dizon — Collection Supervisor", "Grace Lim — Department Manager"];
+  const r = await dialog({
+    title: "Assign / reassign owner", body: html`
+      ${illus("The owner is stored on the invoice — it never changes when you switch the demo viewer. A supervisor can reassign it to another named specialist.")}
+      <div class="field mt"><label for="ow">Assign to</label><select id="ow" name="ow" class="inp">${names.map((n) => html`<option ${n.startsWith(b.owner || "") ? raw("selected") : ""}>${n}</option>`)}</select></div>`,
+    actions: [{ label: "Cancel" }, { label: "Assign", kind: "primary", value: "ok" }],
+  });
+  if (r?.action !== "ok") return;
+  assignOwner(b, (r.values.ow || "").split(" — ")[0]); toast("Owner updated.", "ok"); ctx.refresh();
+}
+
 function nextWeek() { const d = DEMO_NOW_ISO; const m = /(\d{4})-(\d{2})-(\d{2})/.exec(d); if (!m) return d; const t = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + 7)); return t.toISOString().slice(0, 10); }
 
 function invoiceLetter(b) {
-  return { title: `Billing Invoice ${b.biNo || ""}`, kind: "Official invoice (created by ONS)", ribbon: "DEMO PREVIEW — the official invoice is created by ONS, not HMS",
-    lines: [["BI number (ONS)", b.biNo || "—"], ["Linked SOA (HMS)", b.soaNo || "—"], ["Account", b.account.name], ["Amount", peso(b.total)], ["Outstanding", peso(outstanding(b))], ["Due", fmtD(b.dueDate)]] };
+  return { title: `Billing Invoice ${b.biNo || ""}`, kind: "Official invoice (created by Oracle NetSuite)", ribbon: "DEMO PREVIEW — the official invoice is created by Oracle NetSuite, not HMS",
+    lines: [["BI number (Oracle NetSuite)", b.biNo || "—"], ["Linked SOA (HMS)", b.soaNo || "—"], ["Account", b.account.name], ["Amount", peso(b.total)], ["Confirmed paid", peso(paidTotal(b))], ["Outstanding", peso(outstanding(b))], ["Due", fmtD(b.dueDate)]] };
 }
 
 void refChips; void abbr;
