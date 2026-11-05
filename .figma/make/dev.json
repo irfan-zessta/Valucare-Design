@@ -4,16 +4,16 @@
       "prefer": [
         "app/index.html",
         "app/js/views/**",
-        "app/js/components.js",
         "app/js/main.js",
+        "app/js/components.js",
+        "app/js/guide.js",
+        "app/js/guidance.js",
         "app/css/**"
       ],
       "deprioritize": [
         "app/js/core.js",
         "app/js/demo-store.js",
         "app/js/demo-journey.js",
-        "app/js/guidance.js",
-        "app/js/guide.js",
         "app/js/preview.js"
       ],
       "exclude": [
@@ -22,13 +22,12 @@
         "**/*.figma.js",
         "**/*.figma.jsx",
         "**/*.figma.template.*",
-        ".git/**",
-        "node_modules/**",
-        "docs/**",
         "app/preview/**",
+        "server/**",
         "tests/**",
-        "**/*.test.*",
-        "**/*.spec.*"
+        "docs/**",
+        "node_modules/**",
+        ".git/**"
       ]
     },
     "libraryPaths": {
@@ -57,35 +56,31 @@
       },
       {
         "glob": "**/*.figma.template.*",
-        "reason": "Figma mapping files are not UI source anchors."
+        "reason": "Figma mapping templates are not UI source anchors."
+      },
+      {
+        "glob": "app/preview/**",
+        "reason": "Static JSON fixtures for preview mode, not rendering source."
+      },
+      {
+        "glob": "server/**",
+        "reason": "Python backend, does not render UI."
+      },
+      {
+        "glob": "tests/**",
+        "reason": "Tests are not UI source anchors."
+      },
+      {
+        "glob": "docs/**",
+        "reason": "Documentation, not UI source."
+      },
+      {
+        "glob": "node_modules/**",
+        "reason": "Third-party dependencies, not project UI source."
       },
       {
         "glob": ".git/**",
         "reason": "Version control internals."
-      },
-      {
-        "glob": "node_modules/**",
-        "reason": "Installed dependencies, not project UI source."
-      },
-      {
-        "glob": "docs/**",
-        "reason": "Documentation, not rendered UI."
-      },
-      {
-        "glob": "app/preview/**",
-        "reason": "Static preview fixture data, not UI source."
-      },
-      {
-        "glob": "tests/**",
-        "reason": "Test files are not UI source anchors."
-      },
-      {
-        "glob": "**/*.test.*",
-        "reason": "Test files are not UI source anchors."
-      },
-      {
-        "glob": "**/*.spec.*",
-        "reason": "Test files are not UI source anchors."
       }
     ],
     "generated": {
@@ -93,9 +88,9 @@
       "source": "setup-agent.point-and-edit-path-classifier",
       "prompt": "same-turn-setup-subagent-v5",
       "model": "claude-sonnet-4-6",
-      "createdAt": "2026-11-03T00:00:00Z",
-      "confidence": 0.6,
-      "explanation": "Vanilla JS SPA under app/ was clearly identified from a file listing, but I did not inspect the tests, docs or preview folders directly, and found no verified shared library."
+      "createdAt": "2026-11-05T00:00:00Z",
+      "confidence": 0.8,
+      "explanation": "A vanilla JS SPA under app/ (index.html, js/views, css) with a Python backend, so the active app root is clear, but there is no package.json or shared UI library, so library buckets are left empty."
     }
   }
 }
