@@ -187,7 +187,7 @@ export function DepartmentDashboard<T>({
   )
 
   const toolbar = (
-    <Space wrap style={{ marginBottom: 12 }}>
+    <Space wrap>
       <Input
         allowClear
         prefix={<SearchOutlined />}
@@ -276,11 +276,11 @@ export function DepartmentDashboard<T>({
             ))}
           </div>
 
-          {/* 3. Work list */}
-          {toolbar}
+          {/* 3. Work list — search + filters sit on the right of the tab bar */}
           <Tabs
             activeKey={ui.tab}
             onChange={(k) => setUi((s) => ({ ...s, tab: k as UiState['tab'] }))}
+            tabBarExtraContent={{ right: toolbar }}
             items={[
               {
                 key: 'in-progress',
