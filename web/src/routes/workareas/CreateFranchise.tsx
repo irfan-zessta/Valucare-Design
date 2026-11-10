@@ -393,6 +393,44 @@ export function CreateFranchise({ c }: { c: Case }) {
     }, 1200)
   }
 
+  // Quick demo fill — populate the form with sample data (no upload pretense).
+  function loadSample() {
+    setF((prev) => {
+      const isInt = prev.businessSource === 'Agent' || prev.businessSource === 'Broker'
+      return {
+        ...prev,
+        natureOfBusiness: prev.natureOfBusiness || 'Freight & logistics',
+        companyAddress: prev.companyAddress || '101 Ayala Ave., Barangay Bel-Air',
+        companyProvince: prev.companyProvince || 'Metro Manila',
+        companyCity: prev.companyCity || 'Makati City',
+        companyRegion: prev.companyRegion || 'NCR',
+        sameAsCompany: true,
+        shortName: prev.shortName || shortNameFrom(prev.name || 'company'),
+        email: prev.email || `hr@${shortNameFrom(prev.name || 'company').toLowerCase()}.example`,
+        telephone: prev.telephone || '+63 2 8888 1234',
+        contactPerson: prev.contactPerson || 'Liza Mercado',
+        contactPosition: prev.contactPosition || 'HR Manager',
+        contactNumber: prev.contactNumber || '+63 917 555 0100',
+        tin: prev.tin || '009-123-456-000',
+        employeeCount: prev.employeeCount || 250,
+        dependentCount: prev.dependentCount || 190,
+        vatStatus: 'VAT-able',
+        currentCoverage: prev.currentCoverage || 'AA',
+        mannerOfEnrollment: 'Compulsory',
+        mannerOfPayment: 'Contributory',
+        requestedBy: prev.requestedBy || 'Liza Mercado',
+        department: prev.department || 'Corporate Sales',
+        accountManager: prev.accountManager || 'Demo Admin',
+        salesManager: prev.salesManager || 'Demo Admin',
+        targetEffectiveDate: prev.targetEffectiveDate || '2027-01-01',
+        businessSourceName: isInt ? prev.businessSourceName || 'Pioneer Insurance Brokers' : prev.businessSourceName,
+        commissionType: isInt ? prev.commissionType || 'Percentage of premium' : prev.commissionType,
+      }
+    })
+    setErrors({})
+    message.success('Sample data loaded.')
+  }
+
   function requestExtension() {
     if (!extUntil) {
       message.warning('Choose a new validity date for the extension.')
@@ -912,6 +950,9 @@ export function CreateFranchise({ c }: { c: Case }) {
         />
 
         <div className="app-form-floatbar">
+          <Button size="small" type="text" onClick={loadSample}>
+            Load sample data
+          </Button>
           <div className="app-form-floatbar__actions">
             <Button onClick={saveDraft}>Save draft</Button>
             <Button type="primary" htmlType="submit">
