@@ -1,8 +1,9 @@
 // ===========================================================================
 // Application header (Ant Design Layout.Header) — white and restrained.
-// Left→right: sidebar collapse / drawer toggle, ValuCare logo + app name, a
-// breadcrumb trail (home › … › current page), then notifications and the user
-// menu on the right.
+//   - desktop: a breadcrumb trail (home › … › current page), then notifications
+//     and the user menu. The brand + collapse control live in the sidebar.
+//   - mobile: the sidebar is a drawer, so the header keeps a menu button to open
+//     it plus the ValuCare logo for branding.
 // ===========================================================================
 import { Layout, Button, Breadcrumb, Grid } from 'antd'
 import { MenuOutlined, HomeOutlined } from '@ant-design/icons'
@@ -25,6 +26,7 @@ export function AppHeader({
 }) {
   const { pathname } = useLocation()
   const screens = useBreakpoint()
+  const isMobile = !screens.md
   const pageCrumbs = useBreadcrumbItems()
 
   // Prefer the trail the current page published; otherwise derive one from the
@@ -41,21 +43,28 @@ export function AppHeader({
 
   return (
     <Header className="app-header">
-      <Button
-        type="text"
-        icon={<MenuOutlined />}
-        onClick={onMenuClick}
-        aria-label={navExpanded ? 'Collapse navigation' : 'Expand navigation'}
-        aria-expanded={navExpanded}
-      />
-
-      <Link to="/" className="app-header__brand" aria-label="ValuCare HMS — Home">
-        <ValucareLogo size={40} />
-        <span className="app-header__appname">HMS</span>
-      </Link>
+      {isMobile && (
+        <>
+          <Button
+            type="text"
+            icon={<MenuOutlined />}
+            onClick={onMenuClick}
+            aria-label={navExpanded ? 'Close navigation' : 'Open navigation'}
+            aria-expanded={navExpanded}
+          />
+          <Link to="/" className="app-header__brand" aria-label="ValuCare HMS — Home">
+            <ValucareLogo size={32} />
+            <span className="app-header__appname">HMS</span>
+          </Link>
+        </>
+      )}
 
       {screens.sm && (
-        <Breadcrumb className="app-header__crumbs" items={breadcrumbItems} aria-label="Breadcrumb" />
+        <Breadcrumb
+          className={isMobile ? 'app-header__crumbs' : 'app-header__crumbs app-header__crumbs--lead'}
+          items={breadcrumbItems}
+          aria-label="Breadcrumb"
+        />
       )}
 
       <div className="app-header__spacer" />

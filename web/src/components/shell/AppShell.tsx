@@ -17,6 +17,8 @@ import { useUnsavedChangesState } from '../../state/UnsavedChangesProvider'
 import { ShellActionsContext, type ShellActions } from './shellContext'
 import { AppHeader } from './AppHeader'
 import { Sidebar } from './Sidebar'
+import { SidebarBrand } from './SidebarBrand'
+import { SidebarCollapseToggle } from './SidebarCollapseToggle'
 
 const { Sider, Content } = Layout
 const { useBreakpoint } = Grid
@@ -79,7 +81,9 @@ export function AppShell() {
               collapsed={collapsed}
               trigger={null}
             >
+              <SidebarBrand collapsed={collapsed} />
               <Sidebar collapsed={collapsed} onNavigate={() => {}} />
+              <SidebarCollapseToggle collapsed={collapsed} onToggle={toggleSidebar} />
             </Sider>
           )}
           <Content className="app-content">
@@ -97,6 +101,7 @@ export function AppShell() {
         styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}
         aria-label="Primary navigation"
       >
+        <SidebarBrand collapsed={false} />
         <Sidebar collapsed={false} onNavigate={closeMobileNav} />
       </Drawer>
 

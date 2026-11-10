@@ -67,6 +67,13 @@ body {
   white-space: nowrap;
   overflow: hidden;
 }
+/* When the breadcrumb is the leftmost header element (desktop, no logo), drop
+   the divider and align it with the content padding below. */
+.app-header__crumbs--lead {
+  margin-inline-start: 0;
+  padding-inline-start: 12px;
+  border-inline-start: 0;
+}
 /* Trail segments are muted; the current page (last) reads solid and bold. */
 .app-header__crumbs .ant-breadcrumb-link,
 .app-header__crumbs .ant-breadcrumb-separator {
@@ -119,6 +126,45 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   border-inline-end: 0 !important;
+}
+
+/* Brand pinned to the top of the sidebar (replaces the old header logo). */
+.app-sider-brand {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 56px;
+  padding-inline: 16px;
+  border-block-end: 1px solid #f0f0f0;
+  color: rgba(0, 0, 0, 0.88);
+}
+.app-sider-brand--collapsed {
+  justify-content: center;
+  padding-inline: 0;
+}
+.app-sider-brand__appname {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* Collapse/expand arrow pinned to the bottom of the sidebar. */
+.app-sider-toggle {
+  flex: none;
+  border-block-start: 1px solid #f0f0f0;
+  padding: 8px;
+}
+.app-sider-toggle--collapsed {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+.app-sider-toggle__btn.ant-btn {
+  color: rgba(0, 0, 0, 0.65);
+  justify-content: flex-start;
+  gap: 8px;
+}
+.app-sider-toggle--collapsed .app-sider-toggle__btn.ant-btn {
+  justify-content: center;
 }
 
 /* Selected navigation: clear brand-red left indicator (pale-red surface comes
