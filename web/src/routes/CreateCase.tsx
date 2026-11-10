@@ -22,7 +22,7 @@ export default function CreateCase() {
   const { cases, createCase } = useCases()
   const navigate = useNavigate()
 
-  const [mode, setMode] = useState<'search' | 'capture'>('search')
+  const [mode, setMode] = useState<'search' | 'capture'>('capture')
   const [query, setQuery] = useState('')
 
   // Capture-step fields.
@@ -101,8 +101,9 @@ export default function CreateCase() {
         Create New Franchise
       </Typography.Title>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 24 }}>
-        Search for the company first to avoid duplicate records. If it already exists you can open it;
-        otherwise create a new company and go straight to its franchise form.
+        {mode === 'capture'
+          ? 'Enter the company details to create the case and open its franchise form. If you’re not sure whether this company already exists, search first to avoid a duplicate.'
+          : 'Search for the company first to avoid duplicate records. If it already exists you can open it; otherwise create a new company and go straight to its franchise form.'}
       </Typography.Paragraph>
 
       {mode === 'search' && (
@@ -229,8 +230,8 @@ export default function CreateCase() {
             <Button type="primary" htmlType="submit" icon={<ArrowRightOutlined />} loading={submitting}>
               Create case &amp; open franchise
             </Button>
-            <Button type="text" onClick={() => setMode('search')}>
-              Back to search
+            <Button type="text" icon={<SearchOutlined />} onClick={() => setMode('search')}>
+              Search existing companies
             </Button>
           </Space>
         </Form>
