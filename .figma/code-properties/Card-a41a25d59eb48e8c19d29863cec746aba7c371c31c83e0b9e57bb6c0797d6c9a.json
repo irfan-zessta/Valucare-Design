@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Card",
+    "filePath": "web/node_modules/@carbon/react/es/components/Card/Card.js"
+  },
+  "codeProperties": {
+    "clickable": {
+      "type": "boolean",
+      "name": "Clickable",
+      "defaultValue": false
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    },
+    "density": {
+      "type": "string",
+      "name": "Density",
+      "defaultValue": "productive",
+      "options": [
+        "productive",
+        "expressive"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "productive": "Productive",
+          "expressive": "Expressive"
+        }
+      }
+    },
+    "horizontal": {
+      "type": "boolean",
+      "name": "Horizontal",
+      "defaultValue": false
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "control": false
+    },
+    "renderFooterIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Footer Icon",
+      "control": false
+    }
+  }
+}

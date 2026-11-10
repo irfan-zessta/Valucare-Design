@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ContainedListItem",
+    "filePath": "web/node_modules/@carbon/react/es/components/ContainedList/ContainedListItem/ContainedListItem.js"
+  },
+  "codeProperties": {
+    "action": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Action",
+      "description": "A slot for a possible interactive element to render within the item.",
+      "control": false
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false,
+      "description": "Whether this item is disabled."
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Icon",
+      "description": "A component used to render an icon.",
+      "control": false
+    }
+  }
+}

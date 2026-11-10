@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FormGroup",
+    "filePath": "web/node_modules/@carbon/react/es/components/FormGroup/FormGroup.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid",
+      "defaultValue": false
+    },
+    "legendText": {
+      "type": "string",
+      "name": "Legend Text"
+    },
+    "message": {
+      "type": "boolean",
+      "name": "Show Message",
+      "defaultValue": false
+    },
+    "messageText": {
+      "type": "string",
+      "name": "Message Text",
+      "defaultValue": ""
+    }
+  }
+}

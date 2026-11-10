@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SkipToContent",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/SkipToContent.js"
+  },
+  "codeProperties": {
+    "children": {
+      "type": "string",
+      "name": "Label",
+      "description": "Text to display in the SkipToContent link.",
+      "defaultValue": "Skip to main content"
+    },
+    "href": {
+      "type": "string",
+      "name": "Href",
+      "description": "The id of the element on your page that is the main content.",
+      "defaultValue": "#main-content"
+    },
+    "tabIndex": {
+      "type": "string",
+      "name": "Tab Index",
+      "description": "Optionally override the default tabindex of 0.",
+      "defaultValue": "0"
+    }
+  }
+}

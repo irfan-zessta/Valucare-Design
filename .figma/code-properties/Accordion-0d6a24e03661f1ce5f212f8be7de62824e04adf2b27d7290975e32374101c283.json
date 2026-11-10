@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Accordion",
+    "filePath": "web/node_modules/@carbon/react/es/components/Accordion/Accordion.js"
+  },
+  "codeProperties": {
+    "align": {
+      "type": "string",
+      "name": "Align",
+      "defaultValue": "end",
+      "description": "Specify the alignment of the accordion heading title and chevron.",
+      "options": [
+        "start",
+        "end"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "start": "Start",
+          "end": "End"
+        }
+      }
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false,
+      "description": "Specify whether an individual AccordionItem should be disabled"
+    },
+    "isFlush": {
+      "type": "boolean",
+      "name": "Is Flush",
+      "defaultValue": false,
+      "description": "Specify whether Accordion text should be flush, does not work with align=\"start\""
+    },
+    "ordered": {
+      "type": "boolean",
+      "name": "Ordered",
+      "defaultValue": false,
+      "description": "Specify if the Accordion should be an ordered list"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the Accordion.",
+      "options": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

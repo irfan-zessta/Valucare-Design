@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Select",
+    "filePath": "web/node_modules/@carbon/react/es/components/Select/Select.js"
+  },
+  "codeProperties": {
+    "labelText": {
+      "type": "string",
+      "name": "Label Text",
+      "defaultValue": "Select"
+    },
+    "helperText": {
+      "type": "string",
+      "name": "Helper Text"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    },
+    "inline": {
+      "type": "boolean",
+      "name": "Inline",
+      "defaultValue": false
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    },
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label",
+      "defaultValue": false
+    },
+    "noLabel": {
+      "type": "boolean",
+      "name": "No Label",
+      "defaultValue": false
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid",
+      "defaultValue": false
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text",
+      "defaultValue": ""
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn",
+      "defaultValue": false
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "control": false
+    }
+  }
+}

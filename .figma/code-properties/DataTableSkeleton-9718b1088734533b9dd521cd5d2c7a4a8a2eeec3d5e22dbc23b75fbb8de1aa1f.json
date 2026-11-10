@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "DataTableSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/DataTableSkeleton/DataTableSkeleton.js"
+  },
+  "codeProperties": {
+    "columnCount": {
+      "type": "number",
+      "name": "Column Count",
+      "defaultValue": 5,
+      "description": "Number of columns rendered in the skeleton state."
+    },
+    "rowCount": {
+      "type": "number",
+      "name": "Row Count",
+      "defaultValue": 5,
+      "description": "Number of rows rendered in the skeleton state."
+    },
+    "showHeader": {
+      "type": "boolean",
+      "name": "Show Header",
+      "defaultValue": true
+    },
+    "showToolbar": {
+      "type": "boolean",
+      "name": "Show Toolbar",
+      "defaultValue": true
+    },
+    "toolbarLabel": {
+      "type": "string",
+      "name": "Toolbar Label",
+      "defaultValue": "data table toolbar"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "defaultValue": "lg",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg",
+        "xl"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large",
+          "xl": "Extra Large"
+        }
+      }
+    },
+    "zebra": {
+      "type": "boolean",
+      "name": "Zebra",
+      "defaultValue": false
+    }
+  }
+}

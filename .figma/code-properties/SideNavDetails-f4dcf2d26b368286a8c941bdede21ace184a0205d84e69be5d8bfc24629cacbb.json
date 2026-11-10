@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SideNavDetails",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/SideNavDetails.js"
+  },
+  "codeProperties": {
+    "title": {
+      "type": "string",
+      "name": "Title",
+      "description": "Provide the text that will be rendered as the title in the component"
+    }
+  }
+}

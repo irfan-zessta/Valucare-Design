@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ContentSwitcher",
+    "filePath": "web/node_modules/@carbon/react/es/components/ContentSwitcher/ContentSwitcher.js"
+  },
+  "codeProperties": {
+    "lowContrast": {
+      "type": "boolean",
+      "name": "Low Contrast",
+      "description": "`true` to use the low contrast version."
+    },
+    "selectedIndex": {
+      "type": "number",
+      "name": "Selected Index",
+      "defaultValue": 0,
+      "description": "Specify a selected index for the initially selected content."
+    },
+    "selectionMode": {
+      "type": "string",
+      "name": "Selection Mode",
+      "defaultValue": "automatic",
+      "options": [
+        "automatic",
+        "manual"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "automatic": "Automatic",
+          "manual": "Manual"
+        }
+      }
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "options": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "OverflowMenuItem",
+    "filePath": "web/node_modules/@carbon/react/es/components/OverflowMenuItem/OverflowMenuItem.js"
+  },
+  "codeProperties": {
+    "dangerDescription": {
+      "type": "string",
+      "name": "Danger Description",
+      "description": "Specify the message read by screen readers for the danger overflow menu item variant",
+      "defaultValue": ""
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "True to make this menu item disabled.",
+      "defaultValue": false
+    },
+    "hasDivider": {
+      "type": "boolean",
+      "name": "Has Divider",
+      "description": "True to make this menu item a divider.",
+      "defaultValue": false
+    },
+    "href": {
+      "type": "string",
+      "name": "Href",
+      "description": "If given, overflow item will render as a link with the given href"
+    },
+    "isDelete": {
+      "type": "boolean",
+      "name": "Is Delete",
+      "description": "True to make this menu item a danger button.",
+      "defaultValue": false
+    },
+    "itemText": {
+      "type": "string",
+      "name": "Item Text",
+      "description": "The text in the menu item.",
+      "defaultValue": "Provide itemText"
+    },
+    "requireTitle": {
+      "type": "boolean",
+      "name": "Require Title",
+      "description": "True if this menu item has long text and requires a browser tooltip"
+    },
+    "title": {
+      "type": "string",
+      "name": "Title",
+      "description": "Specify a title for the OverflowMenuItem"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TextDirection",
+    "filePath": "web/node_modules/@carbon/react/es/components/Text/TextDirection.js"
+  },
+  "codeProperties": {
+    "dir": {
+      "type": "string",
+      "name": "Direction",
+      "description": "Specify the text direction for rendered children",
+      "defaultValue": "auto",
+      "options": [
+        "ltr",
+        "rtl",
+        "auto"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "ltr": "Left to right",
+          "rtl": "Right to left",
+          "auto": "Auto"
+        }
+      }
+    }
+  }
+}

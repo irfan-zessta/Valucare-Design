@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Modal",
+    "filePath": "web/node_modules/@carbon/react/es/components/Modal/Modal.js"
+  },
+  "codeProperties": {
+    "modalHeading": {
+      "type": "string",
+      "name": "Modal Heading",
+      "defaultValue": ""
+    },
+    "modalLabel": {
+      "type": "string",
+      "name": "Modal Label",
+      "defaultValue": ""
+    },
+    "primaryButtonText": {
+      "type": "string",
+      "name": "Primary Button Text"
+    },
+    "secondaryButtonText": {
+      "type": "string",
+      "name": "Secondary Button Text"
+    },
+    "closeButtonLabel": {
+      "type": "string",
+      "name": "Close Button Label",
+      "defaultValue": "Close"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    },
+    "open": {
+      "type": "boolean",
+      "name": "Open"
+    },
+    "passiveModal": {
+      "type": "boolean",
+      "name": "Passive Modal",
+      "defaultValue": false
+    },
+    "danger": {
+      "type": "boolean",
+      "name": "Danger"
+    },
+    "alert": {
+      "type": "boolean",
+      "name": "Alert"
+    },
+    "primaryButtonDisabled": {
+      "type": "boolean",
+      "name": "Primary Button Disabled",
+      "defaultValue": false
+    },
+    "hasScrollingContent": {
+      "type": "boolean",
+      "name": "Has Scrolling Content",
+      "defaultValue": false
+    },
+    "isFullWidth": {
+      "type": "boolean",
+      "name": "Is Full Width"
+    },
+    "preventCloseOnClickOutside": {
+      "type": "boolean",
+      "name": "Prevent Close On Click Outside"
+    },
+    "shouldSubmitOnEnter": {
+      "type": "boolean",
+      "name": "Should Submit On Enter"
+    },
+    "loadingStatus": {
+      "type": "string",
+      "name": "Loading Status",
+      "defaultValue": "inactive",
+      "options": [
+        "inactive",
+        "active",
+        "finished",
+        "error"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "inactive": "Inactive",
+          "active": "Active",
+          "finished": "Finished",
+          "error": "Error"
+        }
+      }
+    },
+    "loadingDescription": {
+      "type": "string",
+      "name": "Loading Description"
+    },
+    "loadingIconDescription": {
+      "type": "string",
+      "name": "Loading Icon Description"
+    },
+    "dangerDescription": {
+      "type": "string",
+      "name": "Danger Description",
+      "defaultValue": ""
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "control": false
+    }
+  }
+}

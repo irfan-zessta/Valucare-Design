@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "HeaderName",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/HeaderName.js"
+  },
+  "codeProperties": {
+    "href": {
+      "type": "string",
+      "name": "Href",
+      "description": "Provide an href for the name to link to"
+    },
+    "prefix": {
+      "type": "string",
+      "name": "Prefix",
+      "description": "Optionally specify a prefix to your header name.",
+      "defaultValue": "IBM"
+    }
+  }
+}

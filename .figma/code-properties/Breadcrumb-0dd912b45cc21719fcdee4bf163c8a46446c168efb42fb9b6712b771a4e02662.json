@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Breadcrumb",
+    "filePath": "web/node_modules/@carbon/react/es/components/Breadcrumb/Breadcrumb.js"
+  },
+  "codeProperties": {
+    "noTrailingSlash": {
+      "type": "boolean",
+      "name": "No Trailing Slash",
+      "description": "Optional prop to omit the trailing slash for the breadcrumbs"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the Breadcrumb.",
+      "defaultValue": "md",
+      "options": [
+        "sm",
+        "md"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium"
+        }
+      }
+    }
+  }
+}

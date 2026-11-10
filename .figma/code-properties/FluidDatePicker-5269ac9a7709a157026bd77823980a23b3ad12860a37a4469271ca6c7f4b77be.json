@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FluidDatePicker",
+    "filePath": "web/node_modules/@carbon/react/es/components/FluidDatePicker/FluidDatePicker.js"
+  },
+  "codeProperties": {
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    }
+  }
+}

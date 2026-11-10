@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FluidTimePicker",
+    "filePath": "web/node_modules/@carbon/react/es/components/FluidTimePicker/FluidTimePicker.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "labelText": {
+      "type": "string",
+      "name": "Label Text"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    }
+  }
+}

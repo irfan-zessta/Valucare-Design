@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "DialogFooter",
+    "filePath": "web/node_modules/@carbon/react/es/components/Dialog/Dialog.js"
+  },
+  "codeProperties": {
+    "primaryButtonText": {
+      "type": "string",
+      "name": "Primary Button Text",
+      "defaultValue": "Save"
+    },
+    "primaryButtonDisabled": {
+      "type": "boolean",
+      "name": "Primary Button Disabled",
+      "defaultValue": false
+    },
+    "secondaryButtonText": {
+      "type": "string",
+      "name": "Secondary Button Text",
+      "defaultValue": "Cancel"
+    },
+    "loadingStatus": {
+      "type": "string",
+      "name": "Loading Status",
+      "defaultValue": "inactive",
+      "options": [
+        "inactive",
+        "active",
+        "finished",
+        "error"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "inactive": "Inactive",
+          "active": "Active",
+          "finished": "Finished",
+          "error": "Error"
+        }
+      }
+    },
+    "loadingDescription": {
+      "type": "string",
+      "name": "Loading Description"
+    },
+    "loadingIconDescription": {
+      "type": "string",
+      "name": "Loading Icon Description"
+    },
+    "danger": {
+      "type": "boolean",
+      "name": "Danger",
+      "defaultValue": false
+    },
+    "dangerDescription": {
+      "type": "string",
+      "name": "Danger Description",
+      "defaultValue": ""
+    }
+  }
+}

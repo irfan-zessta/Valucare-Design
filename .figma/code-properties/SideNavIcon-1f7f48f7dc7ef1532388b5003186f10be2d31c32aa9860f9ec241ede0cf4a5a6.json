@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SideNavIcon",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/SideNavIcon.js"
+  },
+  "codeProperties": {
+    "small": {
+      "type": "boolean",
+      "name": "Small",
+      "description": "Specify whether the icon should be placed in a smaller bounding box",
+      "defaultValue": false
+    }
+  }
+}

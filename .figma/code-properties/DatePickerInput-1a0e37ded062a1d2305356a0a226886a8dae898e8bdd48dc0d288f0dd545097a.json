@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "DatePickerInput",
+    "filePath": "web/node_modules/@carbon/react/es/components/DatePickerInput/DatePickerInput.js"
+  },
+  "codeProperties": {
+    "datePickerType": {
+      "type": "string",
+      "name": "Date Picker Type",
+      "options": [
+        "simple",
+        "single",
+        "range"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "simple": "Simple",
+          "single": "Single",
+          "range": "Range"
+        }
+      }
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "control": false
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    },
+    "helperText": {
+      "type": "string",
+      "name": "Helper Text"
+    },
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid",
+      "defaultValue": false
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "labelText": {
+      "type": "string",
+      "name": "Label Text"
+    },
+    "placeholder": {
+      "type": "string",
+      "name": "Placeholder"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "defaultValue": "md",
+      "options": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn",
+      "defaultValue": false
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    }
+  }
+}

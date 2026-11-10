@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Tooltip",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tooltip/Tooltip.js"
+  },
+  "codeProperties": {
+    "align": {
+      "type": "string",
+      "name": "Align",
+      "defaultValue": "top",
+      "options": [
+        "top",
+        "top-left",
+        "top-right",
+        "bottom",
+        "bottom-left",
+        "bottom-right",
+        "left",
+        "left-bottom",
+        "left-top",
+        "right",
+        "right-bottom",
+        "right-top",
+        "top-start",
+        "top-end",
+        "bottom-start",
+        "bottom-end",
+        "left-end",
+        "left-start",
+        "right-end",
+        "right-start"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "top-left": "Top Left",
+          "top-right": "Top Right",
+          "bottom": "Bottom",
+          "bottom-left": "Bottom Left",
+          "bottom-right": "Bottom Right",
+          "left": "Left",
+          "left-bottom": "Left Bottom",
+          "left-top": "Left Top",
+          "right": "Right",
+          "right-bottom": "Right Bottom",
+          "right-top": "Right Top",
+          "top-start": "Top Start",
+          "top-end": "Top End",
+          "bottom-start": "Bottom Start",
+          "bottom-end": "Bottom End",
+          "left-end": "Left End",
+          "left-start": "Left Start",
+          "right-end": "Right End",
+          "right-start": "Right Start"
+        }
+      }
+    },
+    "label": {
+      "type": "string",
+      "name": "Label"
+    },
+    "description": {
+      "type": "string",
+      "name": "Description"
+    },
+    "enterDelayMs": {
+      "type": "number",
+      "name": "Enter Delay (ms)",
+      "defaultValue": 100
+    },
+    "leaveDelayMs": {
+      "type": "number",
+      "name": "Leave Delay (ms)",
+      "defaultValue": 300
+    },
+    "defaultOpen": {
+      "type": "boolean",
+      "name": "Default Open",
+      "defaultValue": false
+    },
+    "closeOnActivation": {
+      "type": "boolean",
+      "name": "Close On Activation",
+      "defaultValue": false
+    },
+    "dropShadow": {
+      "type": "boolean",
+      "name": "Drop Shadow",
+      "defaultValue": false
+    },
+    "highContrast": {
+      "type": "boolean",
+      "name": "High Contrast",
+      "defaultValue": true
+    }
+  }
+}

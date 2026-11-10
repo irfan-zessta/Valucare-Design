@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Tile",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tile/Tile.js"
+  },
+  "codeProperties": {
+    "hasRoundedCorners": {
+      "type": "boolean",
+      "name": "Has Rounded Corners",
+      "defaultValue": false
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "control": false
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "IconTab",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tabs/Tabs.js"
+  },
+  "codeProperties": {
+    "label": {
+      "type": "string",
+      "name": "Label",
+      "description": "The label rendered inside the Tooltip."
+    },
+    "badgeIndicator": {
+      "type": "boolean",
+      "name": "Badge Indicator",
+      "description": "Display an empty dot badge on the Tab."
+    },
+    "defaultOpen": {
+      "type": "boolean",
+      "name": "Default Open",
+      "defaultValue": false
+    },
+    "enterDelayMs": {
+      "type": "number",
+      "name": "Enter Delay (ms)"
+    },
+    "leaveDelayMs": {
+      "type": "number",
+      "name": "Leave Delay (ms)"
+    }
+  }
+}

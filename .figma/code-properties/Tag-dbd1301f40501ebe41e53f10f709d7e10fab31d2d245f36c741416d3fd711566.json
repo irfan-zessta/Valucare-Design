@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Tag",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tag/Tag.js"
+  },
+  "codeProperties": {
+    "type": {
+      "type": "string",
+      "name": "Type",
+      "options": [
+        "red",
+        "magenta",
+        "purple",
+        "blue",
+        "cyan",
+        "teal",
+        "green",
+        "gray",
+        "cool-gray",
+        "warm-gray",
+        "high-contrast",
+        "outline"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "red": "Red",
+          "magenta": "Magenta",
+          "purple": "Purple",
+          "blue": "Blue",
+          "cyan": "Cyan",
+          "teal": "Teal",
+          "green": "Green",
+          "gray": "Gray",
+          "cool-gray": "Cool-Gray",
+          "warm-gray": "Warm-Gray",
+          "high-contrast": "High-Contrast",
+          "outline": "Outline"
+        }
+      }
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "defaultValue": "md",
+      "options": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Icon",
+      "control": false
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "control": false
+    }
+  }
+}

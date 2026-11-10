@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Tabs",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tabs/Tabs.js"
+  },
+  "codeProperties": {
+    "defaultSelectedIndex": {
+      "type": "number",
+      "name": "Default Selected Index",
+      "defaultValue": 0
+    },
+    "selectedIndex": {
+      "type": "number",
+      "name": "Selected Index"
+    },
+    "dismissable": {
+      "type": "boolean",
+      "name": "Dismissable"
+    }
+  }
+}

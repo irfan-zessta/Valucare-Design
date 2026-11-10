@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "CopyButton",
+    "filePath": "web/node_modules/@carbon/react/es/components/CopyButton/CopyButton.js"
+  },
+  "codeProperties": {
+    "align": {
+      "type": "string",
+      "name": "Align",
+      "defaultValue": "bottom",
+      "options": [
+        "top",
+        "top-start",
+        "top-end",
+        "bottom",
+        "bottom-start",
+        "bottom-end",
+        "left",
+        "left-start",
+        "left-end",
+        "right",
+        "right-start",
+        "right-end"
+      ],
+      "control": {
+        "type": "select"
+      }
+    },
+    "autoAlign": {
+      "type": "boolean",
+      "name": "Auto Align",
+      "description": "Experimental: attempts to automatically align the tooltip."
+    },
+    "feedback": {
+      "type": "string",
+      "name": "Feedback",
+      "defaultValue": "Copied!",
+      "description": "The string displayed when the content is copied."
+    },
+    "feedbackTimeout": {
+      "type": "number",
+      "name": "Feedback Timeout",
+      "defaultValue": 2000,
+      "description": "The time it takes for the feedback message to timeout."
+    },
+    "iconDescription": {
+      "type": "string",
+      "name": "Icon Description",
+      "defaultValue": "Copy to clipboard",
+      "description": "Description for the copy icon, read by screen readers."
+    }
+  }
+}

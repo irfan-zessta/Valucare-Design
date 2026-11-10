@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Dialog",
+    "filePath": "web/node_modules/@carbon/react/es/components/Dialog/Dialog.js"
+  },
+  "codeProperties": {
+    "modal": {
+      "type": "boolean",
+      "name": "Modal",
+      "description": "Whether the Dialog is modal or non-modal. Cannot be changed while open."
+    },
+    "open": {
+      "type": "boolean",
+      "name": "Open",
+      "defaultValue": false,
+      "description": "Open initial state"
+    },
+    "role": {
+      "type": "string",
+      "name": "Role",
+      "description": "Specify the role of the dialog for accessibility",
+      "options": [
+        "dialog",
+        "alertdialog"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "dialog": "Dialog",
+          "alertdialog": "Alert Dialog"
+        }
+      }
+    }
+  }
+}

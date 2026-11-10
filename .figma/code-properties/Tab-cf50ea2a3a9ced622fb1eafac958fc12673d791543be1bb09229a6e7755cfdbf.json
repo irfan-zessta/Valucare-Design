@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Tab",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tabs/Tabs.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "secondaryLabel": {
+      "type": "string",
+      "name": "Secondary Label",
+      "description": "An optional label under the primary tab label. Only useful for contained tabs."
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "control": false,
+      "name": "Icon"
+    }
+  }
+}

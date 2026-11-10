@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FluidMultiSelect",
+    "filePath": "web/node_modules/@carbon/react/es/components/FluidMultiSelect/FluidMultiSelect.js"
+  },
+  "codeProperties": {
+    "clearSelectionDescription": {
+      "type": "string",
+      "name": "Clear Selection Description"
+    },
+    "clearSelectionText": {
+      "type": "string",
+      "name": "Clear Selection Text"
+    },
+    "direction": {
+      "type": "string",
+      "name": "Direction",
+      "options": [
+        "top",
+        "bottom"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "bottom": "Bottom"
+        }
+      }
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "isCondensed": {
+      "type": "boolean",
+      "name": "Condensed"
+    },
+    "isFilterable": {
+      "type": "boolean",
+      "name": "Filterable"
+    },
+    "label": {
+      "type": "string",
+      "name": "Label"
+    },
+    "locale": {
+      "type": "string",
+      "name": "Locale"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    },
+    "selectionFeedback": {
+      "type": "string",
+      "name": "Selection Feedback",
+      "options": [
+        "top",
+        "fixed",
+        "top-after-reopen"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "fixed": "Fixed",
+          "top-after-reopen": "Top After Reopen"
+        }
+      }
+    },
+    "titleText": {
+      "type": "string",
+      "name": "Title Text"
+    },
+    "useTitleInItem": {
+      "type": "boolean",
+      "name": "Use Title In Item"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    }
+  }
+}

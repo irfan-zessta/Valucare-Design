@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TabListVertical",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tabs/Tabs.js"
+  },
+  "codeProperties": {
+    "activation": {
+      "type": "string",
+      "name": "Activation",
+      "defaultValue": "automatic",
+      "options": [
+        "automatic",
+        "manual"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "automatic": "Automatic",
+          "manual": "Manual"
+        }
+      }
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "options": [
+        "sm",
+        "md",
+        "lg",
+        "xl"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large",
+          "xl": "Extra Large"
+        }
+      }
+    },
+    "scrollIntoView": {
+      "type": "boolean",
+      "name": "Scroll Into View"
+    }
+  }
+}

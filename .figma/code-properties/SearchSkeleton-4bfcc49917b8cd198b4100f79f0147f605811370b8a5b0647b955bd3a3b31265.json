@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SearchSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/Search/Search.Skeleton.js"
+  },
+  "codeProperties": {
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the SearchSkeleton",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    },
+    "small": {
+      "type": "boolean",
+      "name": "Small",
+      "description": "Specify whether the Search should be a small variant. Deprecated: use the size prop instead.",
+      "defaultValue": false
+    }
+  }
+}

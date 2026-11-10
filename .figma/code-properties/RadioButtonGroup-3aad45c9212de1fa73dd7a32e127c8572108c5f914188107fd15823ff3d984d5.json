@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "RadioButtonGroup",
+    "filePath": "web/node_modules/@carbon/react/es/components/RadioButtonGroup/RadioButtonGroup.js"
+  },
+  "codeProperties": {
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "description": "Experimental: Provide a decorator component to be rendered inside the RadioButtonGroup component",
+      "control": false
+    },
+    "defaultSelected": {
+      "type": "string",
+      "name": "Default Selected",
+      "description": "Specify the RadioButton to be selected by default"
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "Specify whether the group is disabled"
+    },
+    "helperText": {
+      "type": "string",
+      "name": "Helper Text",
+      "description": "Provide text that is used alongside the control label for additional help"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid",
+      "description": "Specify whether the control is currently invalid",
+      "defaultValue": false
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text",
+      "description": "Provide the text that is displayed when the control is in an invalid state"
+    },
+    "labelPosition": {
+      "type": "string",
+      "name": "Label Position",
+      "description": "Provide where label text should be placed",
+      "defaultValue": "right",
+      "options": [
+        "left",
+        "right"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "left": "Left",
+          "right": "Right"
+        }
+      }
+    },
+    "legendText": {
+      "type": "string",
+      "name": "Legend Text",
+      "description": "Provide a legend to the RadioButtonGroup input that you are exposing to the user"
+    },
+    "name": {
+      "type": "string",
+      "name": "Name",
+      "description": "Specify the name of the underlying input nodes"
+    },
+    "orientation": {
+      "type": "string",
+      "name": "Orientation",
+      "description": "Provide where radio buttons should be placed",
+      "defaultValue": "horizontal",
+      "options": [
+        "horizontal",
+        "vertical"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "horizontal": "Horizontal",
+          "vertical": "Vertical"
+        }
+      }
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only",
+      "description": "Whether the RadioButtonGroup should be read-only"
+    },
+    "required": {
+      "type": "boolean",
+      "name": "Required",
+      "description": "True to specify if radio selection in group is required."
+    },
+    "valueSelected": {
+      "type": "string",
+      "name": "Value Selected",
+      "description": "Specify the value that is currently selected in the group"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn",
+      "description": "Specify whether the control is currently in warning state",
+      "defaultValue": false
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text",
+      "description": "Provide the text that is displayed when the control is in warning state"
+    }
+  }
+}

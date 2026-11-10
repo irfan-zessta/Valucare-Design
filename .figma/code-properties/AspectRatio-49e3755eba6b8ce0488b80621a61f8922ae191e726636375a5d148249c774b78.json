@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "AspectRatio",
+    "filePath": "web/node_modules/@carbon/react/es/components/AspectRatio/AspectRatio.js"
+  },
+  "codeProperties": {
+    "ratio": {
+      "type": "string",
+      "name": "Ratio",
+      "description": "Specify the ratio to be used by the aspect ratio container.",
+      "defaultValue": "1x1",
+      "options": [
+        "16x9",
+        "9x16",
+        "2x1",
+        "1x2",
+        "4x3",
+        "3x4",
+        "3x2",
+        "2x3",
+        "1x1"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "16x9": "16x9",
+          "9x16": "9x16",
+          "2x1": "2x1",
+          "1x2": "1x2",
+          "4x3": "4x3",
+          "3x4": "3x4",
+          "3x2": "3x2",
+          "2x3": "2x3",
+          "1x1": "1x1"
+        }
+      }
+    }
+  }
+}

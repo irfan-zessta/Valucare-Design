@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "default",
+    "filePath": "web/node_modules/@carbon/react/es/components/TextInput/TextInput.js"
+  },
+  "codeProperties": {
+    "labelText": {
+      "type": "string",
+      "name": "Label Text"
+    },
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label"
+    },
+    "helperText": {
+      "type": "string",
+      "name": "Helper Text"
+    },
+    "placeholder": {
+      "type": "string",
+      "name": "Placeholder"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    },
+    "type": {
+      "type": "string",
+      "name": "Type",
+      "defaultValue": "text"
+    },
+    "inline": {
+      "type": "boolean",
+      "name": "Inline",
+      "defaultValue": false
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid",
+      "defaultValue": false
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn",
+      "defaultValue": false
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    },
+    "enableCounter": {
+      "type": "boolean",
+      "name": "Enable Counter",
+      "defaultValue": false
+    },
+    "maxCount": {
+      "type": "number",
+      "name": "Max Count"
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "control": false,
+      "name": "Decorator"
+    }
+  }
+}

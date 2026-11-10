@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FluidTextInput",
+    "filePath": "web/node_modules/@carbon/react/es/components/FluidTextInput/FluidTextInput.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "isPassword": {
+      "type": "boolean",
+      "name": "Is Password"
+    },
+    "maxCount": {
+      "type": "number",
+      "name": "Max Count"
+    },
+    "enableCounter": {
+      "type": "boolean",
+      "name": "Enable Counter"
+    },
+    "labelText": {
+      "type": "string",
+      "name": "Label Text"
+    },
+    "placeholder": {
+      "type": "string",
+      "name": "Placeholder"
+    },
+    "value": {
+      "type": "string",
+      "name": "Value"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    }
+  }
+}

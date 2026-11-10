@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TableCell",
+    "filePath": "web/node_modules/@carbon/react/es/components/DataTable/TableCell.js"
+  },
+  "codeProperties": {
+    "colSpan": {
+      "type": "number",
+      "name": "Col Span"
+    },
+    "hasAILabelHeader": {
+      "type": "boolean",
+      "name": "Has AI Label Header"
+    }
+  }
+}

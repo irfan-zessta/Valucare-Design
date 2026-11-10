@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SelectItem",
+    "filePath": "web/node_modules/@carbon/react/es/components/SelectItem/SelectItem.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false,
+      "description": "Specify whether the SelectItem should be disabled."
+    },
+    "hidden": {
+      "type": "boolean",
+      "name": "Hidden",
+      "defaultValue": false,
+      "description": "Specify whether the SelectItem is hidden."
+    },
+    "text": {
+      "type": "string",
+      "name": "Text",
+      "defaultValue": "",
+      "description": "The contents of the SelectItem."
+    },
+    "value": {
+      "type": "string",
+      "name": "Value",
+      "defaultValue": "",
+      "description": "Specify the value of the SelectItem."
+    }
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "OverflowMenu",
+    "filePath": "web/node_modules/@carbon/react/es/components/OverflowMenu/OverflowMenu.js"
+  },
+  "codeProperties": {
+    "align": {
+      "type": "string",
+      "name": "Align",
+      "description": "Specify how the tooltip should be aligned with the button",
+      "options": [
+        "top",
+        "top-start",
+        "top-end",
+        "bottom",
+        "bottom-start",
+        "bottom-end",
+        "left",
+        "left-start",
+        "left-end",
+        "right",
+        "right-start",
+        "right-end"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "top-start": "Top Start",
+          "top-end": "Top End",
+          "bottom": "Bottom",
+          "bottom-start": "Bottom Start",
+          "bottom-end": "Bottom End",
+          "left": "Left",
+          "left-start": "Left Start",
+          "left-end": "Left End",
+          "right": "Right",
+          "right-start": "Right Start",
+          "right-end": "Right End"
+        }
+      }
+    },
+    "direction": {
+      "type": "string",
+      "name": "Direction",
+      "description": "The menu direction.",
+      "defaultValue": "bottom",
+      "options": [
+        "top",
+        "bottom"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "bottom": "Bottom"
+        }
+      }
+    },
+    "flipped": {
+      "type": "boolean",
+      "name": "Flipped",
+      "description": "True if the menu alignment should be flipped.",
+      "defaultValue": false
+    },
+    "iconDescription": {
+      "type": "string",
+      "name": "Icon Description",
+      "description": "The icon description.",
+      "defaultValue": "Options"
+    },
+    "open": {
+      "type": "boolean",
+      "name": "Open",
+      "description": "True if the menu should be open."
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Icon",
+      "description": "A component used to render an icon.",
+      "control": false
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the OverflowMenu.",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

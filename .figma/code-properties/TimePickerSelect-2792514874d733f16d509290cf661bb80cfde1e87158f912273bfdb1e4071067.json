@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TimePickerSelect",
+    "filePath": "web/node_modules/@carbon/react/es/components/TimePickerSelect/TimePickerSelect.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    }
+  }
+}

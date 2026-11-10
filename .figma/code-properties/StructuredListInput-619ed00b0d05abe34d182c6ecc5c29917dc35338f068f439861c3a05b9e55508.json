@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "StructuredListInput",
+    "filePath": "web/node_modules/@carbon/react/es/components/StructuredList/StructuredList.js"
+  },
+  "codeProperties": {
+    "defaultChecked": {
+      "type": "boolean",
+      "name": "Default Checked",
+      "description": "Specify whether the underlying input should be checked by default. Deprecated."
+    },
+    "id": {
+      "type": "string",
+      "name": "ID",
+      "description": "Specify a custom id for the input."
+    },
+    "name": {
+      "type": "string",
+      "name": "Name",
+      "description": "Provide a name for the input."
+    },
+    "title": {
+      "type": "string",
+      "name": "Title",
+      "description": "Provide a title for the input."
+    },
+    "value": {
+      "type": "string",
+      "name": "Value",
+      "description": "Specify the value of the input. Deprecated."
+    }
+  }
+}

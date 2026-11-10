@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "CheckboxGroup",
+    "filePath": "web/node_modules/@carbon/react/es/components/CheckboxGroup/CheckboxGroup.js"
+  },
+  "codeProperties": {
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "description": "Experimental: Provide a decorator component to be rendered inside the CheckboxGroup component",
+      "control": false
+    },
+    "helperText": {
+      "type": "string",
+      "name": "Helper Text",
+      "description": "Provide text for the form group for additional help"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid",
+      "description": "Specify whether the form group is currently invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text",
+      "description": "Provide the text that is displayed when the form group is in an invalid state"
+    },
+    "legendText": {
+      "type": "string",
+      "name": "Legend Text",
+      "description": "Provide the text to be rendered inside of the fieldset legend"
+    },
+    "orientation": {
+      "type": "string",
+      "name": "Orientation",
+      "description": "Provide the orientation for how the checkbox should be displayed",
+      "defaultValue": "vertical",
+      "options": [
+        "horizontal",
+        "vertical"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "horizontal": "Horizontal",
+          "vertical": "Vertical"
+        }
+      }
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only",
+      "description": "Whether the CheckboxGroup should be read-only"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn",
+      "description": "Specify whether the form group is currently in warning state"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text",
+      "description": "Provide the text that is displayed when the form group is in warning state"
+    }
+  }
+}

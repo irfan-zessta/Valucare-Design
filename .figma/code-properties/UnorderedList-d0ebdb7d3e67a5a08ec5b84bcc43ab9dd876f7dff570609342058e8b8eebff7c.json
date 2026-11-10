@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "UnorderedList",
+    "filePath": "web/node_modules/@carbon/react/es/components/UnorderedList/UnorderedList.js"
+  },
+  "codeProperties": {
+    "nested": {
+      "type": "boolean",
+      "name": "Nested",
+      "defaultValue": false
+    },
+    "isExpressive": {
+      "type": "boolean",
+      "name": "Expressive",
+      "defaultValue": false
+    }
+  }
+}

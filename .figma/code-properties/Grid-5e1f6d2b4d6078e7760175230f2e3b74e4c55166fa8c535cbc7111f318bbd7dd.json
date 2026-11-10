@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Grid",
+    "filePath": "web/node_modules/@carbon/react/lib/components/Grid/Grid.js"
+  },
+  "codeProperties": {
+    "align": {
+      "type": "string",
+      "name": "Align",
+      "options": [
+        "start",
+        "center",
+        "end"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "start": "Start",
+          "center": "Center",
+          "end": "End"
+        }
+      }
+    },
+    "condensed": {
+      "type": "boolean",
+      "name": "Condensed"
+    },
+    "fullWidth": {
+      "type": "boolean",
+      "name": "Full Width"
+    },
+    "narrow": {
+      "type": "boolean",
+      "name": "Narrow"
+    },
+    "withRowGap": {
+      "type": "boolean",
+      "name": "With Row Gap"
+    }
+  }
+}

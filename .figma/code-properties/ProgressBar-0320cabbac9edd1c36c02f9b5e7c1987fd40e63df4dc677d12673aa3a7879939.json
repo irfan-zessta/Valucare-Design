@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ProgressBar",
+    "filePath": "web/node_modules/@carbon/react/es/components/ProgressBar/ProgressBar.js"
+  },
+  "codeProperties": {
+    "helperText": {
+      "type": "string",
+      "name": "Helper Text",
+      "description": "The current progress as a textual representation."
+    },
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label",
+      "description": "Whether the label should be visually hidden."
+    },
+    "label": {
+      "type": "string",
+      "name": "Label",
+      "description": "A label describing the progress bar."
+    },
+    "max": {
+      "type": "number",
+      "name": "Max",
+      "description": "The maximum value.",
+      "defaultValue": 100
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the ProgressBar.",
+      "defaultValue": "big",
+      "options": [
+        "small",
+        "big"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "small": "Small",
+          "big": "Big"
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "name": "Status",
+      "description": "Specify the status.",
+      "defaultValue": "active",
+      "options": [
+        "active",
+        "finished",
+        "error"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "active": "Active",
+          "finished": "Finished",
+          "error": "Error"
+        }
+      }
+    },
+    "type": {
+      "type": "string",
+      "name": "Type",
+      "description": "Defines the alignment variant of the progress bar.",
+      "defaultValue": "default",
+      "options": [
+        "default",
+        "inline",
+        "indented"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "default": "Default",
+          "inline": "Inline",
+          "indented": "Indented"
+        }
+      }
+    },
+    "value": {
+      "type": "number",
+      "name": "Value",
+      "description": "The current value."
+    }
+  }
+}

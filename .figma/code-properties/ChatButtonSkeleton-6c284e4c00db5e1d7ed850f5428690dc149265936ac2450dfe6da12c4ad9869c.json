@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ChatButtonSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/ChatButton/ChatButton.Skeleton.js"
+  },
+  "codeProperties": {
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "options": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Checkbox",
+    "filePath": "web/node_modules/@carbon/react/es/components/Checkbox/Checkbox.js"
+  },
+  "codeProperties": {
+    "labelText": {
+      "type": "string",
+      "name": "Label Text",
+      "description": "Label describing the Checkbox input"
+    },
+    "helperText": {
+      "type": "string",
+      "name": "Helper Text",
+      "description": "Provide text for the form group for additional help"
+    },
+    "checked": {
+      "type": "boolean",
+      "name": "Checked",
+      "description": "Specify whether the underlying input should be checked"
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "Specify whether the Checkbox should be disabled"
+    },
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label",
+      "description": "Specify whether the label should be hidden, or not"
+    },
+    "indeterminate": {
+      "type": "boolean",
+      "name": "Indeterminate",
+      "defaultValue": false,
+      "description": "Specify whether the Checkbox is in an indeterminate state"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid",
+      "description": "Specify whether the Checkbox is currently invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text",
+      "description": "Text displayed when the Checkbox is invalid"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only",
+      "description": "Specify whether the Checkbox is read-only"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn",
+      "description": "Specify whether the Checkbox is currently in warning state"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text",
+      "description": "Text displayed when the Checkbox is in warning state"
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "control": false
+    }
+  }
+}

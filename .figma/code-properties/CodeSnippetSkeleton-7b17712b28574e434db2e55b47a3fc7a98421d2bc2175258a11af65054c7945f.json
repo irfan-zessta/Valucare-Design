@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "CodeSnippetSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/CodeSnippet/CodeSnippet.Skeleton.js"
+  },
+  "codeProperties": {
+    "type": {
+      "type": "string",
+      "name": "Type",
+      "defaultValue": "single",
+      "options": [
+        "single",
+        "multi"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "single": "Single",
+          "multi": "Multi"
+        }
+      }
+    }
+  }
+}

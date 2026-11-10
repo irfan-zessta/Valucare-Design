@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ContainedList",
+    "filePath": "web/node_modules/@carbon/react/es/components/ContainedList/ContainedList.js"
+  },
+  "codeProperties": {
+    "action": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Action",
+      "description": "A slot for a possible interactive element to render.",
+      "control": false
+    },
+    "isInset": {
+      "type": "boolean",
+      "name": "Is Inset",
+      "description": "Specify whether the dividing lines in between list items should be inset."
+    },
+    "kind": {
+      "type": "string",
+      "name": "Kind",
+      "description": "The kind of ContainedList you want to display",
+      "defaultValue": "on-page",
+      "options": [
+        "on-page",
+        "disclosed"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "on-page": "On Page",
+          "disclosed": "Disclosed"
+        }
+      }
+    },
+    "label": {
+      "type": "string",
+      "name": "Label",
+      "description": "A label describing the contained list."
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the contained list.",
+      "options": [
+        "sm",
+        "md",
+        "lg",
+        "xl"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large",
+          "xl": "Extra Large"
+        }
+      }
+    }
+  }
+}

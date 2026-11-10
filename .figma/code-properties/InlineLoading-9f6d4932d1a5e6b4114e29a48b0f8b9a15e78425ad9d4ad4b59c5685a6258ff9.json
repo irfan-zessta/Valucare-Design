@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "InlineLoading",
+    "filePath": "web/node_modules/@carbon/react/es/components/InlineLoading/InlineLoading.js"
+  },
+  "codeProperties": {
+    "status": {
+      "type": "string",
+      "name": "Status",
+      "defaultValue": "active",
+      "options": [
+        "inactive",
+        "active",
+        "finished",
+        "error"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "inactive": "Inactive",
+          "active": "Active",
+          "finished": "Finished",
+          "error": "Error"
+        }
+      }
+    },
+    "description": {
+      "type": "string",
+      "name": "Description",
+      "description": "Specify the description for the inline loading text"
+    },
+    "iconDescription": {
+      "type": "string",
+      "name": "Icon Description",
+      "description": "Specify the description for the icon"
+    },
+    "successDelay": {
+      "type": "number",
+      "name": "Success Delay",
+      "defaultValue": 1500,
+      "description": "Provide a delay for the setTimeout for success"
+    }
+  }
+}

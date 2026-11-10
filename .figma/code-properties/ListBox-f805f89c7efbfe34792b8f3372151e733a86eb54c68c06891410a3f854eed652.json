@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ListBox",
+    "filePath": "web/node_modules/@carbon/react/es/components/ListBox/ListBox.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "isOpen": {
+      "type": "boolean",
+      "name": "Open"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "defaultValue": "",
+      "options": [
+        "",
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "": "Default",
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    },
+    "type": {
+      "type": "string",
+      "name": "Type",
+      "defaultValue": "default",
+      "options": [
+        "default",
+        "inline"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "default": "Default",
+          "inline": "Inline"
+        }
+      }
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ClickableTile",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tile/Tile.js"
+  },
+  "codeProperties": {
+    "clicked": {
+      "type": "boolean",
+      "name": "Clicked",
+      "defaultValue": false
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "hasRoundedCorners": {
+      "type": "boolean",
+      "name": "Has Rounded Corners"
+    },
+    "href": {
+      "type": "string",
+      "name": "Href"
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Icon",
+      "control": false
+    }
+  }
+}

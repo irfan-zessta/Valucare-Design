@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FluidTimePickerSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/FluidTimePicker/FluidTimePicker.Skeleton.js"
+  },
+  "codeProperties": {
+    "isOnlyTwo": {
+      "type": "boolean",
+      "name": "Is Only Two",
+      "description": "Specify if there are only two TimePicker elements"
+    }
+  }
+}

@@ -2,19 +2,17 @@
   "pointAndEdit": {
     "priorityPaths": {
       "prefer": [
-        "app/index.html",
-        "app/js/views/**",
-        "app/js/main.js",
-        "app/js/components.js",
-        "app/js/guide.js",
-        "app/js/guidance.js",
-        "app/css/**"
+        "web/src/routes/**",
+        "web/src/components/**",
+        "web/src/App.tsx",
+        "web/src/main.tsx",
+        "web/src/state/**",
+        "web/src/styles/**"
       ],
       "deprioritize": [
-        "app/js/core.js",
-        "app/js/demo-store.js",
-        "app/js/demo-journey.js",
-        "app/js/preview.js"
+        "web/src/domain/**",
+        "web/src/services/**",
+        "web/src/lib/**"
       ],
       "exclude": [
         "**/*.figma.ts",
@@ -22,17 +20,22 @@
         "**/*.figma.js",
         "**/*.figma.jsx",
         "**/*.figma.template.*",
-        "app/preview/**",
-        "server/**",
-        "tests/**",
-        "docs/**",
-        "node_modules/**",
-        ".git/**"
+        "web/node_modules/**",
+        "web/public/**",
+        "web/src/assets/**",
+        "web/dist/**",
+        "web/*.json",
+        "web/.oxlintrc.json",
+        "web/README.md",
+        ".git/**",
+        "**/node_modules/**"
       ]
     },
     "libraryPaths": {
       "local": [],
-      "external": []
+      "external": [
+        "web/node_modules/@carbon/react/**"
+      ]
     },
     "pathClassification": {
       "classifier": "sonnet"
@@ -56,31 +59,43 @@
       },
       {
         "glob": "**/*.figma.template.*",
-        "reason": "Figma mapping templates are not UI source anchors."
+        "reason": "Figma mapping files are not UI source anchors."
       },
       {
-        "glob": "app/preview/**",
-        "reason": "Static JSON fixtures for preview mode, not rendering source."
+        "glob": "web/node_modules/**",
+        "reason": "Installed dependencies are not project source anchors."
       },
       {
-        "glob": "server/**",
-        "reason": "Python backend, does not render UI."
+        "glob": "web/public/**",
+        "reason": "Static assets are not UI source anchors."
       },
       {
-        "glob": "tests/**",
-        "reason": "Tests are not UI source anchors."
+        "glob": "web/src/assets/**",
+        "reason": "Static image assets are not UI source anchors."
       },
       {
-        "glob": "docs/**",
+        "glob": "web/dist/**",
+        "reason": "Build output."
+      },
+      {
+        "glob": "web/*.json",
+        "reason": "Tooling and TypeScript configuration."
+      },
+      {
+        "glob": "web/.oxlintrc.json",
+        "reason": "Linter configuration."
+      },
+      {
+        "glob": "web/README.md",
         "reason": "Documentation, not UI source."
-      },
-      {
-        "glob": "node_modules/**",
-        "reason": "Third-party dependencies, not project UI source."
       },
       {
         "glob": ".git/**",
         "reason": "Version control internals."
+      },
+      {
+        "glob": "**/node_modules/**",
+        "reason": "Installed dependencies are not project source anchors."
       }
     ],
     "generated": {
@@ -88,9 +103,9 @@
       "source": "setup-agent.point-and-edit-path-classifier",
       "prompt": "same-turn-setup-subagent-v5",
       "model": "claude-sonnet-4-6",
-      "createdAt": "2026-11-05T00:00:00Z",
+      "createdAt": "2026-11-10T00:00:00Z",
       "confidence": 0.8,
-      "explanation": "A vanilla JS SPA under app/ (index.html, js/views, css) with a Python backend, so the active app root is clear, but there is no package.json or shared UI library, so library buckets are left empty."
+      "explanation": "The active React/Vite app in web/src is clear and @carbon/react is confirmed installed, but I did not read package.json or the source files, and the legacy app/ folder was not inspected."
     }
   }
 }

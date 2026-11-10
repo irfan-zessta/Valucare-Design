@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ListBoxField",
+    "filePath": "web/node_modules/@carbon/react/es/components/ListBox/ListBoxField.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "Specify if the parent <ListBox> is disabled"
+    },
+    "tabIndex": {
+      "type": "number",
+      "name": "Tab Index",
+      "description": "Optional prop to specify the tabIndex of the <ListBox> trigger button"
+    }
+  }
+}

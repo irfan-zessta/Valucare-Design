@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "RadioButton",
+    "filePath": "web/node_modules/@carbon/react/es/components/RadioButton/RadioButton.js"
+  },
+  "codeProperties": {
+    "checked": {
+      "type": "boolean",
+      "name": "Checked",
+      "description": "Specify whether the RadioButton is currently checked"
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "description": "Experimental: Provide a decorator component to be rendered inside the RadioButton component",
+      "control": false
+    },
+    "defaultChecked": {
+      "type": "boolean",
+      "name": "Default Checked",
+      "description": "Specify whether the RadioButton should be checked by default"
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "Specify whether the control is disabled",
+      "defaultValue": false
+    },
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label",
+      "description": "Specify whether the label should be hidden, or not"
+    },
+    "labelPosition": {
+      "type": "string",
+      "name": "Label Position",
+      "description": "Provide where label text should be placed",
+      "defaultValue": "right",
+      "options": [
+        "right",
+        "left"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "right": "Right",
+          "left": "Left"
+        }
+      }
+    },
+    "labelText": {
+      "type": "string",
+      "name": "Label Text",
+      "description": "Provide label text to be read by screen readers when interacting with the control",
+      "defaultValue": ""
+    },
+    "name": {
+      "type": "string",
+      "name": "Name",
+      "description": "Provide a name for the underlying input node"
+    },
+    "required": {
+      "type": "boolean",
+      "name": "Required",
+      "description": "True to specify if the control is required."
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid",
+      "description": "Specify whether the control is currently invalid",
+      "defaultValue": false
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text",
+      "description": "Provide the text that is displayed when the control is in an invalid state"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn",
+      "description": "Specify whether the control is currently in warning state",
+      "defaultValue": false
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text",
+      "description": "Provide the text that is displayed when the control is in warning state"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only",
+      "description": "Specify whether the RadioButton should be read-only"
+    },
+    "value": {
+      "type": "string",
+      "name": "Value",
+      "description": "Specify the value of the RadioButton",
+      "defaultValue": ""
+    }
+  }
+}

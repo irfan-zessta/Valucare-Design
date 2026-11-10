@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ModalBody",
+    "filePath": "web/node_modules/@carbon/react/es/components/ComposedModal/ComposedModal.js"
+  },
+  "codeProperties": {
+    "hasForm": {
+      "type": "boolean",
+      "name": "Has Form",
+      "description": "Provide whether the modal content has a form element."
+    },
+    "hasScrollingContent": {
+      "type": "boolean",
+      "name": "Has Scrolling Content",
+      "description": "Specify whether the modal contains scrolling content"
+    }
+  }
+}

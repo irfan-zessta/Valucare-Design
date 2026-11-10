@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "DropdownSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/Dropdown/Dropdown.Skeleton.js"
+  },
+  "codeProperties": {
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "options": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

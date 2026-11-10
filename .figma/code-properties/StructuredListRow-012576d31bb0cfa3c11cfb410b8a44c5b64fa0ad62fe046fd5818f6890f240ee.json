@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "StructuredListRow",
+    "filePath": "web/node_modules/@carbon/react/es/components/StructuredList/StructuredList.js"
+  },
+  "codeProperties": {
+    "head": {
+      "type": "boolean",
+      "name": "Head",
+      "description": "Specify whether the row should be used as a header row."
+    },
+    "label": {
+      "type": "boolean",
+      "name": "Label",
+      "description": "Specify whether a label should be used. Deprecated."
+    },
+    "selection": {
+      "type": "boolean",
+      "name": "Selection",
+      "description": "Mark if this row should be selectable."
+    },
+    "id": {
+      "type": "string",
+      "name": "ID",
+      "description": "Specify row id so it can be used for initial selection."
+    }
+  }
+}

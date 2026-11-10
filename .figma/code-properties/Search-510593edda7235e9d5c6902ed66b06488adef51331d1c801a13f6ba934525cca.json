@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Search",
+    "filePath": "web/node_modules/@carbon/react/es/components/Search/Search.js"
+  },
+  "codeProperties": {
+    "autoComplete": {
+      "type": "string",
+      "name": "Auto Complete",
+      "defaultValue": "off",
+      "description": "Value for the autocomplete property on the underlying input."
+    },
+    "closeButtonLabelText": {
+      "type": "string",
+      "name": "Close Button Label Text",
+      "defaultValue": "Clear search input",
+      "description": "Label read by screen readers on the close button."
+    },
+    "defaultValue": {
+      "type": "string",
+      "name": "Default Value",
+      "description": "Default value of the input."
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "Specify whether the input should be disabled."
+    },
+    "isExpanded": {
+      "type": "boolean",
+      "name": "Is Expanded",
+      "defaultValue": true,
+      "description": "Specify whether the search renders expanded."
+    },
+    "labelText": {
+      "type": "string",
+      "name": "Label Text",
+      "description": "Label text for the Search."
+    },
+    "light": {
+      "type": "boolean",
+      "name": "Light",
+      "description": "Light version of the control. Deprecated."
+    },
+    "placeholder": {
+      "type": "string",
+      "name": "Placeholder",
+      "defaultValue": "Search",
+      "description": "Placeholder text for the Search."
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "control": false,
+      "name": "Render Icon",
+      "description": "A component used to render an icon."
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      },
+      "description": "Specify the size of the Search."
+    },
+    "type": {
+      "type": "string",
+      "name": "Type",
+      "defaultValue": "search",
+      "description": "Type of the input."
+    },
+    "value": {
+      "type": "string",
+      "name": "Value",
+      "description": "Value of the input."
+    }
+  }
+}

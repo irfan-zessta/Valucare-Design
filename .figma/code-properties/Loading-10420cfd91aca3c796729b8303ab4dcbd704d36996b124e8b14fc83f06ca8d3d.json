@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Loading",
+    "filePath": "web/node_modules/@carbon/react/es/components/Loading/Loading.js"
+  },
+  "codeProperties": {
+    "active": {
+      "type": "boolean",
+      "name": "Active",
+      "defaultValue": true
+    },
+    "description": {
+      "type": "string",
+      "name": "Description",
+      "defaultValue": "loading"
+    },
+    "small": {
+      "type": "boolean",
+      "name": "Small",
+      "defaultValue": false
+    },
+    "withOverlay": {
+      "type": "boolean",
+      "name": "With Overlay",
+      "defaultValue": true
+    }
+  }
+}

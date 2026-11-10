@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "StructuredListCell",
+    "filePath": "web/node_modules/@carbon/react/es/components/StructuredList/StructuredList.js"
+  },
+  "codeProperties": {
+    "head": {
+      "type": "boolean",
+      "name": "Head",
+      "description": "Specify whether the cell should be used as a header cell."
+    },
+    "noWrap": {
+      "type": "boolean",
+      "name": "No Wrap",
+      "description": "Specify whether the cell should have text wrapping."
+    }
+  }
+}

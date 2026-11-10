@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "DialogBody",
+    "filePath": "web/node_modules/@carbon/react/es/components/Dialog/Dialog.js"
+  },
+  "codeProperties": {
+    "hasScrollingContent": {
+      "type": "boolean",
+      "name": "Has Scrolling Content",
+      "description": "Specify whether the content has overflow that should be scrollable"
+    }
+  }
+}

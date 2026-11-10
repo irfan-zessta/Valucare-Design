@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TileGroup",
+    "filePath": "web/node_modules/@carbon/react/es/components/TileGroup/TileGroup.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "legend": {
+      "type": "string",
+      "name": "Legend"
+    },
+    "name": {
+      "type": "string",
+      "name": "Name"
+    },
+    "required": {
+      "type": "boolean",
+      "name": "Required"
+    }
+  }
+}

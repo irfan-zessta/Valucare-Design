@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TreeView",
+    "filePath": "web/node_modules/@carbon/react/es/components/TreeView/TreeView.js"
+  },
+  "codeProperties": {
+    "label": {
+      "type": "string",
+      "name": "Label"
+    },
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label",
+      "defaultValue": false
+    },
+    "multiselect": {
+      "type": "boolean",
+      "name": "Multiselect",
+      "defaultValue": false
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "defaultValue": "sm",
+      "options": [
+        "xs",
+        "sm"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small"
+        }
+      }
+    }
+  }
+}

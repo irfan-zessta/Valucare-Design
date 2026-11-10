@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FluidTextArea",
+    "filePath": "web/node_modules/@carbon/react/es/components/FluidTextArea/FluidTextArea.js"
+  },
+  "codeProperties": {
+    "cols": {
+      "type": "number",
+      "name": "Columns"
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "enableCounter": {
+      "type": "boolean",
+      "name": "Enable Counter"
+    },
+    "helperText": {
+      "type": "string",
+      "name": "Helper Text"
+    },
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "labelText": {
+      "type": "string",
+      "name": "Label Text"
+    },
+    "maxCount": {
+      "type": "number",
+      "name": "Max Count"
+    },
+    "placeholder": {
+      "type": "string",
+      "name": "Placeholder"
+    },
+    "rows": {
+      "type": "number",
+      "name": "Rows"
+    },
+    "value": {
+      "type": "string",
+      "name": "Value"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    }
+  }
+}
