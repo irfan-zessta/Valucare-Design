@@ -91,7 +91,7 @@ export default function CreateCase() {
   })
 
   return (
-    <div className="app-page">
+    <div className="app-page app-page--wide">
       <PageHeader
         breadcrumb={[{ title: <Link to="/sales">Sales</Link> }, { title: 'Create New Franchise' }]}
         overline="New Business · Create Franchise"
@@ -100,7 +100,7 @@ export default function CreateCase() {
       />
 
       {mode === 'capture' && (
-        <FormSection title="Company details" description="Tell us which company this franchise is for.">
+        <FormSection wide title="Company details" description="Tell us which company this franchise is for.">
           <Form
             layout="vertical"
             requiredMark
@@ -177,6 +177,7 @@ export default function CreateCase() {
 
       {mode === 'search' && (
         <FormSection
+          wide
           title="Find a company"
           description="Search before creating to avoid a duplicate record. Open an existing case, or start a new company."
         >
