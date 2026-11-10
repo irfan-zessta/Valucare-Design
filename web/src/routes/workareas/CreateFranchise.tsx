@@ -27,7 +27,6 @@ import {
 import dayjs from 'dayjs'
 import { useCases } from '../../state/CaseProvider'
 import { shortNameFrom } from '../../domain/sampleData'
-import { JourneyStepper } from '../../components/ui/JourneyStepper'
 import type { BusinessSource, Case, FranchiseAffiliate, ProductType } from '../../domain/types'
 
 // --- Option lists (mirrored from the legacy franchise schema) ---------------
@@ -913,7 +912,6 @@ export function CreateFranchise({ c }: { c: Case }) {
         />
 
         <div className="app-form-floatbar">
-          <JourneyStepper current={c.currentWorkArea} variant="mini" />
           <div className="app-form-floatbar__actions">
             <Button onClick={saveDraft}>Save draft</Button>
             <Button type="primary" htmlType="submit">
