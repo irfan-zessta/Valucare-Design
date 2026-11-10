@@ -905,12 +905,12 @@ export function CreateFranchise({ c }: { c: Case }) {
           description="Submitting sends this franchise to Account Services for review. They either accept it (you move on to Prepare Quotation) or return it with specific corrections."
         />
 
-        <Space wrap>
+        <div className="app-form-floatbar">
           <Button type="primary" htmlType="submit" icon={<ArrowRightOutlined />}>
             {c.franchise.status === 'returned' ? 'Resubmit to Account Services' : 'Submit to Account Services'}
           </Button>
           <Button onClick={saveDraft}>Save draft</Button>
-        </Space>
+        </div>
       </Form>
     </div>
   )
