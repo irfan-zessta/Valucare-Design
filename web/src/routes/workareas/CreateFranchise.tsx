@@ -53,6 +53,15 @@ const DOC_SLOTS = [
   'Current policy or contract (if any)',
 ]
 
+// Sample attachments shown by default (prototype) so the Documents tab starts
+// populated. The optional "current policy" slot is intentionally left empty.
+const SAMPLE_DOCS: Record<string, string> = {
+  'Signed franchise form': 'franchise-form-signed.pdf',
+  'Company registration (SEC/DTI)': 'sec-registration.pdf',
+  'BIR Form 2303 (TIN)': 'bir-2303.pdf',
+  'List of employees / census': 'employee-census.xlsx',
+}
+
 const opts = (xs: readonly string[]) => xs.map((x) => ({ value: x, label: x }))
 const two = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } as const
 
@@ -208,9 +217,14 @@ export function CreateFranchise({ c }: { c: Case }) {
 
   // Documents (prototype — file names only) and affiliates.
   const [docs, setDocs] = useState<Record<string, string>>(() => {
-    const m: Record<string, string> = {}
-    for (const d of c.franchise.documents ?? []) m[d.slot] = d.fileName
-    return m
+    const saved = c.franchise.documents ?? []
+    if (saved.length > 0) {
+      const m: Record<string, string> = {}
+      for (const d of saved) m[d.slot] = d.fileName
+      return m
+    }
+    // No saved docs yet — start with the sample attachments.
+    return { ...SAMPLE_DOCS }
   })
   const [hasAffiliates, setHasAffiliates] = useState<boolean>((c.franchise.affiliateRows?.length ?? 0) > 0)
   const [affiliates, setAffiliates] = useState<FranchiseAffiliate[]>(c.franchise.affiliateRows ?? [])
