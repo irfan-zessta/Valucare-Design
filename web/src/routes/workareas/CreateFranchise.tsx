@@ -10,9 +10,11 @@ import {
   InputNumber,
   Select,
   Space,
+  Spin,
   Typography,
+  Upload,
 } from 'antd'
-import { ArrowRightOutlined } from '@ant-design/icons'
+import { ArrowRightOutlined, CloudUploadOutlined, FileDoneOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useCases } from '../../state/CaseProvider'
 import { shortNameFrom } from '../../domain/sampleData'
@@ -130,6 +132,9 @@ export function CreateFranchise({ c }: { c: Case }) {
   const [f, setF] = useState<FormState>(() => initialForm(c))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
+  // Upload-to-autofill (prototype): reading the document is simulated.
+  const [capturing, setCapturing] = useState(false)
+  const [capturedFile, setCapturedFile] = useState<string | null>(null)
   const topRef = useRef<HTMLDivElement>(null)
 
   const isAgentBroker = f.businessSource === 'Agent' || f.businessSource === 'Broker'
@@ -242,6 +247,45 @@ export function CreateFranchise({ c }: { c: Case }) {
     message.success('Draft saved.')
   }
 
+  // Prototype: simulate reading an uploaded franchise form and auto-capturing
+  // its fields. No real file is parsed — the fields are filled with sample data
+  // so the flow can be demonstrated end to end.
+  function autoCaptureFromUpload(fileName: string) {
+    setCapturing(true)
+    window.setTimeout(() => {
+      setF((prev) => {
+        const isInt = prev.businessSource === 'Agent' || prev.businessSource === 'Broker'
+        return {
+          ...prev,
+          contactName: 'Liza Mercado',
+          contactRole: 'HR Manager',
+          contactEmail: `hr@${shortNameFrom(prev.companyName || 'company').toLowerCase()}.example`,
+          contactPhone: '+63 2 8888 1234',
+          line1: '101 Ayala Ave., Barangay Bel-Air',
+          city: 'Makati City',
+          province: 'Metro Manila',
+          region: 'NCR',
+          postalCode: '1226',
+          billingSame: true,
+          currentCoverage: 'New to HMO',
+          contribution: 'Cost-shared',
+          frequency: 'Annual',
+          terms: 'Advance',
+          vat: 'VAT-able',
+          coverageStart: '2027-01-01',
+          principals: 250,
+          dependents: 190,
+          intermediaryName: isInt ? 'Pioneer Insurance Brokers' : prev.intermediaryName,
+          intermediaryLicenseNo: isInt ? 'IC-2024-00891' : prev.intermediaryLicenseNo,
+        }
+      })
+      setErrors({})
+      setCapturedFile(fileName)
+      setCapturing(false)
+      message.success(`Captured franchise details from ${fileName}.`)
+    }, 1200)
+  }
+
   function loadSample() {
     setF((prev) => ({
       ...prev,
@@ -269,6 +313,44 @@ export function CreateFranchise({ c }: { c: Case }) {
 
   return (
     <div ref={topRef}>
+      <div className="app-franchise-upload">
+        <Spin spinning={capturing} tip="Reading the franchise form…">
+          <Upload.Dragger
+            name="franchiseForm"
+            multiple={false}
+            showUploadList={false}
+            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+            disabled={capturing}
+            beforeUpload={(file) => {
+              autoCaptureFromUpload(file.name)
+              return false // prototype — never actually upload
+            }}
+          >
+            <p className="ant-upload-drag-icon" style={{ marginBottom: 8 }}>
+              <CloudUploadOutlined />
+            </p>
+            <p className="ant-upload-text">Upload the franchise form to auto-fill</p>
+            <p className="ant-upload-hint">
+              Drag &amp; drop or browse. We’ll read the document and populate the fields below —
+              then you just review and submit.
+            </p>
+          </Upload.Dragger>
+        </Spin>
+        {capturedFile && !capturing && (
+          <Alert
+            type="success"
+            showIcon
+            icon={<FileDoneOutlined />}
+            style={{ marginTop: 12 }}
+            title={`Captured from ${capturedFile}`}
+            description="Fields below were filled from the uploaded form. Review them, correct anything, then submit."
+          />
+        )}
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '12px 0 0' }}>
+          Prototype: the document isn’t actually read — the fields are filled with sample data to show the flow.
+        </Typography.Paragraph>
+      </div>
+
       {c.franchise.status === 'returned' && (
         <Alert
           type="warning"

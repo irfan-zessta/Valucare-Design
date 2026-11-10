@@ -65,7 +65,10 @@ export default function CaseWorkspace() {
         items={WORK_AREA_ORDER.map((wa) => ({ title: WORK_AREA_LABELS[wa] }))}
       />
 
-      {/* What to do next — one primary action, honest ownership. */}
+      {/* What to do next — one primary action, honest ownership. On the Create
+          Franchise step the work area offers an upload-to-autofill card instead,
+          so this guidance card is hidden there while it's the user's turn. */}
+      {!(activeWorkArea === 'create-franchise' && !action.waiting) && (
       <Card size="small" style={{ margin: '12px 0 20px' }}>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           What to do next · {WORK_AREA_LABELS[c.currentWorkArea]}
@@ -90,6 +93,7 @@ export default function CaseWorkspace() {
           </Typography.Paragraph>
         )}
       </Card>
+      )}
 
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
         <WorkAreaPanel c={c} workArea={activeWorkArea} />

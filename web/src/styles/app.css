@@ -386,6 +386,15 @@ body {
   border-block-start: 1px solid #f0f0f0;
 }
 
+/* --- Create Franchise: upload-to-autofill -------------------------------- */
+.app-franchise-upload {
+  margin-block-end: 28px;
+}
+.app-franchise-upload .ant-upload-drag-icon .anticon {
+  font-size: 32px;
+  color: #cb0a2f;
+}
+
 /* --- Home ---------------------------------------------------------------- */
 .app-home__recent-item {
   display: flex;
