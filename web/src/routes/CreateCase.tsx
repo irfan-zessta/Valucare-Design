@@ -171,7 +171,9 @@ export default function CreateCase() {
               help={nameInvalid ? 'Enter the company name to continue.' : undefined}
               label={
                 <span className="app-field-label">
-                  <span>Company name</span>
+                  <span>
+                    Company name<span className="app-req">*</span>
+                  </span>
                   <Button
                     type="link"
                     className="app-field-label__action"
@@ -203,12 +205,12 @@ export default function CreateCase() {
 
             <Row gutter={16}>
               <Col xs={24} sm={8}>
-                <Form.Item label="Business source" required>
+                <Form.Item label={<span>Business source<span className="app-req">*</span></span>} required>
                   <Select value={source} onChange={(v) => setSource(v)} options={SOURCES.map((s) => ({ value: s, label: s }))} />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={8}>
-                <Form.Item label="Product type" required>
+                <Form.Item label={<span>Product type<span className="app-req">*</span></span>} required>
                   <Select value={product} onChange={(v) => setProduct(v)} options={PRODUCTS.map((p) => ({ value: p, label: p }))} />
                 </Form.Item>
               </Col>

@@ -313,6 +313,16 @@ body {
   font-size: 13px;
 }
 
+/* Required marker: hide Ant's leading asterisk in this form and place our own
+   red "*" on the right of the label text instead. */
+.app-form-panel .ant-form-item-required::before {
+  display: none !important;
+}
+.app-req {
+  color: #ff4d4f;
+  margin-inline-start: 4px;
+}
+
 /* Field label with a trailing inline action (e.g. "Search existing companies"). */
 .app-field-label-item .ant-form-item-label,
 .app-field-label-item .ant-form-item-label > label {
