@@ -242,6 +242,31 @@ export interface Case {
   isCompleted: boolean
 }
 
+// --- Enquiries (leads) ------------------------------------------------------
+//
+// A lightweight lead captured before any franchise exists: basic company
+// details only. An open enquiry can be converted into a full New Business case
+// (which opens the franchise form), or marked lost.
+
+export type EnquiryStatus = 'open' | 'converted' | 'lost'
+
+export interface Enquiry {
+  id: string // e.g. ENQ-2026-0001
+  companyName: string
+  shortName: string
+  productType: ProductType
+  businessSource: BusinessSource
+  contactName?: string
+  contactEmail?: string
+  contactPhone?: string
+  notes?: string
+  status: EnquiryStatus
+  createdAt: string
+  updatedAt: string
+  /** The case created when this enquiry was converted to a franchise. */
+  convertedCaseId?: string
+}
+
 // --- Mock service contracts -------------------------------------------------
 
 export interface ServiceSuccess<T> {

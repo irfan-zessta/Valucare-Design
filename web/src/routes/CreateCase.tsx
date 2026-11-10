@@ -93,16 +93,16 @@ export default function CreateCase() {
         style={{ marginBottom: 12 }}
         items={[
           { title: <Link to="/sales">Sales</Link> },
-          { title: 'Create New Business' },
+          { title: 'Create New Franchise' },
         ]}
       />
 
       <Typography.Title level={2} style={{ marginBottom: 4 }}>
-        Create New Business
+        Create New Franchise
       </Typography.Title>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 24 }}>
         Search for the company first to avoid duplicate records. If it already exists you can open it;
-        otherwise create a new company.
+        otherwise create a new company and go straight to its franchise form.
       </Typography.Paragraph>
 
       {mode === 'search' && (

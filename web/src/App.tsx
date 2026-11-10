@@ -4,6 +4,7 @@ import { theme } from './theme'
 import { AuthProvider } from './auth/AuthProvider'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { CaseProvider, useCases } from './state/CaseProvider'
+import { EnquiryProvider } from './state/EnquiryProvider'
 import { UiPrefsProvider } from './state/UiPrefsProvider'
 import { UnsavedChangesProvider } from './state/UnsavedChangesProvider'
 import { AppShell } from './components/shell/AppShell'
@@ -14,6 +15,9 @@ import SalesDashboard from './routes/dashboards/SalesDashboard'
 import DepartmentPlaceholderDashboard from './routes/dashboards/DepartmentPlaceholderDashboard'
 import CreateCase from './routes/CreateCase'
 import CaseWorkspace from './routes/CaseWorkspace'
+import EnquiriesList from './routes/enquiries/EnquiriesList'
+import NewEnquiry from './routes/enquiries/NewEnquiry'
+import EnquiryDetail from './routes/enquiries/EnquiryDetail'
 
 // /cases/:caseId with no work area → resume the case's latest saved work area.
 function ResumeCase() {
@@ -32,6 +36,7 @@ export default function App() {
           <AuthProvider>
             <UiPrefsProvider>
               <CaseProvider>
+                <EnquiryProvider>
                 <UnsavedChangesProvider>
                   <Routes>
                     {/* Public: the login screen lives outside the application shell. */}
@@ -45,6 +50,10 @@ export default function App() {
                         {/* Old list route → the Sales dashboard (preserves saved links). */}
                         <Route path="/sales/corporate-new-business" element={<Navigate to="/sales" replace />} />
                         <Route path="/sales/corporate-new-business/new" element={<CreateCase />} />
+                        {/* Enquiries (leads) — capture → convert to franchise. */}
+                        <Route path="/sales/enquiries" element={<EnquiriesList />} />
+                        <Route path="/sales/enquiries/new" element={<NewEnquiry />} />
+                        <Route path="/sales/enquiries/:enquiryId" element={<EnquiryDetail />} />
                         <Route path="/cases/:caseId" element={<ResumeCase />} />
                         <Route path="/cases/:caseId/:workArea" element={<CaseWorkspace />} />
                         <Route path="/coming-soon/:slug" element={<ComingSoon />} />
@@ -55,6 +64,7 @@ export default function App() {
                     </Route>
                   </Routes>
                 </UnsavedChangesProvider>
+                </EnquiryProvider>
               </CaseProvider>
             </UiPrefsProvider>
           </AuthProvider>
