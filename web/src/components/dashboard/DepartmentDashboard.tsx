@@ -78,7 +78,7 @@ export interface DashboardConfig<T> {
 interface UiState {
   search: string
   filters: Record<string, string | undefined>
-  tab: 'in-progress' | 'completed' | 'needs-action'
+  tab: 'all' | 'in-progress' | 'completed' | 'needs-action'
 }
 
 function loadUiState(deptId: string): UiState {
@@ -90,7 +90,9 @@ function loadUiState(deptId: string): UiState {
         search: typeof p.search === 'string' ? p.search : '',
         filters: p.filters && typeof p.filters === 'object' ? p.filters : {},
         tab:
-          p.tab === 'completed' || p.tab === 'needs-action' ? p.tab : 'in-progress',
+          p.tab === 'all' || p.tab === 'completed' || p.tab === 'needs-action'
+            ? p.tab
+            : 'in-progress',
       }
     }
   } catch {
@@ -284,6 +286,11 @@ export function DepartmentDashboard<T>({
             onChange={(k) => setUi((s) => ({ ...s, tab: k as UiState['tab'] }))}
             tabBarExtraContent={{ right: toolbar }}
             items={[
+              {
+                key: 'all',
+                label: `All (${filtered.length})`,
+                children: loading ? <Skeleton active /> : renderTable(filtered, config.inProgressColumns),
+              },
               {
                 key: 'in-progress',
                 label: `In progress (${inProgress.length})`,
