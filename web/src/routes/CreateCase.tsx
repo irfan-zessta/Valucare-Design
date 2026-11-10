@@ -166,7 +166,7 @@ export default function CreateCase() {
               />
             </Form.Item>
 
-            <FormActions note="Creates a draft case and opens the franchise details.">
+            <FormActions>
               <Button type="primary" htmlType="submit" icon={<ArrowRightOutlined />} loading={submitting}>
                 Continue to franchise
               </Button>
