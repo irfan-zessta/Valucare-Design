@@ -94,7 +94,6 @@ export default function CreateCase() {
     <div className="app-page app-page--wide">
       <PageHeader
         breadcrumb={[{ title: 'Sales', to: '/sales' }, { title: 'Create New Franchise' }]}
-        overline="New Business · Create Franchise"
         title="Create New Franchise"
         supporting="Start with the company details. You can complete the franchise information next."
       />
