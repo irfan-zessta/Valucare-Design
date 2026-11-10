@@ -971,7 +971,7 @@ export function CreateFranchise({ c }: { c: Case }) {
           <MiniStepper current={c.currentWorkArea} />
           <div className="app-form-floatbar__actions">
             <Button type="primary" htmlType="submit">
-              {c.franchise.status === 'returned' ? 'Resubmit to Account Services' : 'Submit to Account Services'}
+              {c.franchise.status === 'returned' ? 'Resubmit to AMT' : 'Submit to AMT'}
             </Button>
             <Button onClick={saveDraft}>Save draft</Button>
           </div>
