@@ -232,7 +232,7 @@ export function DepartmentDashboard<T>({
   )
 
   return (
-    <div className="app-page">
+    <div className="app-page app-page--wide">
       {/* 1. Page header */}
       <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>

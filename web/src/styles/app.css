@@ -173,6 +173,10 @@ body {
 .app-page {
   max-inline-size: 1180px;
 }
+/* Dashboards span the full content width (tables + stats fill the screen). */
+.app-page--wide {
+  max-inline-size: none;
+}
 
 /* --- Login --------------------------------------------------------------- */
 .app-login {
