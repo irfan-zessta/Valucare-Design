@@ -941,14 +941,6 @@ export function CreateFranchise({ c }: { c: Case }) {
           ]}
         />
 
-        <Alert
-          type="info"
-          showIcon
-          style={{ margin: '8px 0 16px' }}
-          title="What happens on submit"
-          description="Submitting sends this franchise to Account Services for review. They either accept it (you move on to Prepare Quotation) or return it with specific corrections."
-        />
-
         <div className="app-form-floatbar">
           <Button size="small" type="text" onClick={loadSample}>
             Load sample data
