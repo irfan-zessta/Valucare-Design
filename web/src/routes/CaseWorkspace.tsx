@@ -41,7 +41,7 @@ export default function CaseWorkspace() {
   const action = nextAction(c)
 
   return (
-    <div className="app-page">
+    <div className="app-page app-page--wide">
       <Breadcrumb
         style={{ marginBottom: 12 }}
         items={[
