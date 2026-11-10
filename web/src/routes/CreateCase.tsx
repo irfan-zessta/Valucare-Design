@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert, AutoComplete, Button, Card, Col, Form, Input, Row, Select, Space, Typography } from 'antd'
-import { ArrowRightOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { useCases } from '../state/CaseProvider'
 import { useUnsavedChanges } from '../state/UnsavedChangesProvider'
 import { shortNameFrom } from '../domain/sampleData'
@@ -224,7 +224,7 @@ export default function CreateCase() {
             </Row>
 
             <FormActions>
-              <Button type="primary" htmlType="submit" icon={<ArrowRightOutlined />} loading={submitting}>
+              <Button type="primary" htmlType="submit" loading={submitting}>
                 Continue to franchise
               </Button>
             </FormActions>
