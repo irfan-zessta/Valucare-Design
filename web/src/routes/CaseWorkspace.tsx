@@ -86,13 +86,16 @@ export default function CaseWorkspace() {
             title={meaningfulStatus(c)}
             subtitle={`This case is with ${responsibleDepartment(c)}. You'll be able to continue once they respond.`}
           />
-        ) : (
-          <Button
-            renderIcon={ArrowRight}
-            onClick={() => navigate(`/cases/${c.id}/${action.workArea}`)}
-          >
+        ) : action.workArea !== activeWorkArea ? (
+          // The action lives in another work area — offer a move button.
+          <Button renderIcon={ArrowRight} onClick={() => navigate(`/cases/${c.id}/${action.workArea}`)}>
             {action.label}
           </Button>
+        ) : (
+          // The action is completed below in this work area's own content.
+          <p className="cds--type-body-long-01" style={{ color: 'var(--cds-text-secondary)' }}>
+            Complete this in the {WORK_AREA_LABELS[activeWorkArea]} tasks below.
+          </p>
         )}
       </Tile>
 

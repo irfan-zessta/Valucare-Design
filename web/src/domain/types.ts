@@ -181,12 +181,16 @@ export interface Company {
   /** Intermediary details — only relevant when source is Agent/Broker. */
   intermediaryName?: string
   intermediaryLicenseNo?: string
+  /** Affiliated/sister companies under the same account, when applicable. */
+  affiliates?: string[]
 }
 
 export interface Franchise {
   status: FranchiseStatus
   estimatedPrincipals: number
   estimatedDependents: number
+  /** The client's current coverage situation (new, existing HMO/TPA, self-funded). */
+  currentCoverage?: string
   contributionArrangement?: ContributionArrangement
   paymentFrequency?: PaymentFrequency
   paymentTerms?: PaymentTerms

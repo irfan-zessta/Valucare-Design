@@ -3,6 +3,7 @@ import type { Case, WorkAreaId } from '../../domain/types'
 import { WORK_AREA_LABELS } from '../../domain/types'
 import { currentProposal } from '../../domain/progress'
 import { formatDate, formatCount } from '../../lib/format'
+import { CreateFranchise } from './CreateFranchise'
 
 // Read-only work-area summaries. Each work area's interactive task flow is layered
 // on in its own phase; these panels already read from the one shared case model
@@ -33,6 +34,10 @@ export function WorkAreaPanel({ c, workArea }: { c: Case; workArea: WorkAreaId }
 function renderArea(c: Case, workArea: WorkAreaId) {
   switch (workArea) {
     case 'create-franchise':
+      // Editable form while Sales owns it; read-only summary once submitted.
+      if (c.franchise.status === 'draft' || c.franchise.status === 'returned') {
+        return <CreateFranchise c={c} />
+      }
       return (
         <>
           {c.franchise.status === 'returned' && c.franchise.returnReasons?.map((r, i) => (
