@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
-# No dependencies to install: the server and UI use only the Python standard
-# library, and the frontend is served as-is (no bundler, no build step).
-exit 0
+# Install the web app's dependencies (React, @carbon/react, Vite, Sass).
+set -e
+cd "$(dirname "$0")/../../web"
+npm install

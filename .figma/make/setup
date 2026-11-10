@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# First-open setup. The HMS3 app runs on the Python standard library only
-# (no build tools, no system packages), so setup just confirms Python 3 exists.
+# First-open setup for the React + @carbon/react app (lives in web/).
+# Confirms the Node toolchain is available; dependencies are installed by install.
 set -e
-command -v python3 >/dev/null 2>&1 || {
-  echo "python3 is required but was not found on PATH" >&2
+command -v node >/dev/null 2>&1 || {
+  echo "node is required but was not found on PATH" >&2
   exit 1
 }
-python3 --version
+command -v npm >/dev/null 2>&1 || {
+  echo "npm is required but was not found on PATH" >&2
+  exit 1
+}
+echo "node $(node --version), npm $(npm --version)"

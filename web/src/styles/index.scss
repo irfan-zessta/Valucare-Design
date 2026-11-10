@@ -1,0 +1,25 @@
+// ---------------------------------------------------------------------------
+// Single Carbon style entry for the whole app (imported once in main.tsx).
+//
+// This currently loads Carbon's DEFAULT light theme and IBM Plex typography as
+// a neutral baseline. Brand colours and typography are intentionally NOT set
+// here yet — they are applied in a dedicated theme layer once confirmed.
+// ---------------------------------------------------------------------------
+// $css--font-face: false stops Carbon emitting @font-face rules that point at
+// webpack-style `~@ibm/plex` URLs Vite can't resolve. The real typeface is wired
+// in the theme layer once the brand typography is confirmed; until then the
+// Carbon font stack falls back to the system sans-serif.
+@use '@carbon/react' with (
+  $css--font-face: false
+);
+
+// Gray 10 application background with layered white surfaces (Carbon guidance).
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--cds-background, #f4f4f4);
+}
