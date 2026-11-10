@@ -19,12 +19,10 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Button,
   Card,
-  Col,
   Empty,
   Input,
   Popover,
   Result,
-  Row,
   Select,
   Skeleton,
   Space,
@@ -266,19 +264,17 @@ export function DepartmentDashboard<T>({
       ) : (
         <>
           {/* 2. Four compact statistics */}
-          <Row gutter={16} style={{ margin: '20px 0 8px' }}>
+          <div className="app-dashboard__stats">
             {stats.map((s) => (
-              <Col key={s.key} xs={12} md={6}>
-                <Card size="small">
-                  {loading ? (
-                    <Skeleton active paragraph={false} title={{ width: '60%' }} />
-                  ) : (
-                    <Statistic title={s.title} value={s.value} />
-                  )}
-                </Card>
-              </Col>
+              <Card key={s.key} size="small">
+                {loading ? (
+                  <Skeleton active paragraph={false} title={{ width: '60%' }} />
+                ) : (
+                  <Statistic title={s.title} value={s.value} />
+                )}
+              </Card>
             ))}
-          </Row>
+          </div>
 
           {/* 3. Work list */}
           {toolbar}

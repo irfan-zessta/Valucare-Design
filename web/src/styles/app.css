@@ -178,6 +178,19 @@ body {
   max-inline-size: none;
 }
 
+/* Stat cards: edges flush with the toolbar/table (no gutter negative margin). */
+.app-dashboard__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 20px 0 8px;
+}
+@media (max-width: 767px) {
+  .app-dashboard__stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* --- Login --------------------------------------------------------------- */
 .app-login {
   min-block-size: 100vh;
