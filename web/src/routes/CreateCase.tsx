@@ -143,10 +143,7 @@ export default function CreateCase() {
 
             <Row gutter={16}>
               <Col xs={24} sm={8}>
-                <Form.Item
-                  label="Business source"
-                  help="Agent or Broker cases will ask for intermediary details in the franchise."
-                >
+                <Form.Item label="Business source">
                   <Select value={source} onChange={(v) => setSource(v)} options={SOURCES.map((s) => ({ value: s, label: s }))} />
                 </Form.Item>
               </Col>
