@@ -1,12 +1,6 @@
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  Button,
-  InlineNotification,
-  Tile,
-} from '@carbon/react'
-import { ArrowRight } from '@carbon/icons-react'
+import { Alert, Breadcrumb, Button, Card, Result, Space, Steps, Typography } from 'antd'
+import { ArrowRightOutlined } from '@ant-design/icons'
 import { useCases } from '../state/CaseProvider'
 import {
   WORK_AREA_LABELS,
@@ -29,16 +23,16 @@ export default function CaseWorkspace() {
   if (!c) {
     return (
       <div className="app-page">
-        <InlineNotification
-          kind="error"
-          lowContrast
-          hideCloseButton
+        <Result
+          status="404"
           title="Case not found"
-          subtitle={`We couldn't find case ${caseId}. It may have been removed or the link is out of date.`}
+          subTitle={`We couldn't find case ${caseId}. It may have been removed or the link is out of date.`}
+          extra={
+            <Button type="primary" onClick={() => navigate('/sales/corporate-new-business')}>
+              Back to New Business
+            </Button>
+          }
         />
-        <Button style={{ marginTop: '1rem' }} onClick={() => navigate('/')}>
-          Back to New Business
-        </Button>
       </div>
     )
   }
@@ -48,59 +42,66 @@ export default function CaseWorkspace() {
 
   return (
     <div className="app-page">
-      <Breadcrumb noTrailingSlash style={{ marginBottom: '0.75rem' }}>
-        <BreadcrumbItem>
-          <Link to="/" className="cds--link">
-            New Business
-          </Link>
-        </BreadcrumbItem>
-        <BreadcrumbItem isCurrentPage>{c.company.name}</BreadcrumbItem>
-      </Breadcrumb>
+      <Breadcrumb
+        style={{ marginBottom: 12 }}
+        items={[
+          { title: <Link to="/sales/corporate-new-business">New Business</Link> },
+          { title: c.company.name },
+        ]}
+      />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'start' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'start', flexWrap: 'wrap' }}>
         <div>
-          <h1 className="cds--type-productive-heading-05" style={{ marginBottom: '0.25rem' }}>
+          <Typography.Title level={2} style={{ marginBottom: 4 }}>
             {c.company.name}
-          </h1>
-          <p className="cds--type-label-01" style={{ color: 'var(--cds-text-secondary)' }}>
+          </Typography.Title>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {c.id} · {c.company.shortName} · {c.company.productType} · {c.company.businessSource}
             {c.account.accountRef ? ` · ${c.account.accountRef}` : ''}
-          </p>
+          </Typography.Text>
         </div>
         <CaseStatusTag c={c} />
       </div>
 
+      {/* Work-area navigation for this case (kept to two sidebar levels; the
+          journey itself is a Steps control). Clicking a step moves between the
+          five work areas. */}
+      <Steps
+        style={{ margin: '20px 0' }}
+        current={WORK_AREA_ORDER.indexOf(activeWorkArea)}
+        onChange={(index) => navigate(`/cases/${c.id}/${WORK_AREA_ORDER[index]}`)}
+        items={WORK_AREA_ORDER.map((wa) => ({ title: WORK_AREA_LABELS[wa] }))}
+      />
+
       {/* What to do next — one primary action, honest ownership. */}
-      <Tile style={{ margin: '1.25rem 0' }}>
-        <p className="cds--type-label-01" style={{ color: 'var(--cds-text-secondary)', marginBottom: '0.25rem' }}>
+      <Card size="small" style={{ margin: '12px 0 20px' }}>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           What to do next · {WORK_AREA_LABELS[c.currentWorkArea]}
-        </p>
-        <p className="cds--type-heading-compact-02" style={{ marginBottom: '0.75rem' }}>
+        </Typography.Text>
+        <Typography.Title level={5} style={{ margin: '4px 0 12px' }}>
           {action.label}
-        </p>
+        </Typography.Title>
         {action.waiting ? (
-          <InlineNotification
-            kind="info"
-            lowContrast
-            hideCloseButton
+          <Alert
+            type="info"
+            showIcon
             title={meaningfulStatus(c)}
-            subtitle={`This case is with ${responsibleDepartment(c)}. You'll be able to continue once they respond.`}
+            description={`This case is with ${responsibleDepartment(c)}. You'll be able to continue once they respond.`}
           />
         ) : action.workArea !== activeWorkArea ? (
-          // The action lives in another work area — offer a move button.
-          <Button renderIcon={ArrowRight} onClick={() => navigate(`/cases/${c.id}/${action.workArea}`)}>
+          <Button type="primary" icon={<ArrowRightOutlined />} onClick={() => navigate(`/cases/${c.id}/${action.workArea}`)}>
             {action.label}
           </Button>
         ) : (
-          // The action is completed below in this work area's own content.
-          <p className="cds--type-body-long-01" style={{ color: 'var(--cds-text-secondary)' }}>
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
             Complete this in the {WORK_AREA_LABELS[activeWorkArea]} tasks below.
-          </p>
+          </Typography.Paragraph>
         )}
-      </Tile>
+      </Card>
 
-      {/* Current work area content (filled out per work area in later phases). */}
-      <WorkAreaPanel c={c} workArea={activeWorkArea} />
+      <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+        <WorkAreaPanel c={c} workArea={activeWorkArea} />
+      </Space>
     </div>
   )
 }

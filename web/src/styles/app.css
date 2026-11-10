@@ -1,0 +1,205 @@
+/* ===========================================================================
+   Global app styles. Ant Design components carry most of the styling via the
+   central theme (see theme.ts); this file only covers the shell layout plumbing
+   and a few brand touches that live outside component tokens.
+   =========================================================================== */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background-color: #f4f4f4;
+}
+
+/* Utility */
+.app-muted {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* --- Brand logo ----------------------------------------------------------- */
+.app-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.app-logo svg {
+  display: block;
+  flex: none;
+}
+.app-logo__wordmark {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+/* --- Header --------------------------------------------------------------- */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.app-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-inline: 8px;
+  color: rgba(0, 0, 0, 0.88);
+}
+.app-header__appname {
+  color: rgba(0, 0, 0, 0.45);
+}
+.app-header__context {
+  margin-inline-start: 12px;
+  padding-inline-start: 12px;
+  border-inline-start: 1px solid #f0f0f0;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-header__spacer {
+  flex: 1 1 auto;
+}
+.app-header__user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.app-header__user:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* --- Sider --------------------------------------------------------------- */
+.app-sider {
+  position: sticky;
+  top: 56px; /* header height */
+  height: calc(100vh - 56px);
+  border-inline-end: 1px solid #f0f0f0;
+}
+.app-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.app-sider-menu {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-inline-end: 0 !important;
+}
+
+/* Selected navigation: clear brand-red left indicator (pale-red surface comes
+   from the Menu itemSelectedBg token). Hide Ant's default right indicator so
+   there is a single, consistent marker. */
+.app-sider-menu.ant-menu-inline .ant-menu-item::after,
+.app-sider-menu.ant-menu-inline .ant-menu-submenu-title::after {
+  display: none !important;
+}
+.app-sider-menu.ant-menu-inline .ant-menu-item-selected::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 3px;
+  background-color: #cb0a2f;
+  border-start-end-radius: 2px;
+  border-end-end-radius: 2px;
+}
+
+/* --- Sider user section (pinned bottom) ---------------------------------- */
+.app-sider-user {
+  flex: none;
+  border-block-start: 1px solid #f0f0f0;
+  padding: 12px;
+}
+.app-sider-user--collapsed {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0;
+}
+.app-sider-user__identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-block-end: 10px;
+  min-inline-size: 0;
+}
+.app-sider-user__identity-text {
+  min-inline-size: 0;
+}
+.app-sider-user__identity-text > div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Coming-soon label inside a menu item: truncate the name, keep the tag. */
+.app-sider-menu .ant-menu-title-content {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.app-nav__label-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-nav__soon {
+  flex: none;
+  margin-inline-start: 8px;
+}
+
+/* Mobile nav drawer width (~256px, matching the expanded sider) */
+.app-nav-drawer .ant-drawer-content-wrapper {
+  width: 256px !important;
+}
+
+/* --- Content ------------------------------------------------------------- */
+.app-content {
+  padding: 24px;
+}
+.app-page {
+  max-inline-size: 1180px;
+}
+
+/* --- Login --------------------------------------------------------------- */
+.app-login {
+  min-block-size: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  background-color: #f4f4f4;
+}
+.app-login__card {
+  inline-size: 100%;
+  max-inline-size: 400px;
+}
+.app-login__brand {
+  margin-block-end: 20px;
+}
+.app-login__demo {
+  margin-block-start: 20px;
+  padding-block-start: 16px;
+  border-block-start: 1px solid #f0f0f0;
+}
+
+/* --- Home ---------------------------------------------------------------- */
+.app-home__recent-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}

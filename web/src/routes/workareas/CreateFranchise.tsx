@@ -1,16 +1,19 @@
 import { useMemo, useRef, useState } from 'react'
 import {
+  Alert,
+  App,
   Button,
   Checkbox,
-  Dropdown,
+  DatePicker,
   Form,
-  InlineNotification,
-  NumberInput,
-  Stack,
-  TextArea,
-  TextInput,
-} from '@carbon/react'
-import { ArrowRight } from '@carbon/icons-react'
+  Input,
+  InputNumber,
+  Select,
+  Space,
+  Typography,
+} from 'antd'
+import { ArrowRightOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import { useCases } from '../../state/CaseProvider'
 import { shortNameFrom } from '../../domain/sampleData'
 import type {
@@ -30,6 +33,8 @@ const CONTRIBUTION: ContributionArrangement[] = ['Fully subsidized', 'Cost-share
 const FREQUENCY: PaymentFrequency[] = ['Annual', 'Semi-annual', 'Quarterly', 'Monthly']
 const TERMS: PaymentTerms[] = ['Advance', 'Net 30', 'Net 60', 'Net 90']
 const VAT: VatStatus[] = ['VAT-able', 'VAT-exempt', 'Zero-rated']
+
+const opts = (xs: readonly string[]) => xs.map((x) => ({ value: x, label: x }))
 
 interface FormState {
   companyName: string
@@ -55,7 +60,7 @@ interface FormState {
   frequency: PaymentFrequency
   terms: PaymentTerms
   vat: VatStatus
-  coverageStart: string
+  coverageStart: string // stored as 'YYYY-MM-DD' — never a timezone-shifted ISO
   principals: number
   dependents: number
   intermediaryName: string
@@ -103,24 +108,25 @@ const isEmail = (v: string) => /.+@.+\..+/.test(v)
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section style={{ marginBottom: '2rem' }}>
-      <h3 className="cds--type-heading-compact-02" style={{ marginBottom: hint ? '0.25rem' : '1rem' }}>
+    <section style={{ marginBottom: 32 }}>
+      <Typography.Title level={5} style={{ marginBottom: hint ? 4 : 16 }}>
         {title}
-      </h3>
+      </Typography.Title>
       {hint && (
-        <p className="cds--type-body-long-01" style={{ color: 'var(--cds-text-secondary)', marginBottom: '1rem' }}>
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
           {hint}
-        </p>
+        </Typography.Paragraph>
       )}
       {children}
     </section>
   )
 }
 
-const two = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' } as const
+const two = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } as const
 
 export function CreateFranchise({ c }: { c: Case }) {
   const { patchCase } = useCases()
+  const { message } = App.useApp()
   const [f, setF] = useState<FormState>(() => initialForm(c))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
@@ -130,7 +136,6 @@ export function CreateFranchise({ c }: { c: Case }) {
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setF((prev) => ({ ...prev, [key]: value }))
-    // Clear a field's error as soon as the user corrects it.
     setErrors((prev) => (prev[key as string] ? { ...prev, [key as string]: '' } : prev))
   }
 
@@ -208,6 +213,8 @@ export function CreateFranchise({ c }: { c: Case }) {
         paymentFrequency: f.frequency,
         paymentTerms: f.terms,
         vatStatus: f.vat,
+        // Stored exactly as the picker's calendar date — no toISOString(), so the
+        // saved coverage date never shifts by a timezone.
         coverageStart: f.coverageStart,
         returnReasons: status === 'submitted' ? undefined : prev.franchise.returnReasons,
         submittedAt: status === 'submitted' ? new Date().toISOString() : prev.franchise.submittedAt,
@@ -220,7 +227,6 @@ export function CreateFranchise({ c }: { c: Case }) {
     setSubmitted(true)
     if (Object.keys(e).length > 0) {
       setErrors(e)
-      // Move focus to the first field in error so keyboard users land on it.
       const first = Object.keys(e)[0]
       requestAnimationFrame(() => document.getElementById(first)?.focus())
       topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -228,10 +234,15 @@ export function CreateFranchise({ c }: { c: Case }) {
     }
     setErrors({})
     persist('submitted')
+    message.success('Franchise submitted to Account Services.')
+  }
+
+  function saveDraft() {
+    persist('draft')
+    message.success('Draft saved.')
   }
 
   function loadSample() {
-    // Coherent sample values — keeps the entered company name, never contradicts.
     setF((prev) => ({
       ...prev,
       contactName: prev.contactName || 'Liza Mercado',
@@ -250,211 +261,198 @@ export function CreateFranchise({ c }: { c: Case }) {
   }
 
   const errorList = Object.entries(errors).filter(([, v]) => v)
-  const fieldError = (key: keyof FormState) =>
-    (submitted && errors[key as string]) || returnByField[key as string] || ''
   const isInvalid = (key: keyof FormState) => Boolean(submitted && errors[key as string])
   const isWarn = (key: keyof FormState) => !isInvalid(key) && Boolean(returnByField[key as string])
+  const statusOf = (key: keyof FormState) => (isInvalid(key) ? 'error' : isWarn(key) ? 'warning' : undefined)
+  const helpOf = (key: keyof FormState) =>
+    (isInvalid(key) ? errors[key as string] : isWarn(key) ? returnByField[key as string] : undefined) as string | undefined
 
   return (
     <div ref={topRef}>
       {c.franchise.status === 'returned' && (
-        <InlineNotification
-          kind="warning"
-          lowContrast
-          hideCloseButton
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
           title="Returned by Account Services"
-          subtitle="Address the requested corrections below (highlighted beside the fields), then resubmit."
-          style={{ maxInlineSize: '100%', marginBottom: '1rem' }}
+          description="Address the requested corrections below (highlighted beside the fields), then resubmit."
         />
       )}
 
       {submitted && errorList.length > 0 && (
-        // Custom summary (not Carbon InlineNotification, which forbids interactive
-        // children) so each item can link focus to its field. role=alert announces it.
-        <div
-          role="alert"
-          style={{
-            borderInlineStart: '3px solid var(--cds-support-error, #da1e28)',
-            background: 'var(--cds-notification-background-error, #fff1f1)',
-            padding: '1rem',
-            marginBottom: '1rem',
-          }}
-        >
-          <p className="cds--type-heading-compact-01" style={{ marginBottom: '0.25rem' }}>
-            {errorList.length} field{errorList.length > 1 ? 's' : ''} need{errorList.length > 1 ? '' : 's'} attention
-          </p>
-          <ul style={{ margin: 0, paddingInlineStart: '1rem' }}>
-            {errorList.map(([key, msg]) => (
-              <li key={key}>
-                <button
-                  type="button"
-                  className="cds--link"
-                  style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit' }}
-                  onClick={() => document.getElementById(key)?.focus()}
-                >
-                  {msg}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title={`${errorList.length} field${errorList.length > 1 ? 's' : ''} need${errorList.length > 1 ? '' : 's'} attention`}
+          description={
+            <ul style={{ margin: 0, paddingInlineStart: 16 }}>
+              {errorList.map(([key, msg]) => (
+                <li key={key}>
+                  <Typography.Link onClick={() => document.getElementById(key)?.focus()}>{msg}</Typography.Link>
+                </li>
+              ))}
+            </ul>
+          }
+        />
       )}
 
-      <Form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
+      <Form layout="vertical" onSubmitCapture={(e) => { e.preventDefault(); handleSubmit() }}>
         <Section title="Company & contact">
-          <Stack gap={5}>
-            <TextInput id="companyName" labelText="Company name" value={f.companyName}
-              invalid={isInvalid('companyName')} invalidText={errors.companyName}
-              warn={isWarn('companyName')} warnText={returnByField.companyName}
-              onChange={(e) => set('companyName', e.target.value)} />
-            <div style={two}>
-              <TextInput id="contactName" labelText="Contact name" value={f.contactName}
-                invalid={isInvalid('contactName')} invalidText={errors.contactName}
-                onChange={(e) => set('contactName', e.target.value)} />
-              <TextInput id="contactRole" labelText="Contact role (optional)" value={f.contactRole}
-                onChange={(e) => set('contactRole', e.target.value)} />
-            </div>
-            <div style={two}>
-              <TextInput id="contactEmail" labelText="Contact email" value={f.contactEmail}
-                invalid={isInvalid('contactEmail')} invalidText={errors.contactEmail}
-                warn={isWarn('contactEmail')} warnText={returnByField.contactEmail}
-                onChange={(e) => set('contactEmail', e.target.value)} />
-              <TextInput id="contactPhone" labelText="Contact phone (optional)" value={f.contactPhone}
-                onChange={(e) => set('contactPhone', e.target.value)} />
-            </div>
-          </Stack>
+          <Form.Item label="Company name" validateStatus={statusOf('companyName')} help={helpOf('companyName')}>
+            <Input id="companyName" value={f.companyName} onChange={(e) => set('companyName', e.target.value)} />
+          </Form.Item>
+          <div style={two}>
+            <Form.Item label="Contact name" validateStatus={statusOf('contactName')} help={helpOf('contactName')}>
+              <Input id="contactName" value={f.contactName} onChange={(e) => set('contactName', e.target.value)} />
+            </Form.Item>
+            <Form.Item label="Contact role (optional)">
+              <Input id="contactRole" value={f.contactRole} onChange={(e) => set('contactRole', e.target.value)} />
+            </Form.Item>
+          </div>
+          <div style={two}>
+            <Form.Item label="Contact email" validateStatus={statusOf('contactEmail')} help={helpOf('contactEmail')}>
+              <Input id="contactEmail" value={f.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} />
+            </Form.Item>
+            <Form.Item label="Contact phone (optional)">
+              <Input id="contactPhone" value={f.contactPhone} onChange={(e) => set('contactPhone', e.target.value)} />
+            </Form.Item>
+          </div>
         </Section>
 
         <Section title="Company address">
-          <Stack gap={5}>
-            <TextInput id="line1" labelText="Street address" value={f.line1}
-              invalid={isInvalid('line1')} invalidText={errors.line1}
-              onChange={(e) => set('line1', e.target.value)} />
-            <div style={two}>
-              <TextInput id="city" labelText="City" value={f.city}
-                invalid={isInvalid('city')} invalidText={errors.city}
-                onChange={(e) => set('city', e.target.value)} />
-              <TextInput id="province" labelText="Province" value={f.province}
-                invalid={isInvalid('province')} invalidText={errors.province}
-                onChange={(e) => set('province', e.target.value)} />
-            </div>
-            <div style={two}>
-              <TextInput id="region" labelText="Region" value={f.region}
-                invalid={isInvalid('region')} invalidText={errors.region}
-                onChange={(e) => set('region', e.target.value)} />
-              <TextInput id="postalCode" labelText="Postal code" value={f.postalCode}
-                invalid={isInvalid('postalCode')} invalidText={errors.postalCode}
-                onChange={(e) => set('postalCode', e.target.value)} />
-            </div>
-            <Checkbox id="billingSame" labelText="Billing address is the same as the company address"
-              checked={f.billingSame} onChange={(_e, { checked }) => set('billingSame', checked)} />
-            {!f.billingSame && (
-              <div style={{ borderInlineStart: '2px solid var(--cds-border-subtle)', paddingInlineStart: '1rem' }}>
-                <Stack gap={5}>
-                  <TextInput id="bLine1" labelText="Billing street address" value={f.bLine1}
-                    invalid={isInvalid('bLine1')} invalidText={errors.bLine1}
-                    onChange={(e) => set('bLine1', e.target.value)} />
-                  <div style={two}>
-                    <TextInput id="bCity" labelText="Billing city" value={f.bCity}
-                      invalid={isInvalid('bCity')} invalidText={errors.bCity}
-                      onChange={(e) => set('bCity', e.target.value)} />
-                    <TextInput id="bProvince" labelText="Billing province" value={f.bProvince}
-                      onChange={(e) => set('bProvince', e.target.value)} />
-                  </div>
-                </Stack>
+          <Form.Item label="Street address" validateStatus={statusOf('line1')} help={helpOf('line1')}>
+            <Input id="line1" value={f.line1} onChange={(e) => set('line1', e.target.value)} />
+          </Form.Item>
+          <div style={two}>
+            <Form.Item label="City" validateStatus={statusOf('city')} help={helpOf('city')}>
+              <Input id="city" value={f.city} onChange={(e) => set('city', e.target.value)} />
+            </Form.Item>
+            <Form.Item label="Province" validateStatus={statusOf('province')} help={helpOf('province')}>
+              <Input id="province" value={f.province} onChange={(e) => set('province', e.target.value)} />
+            </Form.Item>
+          </div>
+          <div style={two}>
+            <Form.Item label="Region" validateStatus={statusOf('region')} help={helpOf('region')}>
+              <Input id="region" value={f.region} onChange={(e) => set('region', e.target.value)} />
+            </Form.Item>
+            <Form.Item label="Postal code" validateStatus={statusOf('postalCode')} help={helpOf('postalCode')}>
+              <Input id="postalCode" value={f.postalCode} onChange={(e) => set('postalCode', e.target.value)} />
+            </Form.Item>
+          </div>
+          <Checkbox checked={f.billingSame} onChange={(e) => set('billingSame', e.target.checked)}>
+            Billing address is the same as the company address
+          </Checkbox>
+          {!f.billingSame && (
+            <div style={{ borderInlineStart: '2px solid #f0f0f0', paddingInlineStart: 16, marginTop: 16 }}>
+              <Form.Item label="Billing street address" validateStatus={statusOf('bLine1')} help={helpOf('bLine1')}>
+                <Input id="bLine1" value={f.bLine1} onChange={(e) => set('bLine1', e.target.value)} />
+              </Form.Item>
+              <div style={two}>
+                <Form.Item label="Billing city" validateStatus={statusOf('bCity')} help={helpOf('bCity')}>
+                  <Input id="bCity" value={f.bCity} onChange={(e) => set('bCity', e.target.value)} />
+                </Form.Item>
+                <Form.Item label="Billing province">
+                  <Input id="bProvince" value={f.bProvince} onChange={(e) => set('bProvince', e.target.value)} />
+                </Form.Item>
               </div>
-            )}
-          </Stack>
+            </div>
+          )}
         </Section>
 
         <Section title="Business & coverage">
-          <Stack gap={5}>
-            <div style={two}>
-              <Dropdown id="productType" titleText="Product type" label="Select"
-                items={PRODUCTS} selectedItem={f.productType}
-                onChange={({ selectedItem }) => set('productType', (selectedItem as ProductType) ?? 'HMO')} />
-              <Dropdown id="businessSource" titleText="Business source" label="Select"
-                items={SOURCES} selectedItem={f.businessSource}
-                onChange={({ selectedItem }) => set('businessSource', (selectedItem as BusinessSource) ?? 'Direct')} />
-            </div>
-            <div style={two}>
-              <Dropdown id="currentCoverage" titleText="Current coverage" label="Select"
-                items={CURRENT_COVERAGE} selectedItem={f.currentCoverage}
-                onChange={({ selectedItem }) => set('currentCoverage', (selectedItem as string) ?? '')} />
-              <TextInput id="coverageStart" labelText="Requested coverage start" type="date" value={f.coverageStart}
-                invalid={isInvalid('coverageStart')} invalidText={errors.coverageStart}
-                warn={isWarn('coverageStart')} warnText={returnByField.coverageStart}
-                onChange={(e) => set('coverageStart', e.target.value)} />
-            </div>
-            <div style={two}>
-              <Dropdown id="contribution" titleText="Contribution arrangement" label="Select"
-                items={CONTRIBUTION} selectedItem={f.contribution}
-                onChange={({ selectedItem }) => set('contribution', (selectedItem as ContributionArrangement) ?? 'Cost-shared')} />
-              <Dropdown id="frequency" titleText="Payment frequency" label="Select"
-                items={FREQUENCY} selectedItem={f.frequency}
-                onChange={({ selectedItem }) => set('frequency', (selectedItem as PaymentFrequency) ?? 'Annual')} />
-            </div>
-            <div style={two}>
-              <Dropdown id="terms" titleText="Payment terms" label="Select"
-                items={TERMS} selectedItem={f.terms}
-                onChange={({ selectedItem }) => set('terms', (selectedItem as PaymentTerms) ?? 'Advance')} />
-              <Dropdown id="vat" titleText="VAT status" label="Select"
-                items={VAT} selectedItem={f.vat}
-                onChange={({ selectedItem }) => set('vat', (selectedItem as VatStatus) ?? 'VAT-able')} />
-            </div>
-          </Stack>
+          <div style={two}>
+            <Form.Item label="Product type">
+              <Select id="productType" value={f.productType} options={opts(PRODUCTS)} onChange={(v) => set('productType', v)} />
+            </Form.Item>
+            <Form.Item label="Business source">
+              <Select id="businessSource" value={f.businessSource} options={opts(SOURCES)} onChange={(v) => set('businessSource', v)} />
+            </Form.Item>
+          </div>
+          <div style={two}>
+            <Form.Item label="Current coverage">
+              <Select id="currentCoverage" value={f.currentCoverage} options={opts(CURRENT_COVERAGE)} onChange={(v) => set('currentCoverage', v)} />
+            </Form.Item>
+            <Form.Item label="Requested coverage start" validateStatus={statusOf('coverageStart')} help={helpOf('coverageStart')}>
+              <DatePicker
+                id="coverageStart"
+                style={{ width: '100%' }}
+                format="YYYY-MM-DD"
+                value={f.coverageStart ? dayjs(f.coverageStart) : null}
+                onChange={(d) => set('coverageStart', d ? d.format('YYYY-MM-DD') : '')}
+              />
+            </Form.Item>
+          </div>
+          <div style={two}>
+            <Form.Item label="Contribution arrangement">
+              <Select id="contribution" value={f.contribution} options={opts(CONTRIBUTION)} onChange={(v) => set('contribution', v)} />
+            </Form.Item>
+            <Form.Item label="Payment frequency">
+              <Select id="frequency" value={f.frequency} options={opts(FREQUENCY)} onChange={(v) => set('frequency', v)} />
+            </Form.Item>
+          </div>
+          <div style={two}>
+            <Form.Item label="Payment terms">
+              <Select id="terms" value={f.terms} options={opts(TERMS)} onChange={(v) => set('terms', v)} />
+            </Form.Item>
+            <Form.Item label="VAT status">
+              <Select id="vat" value={f.vat} options={opts(VAT)} onChange={(v) => set('vat', v)} />
+            </Form.Item>
+          </div>
         </Section>
 
         <Section title="Member counts" hint="Estimates are fine at this stage; the actual Member Data import comes later.">
           <div style={two}>
-            <NumberInput id="principals" label="Estimated principals" min={0} value={f.principals}
-              invalid={isInvalid('principals')} invalidText={errors.principals}
-              onChange={(_e, { value }) => set('principals', Number(value) || 0)} />
-            <NumberInput id="dependents" label="Estimated dependents" min={0} value={f.dependents}
-              onChange={(_e, { value }) => set('dependents', Number(value) || 0)} />
+            <Form.Item label="Estimated principals" validateStatus={statusOf('principals')} help={helpOf('principals')}>
+              <InputNumber id="principals" min={0} style={{ width: '100%' }} value={f.principals} onChange={(v) => set('principals', Number(v) || 0)} />
+            </Form.Item>
+            <Form.Item label="Estimated dependents">
+              <InputNumber id="dependents" min={0} style={{ width: '100%' }} value={f.dependents} onChange={(v) => set('dependents', Number(v) || 0)} />
+            </Form.Item>
           </div>
         </Section>
 
         {isAgentBroker && (
           <Section title="Intermediary details" hint="Shown because this is an Agent/Broker case.">
             <div style={two}>
-              <TextInput id="intermediaryName" labelText="Agent / broker name" value={f.intermediaryName}
-                invalid={isInvalid('intermediaryName')} invalidText={errors.intermediaryName}
-                onChange={(e) => set('intermediaryName', e.target.value)} />
-              <TextInput id="intermediaryLicenseNo" labelText="License no. (optional)" value={f.intermediaryLicenseNo}
-                onChange={(e) => set('intermediaryLicenseNo', e.target.value)} />
+              <Form.Item label="Agent / broker name" validateStatus={statusOf('intermediaryName')} help={helpOf('intermediaryName')}>
+                <Input id="intermediaryName" value={f.intermediaryName} onChange={(e) => set('intermediaryName', e.target.value)} />
+              </Form.Item>
+              <Form.Item label="License no. (optional)">
+                <Input id="intermediaryLicenseNo" value={f.intermediaryLicenseNo} onChange={(e) => set('intermediaryLicenseNo', e.target.value)} />
+              </Form.Item>
             </div>
           </Section>
         )}
 
         <Section title="Affiliates">
-          <Stack gap={5}>
-            <Checkbox id="hasAffiliates" labelText="This account includes affiliated / sister companies"
-              checked={f.hasAffiliates} onChange={(_e, { checked }) => set('hasAffiliates', checked)} />
-            {f.hasAffiliates && (
-              <TextArea id="affiliates" labelText="Affiliated companies"
-                helperText="One per line or comma-separated." value={f.affiliates}
-                onChange={(e) => set('affiliates', e.target.value)} />
-            )}
-          </Stack>
+          <Checkbox checked={f.hasAffiliates} onChange={(e) => set('hasAffiliates', e.target.checked)}>
+            This account includes affiliated / sister companies
+          </Checkbox>
+          {f.hasAffiliates && (
+            <Form.Item label="Affiliated companies" help="One per line or comma-separated." style={{ marginTop: 16 }}>
+              <Input.TextArea id="affiliates" rows={3} value={f.affiliates} onChange={(e) => set('affiliates', e.target.value)} />
+            </Form.Item>
+          )}
         </Section>
 
-        <InlineNotification kind="info" lowContrast hideCloseButton
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
           title="What happens on submit"
-          subtitle="Submitting sends this franchise to Account Services for review. They either accept it (you move on to Prepare Quotation) or return it with specific corrections."
-          style={{ maxInlineSize: '100%', marginBottom: '1rem' }} />
+          description="Submitting sends this franchise to Account Services for review. They either accept it (you move on to Prepare Quotation) or return it with specific corrections."
+        />
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <Button type="submit" renderIcon={ArrowRight}>
+        <Space wrap>
+          <Button type="primary" htmlType="submit" icon={<ArrowRightOutlined />}>
             {c.franchise.status === 'returned' ? 'Resubmit to Account Services' : 'Submit to Account Services'}
           </Button>
-          <Button kind="secondary" onClick={() => persist('draft')}>
-            Save draft
-          </Button>
-          <Button kind="ghost" onClick={loadSample}>
+          <Button onClick={saveDraft}>Save draft</Button>
+          <Button type="text" onClick={loadSample}>
             Load sample data
           </Button>
-        </div>
+        </Space>
       </Form>
     </div>
   )

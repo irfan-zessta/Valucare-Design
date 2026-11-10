@@ -1,19 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  Button,
-  Dropdown,
-  Form,
-  InlineNotification,
-  Search,
-  Stack,
-  Tile,
-  TextInput,
-} from '@carbon/react'
-import { ArrowRight, Add } from '@carbon/icons-react'
+import { Alert, Breadcrumb, Button, Card, Form, Input, Select, Space, Typography } from 'antd'
+import { ArrowRightOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { useCases } from '../state/CaseProvider'
+import { useUnsavedChanges } from '../state/UnsavedChangesProvider'
 import { shortNameFrom } from '../domain/sampleData'
 import type { BusinessSource, Company, ProductType } from '../domain/types'
 
@@ -65,14 +55,8 @@ export default function CreateCase() {
     setMode('capture')
   }
 
-  function handleCreate() {
-    if (submitting) return
-    if (name.trim() === '') {
-      setNameInvalid(true)
-      return
-    }
-    setSubmitting(true)
-    const company: Company = {
+  function buildCompany(): Company {
+    return {
       id: 'pending',
       name: name.trim(),
       shortName: shortNameFrom(name.trim()),
@@ -82,176 +66,173 @@ export default function CreateCase() {
       billingAddressSameAsCompany: true,
       contact: { name: contactName.trim(), role: '', email: '', phone: '' },
     }
-    const created = createCase(company)
+  }
+
+  function handleCreate() {
+    if (submitting) return
+    if (name.trim() === '') {
+      setNameInvalid(true)
+      return
+    }
+    setSubmitting(true)
+    const created = createCase(buildCompany())
     navigate(`/cases/${created.id}/create-franchise`)
   }
 
-  return (
-    <div className="app-page" style={{ maxInlineSize: '46rem' }}>
-      <Breadcrumb noTrailingSlash style={{ marginBottom: '0.75rem' }}>
-        <BreadcrumbItem>
-          <Link to="/" className="cds--link">
-            New Business
-          </Link>
-        </BreadcrumbItem>
-        <BreadcrumbItem isCurrentPage>Create New Business</BreadcrumbItem>
-      </Breadcrumb>
+  // Transient capture state is the one place this app has "unsaved changes":
+  // the case isn't created until submitted. Let the shell offer save/discard.
+  const hasCaptureInput = mode === 'capture' && (name.trim() !== '' || contactName.trim() !== '')
+  useUnsavedChanges({
+    dirty: hasCaptureInput && !submitting,
+    onSave: name.trim() !== '' ? () => void createCase(buildCompany()) : undefined,
+  })
 
-      <h1 className="cds--type-productive-heading-05" style={{ marginBottom: '0.25rem' }}>
+  return (
+    <div className="app-page" style={{ maxWidth: 720 }}>
+      <Breadcrumb
+        style={{ marginBottom: 12 }}
+        items={[
+          { title: <Link to="/sales/corporate-new-business">New Business</Link> },
+          { title: 'Create New Business' },
+        ]}
+      />
+
+      <Typography.Title level={2} style={{ marginBottom: 4 }}>
         Create New Business
-      </h1>
-      <p className="cds--type-body-long-01" style={{ color: 'var(--cds-text-secondary)', marginBottom: '1.5rem' }}>
+      </Typography.Title>
+      <Typography.Paragraph type="secondary" style={{ marginBottom: 24 }}>
         Search for the company first to avoid duplicate records. If it already exists you can open it;
         otherwise create a new company.
-      </p>
+      </Typography.Paragraph>
 
       {mode === 'search' && (
-        <Stack gap={6}>
-          <Search
-            labelText="Search companies"
+        <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+          <Input
+            allowClear
+            size="large"
+            prefix={<SearchOutlined />}
             placeholder="Type a company name"
-            size="lg"
             value={query}
-            onChange={(e) => setQuery((e.target as HTMLInputElement).value)}
+            onChange={(e) => setQuery(e.target.value)}
           />
 
           {q.length >= 2 && caseMatches.length > 0 && (
             <div>
-              <p className="cds--type-heading-compact-01" style={{ marginBottom: '0.5rem' }}>
-                Existing cases
-              </p>
-              <Stack gap={3}>
+              <Typography.Text strong>Existing cases</Typography.Text>
+              <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8 }}>
                 {caseMatches.map((c) => (
-                  <Tile key={c.id}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                  <Card key={c.id} size="small">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                       <div>
-                        <div className="cds--type-heading-compact-01">{c.company.name}</div>
-                        <div className="cds--type-label-01" style={{ color: 'var(--cds-text-secondary)' }}>
+                        <div style={{ fontWeight: 600 }}>{c.company.name}</div>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                           {c.id} · {c.company.businessSource} · {c.company.productType}
-                        </div>
+                        </Typography.Text>
                       </div>
-                      <Button kind="tertiary" size="sm" onClick={() => navigate(`/cases/${c.id}/${c.currentWorkArea}`)}>
+                      <Button onClick={() => navigate(`/cases/${c.id}/${c.currentWorkArea}`)}>
                         Open existing case
                       </Button>
                     </div>
-                  </Tile>
+                  </Card>
                 ))}
-              </Stack>
-              <InlineNotification
-                kind="warning"
-                lowContrast
-                hideCloseButton
+              </Space>
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginTop: 12 }}
                 title="Possible duplicate"
-                subtitle="A case already exists for a company with this name. Open it instead of creating a duplicate, unless this is genuinely a different entity."
-                style={{ maxInlineSize: '100%', marginTop: '0.75rem' }}
+                description="A case already exists for a company with this name. Open it instead of creating a duplicate, unless this is genuinely a different entity."
               />
             </div>
           )}
 
           {q.length >= 2 && knownMatches.length > 0 && (
             <div>
-              <p className="cds--type-heading-compact-01" style={{ marginBottom: '0.5rem' }}>
-                Known companies (no case yet)
-              </p>
-              <Stack gap={3}>
+              <Typography.Text strong>Known companies (no case yet)</Typography.Text>
+              <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8 }}>
                 {knownMatches.map((k) => (
-                  <Tile key={k.name}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                  <Card key={k.name} size="small">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                       <div>
-                        <div className="cds--type-heading-compact-01">{k.name}</div>
-                        <div className="cds--type-label-01" style={{ color: 'var(--cds-text-secondary)' }}>
+                        <div style={{ fontWeight: 600 }}>{k.name}</div>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                           {k.businessSource} · {k.productType}
-                        </div>
+                        </Typography.Text>
                       </div>
-                      <Button
-                        kind="tertiary"
-                        size="sm"
-                        onClick={() => startNewCompany({ name: k.name, source: k.businessSource, product: k.productType })}
-                      >
+                      <Button onClick={() => startNewCompany({ name: k.name, source: k.businessSource, product: k.productType })}>
                         Use this company
                       </Button>
                     </div>
-                  </Tile>
+                  </Card>
                 ))}
-              </Stack>
+              </Space>
             </div>
           )}
 
           {q.length >= 2 && caseMatches.length === 0 && knownMatches.length === 0 && (
-            <InlineNotification
-              kind="info"
-              lowContrast
-              hideCloseButton
+            <Alert
+              type="info"
+              showIcon
               title="No matches found"
-              subtitle={`No existing company matches “${query.trim()}”.`}
-              style={{ maxInlineSize: '100%' }}
+              description={`No existing company matches “${query.trim()}”.`}
             />
           )}
 
           <div>
-            <Button renderIcon={Add} onClick={() => startNewCompany()} disabled={q.length < 2}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => startNewCompany()} disabled={q.length < 2}>
               {q.length >= 2 ? `Create new company “${query.trim()}”` : 'Create new company'}
             </Button>
             {q.length < 2 && (
-              <p className="cds--type-label-01" style={{ color: 'var(--cds-text-secondary)', marginTop: '0.5rem' }}>
+              <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
                 Type at least two characters to search or create.
-              </p>
+              </Typography.Paragraph>
             )}
           </div>
-        </Stack>
+        </Space>
       )}
 
       {mode === 'capture' && (
         <Form
-          onSubmit={(e) => {
+          layout="vertical"
+          onSubmitCapture={(e) => {
             e.preventDefault()
             handleCreate()
           }}
         >
-          <Stack gap={6}>
-            <TextInput
-              id="company-name"
-              labelText="Company name"
+          <Form.Item
+            label="Company name"
+            required
+            validateStatus={nameInvalid ? 'error' : undefined}
+            help={nameInvalid ? 'Enter the company name to create the case.' : undefined}
+          >
+            <Input
               value={name}
-              invalid={nameInvalid}
-              invalidText="Enter the company name to create the case."
               onChange={(e) => {
                 setName(e.target.value)
                 if (nameInvalid) setNameInvalid(false)
               }}
             />
-            <Dropdown
-              id="business-source"
-              titleText="Business source"
-              helperText="Agent or Broker cases will ask for intermediary details in the franchise."
-              label="Select"
-              items={SOURCES}
-              selectedItem={source}
-              onChange={({ selectedItem }) => setSource((selectedItem as BusinessSource) ?? 'Direct')}
-            />
-            <Dropdown
-              id="product-type"
-              titleText="Product type"
-              label="Select"
-              items={PRODUCTS}
-              selectedItem={product}
-              onChange={({ selectedItem }) => setProduct((selectedItem as ProductType) ?? 'HMO')}
-            />
-            <TextInput
-              id="contact-name"
-              labelText="Lead contact (optional)"
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-            />
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <Button type="submit" renderIcon={ArrowRight} disabled={submitting}>
-                {submitting ? 'Creating…' : 'Create case & open franchise'}
-              </Button>
-              <Button kind="ghost" onClick={() => setMode('search')}>
-                Back to search
-              </Button>
-            </div>
-          </Stack>
+          </Form.Item>
+          <Form.Item
+            label="Business source"
+            help="Agent or Broker cases will ask for intermediary details in the franchise."
+          >
+            <Select value={source} onChange={(v) => setSource(v)} options={SOURCES.map((s) => ({ value: s, label: s }))} />
+          </Form.Item>
+          <Form.Item label="Product type">
+            <Select value={product} onChange={(v) => setProduct(v)} options={PRODUCTS.map((p) => ({ value: p, label: p }))} />
+          </Form.Item>
+          <Form.Item label="Lead contact (optional)">
+            <Input value={contactName} onChange={(e) => setContactName(e.target.value)} />
+          </Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit" icon={<ArrowRightOutlined />} loading={submitting}>
+              Create case &amp; open franchise
+            </Button>
+            <Button type="text" onClick={() => setMode('search')}>
+              Back to search
+            </Button>
+          </Space>
         </Form>
       )}
     </div>

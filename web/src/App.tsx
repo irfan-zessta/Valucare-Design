@@ -1,6 +1,15 @@
+import { ConfigProvider, App as AntApp } from 'antd'
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { theme } from './theme'
+import { AuthProvider } from './auth/AuthProvider'
+import { ProtectedRoute } from './auth/ProtectedRoute'
 import { CaseProvider, useCases } from './state/CaseProvider'
-import { AppShell } from './components/AppShell'
+import { UiPrefsProvider } from './state/UiPrefsProvider'
+import { UnsavedChangesProvider } from './state/UnsavedChangesProvider'
+import { AppShell } from './components/shell/AppShell'
+import Login from './routes/Login'
+import Home from './routes/Home'
+import ComingSoon from './routes/ComingSoon'
 import NewBusinessList from './routes/NewBusinessList'
 import CreateCase from './routes/CreateCase'
 import CaseWorkspace from './routes/CaseWorkspace'
@@ -10,24 +19,42 @@ function ResumeCase() {
   const { caseId = '' } = useParams()
   const { getCase } = useCases()
   const c = getCase(caseId)
-  if (!c) return <Navigate to="/" replace />
+  if (!c) return <Navigate to="/sales/corporate-new-business" replace />
   return <Navigate to={`/cases/${c.id}/${c.currentWorkArea}`} replace />
 }
 
 export default function App() {
   return (
-    <CaseProvider>
-      <BrowserRouter>
-        <AppShell>
-          <Routes>
-            <Route path="/" element={<NewBusinessList />} />
-            <Route path="/new" element={<CreateCase />} />
-            <Route path="/cases/:caseId" element={<ResumeCase />} />
-            <Route path="/cases/:caseId/:workArea" element={<CaseWorkspace />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AppShell>
-      </BrowserRouter>
-    </CaseProvider>
+    <ConfigProvider theme={theme}>
+      <AntApp>
+        <BrowserRouter>
+          <AuthProvider>
+            <UiPrefsProvider>
+              <CaseProvider>
+                <UnsavedChangesProvider>
+                  <Routes>
+                    {/* Public: the login screen lives outside the application shell. */}
+                    <Route path="/login" element={<Login />} />
+
+                    {/* Everything else requires a (simulated) session and renders in the shell. */}
+                    <Route element={<ProtectedRoute />}>
+                      <Route element={<AppShell />}>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/sales/corporate-new-business" element={<NewBusinessList />} />
+                        <Route path="/sales/corporate-new-business/new" element={<CreateCase />} />
+                        <Route path="/cases/:caseId" element={<ResumeCase />} />
+                        <Route path="/cases/:caseId/:workArea" element={<CaseWorkspace />} />
+                        <Route path="/coming-soon/:slug" element={<ComingSoon />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </Route>
+                    </Route>
+                  </Routes>
+                </UnsavedChangesProvider>
+              </CaseProvider>
+            </UiPrefsProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </AntApp>
+    </ConfigProvider>
   )
 }

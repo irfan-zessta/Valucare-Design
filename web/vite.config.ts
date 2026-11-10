@@ -17,14 +17,4 @@ export default defineConfig({
     port: PORT,
     strictPort: true,
   },
-  css: {
-    preprocessorOptions: {
-      scss: {
-        // Carbon's Sass still uses some legacy APIs; silence that upstream noise
-        // so our own build output stays readable.
-        quietDeps: true,
-        silenceDeprecations: ['mixed-decls', 'global-builtin', 'import', 'legacy-js-api'],
-      },
-    },
-  },
 })
