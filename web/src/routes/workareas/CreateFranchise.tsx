@@ -14,6 +14,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
   Upload,
 } from 'antd'
@@ -450,6 +451,25 @@ export function CreateFranchise({ c }: { c: Case }) {
     setExtReason('')
     message.success('Extension requested (prototype).')
   }
+
+  // Submit is gated until Account Information, Other Information and Documents
+  // are complete. Completeness is checked without surfacing inline errors.
+  const filled = (k: keyof FormState) => String(f[k] ?? '').trim() !== ''
+  const accountComplete =
+    (['accountType', 'name', 'natureOfBusiness', 'companyAddress', 'companyProvince', 'companyCity', 'email', 'contactPerson', 'contactNumber'] as (keyof FormState)[]).every(filled) &&
+    isEmail(f.email) &&
+    (f.sameAsCompany || (filled('billingAddress') && filled('billingProvince') && filled('billingCity')))
+  const otherComplete =
+    f.employeeCount > 0 &&
+    (['vatStatus', 'currentCoverage', 'mannerOfEnrollment', 'mannerOfPayment', 'businessSource', 'accountManager', 'salesManager'] as (keyof FormState)[]).every(filled) &&
+    (!isIntermediary || (filled('businessSourceName') && filled('commissionType')))
+  const docsComplete = Object.keys(docs).length > 0
+  const canSubmit = accountComplete && otherComplete && docsComplete
+  const submitBlockers = [
+    !accountComplete && 'Account Information',
+    !otherComplete && 'Other Information',
+    !docsComplete && 'a document',
+  ].filter(Boolean) as string[]
 
   const errorList = Object.entries(errors).filter(([, v]) => v)
   const isInvalid = (key: string) => Boolean(submitted && errors[key])
@@ -947,9 +967,11 @@ export function CreateFranchise({ c }: { c: Case }) {
           </Button>
           <div className="app-form-floatbar__actions">
             <Button onClick={saveDraft}>Save draft</Button>
-            <Button type="primary" htmlType="submit">
-              {c.franchise.status === 'returned' ? 'Resubmit to AMT' : 'Submit to AMT'}
-            </Button>
+            <Tooltip title={canSubmit ? '' : `Complete ${submitBlockers.join(', ')} to submit.`}>
+              <Button type="primary" htmlType="submit" disabled={!canSubmit}>
+                {c.franchise.status === 'returned' ? 'Resubmit to AMT' : 'Submit to AMT'}
+              </Button>
+            </Tooltip>
           </div>
         </div>
       </Form>
