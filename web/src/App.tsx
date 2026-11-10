@@ -10,7 +10,8 @@ import { AppShell } from './components/shell/AppShell'
 import Login from './routes/Login'
 import Home from './routes/Home'
 import ComingSoon from './routes/ComingSoon'
-import NewBusinessList from './routes/NewBusinessList'
+import SalesDashboard from './routes/dashboards/SalesDashboard'
+import DepartmentPlaceholderDashboard from './routes/dashboards/DepartmentPlaceholderDashboard'
 import CreateCase from './routes/CreateCase'
 import CaseWorkspace from './routes/CaseWorkspace'
 
@@ -19,7 +20,7 @@ function ResumeCase() {
   const { caseId = '' } = useParams()
   const { getCase } = useCases()
   const c = getCase(caseId)
-  if (!c) return <Navigate to="/sales/corporate-new-business" replace />
+  if (!c) return <Navigate to="/sales" replace />
   return <Navigate to={`/cases/${c.id}/${c.currentWorkArea}`} replace />
 }
 
@@ -40,11 +41,15 @@ export default function App() {
                     <Route element={<ProtectedRoute />}>
                       <Route element={<AppShell />}>
                         <Route path="/" element={<Home />} />
-                        <Route path="/sales/corporate-new-business" element={<NewBusinessList />} />
+                        <Route path="/sales" element={<SalesDashboard />} />
+                        {/* Old list route → the Sales dashboard (preserves saved links). */}
+                        <Route path="/sales/corporate-new-business" element={<Navigate to="/sales" replace />} />
                         <Route path="/sales/corporate-new-business/new" element={<CreateCase />} />
                         <Route path="/cases/:caseId" element={<ResumeCase />} />
                         <Route path="/cases/:caseId/:workArea" element={<CaseWorkspace />} />
                         <Route path="/coming-soon/:slug" element={<ComingSoon />} />
+                        {/* Per-department dashboards (Actuarial, MDA, Billing, …). */}
+                        <Route path="/:deptId" element={<DepartmentPlaceholderDashboard />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                       </Route>
                     </Route>

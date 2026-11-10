@@ -92,7 +92,7 @@ export default function CreateCase() {
       <Breadcrumb
         style={{ marginBottom: 12 }}
         items={[
-          { title: <Link to="/sales/corporate-new-business">New Business</Link> },
+          { title: <Link to="/sales">Sales</Link> },
           { title: 'Create New Business' },
         ]}
       />

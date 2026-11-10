@@ -23,18 +23,18 @@ interface LoginValues {
 }
 
 export default function Login() {
-  const { isAuthenticated, signIn } = useAuth()
+  const { isAuthenticated, signIn, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const redirectTo = (location.state as FromState | null)?.from?.pathname ?? '/'
+  const deepLink = (location.state as FromState | null)?.from?.pathname
 
   const [form] = Form.useForm<LoginValues>()
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Already signed in — don't show the login page.
+  // Already signed in — go to the deep link, else the user's department dashboard.
   if (isAuthenticated) {
-    return <Navigate to={redirectTo} replace />
+    return <Navigate to={deepLink ?? user?.departmentPath ?? '/'} replace />
   }
 
   function useDemoCredentials() {
@@ -48,7 +48,8 @@ export default function Login() {
     const result = await signIn(values.email, values.password)
     setSubmitting(false)
     if (result.ok) {
-      navigate(redirectTo, { replace: true })
+      // Deep link wins; otherwise open the user's configured department dashboard.
+      navigate(deepLink ?? result.data.departmentPath ?? '/', { replace: true })
     } else {
       setFormError(result.error.message)
     }

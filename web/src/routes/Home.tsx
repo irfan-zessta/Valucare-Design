@@ -30,7 +30,7 @@ export default function Home() {
       <Card
         hoverable
         style={{ maxWidth: 420 }}
-        onClick={() => navigate('/sales/corporate-new-business')}
+        onClick={() => navigate('/sales')}
       >
         <Card.Meta
           title="Corporate New Business"
@@ -58,7 +58,7 @@ export default function Home() {
             <Button
               type="link"
               icon={<ArrowRightOutlined />}
-              onClick={() => navigate('/sales/corporate-new-business')}
+              onClick={() => navigate('/sales')}
               style={{ paddingInline: 0, marginTop: 8 }}
             >
               View all New Business

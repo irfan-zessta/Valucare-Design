@@ -28,8 +28,8 @@ export default function CaseWorkspace() {
           title="Case not found"
           subTitle={`We couldn't find case ${caseId}. It may have been removed or the link is out of date.`}
           extra={
-            <Button type="primary" onClick={() => navigate('/sales/corporate-new-business')}>
-              Back to New Business
+            <Button type="primary" onClick={() => navigate('/sales')}>
+              Back to Sales
             </Button>
           }
         />
@@ -45,7 +45,7 @@ export default function CaseWorkspace() {
       <Breadcrumb
         style={{ marginBottom: 12 }}
         items={[
-          { title: <Link to="/sales/corporate-new-business">New Business</Link> },
+          { title: <Link to="/sales">Sales</Link> },
           { title: c.company.name },
         ]}
       />

@@ -5,9 +5,9 @@
 // at real routes, and everything not yet built is marked "coming-soon" so the
 // sidebar never opens an unrelated screen.
 //
-// Today only Home and Sales › Corporate New Business are implemented in this
-// React app; the other departments live in the legacy app and are surfaced here
-// as "coming soon" placeholders using their real department names.
+// Each department links directly to its own dashboard. Sales is fully wired to
+// real records; the other departments render the same shared dashboard in its
+// honest empty state until their records are migrated from the legacy app.
 // ===========================================================================
 import type { ComponentType, CSSProperties } from 'react'
 import {
@@ -68,27 +68,18 @@ export const NAV: NavDept[] = [
     id: 'sales',
     label: 'Sales',
     Icon: LineChartOutlined,
-    children: [
-      {
-        id: 'corp-new-business',
-        label: 'Corporate New Business',
-        status: 'available',
-        to: '/sales/corporate-new-business',
-        // Also current while inside a specific corporate case workspace.
-        match: (p) => startsWith('/sales/corporate-new-business')(p) || startsWith('/cases')(p),
-      },
-      { id: 'corp-renewal', label: 'Corporate Renewal', status: 'coming-soon' },
-      { id: 'ifg-new-business', label: 'IFG New Business', status: 'coming-soon' },
-      { id: 'ifg-renewal', label: 'IFG Renewal', status: 'coming-soon' },
-    ],
+    to: '/sales',
+    status: 'available',
+    // Also current inside the creation journey and any case workspace.
+    match: (p) => startsWith('/sales')(p) || startsWith('/cases')(p),
   },
-  { id: 'actuarial', label: 'Actuarial', Icon: BarChartOutlined, status: 'coming-soon' },
-  { id: 'mda', label: 'MDA', Icon: TeamOutlined, status: 'coming-soon' },
-  { id: 'billing', label: 'Billing & Collections', Icon: WalletOutlined, status: 'coming-soon' },
-  { id: 'accounts', label: 'Accounts', Icon: BankOutlined, status: 'coming-soon' },
-  { id: 'provider-networks', label: 'Provider Networks', Icon: DeploymentUnitOutlined, status: 'coming-soon' },
-  { id: 'claims', label: 'Claims', Icon: FileTextOutlined, status: 'coming-soon' },
-  { id: 'ccd', label: 'CCD', Icon: CustomerServiceOutlined, status: 'coming-soon' },
+  { id: 'actuarial', label: 'Actuarial', Icon: BarChartOutlined, to: '/actuarial', status: 'available' },
+  { id: 'mda', label: 'MDA', Icon: TeamOutlined, to: '/mda', status: 'available' },
+  { id: 'billing', label: 'Billing & Collections', Icon: WalletOutlined, to: '/billing', status: 'available' },
+  { id: 'accounts', label: 'Accounts', Icon: BankOutlined, to: '/accounts', status: 'available' },
+  { id: 'provider-networks', label: 'Provider Networks', Icon: DeploymentUnitOutlined, to: '/provider-networks', status: 'available' },
+  { id: 'claims', label: 'Claims', Icon: FileTextOutlined, to: '/claims', status: 'available' },
+  { id: 'ccd', label: 'CCD', Icon: CustomerServiceOutlined, to: '/ccd', status: 'available' },
   { id: 'admin', label: 'Admin', Icon: SettingOutlined, status: 'coming-soon' },
 ]
 

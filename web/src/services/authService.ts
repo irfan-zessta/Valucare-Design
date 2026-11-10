@@ -24,6 +24,10 @@ export interface AuthedUser {
   email: string
   name: string
   workspace: string
+  /** The user's configured home department (used for "needs my action" scope). */
+  department: string
+  /** Dashboard route opened on a normal sign-in. */
+  departmentPath: string
 }
 
 /** The demo user granted to anyone who signs in with the demo credentials. */
@@ -31,6 +35,8 @@ const DEMO_USER: AuthedUser = {
   email: DEMO_CREDENTIALS.email,
   name: 'Demo Admin',
   workspace: 'Demo workspace',
+  department: 'Sales',
+  departmentPath: '/sales',
 }
 
 /**
