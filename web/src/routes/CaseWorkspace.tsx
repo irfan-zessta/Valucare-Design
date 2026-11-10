@@ -44,7 +44,7 @@ export default function CaseWorkspace() {
   return (
     <div className="app-page app-page--wide">
       <PageHeader
-        breadcrumb={[{ title: 'Sales', to: '/sales' }, { title: c.company.name }]}
+        breadcrumb={[{ title: 'Sales' }, { title: 'New Business', to: '/sales' }, { title: c.company.name }]}
         title={c.company.name}
         supporting={
           <>
