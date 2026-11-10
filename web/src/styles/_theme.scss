@@ -1,0 +1,53 @@
+// ---------------------------------------------------------------------------
+// Centralized Carbon theme.
+//
+// Base = Carbon's g10 theme (Gray 10 #f4f4f4 application background, white
+// layered surfaces, neutral text/borders, Carbon semantic status colours).
+// Only the interactive/brand tokens are overridden to the brand red, so every
+// Carbon component picks up the brand consistently and keeps its behaviour.
+// ---------------------------------------------------------------------------
+@use 'sass:map';
+@use '@carbon/styles/scss/theme' as cds-theme;
+@use '@carbon/styles/scss/themes' as cds-themes;
+@use 'tokens' as brand;
+
+$brand-g10: map.merge(
+  cds-themes.$g10,
+  (
+    // Primary buttons: red background, white text (text-on-color stays white),
+    // darker reds for hover / pressed.
+    button-primary: brand.$red-60,
+    button-primary-hover: brand.$red-70,
+    button-primary-active: brand.$red-80,
+
+    // Links: brand red (underline handled in the brand layer for a11y).
+    link-primary: brand.$red-60,
+    link-primary-hover: brand.$red-80,
+
+    // Selection + interactive accents (selected nav tint, checked controls,
+    // input focus borders, spinners).
+    background-selected: brand.$red-tint,
+    background-selected-hover: brand.$red-tint-hover,
+    border-interactive: brand.$red-60,
+    interactive: brand.$red-60,
+
+    // Focus ring — brand red; Carbon keeps a white focus-inset on coloured
+    // surfaces so it stays visible on the red buttons too.
+    focus: brand.$red-60,
+  )
+);
+
+:root {
+  @include cds-theme.theme($brand-g10);
+
+  // Button colours are Carbon *component tokens*, not part of the theme map,
+  // so set their custom properties directly to the brand red. Primary = red
+  // fill (white text via text-on-color); tertiary = red outline/text. Danger
+  // tokens are deliberately left as Carbon's semantic red.
+  --cds-button-primary: #{brand.$red-60};
+  --cds-button-primary-hover: #{brand.$red-70};
+  --cds-button-primary-active: #{brand.$red-80};
+  --cds-button-tertiary: #{brand.$red-60};
+  --cds-button-tertiary-hover: #{brand.$red-70};
+  --cds-button-tertiary-active: #{brand.$red-80};
+}
