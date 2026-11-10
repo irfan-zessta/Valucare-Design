@@ -390,9 +390,26 @@ body {
 .app-franchise-upload {
   margin-block-end: 28px;
 }
-.app-franchise-upload .ant-upload-drag-icon .anticon {
-  font-size: 32px;
-  color: #cb0a2f;
+.app-franchise-upload .ant-upload-wrapper .ant-upload-drag {
+  min-block-size: 0 !important;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-drag .ant-upload {
+  padding-block: 12px !important;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-drag-icon {
+  margin-bottom: 4px !important;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-drag-icon .anticon {
+  font-size: 22px !important;
+  color: #cb0a2f !important;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-text {
+  font-size: 14px !important;
+  margin: 0 !important;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-hint {
+  font-size: 12px !important;
+  margin: 2px 0 0 !important;
 }
 .app-doc-slot {
   display: flex;
