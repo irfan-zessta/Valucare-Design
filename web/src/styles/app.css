@@ -589,6 +589,13 @@ body {
   border: 1px solid #f0f0f0;
   border-radius: 8px;
 }
+.app-doc-slot__info {
+  min-inline-size: 0;
+}
+.app-doc-slot__title {
+  display: flex;
+  align-items: center;
+}
 .app-decision-row {
   display: flex;
   align-items: center;

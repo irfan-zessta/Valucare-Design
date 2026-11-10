@@ -45,21 +45,31 @@ const SOURCES: BusinessSource[] = ['Direct', 'Agent', 'Broker']
 const COMMISSION = ['Percentage of premium', 'Percentage of net premium', 'None']
 const DEPARTMENT = ['Corporate Sales', 'Account Services', 'Actuarial']
 
-const DOC_SLOTS = [
-  'Signed franchise form',
-  'Company registration (SEC/DTI)',
-  'BIR Form 2303 (TIN)',
-  'List of employees / census',
-  'Current policy or contract (if any)',
+// Franchise attachment slots — the legacy (HMS3) requirement list, plus GIS as
+// a new additional requirement. AOR/BOR applies to Agent/Broker accounts.
+interface DocSlot {
+  key: string
+  label: string
+  tag: 'HMS3' | 'New'
+  hint?: string
+  intermediaryOnly?: boolean
+}
+const FRANCHISE_DOCS: DocSlot[] = [
+  { key: 'aor_bor', label: 'AOR/BOR', tag: 'HMS3', hint: 'Required for Agent/Broker accounts: one active AOR/BOR per account.', intermediaryOnly: true },
+  { key: 'signatory_id', label: 'Signatory ID', tag: 'HMS3' },
+  { key: 'masterlist', label: 'Member Data (Master List)', tag: 'HMS3', hint: 'Sensitive personal data (Data Privacy Act).' },
+  { key: 'tor', label: 'TOR', tag: 'HMS3' },
+  { key: 'utilization', label: 'Utilization', tag: 'HMS3' },
+  { key: 'gis', label: 'GIS (additional requirement)', tag: 'New' },
 ]
 
-// Sample attachments shown by default (prototype) so the Documents tab starts
-// populated. The optional "current policy" slot is intentionally left empty.
+// Sample attachments shown by default (prototype) so the tab starts populated;
+// AOR/BOR (intermediary-only) and the additional GIS are left empty.
 const SAMPLE_DOCS: Record<string, string> = {
-  'Signed franchise form': 'franchise-form-signed.pdf',
-  'Company registration (SEC/DTI)': 'sec-registration.pdf',
-  'BIR Form 2303 (TIN)': 'bir-2303.pdf',
-  'List of employees / census': 'employee-census.xlsx',
+  signatory_id: 'authorized-signatory-id.pdf',
+  masterlist: 'member-data-masterlist.xlsx',
+  tor: 'current-sob-tor.pdf',
+  utilization: 'utilization-report.pdf',
 }
 
 const opts = (xs: readonly string[]) => xs.map((x) => ({ value: x, label: x }))
@@ -706,17 +716,27 @@ export function CreateFranchise({ c }: { c: Case }) {
   const documentsTab = (
     <Section title="Documents" hint="Attach the supporting documents for this franchise. (Prototype — files are not stored.)">
       <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-        {DOC_SLOTS.map((slot) => (
-          <div key={slot} className="app-doc-slot">
-            <div>
-              <div style={{ fontWeight: 500 }}>{slot}</div>
-              {docs[slot] ? (
+        {FRANCHISE_DOCS.map((d) => (
+          <div key={d.key} className="app-doc-slot">
+            <div className="app-doc-slot__info">
+              <div className="app-doc-slot__title">
+                <span style={{ fontWeight: 600 }}>{d.label}</span>
+                <Tag color={d.tag === 'New' ? 'blue' : 'default'} style={{ marginInlineStart: 8 }}>
+                  {d.tag}
+                </Tag>
+              </div>
+              {d.hint && (
+                <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '2px 0 0' }}>
+                  {d.hint}
+                </Typography.Paragraph>
+              )}
+              {docs[d.key] ? (
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  <PaperClipOutlined /> {docs[slot]}
+                  <PaperClipOutlined /> {docs[d.key]}
                 </Typography.Text>
               ) : (
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  No file attached
+                  No file uploaded.
                 </Typography.Text>
               )}
             </div>
@@ -724,21 +744,21 @@ export function CreateFranchise({ c }: { c: Case }) {
               <Upload
                 showUploadList={false}
                 beforeUpload={(file) => {
-                  setDocs((prev) => ({ ...prev, [slot]: file.name }))
+                  setDocs((prev) => ({ ...prev, [d.key]: file.name }))
                   message.success(`Attached ${file.name}.`)
                   return false
                 }}
               >
                 <Button size="small" icon={<CloudUploadOutlined />}>
-                  {docs[slot] ? 'Replace' : 'Upload'}
+                  {docs[d.key] ? 'Replace' : 'Upload'}
                 </Button>
               </Upload>
-              {docs[slot] && (
+              {docs[d.key] && (
                 <Button
                   size="small"
                   type="text"
                   icon={<DeleteOutlined />}
-                  onClick={() => setDocs((prev) => { const n = { ...prev }; delete n[slot]; return n })}
+                  onClick={() => setDocs((prev) => { const n = { ...prev }; delete n[d.key]; return n })}
                 />
               )}
             </Space>
