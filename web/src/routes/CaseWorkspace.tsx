@@ -1,4 +1,4 @@
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Alert, Button, Card, Result, Space, Steps, Typography } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { useCases } from '../state/CaseProvider'
@@ -44,7 +44,7 @@ export default function CaseWorkspace() {
   return (
     <div className="app-page app-page--wide">
       <PageHeader
-        breadcrumb={[{ title: <Link to="/sales">Sales</Link> }, { title: c.company.name }]}
+        breadcrumb={[{ title: 'Sales', to: '/sales' }, { title: c.company.name }]}
         overline="Sales · New Business"
         title={c.company.name}
         supporting={

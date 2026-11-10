@@ -143,6 +143,25 @@ export function activeDeptId(pathname: string): string | null {
   return found ? found.id : null
 }
 
+/**
+ * A breadcrumb trail derived from the nav config for the current route:
+ * the active department, then its active child (if any). Used as the header's
+ * fallback when a page hasn't published a more specific trail of its own.
+ */
+export function navTrail(pathname: string): { label: string; to?: string }[] {
+  for (const dept of NAV) {
+    if (!isDeptActive(dept, pathname)) continue
+    const trail: { label: string; to?: string }[] = [
+      // A department with children is a grouping label, not a destination.
+      { label: dept.label, to: hasChildren(dept) ? undefined : deptTarget(dept) },
+    ]
+    const child = (dept.children ?? []).find((c) => isChildActive(c, pathname))
+    if (child) trail.push({ label: child.label, to: child.status === 'available' ? childTarget(child) : undefined })
+    return trail
+  }
+  return []
+}
+
 /** Human-readable context for the header (e.g. "Sales · Corporate New Business"). */
 export function headerContext(pathname: string): string {
   for (const dept of NAV) {

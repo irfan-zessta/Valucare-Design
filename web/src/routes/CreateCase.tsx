@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, Col, Form, Input, Row, Select, Space, Typography } from 'antd'
 import { ArrowRightOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { useCases } from '../state/CaseProvider'
@@ -93,7 +93,7 @@ export default function CreateCase() {
   return (
     <div className="app-page app-page--wide">
       <PageHeader
-        breadcrumb={[{ title: <Link to="/sales">Sales</Link> }, { title: 'Create New Franchise' }]}
+        breadcrumb={[{ title: 'Sales', to: '/sales' }, { title: 'Create New Franchise' }]}
         overline="New Business · Create Franchise"
         title="Create New Franchise"
         supporting="Start with the company details. You can complete the franchise information next."

@@ -7,6 +7,7 @@ import { CaseProvider, useCases } from './state/CaseProvider'
 import { EnquiryProvider } from './state/EnquiryProvider'
 import { UiPrefsProvider } from './state/UiPrefsProvider'
 import { UnsavedChangesProvider } from './state/UnsavedChangesProvider'
+import { BreadcrumbProvider } from './state/BreadcrumbProvider'
 import { AppShell } from './components/shell/AppShell'
 import Login from './routes/Login'
 import Home from './routes/Home'
@@ -38,6 +39,7 @@ export default function App() {
               <CaseProvider>
                 <EnquiryProvider>
                 <UnsavedChangesProvider>
+                <BreadcrumbProvider>
                   <Routes>
                     {/* Public: the login screen lives outside the application shell. */}
                     <Route path="/login" element={<Login />} />
@@ -63,6 +65,7 @@ export default function App() {
                       </Route>
                     </Route>
                   </Routes>
+                </BreadcrumbProvider>
                 </UnsavedChangesProvider>
                 </EnquiryProvider>
               </CaseProvider>

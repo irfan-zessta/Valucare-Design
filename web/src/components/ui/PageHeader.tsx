@@ -1,16 +1,17 @@
 // ===========================================================================
 // Shared page header — one consistent heading block for every screen.
-//   - optional breadcrumb;
+//   - an optional breadcrumb trail, published to the application header
+//     (rendered there as "home › … › current page"), not inline;
 //   - a small uppercase context overline (e.g. "NEW BUSINESS · CREATE FRANCHISE");
 //   - a 28px page title;
 //   - one short supporting sentence;
 //   - optional right-aligned actions (buttons, a status tag).
-// Spacing between breadcrumb, heading and the content below is owned here so it
-// stays identical across dashboards, the creation journey and case screens.
+// Spacing between the heading and the content below is owned here so it stays
+// identical across dashboards, the creation journey and case screens.
 // ===========================================================================
 import type { ReactNode } from 'react'
-import { Breadcrumb, Typography } from 'antd'
-import type { BreadcrumbProps } from 'antd'
+import { Typography } from 'antd'
+import { useSetBreadcrumb, type Crumb } from '../../state/BreadcrumbProvider'
 
 export function PageHeader({
   overline,
@@ -23,11 +24,13 @@ export function PageHeader({
   title: ReactNode
   supporting?: ReactNode
   extra?: ReactNode
-  breadcrumb?: BreadcrumbProps['items']
+  breadcrumb?: Crumb[]
 }) {
+  // The trail lives in the application header; publish it there for this page.
+  useSetBreadcrumb(breadcrumb)
+
   return (
     <div className="app-pageheader">
-      {breadcrumb && <Breadcrumb className="app-pageheader__crumb" items={breadcrumb} />}
       <div className="app-pageheader__row">
         <div className="app-pageheader__heading">
           {overline && <div className="app-pageheader__overline">{overline}</div>}
