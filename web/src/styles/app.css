@@ -253,7 +253,6 @@ body {
 }
 .app-pageheader__supporting.ant-typography {
   margin: 0;
-  max-inline-size: 60ch;
 }
 .app-pageheader__extra {
   flex: none;
