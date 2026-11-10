@@ -14,6 +14,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
   Upload,
 } from 'antd'
@@ -62,7 +63,7 @@ const DOC_SLOTS = [
 const opts = (xs: readonly string[]) => xs.map((x) => ({ value: x, label: x }))
 const two = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } as const
 
-// Icons for the compact journey stepper shown in the floating action bar.
+// Icons + one-line descriptions for the compact journey stepper.
 const STEP_ICONS: Record<WorkAreaId, ReactNode> = {
   'create-franchise': <BankOutlined />,
   'prepare-quotation': <FileTextOutlined />,
@@ -70,20 +71,37 @@ const STEP_ICONS: Record<WorkAreaId, ReactNode> = {
   'setup-account': <UserAddOutlined />,
   'activate-handover': <RocketOutlined />,
 }
+const STEP_DESC: Record<WorkAreaId, string> = {
+  'create-franchise': 'Add company & contact details',
+  'prepare-quotation': 'Configure pricing & terms',
+  'finalize-offer': 'Review and confirm',
+  'setup-account': 'Create user access',
+  'activate-handover': 'Go live and transfer',
+}
 
 function MiniStepper({ current }: { current: WorkAreaId }) {
   const currentIdx = WORK_AREA_ORDER.indexOf(current)
   return (
-    <div className="app-ministepper" aria-hidden>
+    <div className="app-ministepper">
       {WORK_AREA_ORDER.map((wa, i) => {
         const cls = i === currentIdx ? ' is-active' : i < currentIdx ? ' is-done' : ''
         return (
           <div key={wa} className="app-ministepper__item">
-            <span className={`app-ministepper__dot${cls}`} title={WORK_AREA_LABELS[wa]}>
-              {STEP_ICONS[wa]}
-            </span>
+            <Tooltip
+              placement="top"
+              title={
+                <div style={{ lineHeight: 1.35 }}>
+                  <div style={{ fontWeight: 600 }}>{WORK_AREA_LABELS[wa]}</div>
+                  <div style={{ fontSize: 12, opacity: 0.85 }}>{STEP_DESC[wa]}</div>
+                </div>
+              }
+            >
+              <span className={`app-ministepper__dot${cls}`} tabIndex={0} aria-label={`${WORK_AREA_LABELS[wa]} — ${STEP_DESC[wa]}`}>
+                {STEP_ICONS[wa]}
+              </span>
+            </Tooltip>
             {i < WORK_AREA_ORDER.length - 1 && (
-              <span className={`app-ministepper__line${i < currentIdx ? ' is-done' : ''}`} />
+              <span className={`app-ministepper__line${i < currentIdx ? ' is-done' : ''}`} aria-hidden />
             )}
           </div>
         )
