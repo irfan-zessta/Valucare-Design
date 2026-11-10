@@ -45,7 +45,6 @@ export default function CaseWorkspace() {
     <div className="app-page app-page--wide">
       <PageHeader
         breadcrumb={[{ title: 'Sales', to: '/sales' }, { title: c.company.name }]}
-        overline="Sales · New Business"
         title={c.company.name}
         supporting={
           <>
