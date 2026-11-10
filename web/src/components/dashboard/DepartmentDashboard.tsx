@@ -234,7 +234,7 @@ export function DepartmentDashboard<T>({
   return (
     <div className="app-page app-page--wide">
       {/* 1. Page header */}
-      <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <Typography.Title level={2} style={{ marginBottom: 4 }}>
             {config.title}
