@@ -428,8 +428,8 @@ body {
   position: sticky;
   bottom: 16px;
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 16px;
   flex-wrap: wrap;
   align-items: center;
   background: #fff;
@@ -438,6 +438,65 @@ body {
   padding: 12px 16px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
   z-index: 5;
+}
+.app-form-floatbar__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+/* Compact journey stepper inside the floating action bar. */
+.app-ministepper {
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+.app-ministepper__item {
+  display: flex;
+  align-items: center;
+}
+.app-ministepper__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 26px;
+  block-size: 26px;
+  border-radius: 50%;
+  border: 1px solid #d9d9d9;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  flex: none;
+}
+.app-ministepper__dot.is-active {
+  background: #cb0a2f;
+  border-color: #cb0a2f;
+  color: #fff;
+}
+.app-ministepper__dot.is-done {
+  border-color: #cb0a2f;
+  color: #cb0a2f;
+}
+.app-ministepper__line {
+  inline-size: 16px;
+  block-size: 2px;
+  background: #eee;
+  margin-inline: 4px;
+}
+.app-ministepper__line.is-done {
+  background: #cb0a2f;
+}
+.app-ministepper__label {
+  margin-inline-start: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
+@media (max-width: 767px) {
+  .app-ministepper__label {
+    display: none;
+  }
 }
 .app-doc-slot {
   display: flex;

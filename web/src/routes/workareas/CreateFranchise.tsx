@@ -17,11 +17,24 @@ import {
   Typography,
   Upload,
 } from 'antd'
-import { CloudUploadOutlined, DeleteOutlined, FileDoneOutlined, PaperClipOutlined, PlusOutlined } from '@ant-design/icons'
+import {
+  BankOutlined,
+  CloudUploadOutlined,
+  DeleteOutlined,
+  FileDoneOutlined,
+  FileTextOutlined,
+  PaperClipOutlined,
+  PlusOutlined,
+  RocketOutlined,
+  TagOutlined,
+  UserAddOutlined,
+} from '@ant-design/icons'
+import type { ReactNode } from 'react'
 import dayjs from 'dayjs'
 import { useCases } from '../../state/CaseProvider'
 import { shortNameFrom } from '../../domain/sampleData'
-import type { BusinessSource, Case, FranchiseAffiliate, ProductType } from '../../domain/types'
+import { WORK_AREA_LABELS, WORK_AREA_ORDER } from '../../domain/types'
+import type { BusinessSource, Case, FranchiseAffiliate, ProductType, WorkAreaId } from '../../domain/types'
 
 // --- Option lists (mirrored from the legacy franchise schema) ---------------
 const ACCOUNT_TYPE = ['CORPORATE/HMO', 'TPA/ASO']
@@ -48,6 +61,37 @@ const DOC_SLOTS = [
 
 const opts = (xs: readonly string[]) => xs.map((x) => ({ value: x, label: x }))
 const two = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } as const
+
+// Icons for the compact journey stepper shown in the floating action bar.
+const STEP_ICONS: Record<WorkAreaId, ReactNode> = {
+  'create-franchise': <BankOutlined />,
+  'prepare-quotation': <FileTextOutlined />,
+  'finalize-offer': <TagOutlined />,
+  'setup-account': <UserAddOutlined />,
+  'activate-handover': <RocketOutlined />,
+}
+
+function MiniStepper({ current }: { current: WorkAreaId }) {
+  const currentIdx = WORK_AREA_ORDER.indexOf(current)
+  return (
+    <div className="app-ministepper" aria-hidden>
+      {WORK_AREA_ORDER.map((wa, i) => {
+        const cls = i === currentIdx ? ' is-active' : i < currentIdx ? ' is-done' : ''
+        return (
+          <div key={wa} className="app-ministepper__item">
+            <span className={`app-ministepper__dot${cls}`} title={WORK_AREA_LABELS[wa]}>
+              {STEP_ICONS[wa]}
+            </span>
+            {i < WORK_AREA_ORDER.length - 1 && (
+              <span className={`app-ministepper__line${i < currentIdx ? ' is-done' : ''}`} />
+            )}
+          </div>
+        )
+      })}
+      <span className="app-ministepper__label">{WORK_AREA_LABELS[current]}</span>
+    </div>
+  )
+}
 
 // --- Form state (the full wireframe field set across the tabs) --------------
 interface FormState {
@@ -906,10 +950,13 @@ export function CreateFranchise({ c }: { c: Case }) {
         />
 
         <div className="app-form-floatbar">
-          <Button type="primary" htmlType="submit">
-            {c.franchise.status === 'returned' ? 'Resubmit to Account Services' : 'Submit to Account Services'}
-          </Button>
-          <Button onClick={saveDraft}>Save draft</Button>
+          <MiniStepper current={c.currentWorkArea} />
+          <div className="app-form-floatbar__actions">
+            <Button type="primary" htmlType="submit">
+              {c.franchise.status === 'returned' ? 'Resubmit to Account Services' : 'Submit to Account Services'}
+            </Button>
+            <Button onClick={saveDraft}>Save draft</Button>
+          </div>
         </div>
       </Form>
     </div>
