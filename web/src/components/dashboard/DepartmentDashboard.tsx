@@ -78,7 +78,7 @@ export interface DashboardConfig<T> {
 interface UiState {
   search: string
   filters: Record<string, string | undefined>
-  tab: 'in-progress' | 'completed'
+  tab: 'in-progress' | 'completed' | 'needs-action'
 }
 
 function loadUiState(deptId: string): UiState {
@@ -89,7 +89,8 @@ function loadUiState(deptId: string): UiState {
       return {
         search: typeof p.search === 'string' ? p.search : '',
         filters: p.filters && typeof p.filters === 'object' ? p.filters : {},
-        tab: p.tab === 'completed' ? 'completed' : 'in-progress',
+        tab:
+          p.tab === 'completed' || p.tab === 'needs-action' ? p.tab : 'in-progress',
       }
     }
   } catch {
@@ -134,7 +135,8 @@ export function DepartmentDashboard<T>({
 
   const inProgress = useMemo(() => filtered.filter((r) => !config.isCompleted(r)), [filtered, config])
   const completed = useMemo(() => filtered.filter((r) => config.isCompleted(r)), [filtered, config])
-  const needsAction = useMemo(() => filtered.filter((r) => config.needsMyAction(r)).length, [filtered, config])
+  const needsActionRows = useMemo(() => filtered.filter((r) => config.needsMyAction(r)), [filtered, config])
+  const needsAction = needsActionRows.length
 
   function clearFilters() {
     setUi((s) => ({ ...s, search: '', filters: {} }))
@@ -291,6 +293,11 @@ export function DepartmentDashboard<T>({
                 key: 'completed',
                 label: `Completed (${completed.length})`,
                 children: loading ? <Skeleton active /> : renderTable(completed, config.completedColumns),
+              },
+              {
+                key: 'needs-action',
+                label: `Needs my action (${needsAction})`,
+                children: loading ? <Skeleton active /> : renderTable(needsActionRows, config.inProgressColumns),
               },
             ]}
           />
