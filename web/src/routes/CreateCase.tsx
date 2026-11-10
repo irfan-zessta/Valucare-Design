@@ -203,12 +203,12 @@ export default function CreateCase() {
 
             <Row gutter={16}>
               <Col xs={24} sm={8}>
-                <Form.Item label="Business source">
+                <Form.Item label="Business source" required>
                   <Select value={source} onChange={(v) => setSource(v)} options={SOURCES.map((s) => ({ value: s, label: s }))} />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={8}>
-                <Form.Item label="Product type">
+                <Form.Item label="Product type" required>
                   <Select value={product} onChange={(v) => setProduct(v)} options={PRODUCTS.map((p) => ({ value: p, label: p }))} />
                 </Form.Item>
               </Col>
