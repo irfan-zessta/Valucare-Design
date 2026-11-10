@@ -68,10 +68,22 @@ export const NAV: NavDept[] = [
     id: 'sales',
     label: 'Sales',
     Icon: LineChartOutlined,
-    to: '/sales',
     status: 'available',
     // Also current inside the creation journey and any case workspace.
     match: (p) => startsWith('/sales')(p) || startsWith('/cases')(p),
+    children: [
+      {
+        id: 'sales-new-business',
+        label: 'New Business',
+        status: 'available',
+        to: '/sales',
+        // The Sales dashboard, the creation journey, and open cases all live here.
+        match: (p) => startsWith('/sales')(p) || startsWith('/cases')(p),
+      },
+      { id: 'sales-renewal-business', label: 'Renewal Business', status: 'coming-soon' },
+      { id: 'sales-new-ifg', label: 'New IFG', status: 'coming-soon' },
+      { id: 'sales-renewal-ifg', label: 'Renewal IFG', status: 'coming-soon' },
+    ],
   },
   { id: 'actuarial', label: 'Actuarial', Icon: BarChartOutlined, to: '/actuarial', status: 'available' },
   { id: 'mda', label: 'MDA', Icon: TeamOutlined, to: '/mda', status: 'available' },
