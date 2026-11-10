@@ -43,17 +43,19 @@ export default function CaseWorkspace() {
 
   return (
     <div className="app-page app-page--wide">
-      <PageHeader
-        breadcrumb={[{ title: 'Sales' }, { title: 'New Business', to: '/sales' }, { title: c.company.name }]}
-        title={c.company.name}
-        supporting={
-          <>
-            {c.id} · {c.company.shortName} · {c.company.productType} · {c.company.businessSource}
-            {c.account.accountRef ? ` · ${c.account.accountRef}` : ''}
-          </>
-        }
-        extra={<CaseStatusTag c={c} />}
-      />
+      <div className="app-pageheader-card">
+        <PageHeader
+          breadcrumb={[{ title: 'Sales' }, { title: 'New Business', to: '/sales' }, { title: c.company.name }]}
+          title={c.company.name}
+          supporting={
+            <>
+              {c.id} · {c.company.shortName} · {c.company.productType} · {c.company.businessSource}
+              {c.account.accountRef ? ` · ${c.account.accountRef}` : ''}
+            </>
+          }
+          extra={<CaseStatusTag c={c} />}
+        />
+      </div>
 
       {/* Work-area navigation for this case (kept to two sidebar levels; the
           journey itself is a Steps control). Clicking a step moves between the
