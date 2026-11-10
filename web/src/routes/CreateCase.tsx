@@ -143,7 +143,7 @@ export default function CreateCase() {
             </Form.Item>
 
             <Row gutter={16}>
-              <Col xs={24} sm={12}>
+              <Col xs={24} sm={8}>
                 <Form.Item
                   label="Business source"
                   help="Agent or Broker cases will ask for intermediary details in the franchise."
@@ -151,20 +151,21 @@ export default function CreateCase() {
                   <Select value={source} onChange={(v) => setSource(v)} options={SOURCES.map((s) => ({ value: s, label: s }))} />
                 </Form.Item>
               </Col>
-              <Col xs={24} sm={12}>
+              <Col xs={24} sm={8}>
                 <Form.Item label="Product type">
                   <Select value={product} onChange={(v) => setProduct(v)} options={PRODUCTS.map((p) => ({ value: p, label: p }))} />
                 </Form.Item>
               </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item label="Lead contact (optional)">
+                  <Input
+                    placeholder="Name of your main contact at the company"
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                  />
+                </Form.Item>
+              </Col>
             </Row>
-
-            <Form.Item label="Lead contact (optional)" style={{ marginBottom: 0 }}>
-              <Input
-                placeholder="Name of your main contact at the company"
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
-              />
-            </Form.Item>
 
             <FormActions>
               <Button type="primary" htmlType="submit" icon={<ArrowRightOutlined />} loading={submitting}>
