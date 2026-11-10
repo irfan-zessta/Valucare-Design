@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import { Alert, Button, Card, Result, Space, Steps, Typography } from 'antd'
+import { Alert, Button, Card, Result, Space, Typography } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { useCases } from '../state/CaseProvider'
 import {
@@ -56,16 +56,6 @@ export default function CaseWorkspace() {
           extra={<CaseStatusTag c={c} />}
         />
       </div>
-
-      {/* Work-area navigation for this case (kept to two sidebar levels; the
-          journey itself is a Steps control). Clicking a step moves between the
-          five work areas. */}
-      <Steps
-        style={{ margin: '20px 0' }}
-        current={WORK_AREA_ORDER.indexOf(activeWorkArea)}
-        onChange={(index) => navigate(`/cases/${c.id}/${WORK_AREA_ORDER[index]}`)}
-        items={WORK_AREA_ORDER.map((wa) => ({ title: WORK_AREA_LABELS[wa] }))}
-      />
 
       {/* What to do next — one primary action, honest ownership. On the Create
           Franchise step the work area offers an upload-to-autofill card instead,
