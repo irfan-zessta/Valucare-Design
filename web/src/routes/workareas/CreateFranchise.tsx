@@ -721,9 +721,6 @@ export function CreateFranchise({ c }: { c: Case }) {
             <div className="app-doc-slot__info">
               <div className="app-doc-slot__title">
                 <span style={{ fontWeight: 600 }}>{d.label}</span>
-                <Tag color={d.tag === 'New' ? 'blue' : 'default'} style={{ marginInlineStart: 8 }}>
-                  {d.tag}
-                </Tag>
               </div>
               {d.hint && (
                 <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '2px 0 0' }}>
