@@ -17,7 +17,7 @@ import {
   Typography,
   Upload,
 } from 'antd'
-import { ArrowRightOutlined, CloudUploadOutlined, DeleteOutlined, FileDoneOutlined, PaperClipOutlined, PlusOutlined } from '@ant-design/icons'
+import { CloudUploadOutlined, DeleteOutlined, FileDoneOutlined, PaperClipOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useCases } from '../../state/CaseProvider'
 import { shortNameFrom } from '../../domain/sampleData'
@@ -906,7 +906,7 @@ export function CreateFranchise({ c }: { c: Case }) {
         />
 
         <div className="app-form-floatbar">
-          <Button type="primary" htmlType="submit" icon={<ArrowRightOutlined />}>
+          <Button type="primary" htmlType="submit">
             {c.franchise.status === 'returned' ? 'Resubmit to Account Services' : 'Submit to Account Services'}
           </Button>
           <Button onClick={saveDraft}>Save draft</Button>
