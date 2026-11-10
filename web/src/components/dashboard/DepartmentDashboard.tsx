@@ -34,6 +34,7 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { FilterOutlined, SearchOutlined } from '@ant-design/icons'
+import { PageHeader } from '../ui/PageHeader'
 
 export interface DashboardFilterDef {
   key: string
@@ -246,19 +247,9 @@ export function DepartmentDashboard<T>({
   return (
     <div className="app-page app-page--wide">
       {/* 1. Page header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <Typography.Title level={2} style={{ marginBottom: 4 }}>
-            {config.title}
-          </Typography.Title>
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            {config.supportingText}
-          </Typography.Paragraph>
-        </div>
-        {headerActions}
-      </div>
+      <PageHeader title={config.title} supporting={config.supportingText} extra={headerActions} />
 
-      {config.note && <div style={{ marginTop: 16 }}>{config.note}</div>}
+      {config.note && <div style={{ marginTop: -8, marginBottom: 16 }}>{config.note}</div>}
 
       {error ? (
         <Result

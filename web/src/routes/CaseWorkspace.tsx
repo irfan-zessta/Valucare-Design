@@ -1,5 +1,5 @@
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Alert, Breadcrumb, Button, Card, Result, Space, Steps, Typography } from 'antd'
+import { Alert, Button, Card, Result, Space, Steps, Typography } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { useCases } from '../state/CaseProvider'
 import {
@@ -9,6 +9,7 @@ import {
 } from '../domain/types'
 import { meaningfulStatus, nextAction, responsibleDepartment } from '../domain/progress'
 import { CaseStatusTag } from '../components/CaseStatusTag'
+import { PageHeader } from '../components/ui/PageHeader'
 import { WorkAreaPanel } from './workareas/WorkAreaPanel'
 
 const WORK_AREAS = new Set<string>(WORK_AREA_ORDER)
@@ -42,26 +43,18 @@ export default function CaseWorkspace() {
 
   return (
     <div className="app-page app-page--wide">
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/sales">Sales</Link> },
-          { title: c.company.name },
-        ]}
-      />
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'start', flexWrap: 'wrap' }}>
-        <div>
-          <Typography.Title level={2} style={{ marginBottom: 4 }}>
-            {c.company.name}
-          </Typography.Title>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      <PageHeader
+        breadcrumb={[{ title: <Link to="/sales">Sales</Link> }, { title: c.company.name }]}
+        overline="Sales · New Business"
+        title={c.company.name}
+        supporting={
+          <>
             {c.id} · {c.company.shortName} · {c.company.productType} · {c.company.businessSource}
             {c.account.accountRef ? ` · ${c.account.accountRef}` : ''}
-          </Typography.Text>
-        </div>
-        <CaseStatusTag c={c} />
-      </div>
+          </>
+        }
+        extra={<CaseStatusTag c={c} />}
+      />
 
       {/* Work-area navigation for this case (kept to two sidebar levels; the
           journey itself is a Steps control). Clicking a step moves between the
