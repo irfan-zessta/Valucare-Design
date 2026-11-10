@@ -427,7 +427,8 @@ body {
 .app-form-floatbar {
   position: sticky;
   bottom: 16px;
-  display: inline-flex;
+  display: flex;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
