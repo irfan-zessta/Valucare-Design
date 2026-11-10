@@ -55,6 +55,8 @@ export interface DashboardConfig<T> {
   deptId: string
   title: string
   supportingText: string
+  /** Optional secondary action, rendered as a default button left of primary. */
+  secondaryAction?: DashboardPrimaryAction
   primaryAction?: DashboardPrimaryAction
   /** Optional honest note (e.g. "records not connected in this build"). */
   note?: ReactNode
@@ -151,17 +153,25 @@ export function DepartmentDashboard<T>({
     { key: 'needs-action', title: 'Needs my action', value: needsAction },
   ]
 
-  const action = config.primaryAction
-  const primaryButton = action ? (
-    <Button
-      type="primary"
-      icon={action.icon}
-      disabled={action.disabled}
-      onClick={action.onClick}
-    >
-      {action.label}
-    </Button>
-  ) : null
+  function renderAction(a: DashboardPrimaryAction | undefined, type: 'primary' | 'default') {
+    if (!a) return null
+    const btn = (
+      <Button type={type} icon={a.icon} disabled={a.disabled} onClick={a.onClick}>
+        {a.label}
+      </Button>
+    )
+    return a.disabled && a.disabledReason ? <Tooltip title={a.disabledReason}>{btn}</Tooltip> : btn
+  }
+
+  const secondaryButton = renderAction(config.secondaryAction, 'default')
+  const primaryButton = renderAction(config.primaryAction, 'primary')
+  const headerActions =
+    secondaryButton || primaryButton ? (
+      <Space>
+        {secondaryButton}
+        {primaryButton}
+      </Space>
+    ) : null
 
   const filtersPopover = (
     <div style={{ width: 260 }}>
@@ -245,11 +255,7 @@ export function DepartmentDashboard<T>({
             {config.supportingText}
           </Typography.Paragraph>
         </div>
-        {action?.disabled && action.disabledReason ? (
-          <Tooltip title={action.disabledReason}>{primaryButton}</Tooltip>
-        ) : (
-          primaryButton
-        )}
+        {headerActions}
       </div>
 
       {config.note && <div style={{ marginTop: 16 }}>{config.note}</div>}

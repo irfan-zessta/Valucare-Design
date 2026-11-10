@@ -5,7 +5,7 @@
 // ===========================================================================
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Typography } from 'antd'
+import { App, Button, Typography } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
@@ -22,6 +22,7 @@ export default function SalesDashboard() {
   const { cases } = useCases()
   const { loading, error, retry } = useInitialLoad()
   const navigate = useNavigate()
+  const { message } = App.useApp()
 
   const config = useMemo<DashboardConfig<Case>>(() => {
     const openCase = (c: Case) => navigate(`/cases/${c.id}/${c.currentWorkArea}`)
@@ -88,8 +89,12 @@ export default function SalesDashboard() {
       deptId: 'sales',
       title: 'Sales',
       supportingText: 'Manage your corporate and IFG business.',
+      secondaryAction: {
+        label: 'New enquiry',
+        onClick: () => message.info('Enquiry capture isn’t available in this build yet.'),
+      },
       primaryAction: {
-        label: 'Create New Business',
+        label: 'Create New Franchise',
         icon: <PlusOutlined />,
         onClick: () => navigate('/sales/corporate-new-business/new'),
       },
@@ -137,7 +142,7 @@ export default function SalesDashboard() {
       inProgressColumns,
       completedColumns,
     }
-  }, [navigate])
+  }, [navigate, message])
 
   return <DepartmentDashboard<Case> config={config} rows={cases} loading={loading} error={error} onRetry={retry} />
 }
