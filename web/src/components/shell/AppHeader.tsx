@@ -35,7 +35,7 @@ export function AppHeader({
       />
 
       <Link to="/" className="app-header__brand" aria-label="ValuCare HMS — Home">
-        <ValucareLogo />
+        <ValucareLogo size={40} />
         <span className="app-header__appname">HMS</span>
       </Link>
 
