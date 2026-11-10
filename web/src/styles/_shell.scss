@@ -1,0 +1,53 @@
+// ---------------------------------------------------------------------------
+// App shell layout. Carbon Header is fixed (3rem tall); the SideNav is fixed
+// below it; the main region is offset to sit beside/below them.
+// ---------------------------------------------------------------------------
+$header-h: 3rem;
+$sidenav-w: 16rem;
+
+.app-main {
+  margin-top: $header-h;
+  margin-inline-start: $sidenav-w;
+  padding: 2rem;
+  min-block-size: calc(100vh - #{$header-h});
+}
+
+// Section label inside the side nav (non-interactive).
+.app-sidenav__label {
+  padding: 1rem 1rem 0.25rem;
+  color: var(--cds-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+// The small state hint on a work-area nav link (done / current / to do).
+.app-nav-state {
+  margin-inline-start: auto;
+  padding-inline-start: 0.5rem;
+  color: var(--cds-text-secondary);
+  white-space: nowrap;
+}
+
+// A clear red left indicator on the selected side-nav link (in addition to the
+// red-tinted background from the background-selected token).
+.cds--side-nav__link[aria-current='page']::before,
+.cds--side-nav__link--current::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 3px;
+  background-color: var(--cds-border-interactive);
+}
+
+// Constrain reading width of page content without starving tables.
+.app-page {
+  max-inline-size: 76rem;
+}
+
+// Tablet/laptop: let the main region reclaim the sidenav space if it collapses.
+@media (max-width: 66rem) {
+  .app-main {
+    margin-inline-start: 0;
+  }
+}
