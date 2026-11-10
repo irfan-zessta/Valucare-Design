@@ -394,6 +394,23 @@ body {
   font-size: 32px;
   color: #cb0a2f;
 }
+.app-doc-slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+.app-decision-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-block-end: 1px solid #f5f5f5;
+}
 
 /* --- Home ---------------------------------------------------------------- */
 .app-home__recent-item {

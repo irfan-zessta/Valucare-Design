@@ -199,6 +199,26 @@ export interface Franchise {
   /** Specific corrections requested when the franchise was returned. */
   returnReasons?: { field: string; message: string }[]
   submittedAt?: string
+  /** Full franchise form capture (all wireframe fields across the tabs). Loosely
+      typed because it mirrors the legacy schema, which is broader than the fields
+      the rest of this app reads. */
+  formData?: Record<string, unknown>
+  /** Uploaded supporting documents (prototype — file names only). */
+  documents?: { slot: string; fileName: string }[]
+  /** Affiliated/sister companies with their own detail rows. */
+  affiliateRows?: FranchiseAffiliate[]
+  /** Extension requests raised on the franchise (prototype). */
+  extensions?: { requestedUntil: string; reason: string; status: string; at: string }[]
+}
+
+export interface FranchiseAffiliate {
+  name: string
+  address: string
+  email: string
+  contactPerson: string
+  contactNumber: string
+  financialAssistance: string
+  financialAssistanceName: string
 }
 
 export interface QuotationPackage {

@@ -11,106 +11,161 @@ import {
   Select,
   Space,
   Spin,
+  Table,
+  Tabs,
+  Tag,
   Typography,
   Upload,
 } from 'antd'
-import { ArrowRightOutlined, CloudUploadOutlined, FileDoneOutlined } from '@ant-design/icons'
+import { ArrowRightOutlined, CloudUploadOutlined, DeleteOutlined, FileDoneOutlined, PaperClipOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useCases } from '../../state/CaseProvider'
 import { shortNameFrom } from '../../domain/sampleData'
-import type {
-  BusinessSource,
-  Case,
-  ContributionArrangement,
-  PaymentFrequency,
-  PaymentTerms,
-  ProductType,
-  VatStatus,
-} from '../../domain/types'
+import type { BusinessSource, Case, FranchiseAffiliate, ProductType } from '../../domain/types'
 
+// --- Option lists (mirrored from the legacy franchise schema) ---------------
+const ACCOUNT_TYPE = ['CORPORATE/HMO', 'TPA/ASO']
+const VAT = ['20% VAT-able', 'Fully VAT-able', 'Non Vat', 'VAT exempt', 'VAT-able', 'Zero Rated']
+const CURRENT_COVERAGE = [
+  { value: 'AA', label: 'None (AA)' },
+  { value: 'CP', label: 'HMI (CP)' },
+  { value: 'TP', label: 'TPA (TP)' },
+  { value: 'AT', label: 'HMO (AT)' },
+]
+const ENROLLMENT = ['Compulsory', 'Voluntary']
+const PAYMENT = ['Subsidized', 'Contributory', 'Salary Deduction']
 const SOURCES: BusinessSource[] = ['Direct', 'Agent', 'Broker']
-const PRODUCTS: ProductType[] = ['HMO', 'TPA']
-const CURRENT_COVERAGE = ['New to HMO', 'Existing HMO', 'Existing TPA', 'Self-funded']
-const CONTRIBUTION: ContributionArrangement[] = ['Fully subsidized', 'Cost-shared', 'Voluntary']
-const FREQUENCY: PaymentFrequency[] = ['Annual', 'Semi-annual', 'Quarterly', 'Monthly']
-const TERMS: PaymentTerms[] = ['Advance', 'Net 30', 'Net 60', 'Net 90']
-const VAT: VatStatus[] = ['VAT-able', 'VAT-exempt', 'Zero-rated']
+const COMMISSION = ['Percentage of premium', 'Percentage of net premium', 'None']
+const DEPARTMENT = ['Corporate Sales', 'Account Services', 'Actuarial']
+
+const DOC_SLOTS = [
+  'Signed franchise form',
+  'Company registration (SEC/DTI)',
+  'BIR Form 2303 (TIN)',
+  'List of employees / census',
+  'Current policy or contract (if any)',
+]
 
 const opts = (xs: readonly string[]) => xs.map((x) => ({ value: x, label: x }))
+const two = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } as const
 
+// --- Form state (the full wireframe field set across the tabs) --------------
 interface FormState {
-  companyName: string
-  contactName: string
-  contactRole: string
-  contactEmail: string
-  contactPhone: string
-  line1: string
-  city: string
-  province: string
-  region: string
-  postalCode: string
-  billingSame: boolean
-  bLine1: string
-  bCity: string
-  bProvince: string
-  bRegion: string
-  bPostal: string
-  productType: ProductType
-  businessSource: BusinessSource
+  // Account Information
+  accountType: string
+  name: string
+  natureOfBusiness: string
+  companyAddress: string
+  companyProvince: string
+  companyCity: string
+  companyRegion: string
+  sameAsCompany: boolean
+  billingAddress: string
+  billingProvince: string
+  billingCity: string
+  billingRegion: string
+  shortName: string
+  email: string
+  telephone: string
+  facsimile: string
+  contactPerson: string
+  contactPosition: string
+  contactNumber: string
+  proposalAddressee: string
+  addresseePosition: string
+  addresseeContactNumber: string
+  tin: string
+  // Other Information
+  employeeCount: number
+  dependentCount: number
+  vatStatus: string
   currentCoverage: string
-  contribution: ContributionArrangement
-  frequency: PaymentFrequency
-  terms: PaymentTerms
-  vat: VatStatus
-  coverageStart: string // stored as 'YYYY-MM-DD' — never a timezone-shifted ISO
-  principals: number
-  dependents: number
-  intermediaryName: string
-  intermediaryLicenseNo: string
-  hasAffiliates: boolean
-  affiliates: string
+  mannerOfEnrollment: string
+  mannerOfPayment: string
+  requestedBy: string
+  department: string
+  businessSource: BusinessSource
+  commissionType: string
+  businessSourceName: string
+  accountManager: string
+  salesManager: string
+  currentHmoProvider: string
+  currentContractExpiry: string
+  targetEffectiveDate: string
+  salesRemarks: string
+  acusaRemarks: string
+}
+
+// Which tab each field lives on — used to jump to the first error on submit.
+const FIELD_TAB: Record<string, string> = {}
+const ACCOUNT_FIELDS = [
+  'accountType', 'name', 'natureOfBusiness', 'companyAddress', 'companyProvince', 'companyCity',
+  'billingAddress', 'billingProvince', 'billingCity', 'email', 'contactPerson', 'contactNumber',
+]
+const OTHER_FIELDS = [
+  'employeeCount', 'vatStatus', 'currentCoverage', 'mannerOfEnrollment', 'mannerOfPayment',
+  'businessSource', 'commissionType', 'businessSourceName', 'accountManager', 'salesManager',
+]
+ACCOUNT_FIELDS.forEach((k) => (FIELD_TAB[k] = 'account'))
+OTHER_FIELDS.forEach((k) => (FIELD_TAB[k] = 'other'))
+
+function productToAccountType(p: ProductType): string {
+  return p === 'HMO' ? 'CORPORATE/HMO' : 'TPA/ASO'
 }
 
 function initialForm(c: Case): FormState {
-  return {
-    companyName: c.company.name,
-    contactName: c.company.contact.name,
-    contactRole: c.company.contact.role,
-    contactEmail: c.company.contact.email,
-    contactPhone: c.company.contact.phone,
-    line1: c.company.address.line1,
-    city: c.company.address.city,
-    province: c.company.address.province,
-    region: c.company.address.region,
-    postalCode: c.company.address.postalCode,
-    billingSame: c.company.billingAddressSameAsCompany,
-    bLine1: c.company.billingAddress?.line1 ?? '',
-    bCity: c.company.billingAddress?.city ?? '',
-    bProvince: c.company.billingAddress?.province ?? '',
-    bRegion: c.company.billingAddress?.region ?? '',
-    bPostal: c.company.billingAddress?.postalCode ?? '',
-    productType: c.company.productType,
+  const base: FormState = {
+    accountType: productToAccountType(c.company.productType),
+    name: c.company.name,
+    natureOfBusiness: '',
+    companyAddress: c.company.address.line1,
+    companyProvince: c.company.address.province,
+    companyCity: c.company.address.city,
+    companyRegion: c.company.address.region,
+    sameAsCompany: c.company.billingAddressSameAsCompany,
+    billingAddress: c.company.billingAddress?.line1 ?? '',
+    billingProvince: c.company.billingAddress?.province ?? '',
+    billingCity: c.company.billingAddress?.city ?? '',
+    billingRegion: c.company.billingAddress?.region ?? '',
+    shortName: c.company.shortName,
+    email: c.company.contact.email,
+    telephone: '',
+    facsimile: '',
+    contactPerson: c.company.contact.name,
+    contactPosition: c.company.contact.role,
+    contactNumber: c.company.contact.phone,
+    proposalAddressee: '',
+    addresseePosition: '',
+    addresseeContactNumber: '',
+    tin: '',
+    employeeCount: c.franchise.estimatedPrincipals,
+    dependentCount: c.franchise.estimatedDependents,
+    vatStatus: VAT.includes(c.franchise.vatStatus ?? '') ? (c.franchise.vatStatus as string) : 'VAT-able',
+    currentCoverage: 'AA',
+    mannerOfEnrollment: 'Compulsory',
+    mannerOfPayment: 'Contributory',
+    requestedBy: '',
+    department: 'Corporate Sales',
     businessSource: c.company.businessSource,
-    currentCoverage: c.franchise.currentCoverage ?? 'New to HMO',
-    contribution: c.franchise.contributionArrangement ?? 'Cost-shared',
-    frequency: c.franchise.paymentFrequency ?? 'Annual',
-    terms: c.franchise.paymentTerms ?? 'Advance',
-    vat: c.franchise.vatStatus ?? 'VAT-able',
-    coverageStart: c.franchise.coverageStart ?? '',
-    principals: c.franchise.estimatedPrincipals,
-    dependents: c.franchise.estimatedDependents,
-    intermediaryName: c.company.intermediaryName ?? '',
-    intermediaryLicenseNo: c.company.intermediaryLicenseNo ?? '',
-    hasAffiliates: (c.company.affiliates?.length ?? 0) > 0,
-    affiliates: (c.company.affiliates ?? []).join(', '),
+    commissionType: '',
+    businessSourceName: c.company.intermediaryName ?? '',
+    accountManager: '',
+    salesManager: '',
+    currentHmoProvider: '',
+    currentContractExpiry: '',
+    targetEffectiveDate: c.franchise.coverageStart ?? '',
+    salesRemarks: '',
+    acusaRemarks: '',
   }
+  // Overlay any previously-saved full capture so drafts restore faithfully.
+  return { ...base, ...((c.franchise.formData as Partial<FormState> | undefined) ?? {}) }
 }
 
 const isEmail = (v: string) => /.+@.+\..+/.test(v)
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section style={{ marginBottom: 32 }}>
+    <section style={{ marginBottom: 28 }}>
       <Typography.Title level={5} style={{ marginBottom: hint ? 4 : 16 }}>
         {title}
       </Typography.Title>
@@ -124,7 +179,15 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   )
 }
 
-const two = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } as const
+/** Label with a right-side red asterisk for mandatory fields. */
+function reqLabel(label: string) {
+  return (
+    <span>
+      {label}
+      <span className="app-req">*</span>
+    </span>
+  )
+}
 
 export function CreateFranchise({ c }: { c: Case }) {
   const { patchCase } = useCases()
@@ -132,95 +195,126 @@ export function CreateFranchise({ c }: { c: Case }) {
   const [f, setF] = useState<FormState>(() => initialForm(c))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
-  // Upload-to-autofill (prototype): reading the document is simulated.
+  const [activeTab, setActiveTab] = useState('account')
   const [capturing, setCapturing] = useState(false)
   const [capturedFile, setCapturedFile] = useState<string | null>(null)
-  const topRef = useRef<HTMLDivElement>(null)
 
-  const isAgentBroker = f.businessSource === 'Agent' || f.businessSource === 'Broker'
+  // Documents (prototype — file names only) and affiliates.
+  const [docs, setDocs] = useState<Record<string, string>>(() => {
+    const m: Record<string, string> = {}
+    for (const d of c.franchise.documents ?? []) m[d.slot] = d.fileName
+    return m
+  })
+  const [hasAffiliates, setHasAffiliates] = useState<boolean>((c.franchise.affiliateRows?.length ?? 0) > 0)
+  const [affiliates, setAffiliates] = useState<FranchiseAffiliate[]>(c.franchise.affiliateRows ?? [])
+
+  // Extension request (prototype).
+  const [extUntil, setExtUntil] = useState('')
+  const [extReason, setExtReason] = useState('')
+
+  const topRef = useRef<HTMLDivElement>(null)
+  const isIntermediary = f.businessSource === 'Agent' || f.businessSource === 'Broker'
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setF((prev) => ({ ...prev, [key]: value }))
     setErrors((prev) => (prev[key as string] ? { ...prev, [key as string]: '' } : prev))
   }
 
-  // Corrections requested when the case was returned, mapped to our field ids.
   const returnByField = useMemo(() => {
     const map: Record<string, string> = {}
     for (const r of c.franchise.returnReasons ?? []) {
-      const key = r.field === 'contact.email' ? 'contactEmail' : r.field
+      const key = r.field === 'contact.email' ? 'email' : r.field
       map[key] = r.message
     }
     return map
   }, [c.franchise.returnReasons])
 
+  const totalCount = (Number(f.employeeCount) || 0) + (Number(f.dependentCount) || 0)
+
   function validate(): Record<string, string> {
     const e: Record<string, string> = {}
-    if (!f.companyName.trim()) e.companyName = 'Enter the company name.'
-    if (!f.line1.trim()) e.line1 = 'Enter the street address.'
-    if (!f.city.trim()) e.city = 'Enter the city.'
-    if (!f.province.trim()) e.province = 'Enter the province.'
-    if (!f.region.trim()) e.region = 'Enter the region.'
-    if (!f.postalCode.trim()) e.postalCode = 'Enter the postal code.'
-    if (!f.contactName.trim()) e.contactName = 'Enter a contact name.'
-    if (!f.contactEmail.trim()) e.contactEmail = 'Enter a contact email.'
-    else if (!isEmail(f.contactEmail)) e.contactEmail = 'Enter a valid email, e.g. name@company.com.'
-    if (!f.coverageStart) e.coverageStart = 'Choose the requested coverage start date.'
-    if (!(f.principals > 0)) e.principals = 'Enter the number of principals (at least 1).'
-    if (isAgentBroker && !f.intermediaryName.trim())
-      e.intermediaryName = 'Enter the agent/broker name for this intermediary case.'
-    if (!f.billingSame) {
-      if (!f.bLine1.trim()) e.bLine1 = 'Enter the billing street address, or tick “same as company”.'
-      if (!f.bCity.trim()) e.bCity = 'Enter the billing city.'
+    const need = (k: keyof FormState, msg: string) => {
+      if (!String(f[k] ?? '').trim()) e[k as string] = msg
+    }
+    need('accountType', 'Choose the account type.')
+    need('name', 'Enter the company name.')
+    need('natureOfBusiness', 'Enter the nature of business.')
+    need('companyAddress', 'Enter the company address.')
+    need('companyProvince', 'Enter the company province.')
+    need('companyCity', 'Enter the company city.')
+    need('email', 'Enter an email.')
+    if (f.email.trim() && !isEmail(f.email)) e.email = 'Enter a valid email, e.g. name@company.com.'
+    need('contactPerson', 'Enter a contact person.')
+    need('contactNumber', 'Enter a contact number.')
+    if (!f.sameAsCompany) {
+      need('billingAddress', 'Enter the billing address, or tick “same as company”.')
+      need('billingProvince', 'Enter the billing province.')
+      need('billingCity', 'Enter the billing city.')
+    }
+    if (!(f.employeeCount > 0)) e.employeeCount = 'Enter the number of employees (at least 1).'
+    need('vatStatus', 'Choose the VAT status.')
+    need('currentCoverage', 'Choose the current coverage.')
+    need('mannerOfEnrollment', 'Choose the manner of enrollment.')
+    need('mannerOfPayment', 'Choose the manner of payment.')
+    need('businessSource', 'Choose the business source.')
+    need('accountManager', 'Enter the account handler (AAT).')
+    need('salesManager', 'Enter the secondary handler (AAT).')
+    if (isIntermediary) {
+      need('businessSourceName', 'Enter the agent/broker name for this intermediary case.')
+      need('commissionType', 'Choose the commission type for this intermediary case.')
+    }
+    if (hasAffiliates && affiliates.length > 0 && affiliates.some((a) => !a.name.trim())) {
+      e.affiliates = 'Each affiliate needs a name (or remove the empty row).'
     }
     return e
   }
 
   function persist(status: 'draft' | 'submitted') {
+    const productType: ProductType = f.accountType === 'TPA/ASO' ? 'TPA' : 'HMO'
     patchCase(c.id, (prev) => ({
       ...prev,
       company: {
         ...prev.company,
-        name: f.companyName.trim(),
-        shortName: shortNameFrom(f.companyName.trim()),
-        productType: f.productType,
+        name: f.name.trim(),
+        shortName: (f.shortName.trim() || shortNameFrom(f.name.trim())),
+        productType,
         businessSource: f.businessSource,
         address: {
-          line1: f.line1.trim(),
-          city: f.city.trim(),
-          province: f.province.trim(),
-          region: f.region.trim(),
-          postalCode: f.postalCode.trim(),
+          line1: f.companyAddress.trim(),
+          city: f.companyCity.trim(),
+          province: f.companyProvince.trim(),
+          region: f.companyRegion.trim(),
+          postalCode: prev.company.address.postalCode,
         },
-        billingAddressSameAsCompany: f.billingSame,
-        billingAddress: f.billingSame
+        billingAddressSameAsCompany: f.sameAsCompany,
+        billingAddress: f.sameAsCompany
           ? undefined
-          : { line1: f.bLine1, city: f.bCity, province: f.bProvince, region: f.bRegion, postalCode: f.bPostal },
+          : {
+              line1: f.billingAddress.trim(),
+              city: f.billingCity.trim(),
+              province: f.billingProvince.trim(),
+              region: f.billingRegion.trim(),
+              postalCode: prev.company.billingAddress?.postalCode ?? '',
+            },
         contact: {
-          name: f.contactName.trim(),
-          role: f.contactRole.trim(),
-          email: f.contactEmail.trim(),
-          phone: f.contactPhone.trim(),
+          name: f.contactPerson.trim(),
+          role: f.contactPosition.trim(),
+          email: f.email.trim(),
+          phone: f.contactNumber.trim(),
         },
-        intermediaryName: isAgentBroker ? f.intermediaryName.trim() : undefined,
-        intermediaryLicenseNo: isAgentBroker ? f.intermediaryLicenseNo.trim() : undefined,
-        affiliates: f.hasAffiliates
-          ? f.affiliates.split(',').map((s) => s.trim()).filter(Boolean)
-          : undefined,
+        intermediaryName: isIntermediary ? f.businessSourceName.trim() : undefined,
+        affiliates: hasAffiliates ? affiliates.map((a) => a.name).filter(Boolean) : undefined,
       },
       franchise: {
         ...prev.franchise,
         status,
-        estimatedPrincipals: f.principals,
-        estimatedDependents: f.dependents,
+        estimatedPrincipals: Number(f.employeeCount) || 0,
+        estimatedDependents: Number(f.dependentCount) || 0,
         currentCoverage: f.currentCoverage,
-        contributionArrangement: f.contribution,
-        paymentFrequency: f.frequency,
-        paymentTerms: f.terms,
-        vatStatus: f.vat,
-        // Stored exactly as the picker's calendar date — no toISOString(), so the
-        // saved coverage date never shifts by a timezone.
-        coverageStart: f.coverageStart,
+        coverageStart: f.targetEffectiveDate || prev.franchise.coverageStart,
+        formData: { ...f },
+        documents: Object.entries(docs).map(([slot, fileName]) => ({ slot, fileName })),
+        affiliateRows: hasAffiliates ? affiliates : [],
         returnReasons: status === 'submitted' ? undefined : prev.franchise.returnReasons,
         submittedAt: status === 'submitted' ? new Date().toISOString() : prev.franchise.submittedAt,
       },
@@ -233,6 +327,8 @@ export function CreateFranchise({ c }: { c: Case }) {
     if (Object.keys(e).length > 0) {
       setErrors(e)
       const first = Object.keys(e)[0]
+      const tab = first === 'affiliates' ? 'affiliates' : FIELD_TAB[first] ?? 'account'
+      setActiveTab(tab)
       requestAnimationFrame(() => document.getElementById(first)?.focus())
       topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       return
@@ -248,8 +344,7 @@ export function CreateFranchise({ c }: { c: Case }) {
   }
 
   // Prototype: simulate reading an uploaded franchise form and auto-capturing
-  // its fields. No real file is parsed — the fields are filled with sample data
-  // so the flow can be demonstrated end to end.
+  // every field. No real file is parsed — values are sample data.
   function autoCaptureFromUpload(fileName: string) {
     setCapturing(true)
     window.setTimeout(() => {
@@ -257,26 +352,32 @@ export function CreateFranchise({ c }: { c: Case }) {
         const isInt = prev.businessSource === 'Agent' || prev.businessSource === 'Broker'
         return {
           ...prev,
-          contactName: 'Liza Mercado',
-          contactRole: 'HR Manager',
-          contactEmail: `hr@${shortNameFrom(prev.companyName || 'company').toLowerCase()}.example`,
-          contactPhone: '+63 2 8888 1234',
-          line1: '101 Ayala Ave., Barangay Bel-Air',
-          city: 'Makati City',
-          province: 'Metro Manila',
-          region: 'NCR',
-          postalCode: '1226',
-          billingSame: true,
-          currentCoverage: 'New to HMO',
-          contribution: 'Cost-shared',
-          frequency: 'Annual',
-          terms: 'Advance',
-          vat: 'VAT-able',
-          coverageStart: '2027-01-01',
-          principals: 250,
-          dependents: 190,
-          intermediaryName: isInt ? 'Pioneer Insurance Brokers' : prev.intermediaryName,
-          intermediaryLicenseNo: isInt ? 'IC-2024-00891' : prev.intermediaryLicenseNo,
+          natureOfBusiness: prev.natureOfBusiness || 'Freight & logistics',
+          companyAddress: prev.companyAddress || '101 Ayala Ave., Barangay Bel-Air',
+          companyProvince: prev.companyProvince || 'Metro Manila',
+          companyCity: prev.companyCity || 'Makati City',
+          companyRegion: prev.companyRegion || 'NCR',
+          sameAsCompany: true,
+          shortName: prev.shortName || shortNameFrom(prev.name || 'company'),
+          email: prev.email || `hr@${shortNameFrom(prev.name || 'company').toLowerCase()}.example`,
+          telephone: prev.telephone || '+63 2 8888 1234',
+          contactPerson: prev.contactPerson || 'Liza Mercado',
+          contactPosition: prev.contactPosition || 'HR Manager',
+          contactNumber: prev.contactNumber || '+63 917 555 0100',
+          tin: prev.tin || '009-123-456-000',
+          employeeCount: prev.employeeCount || 250,
+          dependentCount: prev.dependentCount || 190,
+          vatStatus: 'VAT-able',
+          currentCoverage: prev.currentCoverage || 'AA',
+          mannerOfEnrollment: 'Compulsory',
+          mannerOfPayment: 'Contributory',
+          requestedBy: prev.requestedBy || 'Liza Mercado',
+          department: prev.department || 'Corporate Sales',
+          accountManager: prev.accountManager || 'Demo Admin',
+          salesManager: prev.salesManager || 'Demo Admin',
+          targetEffectiveDate: prev.targetEffectiveDate || '2027-01-01',
+          businessSourceName: isInt ? prev.businessSourceName || 'Pioneer Insurance Brokers' : prev.businessSourceName,
+          commissionType: isInt ? prev.commissionType || 'Percentage of premium' : prev.commissionType,
         }
       })
       setErrors({})
@@ -286,30 +387,427 @@ export function CreateFranchise({ c }: { c: Case }) {
     }, 1200)
   }
 
-  function loadSample() {
-    setF((prev) => ({
+  function requestExtension() {
+    if (!extUntil) {
+      message.warning('Choose a new validity date for the extension.')
+      return
+    }
+    patchCase(c.id, (prev) => ({
       ...prev,
-      contactName: prev.contactName || 'Liza Mercado',
-      contactRole: prev.contactRole || 'HR Manager',
-      contactEmail: prev.contactEmail || `hr@${shortNameFrom(prev.companyName || 'company').toLowerCase()}.example`,
-      contactPhone: prev.contactPhone || '+63 2 8888 1234',
-      line1: prev.line1 || '101 Ayala Ave., Barangay Bel-Air',
-      city: prev.city || 'Makati City',
-      province: prev.province || 'Metro Manila',
-      region: prev.region || 'NCR',
-      postalCode: prev.postalCode || '1226',
-      coverageStart: prev.coverageStart || '2027-01-01',
-      principals: prev.principals || 250,
-      dependents: prev.dependents || 190,
+      franchise: {
+        ...prev.franchise,
+        extensions: [
+          ...(prev.franchise.extensions ?? []),
+          { requestedUntil: extUntil, reason: extReason.trim(), status: 'Requested', at: new Date().toISOString() },
+        ],
+      },
     }))
+    setExtUntil('')
+    setExtReason('')
+    message.success('Extension requested (prototype).')
   }
 
   const errorList = Object.entries(errors).filter(([, v]) => v)
-  const isInvalid = (key: keyof FormState) => Boolean(submitted && errors[key as string])
-  const isWarn = (key: keyof FormState) => !isInvalid(key) && Boolean(returnByField[key as string])
-  const statusOf = (key: keyof FormState) => (isInvalid(key) ? 'error' : isWarn(key) ? 'warning' : undefined)
-  const helpOf = (key: keyof FormState) =>
-    (isInvalid(key) ? errors[key as string] : isWarn(key) ? returnByField[key as string] : undefined) as string | undefined
+  const isInvalid = (key: string) => Boolean(submitted && errors[key])
+  const isWarn = (key: string) => !isInvalid(key) && Boolean(returnByField[key])
+  const statusOf = (key: string) => (isInvalid(key) ? 'error' : isWarn(key) ? 'warning' : undefined)
+  const helpOf = (key: string) =>
+    (isInvalid(key) ? errors[key] : isWarn(key) ? returnByField[key] : undefined) as string | undefined
+
+  // ---- Tab contents --------------------------------------------------------
+  const accountTab = (
+    <>
+      <Section title="Account Information" hint="Pre-filled from the lead and company record.">
+        <div style={two}>
+          <Form.Item label={reqLabel('Account Type')} validateStatus={statusOf('accountType')} help={helpOf('accountType')}>
+            <Select id="accountType" value={f.accountType} options={opts(ACCOUNT_TYPE)} onChange={(v) => set('accountType', v)} />
+          </Form.Item>
+          <Form.Item label={reqLabel('Name')} validateStatus={statusOf('name')} help={helpOf('name')}>
+            <Input id="name" value={f.name} onChange={(e) => set('name', e.target.value)} />
+          </Form.Item>
+        </div>
+        <div style={two}>
+          <Form.Item label={reqLabel('Nature of Business')} validateStatus={statusOf('natureOfBusiness')} help={helpOf('natureOfBusiness')}>
+            <Input id="natureOfBusiness" value={f.natureOfBusiness} onChange={(e) => set('natureOfBusiness', e.target.value)} />
+          </Form.Item>
+          <Form.Item label="Short Name">
+            <Input id="shortName" value={f.shortName} onChange={(e) => set('shortName', e.target.value)} />
+          </Form.Item>
+        </div>
+      </Section>
+
+      <Section title="Company address">
+        <Form.Item label={reqLabel('Company Address')} validateStatus={statusOf('companyAddress')} help={helpOf('companyAddress')}>
+          <Input id="companyAddress" value={f.companyAddress} onChange={(e) => set('companyAddress', e.target.value)} />
+        </Form.Item>
+        <div style={two}>
+          <Form.Item label={reqLabel('Company Province')} validateStatus={statusOf('companyProvince')} help={helpOf('companyProvince')}>
+            <Input id="companyProvince" value={f.companyProvince} onChange={(e) => set('companyProvince', e.target.value)} />
+          </Form.Item>
+          <Form.Item label={reqLabel('Company City')} validateStatus={statusOf('companyCity')} help={helpOf('companyCity')}>
+            <Input id="companyCity" value={f.companyCity} onChange={(e) => set('companyCity', e.target.value)} />
+          </Form.Item>
+        </div>
+        <Form.Item label="Company Region">
+          <Input id="companyRegion" value={f.companyRegion} onChange={(e) => set('companyRegion', e.target.value)} />
+        </Form.Item>
+        <Checkbox checked={f.sameAsCompany} onChange={(e) => set('sameAsCompany', e.target.checked)}>
+          Same as Company Address
+        </Checkbox>
+        {!f.sameAsCompany && (
+          <div style={{ borderInlineStart: '2px solid #f0f0f0', paddingInlineStart: 16, marginTop: 16 }}>
+            <Form.Item label={reqLabel('Billing Address')} validateStatus={statusOf('billingAddress')} help={helpOf('billingAddress')}>
+              <Input id="billingAddress" value={f.billingAddress} onChange={(e) => set('billingAddress', e.target.value)} />
+            </Form.Item>
+            <div style={two}>
+              <Form.Item label={reqLabel('Billing Province')} validateStatus={statusOf('billingProvince')} help={helpOf('billingProvince')}>
+                <Input id="billingProvince" value={f.billingProvince} onChange={(e) => set('billingProvince', e.target.value)} />
+              </Form.Item>
+              <Form.Item label={reqLabel('Billing City')} validateStatus={statusOf('billingCity')} help={helpOf('billingCity')}>
+                <Input id="billingCity" value={f.billingCity} onChange={(e) => set('billingCity', e.target.value)} />
+              </Form.Item>
+            </div>
+            <Form.Item label="Billing Region">
+              <Input id="billingRegion" value={f.billingRegion} onChange={(e) => set('billingRegion', e.target.value)} />
+            </Form.Item>
+          </div>
+        )}
+      </Section>
+
+      <Section title="Contact & correspondence">
+        <div style={two}>
+          <Form.Item label={reqLabel('Email')} validateStatus={statusOf('email')} help={helpOf('email')}>
+            <Input id="email" value={f.email} onChange={(e) => set('email', e.target.value)} />
+          </Form.Item>
+          <Form.Item label="Telephone">
+            <Input id="telephone" value={f.telephone} onChange={(e) => set('telephone', e.target.value)} />
+          </Form.Item>
+        </div>
+        <div style={two}>
+          <Form.Item label="Facsimile">
+            <Input id="facsimile" value={f.facsimile} onChange={(e) => set('facsimile', e.target.value)} />
+          </Form.Item>
+          <Form.Item label="TIN">
+            <Input id="tin" value={f.tin} onChange={(e) => set('tin', e.target.value)} />
+          </Form.Item>
+        </div>
+        <div style={two}>
+          <Form.Item label={reqLabel('Contact Person')} validateStatus={statusOf('contactPerson')} help={helpOf('contactPerson')}>
+            <Input id="contactPerson" value={f.contactPerson} onChange={(e) => set('contactPerson', e.target.value)} />
+          </Form.Item>
+          <Form.Item label="Contact Position">
+            <Input id="contactPosition" value={f.contactPosition} onChange={(e) => set('contactPosition', e.target.value)} />
+          </Form.Item>
+        </div>
+        <div style={two}>
+          <Form.Item label={reqLabel('Contact Number')} validateStatus={statusOf('contactNumber')} help={helpOf('contactNumber')}>
+            <Input id="contactNumber" value={f.contactNumber} onChange={(e) => set('contactNumber', e.target.value)} />
+          </Form.Item>
+          <Form.Item label="Proposal Addressee">
+            <Input id="proposalAddressee" value={f.proposalAddressee} onChange={(e) => set('proposalAddressee', e.target.value)} />
+          </Form.Item>
+        </div>
+        <div style={two}>
+          <Form.Item label="Addressee Position">
+            <Input id="addresseePosition" value={f.addresseePosition} onChange={(e) => set('addresseePosition', e.target.value)} />
+          </Form.Item>
+          <Form.Item label="Addressee Contact Number">
+            <Input id="addresseeContactNumber" value={f.addresseeContactNumber} onChange={(e) => set('addresseeContactNumber', e.target.value)} />
+          </Form.Item>
+        </div>
+      </Section>
+    </>
+  )
+
+  const otherTab = (
+    <>
+      <Section title="Membership & coverage">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          <Form.Item label={reqLabel('No. of Employees (principals)')} validateStatus={statusOf('employeeCount')} help={helpOf('employeeCount')}>
+            <InputNumber id="employeeCount" min={0} style={{ width: '100%' }} value={f.employeeCount} onChange={(v) => set('employeeCount', Number(v) || 0)} />
+          </Form.Item>
+          <Form.Item label="No. of Dependents">
+            <InputNumber id="dependentCount" min={0} style={{ width: '100%' }} value={f.dependentCount} onChange={(v) => set('dependentCount', Number(v) || 0)} />
+          </Form.Item>
+          <Form.Item label="Total">
+            <InputNumber disabled style={{ width: '100%' }} value={totalCount} />
+          </Form.Item>
+        </div>
+        <div style={two}>
+          <Form.Item label={reqLabel('VAT Status')} validateStatus={statusOf('vatStatus')} help={helpOf('vatStatus')}>
+            <Select id="vatStatus" value={f.vatStatus} options={opts(VAT)} onChange={(v) => set('vatStatus', v)} />
+          </Form.Item>
+          <Form.Item label={reqLabel('Current Coverage')} validateStatus={statusOf('currentCoverage')} help={helpOf('currentCoverage')}>
+            <Select id="currentCoverage" value={f.currentCoverage} options={CURRENT_COVERAGE} onChange={(v) => set('currentCoverage', v)} />
+          </Form.Item>
+        </div>
+        <div style={two}>
+          <Form.Item label={reqLabel('Manner of Enrollment')} validateStatus={statusOf('mannerOfEnrollment')} help={helpOf('mannerOfEnrollment')}>
+            <Select id="mannerOfEnrollment" value={f.mannerOfEnrollment} options={opts(ENROLLMENT)} onChange={(v) => set('mannerOfEnrollment', v)} />
+          </Form.Item>
+          <Form.Item label={reqLabel('Manner of Payment')} validateStatus={statusOf('mannerOfPayment')} help={helpOf('mannerOfPayment')}>
+            <Select id="mannerOfPayment" value={f.mannerOfPayment} options={opts(PAYMENT)} onChange={(v) => set('mannerOfPayment', v)} />
+          </Form.Item>
+        </div>
+      </Section>
+
+      <Section title="Source & handling">
+        <div style={two}>
+          <Form.Item label={reqLabel('Business Source')} validateStatus={statusOf('businessSource')} help={helpOf('businessSource')}>
+            <Select id="businessSource" value={f.businessSource} options={opts(SOURCES)} onChange={(v) => set('businessSource', v)} />
+          </Form.Item>
+          <Form.Item label="Department">
+            <Select id="department" value={f.department} options={opts(DEPARTMENT)} onChange={(v) => set('department', v)} />
+          </Form.Item>
+        </div>
+        {isIntermediary && (
+          <div style={two}>
+            <Form.Item label={reqLabel('Name of Business Source')} validateStatus={statusOf('businessSourceName')} help={helpOf('businessSourceName')}>
+              <Input id="businessSourceName" value={f.businessSourceName} onChange={(e) => set('businessSourceName', e.target.value)} />
+            </Form.Item>
+            <Form.Item label={reqLabel('Commission Type')} validateStatus={statusOf('commissionType')} help={helpOf('commissionType')}>
+              <Select id="commissionType" value={f.commissionType || undefined} options={opts(COMMISSION)} onChange={(v) => set('commissionType', v)} />
+            </Form.Item>
+          </div>
+        )}
+        <div style={two}>
+          <Form.Item label={reqLabel('Account handler (AAT)')} validateStatus={statusOf('accountManager')} help={helpOf('accountManager')}>
+            <Input id="accountManager" value={f.accountManager} onChange={(e) => set('accountManager', e.target.value)} />
+          </Form.Item>
+          <Form.Item label={reqLabel('Secondary handler (AAT)')} validateStatus={statusOf('salesManager')} help={helpOf('salesManager')}>
+            <Input id="salesManager" value={f.salesManager} onChange={(e) => set('salesManager', e.target.value)} />
+          </Form.Item>
+        </div>
+        <div style={two}>
+          <Form.Item label="Requested By">
+            <Input id="requestedBy" value={f.requestedBy} onChange={(e) => set('requestedBy', e.target.value)} />
+          </Form.Item>
+          <Form.Item label="Created By">
+            <Input disabled value="Demo Admin" />
+          </Form.Item>
+        </div>
+      </Section>
+
+      <Section title="Incumbent & timing">
+        <div style={two}>
+          <Form.Item label="Current HMO provider">
+            <Input id="currentHmoProvider" value={f.currentHmoProvider} onChange={(e) => set('currentHmoProvider', e.target.value)} />
+          </Form.Item>
+          <Form.Item label="Current contract expiry">
+            <DatePicker
+              id="currentContractExpiry"
+              style={{ width: '100%' }}
+              format="YYYY-MM-DD"
+              value={f.currentContractExpiry ? dayjs(f.currentContractExpiry) : null}
+              onChange={(d) => set('currentContractExpiry', d ? d.format('YYYY-MM-DD') : '')}
+            />
+          </Form.Item>
+        </div>
+        <Form.Item label="Target effective date">
+          <DatePicker
+            id="targetEffectiveDate"
+            style={{ width: '100%' }}
+            format="YYYY-MM-DD"
+            value={f.targetEffectiveDate ? dayjs(f.targetEffectiveDate) : null}
+            onChange={(d) => set('targetEffectiveDate', d ? d.format('YYYY-MM-DD') : '')}
+          />
+        </Form.Item>
+      </Section>
+
+      <Section title="Remarks">
+        <Form.Item label="Sales Remarks">
+          <Input.TextArea id="salesRemarks" rows={3} value={f.salesRemarks} onChange={(e) => set('salesRemarks', e.target.value)} />
+        </Form.Item>
+        <Form.Item label="Actuarial Remarks" help="Entered by Actuarial or AMT.">
+          <Input.TextArea id="acusaRemarks" rows={3} disabled value={f.acusaRemarks} placeholder="Added later by Actuarial / AMT" />
+        </Form.Item>
+      </Section>
+    </>
+  )
+
+  const documentsTab = (
+    <Section title="Documents" hint="Attach the supporting documents for this franchise. (Prototype — files are not stored.)">
+      <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+        {DOC_SLOTS.map((slot) => (
+          <div key={slot} className="app-doc-slot">
+            <div>
+              <div style={{ fontWeight: 500 }}>{slot}</div>
+              {docs[slot] ? (
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  <PaperClipOutlined /> {docs[slot]}
+                </Typography.Text>
+              ) : (
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  No file attached
+                </Typography.Text>
+              )}
+            </div>
+            <Space>
+              <Upload
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  setDocs((prev) => ({ ...prev, [slot]: file.name }))
+                  message.success(`Attached ${file.name}.`)
+                  return false
+                }}
+              >
+                <Button size="small" icon={<CloudUploadOutlined />}>
+                  {docs[slot] ? 'Replace' : 'Upload'}
+                </Button>
+              </Upload>
+              {docs[slot] && (
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<DeleteOutlined />}
+                  onClick={() => setDocs((prev) => { const n = { ...prev }; delete n[slot]; return n })}
+                />
+              )}
+            </Space>
+          </div>
+        ))}
+      </Space>
+    </Section>
+  )
+
+  const affiliateColumns = [
+    { title: 'Name', dataIndex: 'name', render: (_: string, _r: FranchiseAffiliate, i: number) => (
+      <Input
+        id={i === 0 ? 'affiliates' : undefined}
+        status={submitted && errors.affiliates && !affiliates[i].name.trim() ? 'error' : undefined}
+        value={affiliates[i].name}
+        onChange={(e) => updateAffiliate(i, 'name', e.target.value)}
+      />
+    ) },
+    { title: 'Address', dataIndex: 'address', render: (_: string, _r: FranchiseAffiliate, i: number) => (
+      <Input value={affiliates[i].address} onChange={(e) => updateAffiliate(i, 'address', e.target.value)} />
+    ) },
+    { title: 'Email', dataIndex: 'email', render: (_: string, _r: FranchiseAffiliate, i: number) => (
+      <Input value={affiliates[i].email} onChange={(e) => updateAffiliate(i, 'email', e.target.value)} />
+    ) },
+    { title: 'Contact Person', dataIndex: 'contactPerson', render: (_: string, _r: FranchiseAffiliate, i: number) => (
+      <Input value={affiliates[i].contactPerson} onChange={(e) => updateAffiliate(i, 'contactPerson', e.target.value)} />
+    ) },
+    { title: 'Contact Number', dataIndex: 'contactNumber', render: (_: string, _r: FranchiseAffiliate, i: number) => (
+      <Input value={affiliates[i].contactNumber} onChange={(e) => updateAffiliate(i, 'contactNumber', e.target.value)} />
+    ) },
+    { title: '', dataIndex: 'x', width: 48, render: (_: string, _r: FranchiseAffiliate, i: number) => (
+      <Button type="text" icon={<DeleteOutlined />} onClick={() => removeAffiliate(i)} />
+    ) },
+  ]
+
+  function updateAffiliate(i: number, key: keyof FranchiseAffiliate, value: string) {
+    setAffiliates((prev) => prev.map((a, idx) => (idx === i ? { ...a, [key]: value } : a)))
+    if (errors.affiliates) setErrors((prev) => ({ ...prev, affiliates: '' }))
+  }
+  function removeAffiliate(i: number) {
+    setAffiliates((prev) => prev.filter((_, idx) => idx !== i))
+  }
+  function addAffiliate() {
+    setAffiliates((prev) => [
+      ...prev,
+      { name: '', address: '', email: '', contactPerson: '', contactNumber: '', financialAssistance: '', financialAssistanceName: '' },
+    ])
+  }
+
+  const affiliatesTab = (
+    <Section title="Affiliates" hint="Affiliated or sister companies enrolled under the same account.">
+      <Checkbox
+        checked={hasAffiliates}
+        onChange={(e) => {
+          setHasAffiliates(e.target.checked)
+          if (e.target.checked && affiliates.length === 0) addAffiliate()
+        }}
+      >
+        This account includes affiliated / sister companies
+      </Checkbox>
+      {hasAffiliates && (
+        <div style={{ marginTop: 16 }}>
+          {errors.affiliates && submitted && (
+            <Alert type="error" showIcon style={{ marginBottom: 12 }} description={errors.affiliates} />
+          )}
+          <Table<FranchiseAffiliate>
+            size="small"
+            pagination={false}
+            rowKey={(_, i) => String(i)}
+            dataSource={affiliates}
+            columns={affiliateColumns}
+            locale={{ emptyText: 'No affiliates added yet.' }}
+          />
+          <Button icon={<PlusOutlined />} onClick={addAffiliate} style={{ marginTop: 12 }}>
+            Add affiliate
+          </Button>
+        </div>
+      )}
+    </Section>
+  )
+
+  const decisionsTab = (
+    <Section title="Decisions and extensions" hint="Review outcome, validity and any extension requests.">
+      <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+        <div className="app-decision-row">
+          <span>Current status</span>
+          <Tag color={c.franchise.status === 'returned' ? 'red' : c.franchise.status === 'submitted' ? 'blue' : 'default'}>
+            {c.franchise.status}
+          </Tag>
+        </div>
+        {c.franchise.submittedAt && (
+          <div className="app-decision-row">
+            <span>Submitted</span>
+            <span>{dayjs(c.franchise.submittedAt).format('YYYY-MM-DD HH:mm')}</span>
+          </div>
+        )}
+        {c.franchise.status === 'returned' && (c.franchise.returnReasons?.length ?? 0) > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            title="Returned by Account Services"
+            description={
+              <ul style={{ margin: 0, paddingInlineStart: 16 }}>
+                {c.franchise.returnReasons!.map((r, i) => (
+                  <li key={i}>{r.message}</li>
+                ))}
+              </ul>
+            }
+          />
+        )}
+
+        {(c.franchise.extensions?.length ?? 0) > 0 && (
+          <div>
+            <Typography.Text strong>Extension requests</Typography.Text>
+            <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8 }}>
+              {c.franchise.extensions!.map((x, i) => (
+                <div key={i} className="app-decision-row">
+                  <span>Until {x.requestedUntil}{x.reason ? ` — ${x.reason}` : ''}</span>
+                  <Tag>{x.status}</Tag>
+                </div>
+              ))}
+            </Space>
+          </div>
+        )}
+
+        <div>
+          <Typography.Title level={5} style={{ marginBottom: 12 }}>
+            Request an extension
+          </Typography.Title>
+          <div style={two}>
+            <Form.Item label="Extend validity until">
+              <DatePicker
+                style={{ width: '100%' }}
+                format="YYYY-MM-DD"
+                value={extUntil ? dayjs(extUntil) : null}
+                onChange={(d) => setExtUntil(d ? d.format('YYYY-MM-DD') : '')}
+              />
+            </Form.Item>
+            <Form.Item label="Reason">
+              <Input value={extReason} onChange={(e) => setExtReason(e.target.value)} />
+            </Form.Item>
+          </div>
+          <Button onClick={requestExtension}>Request extension</Button>
+        </div>
+      </Space>
+    </Section>
+  )
 
   return (
     <div ref={topRef}>
@@ -323,7 +821,7 @@ export function CreateFranchise({ c }: { c: Case }) {
             disabled={capturing}
             beforeUpload={(file) => {
               autoCaptureFromUpload(file.name)
-              return false // prototype — never actually upload
+              return false
             }}
           >
             <p className="ant-upload-drag-icon" style={{ marginBottom: 8 }}>
@@ -343,7 +841,7 @@ export function CreateFranchise({ c }: { c: Case }) {
             icon={<FileDoneOutlined />}
             style={{ marginTop: 12 }}
             title={`Captured from ${capturedFile}`}
-            description="Fields below were filled from the uploaded form. Review them, correct anything, then submit."
+            description="Fields across the tabs were filled from the uploaded form. Review them, correct anything, then submit."
           />
         )}
         <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '12px 0 0' }}>
@@ -357,7 +855,7 @@ export function CreateFranchise({ c }: { c: Case }) {
           showIcon
           style={{ marginBottom: 16 }}
           title="Returned by Account Services"
-          description="Address the requested corrections below (highlighted beside the fields), then resubmit."
+          description="Address the requested corrections (highlighted beside the fields), then resubmit."
         />
       )}
 
@@ -371,7 +869,14 @@ export function CreateFranchise({ c }: { c: Case }) {
             <ul style={{ margin: 0, paddingInlineStart: 16 }}>
               {errorList.map(([key, msg]) => (
                 <li key={key}>
-                  <Typography.Link onClick={() => document.getElementById(key)?.focus()}>{msg}</Typography.Link>
+                  <Typography.Link
+                    onClick={() => {
+                      setActiveTab(key === 'affiliates' ? 'affiliates' : FIELD_TAB[key] ?? 'account')
+                      requestAnimationFrame(() => document.getElementById(key)?.focus())
+                    }}
+                  >
+                    {msg}
+                  </Typography.Link>
                 </li>
               ))}
             </ul>
@@ -380,148 +885,22 @@ export function CreateFranchise({ c }: { c: Case }) {
       )}
 
       <Form layout="vertical" onSubmitCapture={(e) => { e.preventDefault(); handleSubmit() }}>
-        <Section title="Company & contact">
-          <Form.Item label="Company name" validateStatus={statusOf('companyName')} help={helpOf('companyName')}>
-            <Input id="companyName" value={f.companyName} onChange={(e) => set('companyName', e.target.value)} />
-          </Form.Item>
-          <div style={two}>
-            <Form.Item label="Contact name" validateStatus={statusOf('contactName')} help={helpOf('contactName')}>
-              <Input id="contactName" value={f.contactName} onChange={(e) => set('contactName', e.target.value)} />
-            </Form.Item>
-            <Form.Item label="Contact role (optional)">
-              <Input id="contactRole" value={f.contactRole} onChange={(e) => set('contactRole', e.target.value)} />
-            </Form.Item>
-          </div>
-          <div style={two}>
-            <Form.Item label="Contact email" validateStatus={statusOf('contactEmail')} help={helpOf('contactEmail')}>
-              <Input id="contactEmail" value={f.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} />
-            </Form.Item>
-            <Form.Item label="Contact phone (optional)">
-              <Input id="contactPhone" value={f.contactPhone} onChange={(e) => set('contactPhone', e.target.value)} />
-            </Form.Item>
-          </div>
-        </Section>
-
-        <Section title="Company address">
-          <Form.Item label="Street address" validateStatus={statusOf('line1')} help={helpOf('line1')}>
-            <Input id="line1" value={f.line1} onChange={(e) => set('line1', e.target.value)} />
-          </Form.Item>
-          <div style={two}>
-            <Form.Item label="City" validateStatus={statusOf('city')} help={helpOf('city')}>
-              <Input id="city" value={f.city} onChange={(e) => set('city', e.target.value)} />
-            </Form.Item>
-            <Form.Item label="Province" validateStatus={statusOf('province')} help={helpOf('province')}>
-              <Input id="province" value={f.province} onChange={(e) => set('province', e.target.value)} />
-            </Form.Item>
-          </div>
-          <div style={two}>
-            <Form.Item label="Region" validateStatus={statusOf('region')} help={helpOf('region')}>
-              <Input id="region" value={f.region} onChange={(e) => set('region', e.target.value)} />
-            </Form.Item>
-            <Form.Item label="Postal code" validateStatus={statusOf('postalCode')} help={helpOf('postalCode')}>
-              <Input id="postalCode" value={f.postalCode} onChange={(e) => set('postalCode', e.target.value)} />
-            </Form.Item>
-          </div>
-          <Checkbox checked={f.billingSame} onChange={(e) => set('billingSame', e.target.checked)}>
-            Billing address is the same as the company address
-          </Checkbox>
-          {!f.billingSame && (
-            <div style={{ borderInlineStart: '2px solid #f0f0f0', paddingInlineStart: 16, marginTop: 16 }}>
-              <Form.Item label="Billing street address" validateStatus={statusOf('bLine1')} help={helpOf('bLine1')}>
-                <Input id="bLine1" value={f.bLine1} onChange={(e) => set('bLine1', e.target.value)} />
-              </Form.Item>
-              <div style={two}>
-                <Form.Item label="Billing city" validateStatus={statusOf('bCity')} help={helpOf('bCity')}>
-                  <Input id="bCity" value={f.bCity} onChange={(e) => set('bCity', e.target.value)} />
-                </Form.Item>
-                <Form.Item label="Billing province">
-                  <Input id="bProvince" value={f.bProvince} onChange={(e) => set('bProvince', e.target.value)} />
-                </Form.Item>
-              </div>
-            </div>
-          )}
-        </Section>
-
-        <Section title="Business & coverage">
-          <div style={two}>
-            <Form.Item label="Product type">
-              <Select id="productType" value={f.productType} options={opts(PRODUCTS)} onChange={(v) => set('productType', v)} />
-            </Form.Item>
-            <Form.Item label="Business source">
-              <Select id="businessSource" value={f.businessSource} options={opts(SOURCES)} onChange={(v) => set('businessSource', v)} />
-            </Form.Item>
-          </div>
-          <div style={two}>
-            <Form.Item label="Current coverage">
-              <Select id="currentCoverage" value={f.currentCoverage} options={opts(CURRENT_COVERAGE)} onChange={(v) => set('currentCoverage', v)} />
-            </Form.Item>
-            <Form.Item label="Requested coverage start" validateStatus={statusOf('coverageStart')} help={helpOf('coverageStart')}>
-              <DatePicker
-                id="coverageStart"
-                style={{ width: '100%' }}
-                format="YYYY-MM-DD"
-                value={f.coverageStart ? dayjs(f.coverageStart) : null}
-                onChange={(d) => set('coverageStart', d ? d.format('YYYY-MM-DD') : '')}
-              />
-            </Form.Item>
-          </div>
-          <div style={two}>
-            <Form.Item label="Contribution arrangement">
-              <Select id="contribution" value={f.contribution} options={opts(CONTRIBUTION)} onChange={(v) => set('contribution', v)} />
-            </Form.Item>
-            <Form.Item label="Payment frequency">
-              <Select id="frequency" value={f.frequency} options={opts(FREQUENCY)} onChange={(v) => set('frequency', v)} />
-            </Form.Item>
-          </div>
-          <div style={two}>
-            <Form.Item label="Payment terms">
-              <Select id="terms" value={f.terms} options={opts(TERMS)} onChange={(v) => set('terms', v)} />
-            </Form.Item>
-            <Form.Item label="VAT status">
-              <Select id="vat" value={f.vat} options={opts(VAT)} onChange={(v) => set('vat', v)} />
-            </Form.Item>
-          </div>
-        </Section>
-
-        <Section title="Member counts" hint="Estimates are fine at this stage; the actual Member Data import comes later.">
-          <div style={two}>
-            <Form.Item label="Estimated principals" validateStatus={statusOf('principals')} help={helpOf('principals')}>
-              <InputNumber id="principals" min={0} style={{ width: '100%' }} value={f.principals} onChange={(v) => set('principals', Number(v) || 0)} />
-            </Form.Item>
-            <Form.Item label="Estimated dependents">
-              <InputNumber id="dependents" min={0} style={{ width: '100%' }} value={f.dependents} onChange={(v) => set('dependents', Number(v) || 0)} />
-            </Form.Item>
-          </div>
-        </Section>
-
-        {isAgentBroker && (
-          <Section title="Intermediary details" hint="Shown because this is an Agent/Broker case.">
-            <div style={two}>
-              <Form.Item label="Agent / broker name" validateStatus={statusOf('intermediaryName')} help={helpOf('intermediaryName')}>
-                <Input id="intermediaryName" value={f.intermediaryName} onChange={(e) => set('intermediaryName', e.target.value)} />
-              </Form.Item>
-              <Form.Item label="License no. (optional)">
-                <Input id="intermediaryLicenseNo" value={f.intermediaryLicenseNo} onChange={(e) => set('intermediaryLicenseNo', e.target.value)} />
-              </Form.Item>
-            </div>
-          </Section>
-        )}
-
-        <Section title="Affiliates">
-          <Checkbox checked={f.hasAffiliates} onChange={(e) => set('hasAffiliates', e.target.checked)}>
-            This account includes affiliated / sister companies
-          </Checkbox>
-          {f.hasAffiliates && (
-            <Form.Item label="Affiliated companies" help="One per line or comma-separated." style={{ marginTop: 16 }}>
-              <Input.TextArea id="affiliates" rows={3} value={f.affiliates} onChange={(e) => set('affiliates', e.target.value)} />
-            </Form.Item>
-          )}
-        </Section>
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={[
+            { key: 'account', label: 'Account Information', children: accountTab },
+            { key: 'other', label: 'Other Information', children: otherTab },
+            { key: 'documents', label: 'Documents', children: documentsTab },
+            { key: 'affiliates', label: 'Affiliates', children: affiliatesTab },
+            { key: 'decisions', label: 'Decisions and extensions', children: decisionsTab },
+          ]}
+        />
 
         <Alert
           type="info"
           showIcon
-          style={{ marginBottom: 16 }}
+          style={{ margin: '8px 0 16px' }}
           title="What happens on submit"
           description="Submitting sends this franchise to Account Services for review. They either accept it (you move on to Prepare Quotation) or return it with specific corrections."
         />
@@ -531,9 +910,6 @@ export function CreateFranchise({ c }: { c: Case }) {
             {c.franchise.status === 'returned' ? 'Resubmit to Account Services' : 'Submit to Account Services'}
           </Button>
           <Button onClick={saveDraft}>Save draft</Button>
-          <Button type="text" onClick={loadSample}>
-            Load sample data
-          </Button>
         </Space>
       </Form>
     </div>
