@@ -10,6 +10,7 @@ import {
 import { meaningfulStatus, nextAction, responsibleDepartment } from '../domain/progress'
 import { CaseStatusTag } from '../components/CaseStatusTag'
 import { PageHeader } from '../components/ui/PageHeader'
+import { JourneyStepper } from '../components/ui/JourneyStepper'
 import { WorkAreaPanel } from './workareas/WorkAreaPanel'
 
 const WORK_AREAS = new Set<string>(WORK_AREA_ORDER)
@@ -55,6 +56,9 @@ export default function CaseWorkspace() {
           }
           extra={<CaseStatusTag c={c} />}
         />
+        <div className="app-pageheader-card__stepper">
+          <JourneyStepper current={c.currentWorkArea} />
+        </div>
       </div>
 
       {/* What to do next — one primary action, honest ownership. On the Create
