@@ -112,8 +112,8 @@ body {
 /* --- Sider --------------------------------------------------------------- */
 .app-sider {
   position: sticky;
-  top: 56px; /* header height */
-  height: calc(100vh - 56px);
+  top: 0;
+  height: 100vh; /* full height — brand sits in the top-left corner */
   border-inline-end: 1px solid #f0f0f0;
 }
 .app-sider .ant-layout-sider-children {

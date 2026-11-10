@@ -69,23 +69,23 @@ export function AppShell() {
 
   return (
     <ShellActionsContext.Provider value={shellActions}>
-      <Layout style={{ minHeight: '100vh' }}>
-        <AppHeader navExpanded={menuExpanded} onMenuClick={onMenuClick} />
-        <Layout hasSider={!isMobile}>
-          {!isMobile && (
-            <Sider
-              className="app-sider"
-              theme="light"
-              width={256}
-              collapsedWidth={64}
-              collapsed={collapsed}
-              trigger={null}
-            >
-              <SidebarBrand collapsed={collapsed} />
-              <Sidebar collapsed={collapsed} onNavigate={() => {}} />
-              <SidebarCollapseToggle collapsed={collapsed} onToggle={toggleSidebar} />
-            </Sider>
-          )}
+      <Layout style={{ minHeight: '100vh' }} hasSider={!isMobile}>
+        {!isMobile && (
+          <Sider
+            className="app-sider"
+            theme="light"
+            width={256}
+            collapsedWidth={64}
+            collapsed={collapsed}
+            trigger={null}
+          >
+            <SidebarBrand collapsed={collapsed} />
+            <Sidebar collapsed={collapsed} onNavigate={() => {}} />
+            <SidebarCollapseToggle collapsed={collapsed} onToggle={toggleSidebar} />
+          </Sider>
+        )}
+        <Layout>
+          <AppHeader navExpanded={menuExpanded} onMenuClick={onMenuClick} />
           <Content className="app-content">
             <Outlet />
           </Content>
