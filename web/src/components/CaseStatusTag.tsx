@@ -7,7 +7,7 @@ import { meaningfulStatus } from '../domain/progress'
 // carries the meaning so colour is never the only signal.
 function colorFor(c: Case): string {
   if (c.isCompleted) return c.coverage.status === 'scheduled' ? 'cyan' : 'green'
-  if (c.franchise.status === 'returned' || c.quotation.status === 'clarification') return 'red'
+  if (c.franchise.status === 'returned' || c.franchise.status === 'rejected' || c.quotation.status === 'clarification') return 'red'
   const waiting = c.franchise.status === 'submitted' || c.quotation.status === 'submitted'
   if (waiting) return 'blue'
   return 'default'

@@ -79,6 +79,7 @@ export type FranchiseStatus =
   | 'submitted' // to Account Services
   | 'returned' // sent back with requested corrections
   | 'accepted'
+  | 'rejected' // declined by the reviewer
 
 export type QuotationRequestStatus =
   | 'not-started'
@@ -201,6 +202,9 @@ export interface Franchise {
   submittedAt?: string
   /** When the franchise was approved/accepted (prototype admin action). */
   acceptedAt?: string
+  /** When the franchise was rejected, and the reason given (prototype admin action). */
+  rejectedAt?: string
+  rejectedReason?: string
   /** Full franchise form capture (all wireframe fields across the tabs). Loosely
       typed because it mirrors the legacy schema, which is broader than the fields
       the rest of this app reads. */

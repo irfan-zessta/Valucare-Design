@@ -1,20 +1,36 @@
 // ===========================================================================
 // FranchiseReview — the Account Services view of a *submitted* franchise. The
 // prototype runs as an admin, so the same person who submitted can also review
-// here: read the whole captured form, run a quick pre-approval checklist, then
-// approve (advancing the case to Prepare Quotation) or return for corrections.
+// here: read the whole captured form, open each uploaded document, run a quick
+// pre-approval checklist, then decide — approve (advancing the case to Prepare
+// Quotation), take ownership to edit the form, return it for corrections, or
+// reject it.
 // ===========================================================================
 import { useState } from 'react'
-import { Alert, App, Button, Checkbox, Descriptions, Divider, Space, Tag, Tooltip, Typography } from 'antd'
-import { CheckCircleOutlined } from '@ant-design/icons'
+import {
+  Alert,
+  App,
+  Button,
+  Checkbox,
+  Descriptions,
+  Divider,
+  Empty,
+  Input,
+  Modal,
+  Space,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd'
+import { CheckCircleOutlined, CloseCircleOutlined, EditOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Case } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
-import { FRANCHISE_DOCS, initialForm } from './CreateFranchise'
+import { CreateFranchise, FRANCHISE_DOCS, initialForm } from './CreateFranchise'
 
-const DOC_LABELS: Record<string, string> = Object.fromEntries(
-  FRANCHISE_DOCS.map((d) => [d.key, d.label]),
+const DOC_META: Record<string, { label: string; tag?: string }> = Object.fromEntries(
+  FRANCHISE_DOCS.map((d) => [d.key, { label: d.label, tag: d.tag }]),
 )
 const COVERAGE_LABELS: Record<string, string> = {
   AA: 'None (AA)',
@@ -41,6 +57,7 @@ export function FranchiseReview({ c }: { c: Case }) {
   const { message } = App.useApp()
   const navigate = useNavigate()
   const accepted = c.franchise.status === 'accepted'
+  const rejected = c.franchise.status === 'rejected'
 
   // Full captured form (saved formData overlaid on the company/franchise record).
   const f = initialForm(c)
@@ -50,12 +67,37 @@ export function FranchiseReview({ c }: { c: Case }) {
 
   const [checked, setChecked] = useState<boolean[]>(() => CHECKLIST.map(() => false))
   const allChecked = checked.every(Boolean)
+  const [editing, setEditing] = useState(false)
+  const [viewingDoc, setViewingDoc] = useState<{ slot: string; fileName: string } | null>(null)
+  const [rejecting, setRejecting] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+
+  // Ownership: take over the submitted form and edit it in place. Saving or
+  // resubmitting from the editable form updates the case status directly.
+  if (editing) {
+    return (
+      <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+        <Alert
+          type="warning"
+          showIcon
+          title="Editing on behalf of Sales"
+          description="You've taken ownership of this franchise. Save a draft or resubmit from the form below, or stop editing to return to the review."
+          action={
+            <Button size="small" onClick={() => setEditing(false)}>
+              Stop editing
+            </Button>
+          }
+        />
+        <CreateFranchise c={c} />
+      </Space>
+    )
+  }
 
   function approve() {
     patchCase(c.id, (prev) => ({
       ...prev,
       currentWorkArea: 'prepare-quotation',
-      franchise: { ...prev.franchise, status: 'accepted', returnReasons: undefined, acceptedAt: new Date().toISOString() },
+      franchise: { ...prev.franchise, status: 'accepted', returnReasons: undefined, rejectedAt: undefined, rejectedReason: undefined, acceptedAt: new Date().toISOString() },
     }))
     message.success('Franchise approved — moving on to Prepare Quotation.')
     navigate(`/cases/${c.id}/prepare-quotation`)
@@ -68,6 +110,22 @@ export function FranchiseReview({ c }: { c: Case }) {
       franchise: { ...prev.franchise, status: 'returned', acceptedAt: undefined },
     }))
     message.info('Franchise returned for corrections.')
+  }
+
+  function confirmReject() {
+    patchCase(c.id, (prev) => ({
+      ...prev,
+      currentWorkArea: 'create-franchise',
+      franchise: {
+        ...prev.franchise,
+        status: 'rejected',
+        acceptedAt: undefined,
+        rejectedAt: new Date().toISOString(),
+        rejectedReason: rejectReason.trim() || undefined,
+      },
+    }))
+    setRejecting(false)
+    message.warning('Franchise rejected.')
   }
 
   return (
@@ -143,11 +201,18 @@ export function FranchiseReview({ c }: { c: Case }) {
         {docs.length === 0 ? (
           <Typography.Text type="secondary">No documents attached.</Typography.Text>
         ) : (
-          <Space wrap>
+          <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
             {docs.map((d) => (
-              <Tag key={d.slot} color="blue">
-                {DOC_LABELS[d.slot] ?? d.slot}: {d.fileName}
-              </Tag>
+              <div key={d.slot} className="app-decision-row">
+                <Space>
+                  <FileTextOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />
+                  <span>{DOC_META[d.slot]?.label ?? d.slot}</span>
+                  <Typography.Text type="secondary">{d.fileName}</Typography.Text>
+                </Space>
+                <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setViewingDoc(d)}>
+                  View
+                </Button>
+              </div>
             ))}
           </Space>
         )}
@@ -167,7 +232,7 @@ export function FranchiseReview({ c }: { c: Case }) {
       <Divider style={{ margin: '4px 0' }} />
 
       {/* ---- Decision -------------------------------------------------------- */}
-      {accepted ? (
+      {accepted && (
         <Alert
           type="success"
           showIcon
@@ -179,7 +244,29 @@ export function FranchiseReview({ c }: { c: Case }) {
               : 'This franchise has been approved.'
           }
         />
-      ) : (
+      )}
+
+      {rejected && (
+        <Alert
+          type="error"
+          showIcon
+          icon={<CloseCircleOutlined />}
+          title="Franchise rejected"
+          description={
+            <>
+              {c.franchise.rejectedAt && `Rejected on ${dayjs(c.franchise.rejectedAt).format('YYYY-MM-DD HH:mm')}. `}
+              {c.franchise.rejectedReason ? `Reason: ${c.franchise.rejectedReason}` : 'No reason recorded.'}
+            </>
+          }
+          action={
+            <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(true)}>
+              Reopen & edit
+            </Button>
+          }
+        />
+      )}
+
+      {!accepted && !rejected && (
         <section>
           <Typography.Title level={5} style={{ marginTop: 0 }}>
             Quick checklist
@@ -200,18 +287,73 @@ export function FranchiseReview({ c }: { c: Case }) {
               </Checkbox>
             ))}
           </Space>
-          <Space>
+          <Space wrap>
             <Tooltip title={allChecked ? '' : 'Tick every checklist item to approve.'}>
               <Button type="primary" icon={<CheckCircleOutlined />} disabled={!allChecked} onClick={approve}>
                 Approve request
               </Button>
             </Tooltip>
-            <Button danger onClick={returnForCorrections}>
-              Return for corrections
+            <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
+              Edit franchise form
+            </Button>
+            <Button onClick={returnForCorrections}>Return for corrections</Button>
+            <Button danger icon={<CloseCircleOutlined />} onClick={() => setRejecting(true)}>
+              Reject
             </Button>
           </Space>
         </section>
       )}
+
+      {/* ---- Document preview ------------------------------------------------ */}
+      <Modal
+        open={viewingDoc !== null}
+        title={viewingDoc ? DOC_META[viewingDoc.slot]?.label ?? viewingDoc.slot : ''}
+        onCancel={() => setViewingDoc(null)}
+        footer={<Button onClick={() => setViewingDoc(null)}>Close</Button>}
+      >
+        {viewingDoc && (
+          <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+            <Space>
+              <Typography.Text strong>{viewingDoc.fileName}</Typography.Text>
+              {DOC_META[viewingDoc.slot]?.tag && <Tag>{DOC_META[viewingDoc.slot]?.tag}</Tag>}
+            </Space>
+            <div
+              style={{
+                border: '1px dashed rgba(0,0,0,0.15)',
+                borderRadius: 8,
+                padding: 32,
+                textAlign: 'center',
+                background: 'rgba(0,0,0,0.02)',
+              }}
+            >
+              <Empty
+                image={<FileTextOutlined style={{ fontSize: 48, color: 'rgba(0,0,0,0.25)' }} />}
+                description="Prototype: uploaded documents are simulated, so there's no file content to display."
+              />
+            </div>
+          </Space>
+        )}
+      </Modal>
+
+      {/* ---- Reject dialog --------------------------------------------------- */}
+      <Modal
+        open={rejecting}
+        title="Reject franchise"
+        okText="Reject"
+        okButtonProps={{ danger: true }}
+        onOk={confirmReject}
+        onCancel={() => setRejecting(false)}
+      >
+        <Typography.Paragraph type="secondary">
+          Rejecting sends the franchise back to Sales as declined. Add a reason so they know why.
+        </Typography.Paragraph>
+        <Input.TextArea
+          rows={3}
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          placeholder="Reason for rejection (optional)"
+        />
+      </Modal>
     </Space>
   )
 }
