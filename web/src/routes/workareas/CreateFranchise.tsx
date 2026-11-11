@@ -54,7 +54,7 @@ interface DocSlot {
   hint?: string
   intermediaryOnly?: boolean
 }
-const FRANCHISE_DOCS: DocSlot[] = [
+export const FRANCHISE_DOCS: DocSlot[] = [
   { key: 'aor_bor', label: 'AOR/BOR', tag: 'HMS3', hint: 'Required for Agent/Broker accounts: one active AOR/BOR per account.', intermediaryOnly: true },
   { key: 'signatory_id', label: 'Signatory ID', tag: 'HMS3' },
   { key: 'masterlist', label: 'Member Data (Master List)', tag: 'HMS3', hint: 'Sensitive personal data (Data Privacy Act).' },
@@ -76,7 +76,7 @@ const opts = (xs: readonly string[]) => xs.map((x) => ({ value: x, label: x }))
 const two = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } as const
 
 // --- Form state (the full wireframe field set across the tabs) --------------
-interface FormState {
+export interface FormState {
   // Account Information
   accountType: string
   name: string
@@ -139,7 +139,7 @@ function productToAccountType(p: ProductType): string {
   return p === 'HMO' ? 'CORPORATE/HMO' : 'TPA/ASO'
 }
 
-function initialForm(c: Case): FormState {
+export function initialForm(c: Case): FormState {
   const base: FormState = {
     accountType: productToAccountType(c.company.productType),
     name: c.company.name,

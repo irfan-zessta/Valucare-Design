@@ -1,13 +1,10 @@
-import { Alert, App, Button, Card, Descriptions, Space, Tag } from 'antd'
-import { CheckCircleOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
-import dayjs from 'dayjs'
+import { Alert, Card, Descriptions, Space, Tag } from 'antd'
 import type { Case, WorkAreaId } from '../../domain/types'
 import { WORK_AREA_LABELS } from '../../domain/types'
 import { currentProposal } from '../../domain/progress'
 import { formatDate, formatCount } from '../../lib/format'
-import { useCases } from '../../state/CaseProvider'
 import { CreateFranchise } from './CreateFranchise'
+import { FranchiseReview } from './FranchiseReview'
 
 // Read-only work-area summaries. Each work area's interactive task flow is layered
 // on in its own phase; these panels already read from the one shared case model
@@ -105,70 +102,4 @@ function renderArea(c: Case, workArea: WorkAreaId) {
         </Space>
       )
   }
-}
-
-// Submitted-franchise review. The prototype runs as an admin, so the same person
-// who submitted can also act as Account Services here: approve the request or
-// return it for corrections.
-function FranchiseReview({ c }: { c: Case }) {
-  const { patchCase } = useCases()
-  const { message } = App.useApp()
-  const navigate = useNavigate()
-  const accepted = c.franchise.status === 'accepted'
-
-  function approve() {
-    patchCase(c.id, (prev) => ({
-      ...prev,
-      currentWorkArea: 'prepare-quotation',
-      franchise: { ...prev.franchise, status: 'accepted', returnReasons: undefined, acceptedAt: new Date().toISOString() },
-    }))
-    message.success('Franchise approved — moving on to Prepare Quotation.')
-    navigate(`/cases/${c.id}/prepare-quotation`)
-  }
-
-  function returnForCorrections() {
-    patchCase(c.id, (prev) => ({
-      ...prev,
-      currentWorkArea: 'create-franchise',
-      franchise: { ...prev.franchise, status: 'returned', acceptedAt: undefined },
-    }))
-    message.info('Franchise returned for corrections.')
-  }
-
-  return (
-    <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-      <Descriptions column={1} size="small">
-        <Descriptions.Item label="Business source">{c.company.businessSource}</Descriptions.Item>
-        <Descriptions.Item label="Product type">{c.company.productType}</Descriptions.Item>
-        <Descriptions.Item label="Estimated membership">
-          {formatCount(c.franchise.estimatedPrincipals)} principals ·{' '}
-          {formatCount(c.franchise.estimatedDependents)} dependents
-        </Descriptions.Item>
-        <Descriptions.Item label="Coverage start">{formatDate(c.franchise.coverageStart)}</Descriptions.Item>
-      </Descriptions>
-
-      {accepted ? (
-        <Alert
-          type="success"
-          showIcon
-          icon={<CheckCircleOutlined />}
-          title="Franchise approved"
-          description={
-            c.franchise.acceptedAt
-              ? `Approved on ${dayjs(c.franchise.acceptedAt).format('YYYY-MM-DD HH:mm')}.`
-              : 'This franchise has been approved.'
-          }
-        />
-      ) : (
-        <Space>
-          <Button type="primary" icon={<CheckCircleOutlined />} onClick={approve}>
-            Approve request
-          </Button>
-          <Button danger onClick={returnForCorrections}>
-            Return for corrections
-          </Button>
-        </Space>
-      )}
-    </Space>
-  )
 }
