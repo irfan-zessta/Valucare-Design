@@ -71,6 +71,21 @@ const SAMPLE_RATE_ROWS: RateRow[] = [
   { plan: 'Plan B', roomBoard: 'Php 8,000', mbl: 300000, memberType: 'Dependent', paymentMode: 'Annual', rate: 14200 },
 ]
 
+// Sample member roster for initial data gathering — the raw list captured from
+// the master list. Prototype: a representative sample of the full membership.
+const SAMPLE_MEMBERS: { companyId: string; dob: string; gender: 'Male' | 'Female' }[] = [
+  { companyId: 'EMP-0001', dob: '1986-03-14', gender: 'Female' },
+  { companyId: 'EMP-0002', dob: '1979-11-02', gender: 'Male' },
+  { companyId: 'EMP-0003', dob: '1992-07-21', gender: 'Female' },
+  { companyId: 'EMP-0004', dob: '1984-01-09', gender: 'Male' },
+  { companyId: 'EMP-0005', dob: '1998-05-30', gender: 'Female' },
+  { companyId: 'EMP-0006', dob: '1975-09-17', gender: 'Male' },
+  { companyId: 'EMP-0007', dob: '1990-12-05', gender: 'Female' },
+  { companyId: 'EMP-0008', dob: '1988-08-23', gender: 'Male' },
+  { companyId: 'EMP-0009', dob: '1995-02-11', gender: 'Female' },
+  { companyId: 'EMP-0010', dob: '1982-06-28', gender: 'Male' },
+]
+
 const money = (n: number) => `Php ${n.toLocaleString()}`
 
 export function PrepareQuotation({ c }: { c: Case }) {
@@ -593,6 +608,26 @@ export function PrepareQuotation({ c }: { c: Case }) {
         />
       ) : (
         <Alert type="warning" showIcon title="Member Data not yet validated for quotation." />
+      )}
+      {(c.memberData.importProcessed || masterlistAttached) && (
+        <div>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Member list · initial gathering (sample of {formatCount(memberPreview.total)})
+          </Typography.Text>
+          <Table
+            style={{ marginTop: 6 }}
+            rowKey="companyId"
+            size="small"
+            pagination={false}
+            dataSource={SAMPLE_MEMBERS}
+            columns={[
+              { title: 'Company ID', dataIndex: 'companyId' },
+              { title: 'Date of Birth', dataIndex: 'dob', render: (v: string) => dayjs(v).format('YYYY-MM-DD') },
+              { title: 'Age', dataIndex: 'dob', key: 'age', align: 'right', render: (v: string) => dayjs().diff(v, 'year') },
+              { title: 'Gender', dataIndex: 'gender' },
+            ]}
+          />
+        </div>
       )}
       <Space wrap>
         <Button size="small" onClick={validateMemberData}>
