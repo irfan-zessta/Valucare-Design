@@ -351,6 +351,33 @@ export function PrepareQuotation({ c }: { c: Case }) {
                   <PaperClipOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />
                   <Typography.Text>{row.fileName}</Typography.Text>
                   <Tag>{row.fromForm ? 'from franchise form' : 'attached here'}</Tag>
+                </Space>
+              ) : (
+                <Upload
+                  showUploadList={false}
+                  beforeUpload={(file) => {
+                    attachRequirement(row.key, file.name)
+                    return false
+                  }}
+                >
+                  <Button size="small" icon={<CloudUploadOutlined />}>
+                    Attach
+                  </Button>
+                </Upload>
+              ),
+          },
+          {
+            title: 'Note',
+            dataIndex: 'note',
+            render: (_v, row) => (
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  size="small"
+                  placeholder={row.key === 'target_rates' ? 'Enter the target rates' : 'Optional note'}
+                  value={row.note}
+                  onChange={(e) => setRequirement(row.key, { note: e.target.value })}
+                />
+                {row.fileName && (
                   <Dropdown
                     trigger={['click']}
                     menu={{
@@ -375,33 +402,10 @@ export function PrepareQuotation({ c }: { c: Case }) {
                       ],
                     }}
                   >
-                    <Button type="text" size="small" icon={<MoreOutlined />} aria-label="Document actions" />
+                    <Button size="small" icon={<MoreOutlined />} aria-label="Document actions" />
                   </Dropdown>
-                </Space>
-              ) : (
-                <Upload
-                  showUploadList={false}
-                  beforeUpload={(file) => {
-                    attachRequirement(row.key, file.name)
-                    return false
-                  }}
-                >
-                  <Button size="small" icon={<CloudUploadOutlined />}>
-                    Attach
-                  </Button>
-                </Upload>
-              ),
-          },
-          {
-            title: 'Note',
-            dataIndex: 'note',
-            render: (_v, row) => (
-              <Input
-                size="small"
-                placeholder={row.key === 'target_rates' ? 'Enter the target rates' : 'Optional note'}
-                value={row.note}
-                onChange={(e) => setRequirement(row.key, { note: e.target.value })}
-              />
+                )}
+              </Space.Compact>
             ),
           },
         ]}
