@@ -86,7 +86,16 @@ export function PrepareQuotation({ c }: { c: Case }) {
   const [viewDoc, setViewDoc] = useState<string | null>(null)
 
   const requirements = q.requirements ?? DEFAULT_REQUIREMENTS
-  const torLines = q.torLines ?? []
+  // A TOR document attached on the requirement — or carried over from the
+  // franchise form — means the client's current benefits are already on file.
+  // Seed the TOR baseline from it so the TOR tab opens pre-filled for review
+  // instead of empty. (Prototype: the uploaded file is simulated, so we load the
+  // sample baseline rather than parse it.) It stays a derived fallback until the
+  // handler edits a line, so just opening the tab doesn't save a version.
+  const torAttached =
+    !!requirements.find((r) => r.key === 'tor')?.fileName ||
+    !!c.franchise.documents?.find((d) => d.slot === 'tor')
+  const torLines = q.torLines ?? (torAttached ? SAMPLE_TOR : [])
   const rr = q.rateRequest ?? {}
   const clarifications = q.clarifications ?? []
   const openClarification = clarifications.find((x) => !x.answer)
@@ -430,6 +439,14 @@ export function PrepareQuotation({ c }: { c: Case }) {
         Digitise the client's current benefits (Terms of Reference). This becomes the baseline for the
         TOR-vs-SOB comparison in Finalize Offer. The original TOR file stays attached in Requirements.
       </Typography.Paragraph>
+      {torAttached && q.torLines === undefined && (
+        <Alert
+          type="info"
+          showIcon
+          title="Loaded from the attached TOR document"
+          description="These lines were pre-filled from the TOR on file. Review and adjust them before quoting."
+        />
+      )}
       {torLines.length === 0 ? (
         <Alert type="info" showIcon title="No TOR lines yet. Add lines or load a sample set." />
       ) : (
