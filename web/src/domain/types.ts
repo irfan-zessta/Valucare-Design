@@ -353,9 +353,32 @@ export interface QuotationPackage {
   clarifications?: RateClarification[]
 }
 
+/** One benefit line on the Summary of Benefits. */
+export interface SobLine {
+  benefit: string
+  limit: string
+  note?: string
+}
+
+export type SobStatus = 'draft' | 'validated' | 'approved' | 'signed' | 'codified'
+
+/** The Summary of Benefits draft that backs the proposal (parent account). */
+export interface SobDraft {
+  version: number
+  status: SobStatus
+  /** Whether it was started from the approved template or the structured TOR. */
+  source: 'template' | 'tor'
+  templateVersion?: number
+  lines: SobLine[]
+  exclusions: string[]
+  createdAt: string
+}
+
 export interface OfferState {
   proposals: ProposalVersion[]
   acceptedProposalId?: string
+  /** The Summary of Benefits for the account (prepared during Finalize Offer). */
+  sob?: SobDraft
 }
 
 export interface AccountState {

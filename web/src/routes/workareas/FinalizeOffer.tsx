@@ -29,8 +29,10 @@ import {
 } from 'antd'
 import {
   CheckCircleOutlined,
+  DeleteOutlined,
   EditOutlined,
   FileTextOutlined,
+  PlusOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -42,6 +44,8 @@ import type {
   ProposalRateItem,
   ProposalVersion,
   RateSheet,
+  SobDraft,
+  SobLine,
 } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
 import { currentProposal } from '../../domain/progress'
@@ -49,6 +53,32 @@ import { uid } from '../../domain/ids'
 
 const money = (n: number) => `Php ${Number(n || 0).toLocaleString()}`
 const CHANNELS = ['Email', 'Call', 'Meeting', 'Through intermediary']
+
+// Approved standard SOB template (Actuarial-owned) — the starting point for a
+// new Summary of Benefits when not built from the client's structured TOR.
+const SOB_TEMPLATE_VERSION = 3
+const SAMPLE_SOB_TEMPLATE: SobLine[] = [
+  { benefit: 'Room & Board', limit: 'Php 5,000/day', note: 'Semi-private' },
+  { benefit: 'Annual Benefit Limit (MBL)', limit: 'Php 200,000', note: 'Per member/year' },
+  { benefit: 'Outpatient', limit: 'Full coverage', note: 'Consultations, labs, minor procedures' },
+  { benefit: 'Emergency care', limit: 'Full coverage', note: 'Accident & illness' },
+  { benefit: 'Dental', limit: 'Php 5,000', note: 'Annual' },
+  { benefit: 'Annual physical exam', limit: 'Covered', note: 'Template standard' },
+  { benefit: 'Pre-existing conditions', limit: 'Covered after 6 months', note: '' },
+]
+const SOB_EXCLUSIONS = [
+  'Cosmetic procedures',
+  'Experimental or investigational treatments',
+  'Injuries from illegal acts',
+  'Custodial or long-term care',
+]
+const SOB_STATUS_LABEL: Record<string, string> = {
+  draft: 'Draft',
+  validated: 'Validated',
+  approved: 'Approved',
+  signed: 'Client signed',
+  codified: 'Codified',
+}
 
 // Map a proposal status to the workflow stepper index.
 const STEP_INDEX: Record<string, number> = {
@@ -113,7 +143,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
   )
 
   const proposal = currentProposal(c)
-  const sobVersion = proposal?.sobVersion ?? 1
+  const sob = c.offer.sob
+  const sobVersion = sob?.version ?? proposal?.sobVersion ?? 1
 
   // Local edit buffer for the draft form; reset whenever the active version changes.
   const [draft, setDraft] = useState<DraftForm>(() => initDraft(proposal))
@@ -150,12 +181,48 @@ export function FinalizeOffer({ c }: { c: Case }) {
     })
   }
 
-  // ---- Create ---------------------------------------------------------------
+  // ---- SOB (Summary of Benefits) -------------------------------------------
+  const sobEditable = sob?.status === 'draft'
+  function createSob(source: 'template' | 'tor') {
+    const lines: SobLine[] =
+      source === 'tor'
+        ? (c.quotation.torLines ?? []).map((t) => ({ benefit: t.benefit, limit: t.limit, note: t.note }))
+        : SAMPLE_SOB_TEMPLATE.map((l) => ({ ...l }))
+    const draft: SobDraft = {
+      version: 1,
+      status: 'draft',
+      source,
+      templateVersion: source === 'template' ? SOB_TEMPLATE_VERSION : undefined,
+      lines,
+      exclusions: SOB_EXCLUSIONS,
+      createdAt: new Date().toISOString(),
+    }
+    patchCase(c.id, (prev) => ({ ...prev, offer: { ...prev.offer, sob: draft } }))
+    message.success(
+      source === 'template'
+        ? `SOB draft created from the approved template (v${SOB_TEMPLATE_VERSION}).`
+        : 'SOB draft created from the structured TOR.',
+    )
+  }
+  function patchSob(recipe: (s: SobDraft) => SobDraft) {
+    patchCase(c.id, (prev) => (prev.offer.sob ? { ...prev, offer: { ...prev.offer, sob: recipe(prev.offer.sob) } } : prev))
+  }
+  function setSobLines(lines: SobLine[]) {
+    patchSob((s) => ({ ...s, lines }))
+  }
+  function advanceSob() {
+    if (!sob) return
+    const next: SobDraft['status'] = sob.status === 'draft' ? 'validated' : 'approved'
+    patchSob((s) => ({ ...s, status: next }))
+    message.success(next === 'validated' ? 'SOB sent for validation (validated).' : 'SOB approved.')
+  }
+
+  // ---- Create proposal ------------------------------------------------------
   function createProposal() {
     const newProp: ProposalVersion = {
       id: uid('prop'),
       version: 1,
-      sobVersion: 1,
+      sobVersion,
       rateSheetId: selectedSheet?.id ?? '',
       rateSheetVersion: selectedSheet?.version,
       status: 'draft',
@@ -310,28 +377,152 @@ export function FinalizeOffer({ c }: { c: Case }) {
     message.success(`Proposal version ${next.version} created as a draft.`)
   }
 
-  // ---- Empty state ----------------------------------------------------------
+  // ---- SOB section (shown whether or not a proposal exists yet) -------------
+  // A benefit-line cell: editable while the SOB is a draft, read-only otherwise.
+  function renderSobCell(field: keyof SobLine) {
+    return (_v: unknown, row: SobLine & { _i: number }) =>
+      sobEditable && sob ? (
+        <Input
+          size="small"
+          value={(row[field] as string) ?? ''}
+          onChange={(e) => setSobLines(sob.lines.map((l, i) => (i === row._i ? { ...l, [field]: e.target.value } : l)))}
+        />
+      ) : (
+        <Typography.Text>{(row[field] as string) || '—'}</Typography.Text>
+      )
+  }
+  const torCount = c.quotation.torLines?.length ?? 0
+  const sobSection = (
+    <section>
+      <Typography.Title level={5} style={{ marginTop: 0 }}>
+        Summary of Benefits{' '}
+        {sob && (
+          <>
+            · v{sob.version}{' '}
+            <Tag color={sob.status === 'draft' ? 'default' : sob.status === 'validated' ? 'gold' : 'green'}>
+              {SOB_STATUS_LABEL[sob.status]}
+            </Tag>
+          </>
+        )}
+      </Typography.Title>
+      {!sob ? (
+        <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
+          <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
+            Start the SOB from the Actuarial-owned approved template, or from the client's structured TOR. It backs the
+            proposal and is validated before the client signs.
+          </Typography.Paragraph>
+          <Space wrap>
+            <Button type="primary" onClick={() => createSob('template')}>
+              Start from approved template (v{SOB_TEMPLATE_VERSION})
+            </Button>
+            <Tooltip title={torCount ? '' : 'Digitise the TOR in Prepare Quotation first.'}>
+              <Button disabled={!torCount} onClick={() => createSob('tor')}>
+                Start from structured TOR{torCount ? ` (${torCount} lines)` : ' (no TOR lines)'}
+              </Button>
+            </Tooltip>
+          </Space>
+        </Space>
+      ) : (
+        <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Source: {sob.source === 'template' ? `approved template v${sob.templateVersion}` : 'structured TOR'} ·{' '}
+            {sob.lines.length} benefit line{sob.lines.length === 1 ? '' : 's'}
+          </Typography.Text>
+          <Table<SobLine & { _i: number }>
+            rowKey="_i"
+            size="small"
+            pagination={false}
+            dataSource={sob.lines.map((l, i) => ({ ...l, _i: i }))}
+            columns={[
+              { title: 'Benefit', dataIndex: 'benefit', render: renderSobCell('benefit') },
+              { title: 'Limit', dataIndex: 'limit', render: renderSobCell('limit') },
+              { title: 'Note', dataIndex: 'note', render: renderSobCell('note') },
+              ...(sobEditable
+                ? [
+                    {
+                      title: '',
+                      key: '_remove',
+                      width: 48,
+                      align: 'center' as const,
+                      render: (_v: unknown, row: SobLine & { _i: number }) => (
+                        <Tooltip title="Remove benefit">
+                          <Button
+                            type="text"
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            aria-label="Remove benefit"
+                            onClick={() => setSobLines(sob.lines.filter((_, i) => i !== row._i))}
+                          />
+                        </Tooltip>
+                      ),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+          {sobEditable && (
+            <Space wrap>
+              <Button size="small" icon={<PlusOutlined />} onClick={() => setSobLines([...sob.lines, { benefit: '', limit: '', note: '' }])}>
+                Add benefit
+              </Button>
+              <Button size="small" onClick={() => setSobLines(SAMPLE_SOB_TEMPLATE.map((l) => ({ ...l })))}>
+                Load standard template
+              </Button>
+            </Space>
+          )}
+          <div>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Standard exclusions (template)
+            </Typography.Text>
+            <ul style={{ margin: '6px 0 0', paddingLeft: 20 }}>
+              {sob.exclusions.map((e) => (
+                <li key={e}>
+                  <Typography.Text type="secondary">{e}</Typography.Text>
+                </li>
+              ))}
+            </ul>
+          </div>
+          {sob.status !== 'approved' && sob.status !== 'signed' && sob.status !== 'codified' && (
+            <div>
+              <Button type="primary" onClick={advanceSob}>
+                {sob.status === 'draft' ? 'Send for validation' : 'Approve SOB'}
+              </Button>
+            </div>
+          )}
+        </Space>
+      )}
+    </section>
+  )
+
+  // ---- Empty state (no proposal yet) ----------------------------------------
   if (!proposal) {
     return (
-      <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-        <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
-          The proposal is built from the selected rate sheet and the SOB — rates are carried over, not re-typed.
-        </Typography.Paragraph>
-        {selectedSheet ? (
-          <Alert
-            type="info"
-            showIcon
-            title={`Ready to prepare the proposal from rate sheet v${selectedSheet.version}`}
-            description={`${selectedSheet.rows?.length ?? 0} rate lines will be carried into the proposal for pricing.`}
-          />
-        ) : (
-          <Alert type="warning" showIcon title="No rate sheet selected yet — finish Prepare Quotation first." />
-        )}
-        <div>
-          <Button type="primary" disabled={!selectedSheet} onClick={createProposal}>
-            Create proposal from rate sheet v{selectedSheet?.version ?? '—'}
-          </Button>
-        </div>
+      <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+        {sobSection}
+        <section>
+          <Typography.Title level={5} style={{ marginTop: 0 }}>
+            Proposal
+          </Typography.Title>
+          <Typography.Paragraph type="secondary">
+            The proposal is built from the selected rate sheet and the SOB — rates are carried over, not re-typed.
+          </Typography.Paragraph>
+          {selectedSheet ? (
+            <Alert
+              type="info"
+              showIcon
+              title={`Ready to prepare the proposal from rate sheet v${selectedSheet.version}`}
+              description={`${selectedSheet.rows?.length ?? 0} rate lines will be carried into the proposal${sob ? ` (SOB v${sob.version})` : ' — create the SOB above first'}.`}
+            />
+          ) : (
+            <Alert type="warning" showIcon title="No rate sheet selected yet — finish Prepare Quotation first." />
+          )}
+          <div style={{ marginTop: 12 }}>
+            <Button type="primary" disabled={!selectedSheet} onClick={createProposal}>
+              Create proposal from rate sheet v{selectedSheet?.version ?? '—'}
+            </Button>
+          </div>
+        </section>
       </Space>
     )
   }
@@ -547,21 +738,17 @@ export function FinalizeOffer({ c }: { c: Case }) {
           </Typography.Paragraph>
         </section>
 
-        {/* ---- Benefits (SOB) disclosure ------------------------------------ */}
-        <section>
-          <Typography.Title level={5}>Benefits (SOB v{sobVersion})</Typography.Title>
-          {proposal.templateAdditions.length > 0 ? (
-            <Alert
-              type="info"
-              showIcon
-              icon={<FileTextOutlined />}
-              title="Template benefits added beyond the requested TOR"
-              description={proposal.templateAdditions.join('; ')}
-            />
-          ) : (
-            <Typography.Text type="secondary">No template additions beyond the requested TOR.</Typography.Text>
-          )}
-        </section>
+        {/* ---- Summary of Benefits (create + edit the SOB) ------------------ */}
+        {sobSection}
+        {proposal.templateAdditions.length > 0 && (
+          <Alert
+            type="info"
+            showIcon
+            icon={<FileTextOutlined />}
+            title="Template benefits added beyond the requested TOR"
+            description={proposal.templateAdditions.join('; ')}
+          />
+        )}
 
         {/* ---- Negotiation rounds ------------------------------------------- */}
         {['sent', 'feedback', 'accepted'].includes(proposal.status) && (
