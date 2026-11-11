@@ -1,8 +1,11 @@
-import { Alert, Card, Descriptions, Space, Tag } from 'antd'
+import { Alert, App, Button, Card, Descriptions, Space, Tag } from 'antd'
+import { CheckCircleOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import type { Case, WorkAreaId } from '../../domain/types'
 import { WORK_AREA_LABELS } from '../../domain/types'
 import { currentProposal } from '../../domain/progress'
 import { formatDate, formatCount } from '../../lib/format'
+import { useCases } from '../../state/CaseProvider'
 import { CreateFranchise } from './CreateFranchise'
 
 // Read-only work-area summaries. Each work area's interactive task flow is layered
@@ -18,22 +21,12 @@ export function WorkAreaPanel({ c, workArea }: { c: Case; workArea: WorkAreaId }
 function renderArea(c: Case, workArea: WorkAreaId) {
   switch (workArea) {
     case 'create-franchise':
-      // Editable form while Sales owns it; read-only summary once submitted.
+      // Editable form while Sales owns it; review summary once submitted.
       if (c.franchise.status === 'draft' || c.franchise.status === 'returned') {
         return <CreateFranchise c={c} />
       }
-      // Read-only summary (draft/returned are handled by the editable form above).
-      return (
-        <Descriptions column={1} size="small">
-          <Descriptions.Item label="Business source">{c.company.businessSource}</Descriptions.Item>
-          <Descriptions.Item label="Product type">{c.company.productType}</Descriptions.Item>
-          <Descriptions.Item label="Estimated membership">
-            {formatCount(c.franchise.estimatedPrincipals)} principals ·{' '}
-            {formatCount(c.franchise.estimatedDependents)} dependents
-          </Descriptions.Item>
-          <Descriptions.Item label="Coverage start">{formatDate(c.franchise.coverageStart)}</Descriptions.Item>
-        </Descriptions>
-      )
+      // Submitted/accepted: read-only summary plus the admin review decision.
+      return <FranchiseReview c={c} />
     case 'prepare-quotation':
       return (
         <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
@@ -111,4 +104,66 @@ function renderArea(c: Case, workArea: WorkAreaId) {
         </Space>
       )
   }
+}
+
+// Submitted-franchise review. The prototype runs as an admin, so the same person
+// who submitted can also act as Account Services here: approve the request or
+// return it for corrections.
+function FranchiseReview({ c }: { c: Case }) {
+  const { patchCase } = useCases()
+  const { message } = App.useApp()
+  const accepted = c.franchise.status === 'accepted'
+
+  function approve() {
+    patchCase(c.id, (prev) => ({
+      ...prev,
+      franchise: { ...prev.franchise, status: 'accepted', returnReasons: undefined, acceptedAt: new Date().toISOString() },
+    }))
+    message.success('Franchise approved.')
+  }
+
+  function returnForCorrections() {
+    patchCase(c.id, (prev) => ({
+      ...prev,
+      franchise: { ...prev.franchise, status: 'returned', acceptedAt: undefined },
+    }))
+    message.info('Franchise returned for corrections.')
+  }
+
+  return (
+    <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+      <Descriptions column={1} size="small">
+        <Descriptions.Item label="Business source">{c.company.businessSource}</Descriptions.Item>
+        <Descriptions.Item label="Product type">{c.company.productType}</Descriptions.Item>
+        <Descriptions.Item label="Estimated membership">
+          {formatCount(c.franchise.estimatedPrincipals)} principals ·{' '}
+          {formatCount(c.franchise.estimatedDependents)} dependents
+        </Descriptions.Item>
+        <Descriptions.Item label="Coverage start">{formatDate(c.franchise.coverageStart)}</Descriptions.Item>
+      </Descriptions>
+
+      {accepted ? (
+        <Alert
+          type="success"
+          showIcon
+          icon={<CheckCircleOutlined />}
+          title="Franchise approved"
+          description={
+            c.franchise.acceptedAt
+              ? `Approved on ${dayjs(c.franchise.acceptedAt).format('YYYY-MM-DD HH:mm')}.`
+              : 'This franchise has been approved.'
+          }
+        />
+      ) : (
+        <Space>
+          <Button type="primary" icon={<CheckCircleOutlined />} onClick={approve}>
+            Approve request
+          </Button>
+          <Button danger onClick={returnForCorrections}>
+            Return for corrections
+          </Button>
+        </Space>
+      )}
+    </Space>
+  )
 }

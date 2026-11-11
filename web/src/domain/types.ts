@@ -199,6 +199,8 @@ export interface Franchise {
   /** Specific corrections requested when the franchise was returned. */
   returnReasons?: { field: string; message: string }[]
   submittedAt?: string
+  /** When the franchise was approved/accepted (prototype admin action). */
+  acceptedAt?: string
   /** Full franchise form capture (all wireframe fields across the tabs). Loosely
       typed because it mirrors the legacy schema, which is broader than the fields
       the rest of this app reads. */
