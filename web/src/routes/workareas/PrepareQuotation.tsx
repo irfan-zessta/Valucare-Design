@@ -585,30 +585,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
 
   const memberTab = (
     <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-      <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
-        Validate the master list for quotation. A clean import also receives the Member Data requirement.
-      </Typography.Paragraph>
-      {!c.memberData.importProcessed && masterlistAttached && (
-        <Alert
-          type="info"
-          showIcon
-          title="Loaded from the attached master list"
-          description="These counts were pre-filled from the master list on file. Review and validate them before quoting."
-        />
-      )}
-      {c.memberData.importProcessed || masterlistAttached ? (
-        <Alert
-          type="success"
-          showIcon
-          title={c.memberData.importProcessed ? 'Member Data validated' : 'Member Data from attached master list'}
-          description={(() => {
-            const d = c.memberData.importProcessed ? c.memberData : memberPreview
-            return `${formatCount(d.total)} total · ${formatCount(d.accepted)} accepted · ${formatCount(d.rejected)} rejected.`
-          })()}
-        />
-      ) : (
-        <Alert type="warning" showIcon title="Member Data not yet validated for quotation." />
-      )}
       {(c.memberData.importProcessed || masterlistAttached) && (
         <div>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
