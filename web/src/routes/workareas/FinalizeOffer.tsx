@@ -607,14 +607,9 @@ export function FinalizeOffer({ c }: { c: Case }) {
               Return to Actuarial
             </Button>
           </div>
-          <Alert
-            type="info"
-            showIcon
-            style={{ margin: '12px 0' }}
-            title="Rates are issued by Actuarial — view only"
-            description="Sales does not edit the rate sheet. If a rate looks wrong, return it to Actuarial with a concern."
-          />
-          <ProposalRateSchedule value={proposal.rateSchedule ?? emptyRateSchedule()} editable={false} />
+          <div style={{ marginTop: 12 }}>
+            <ProposalRateSchedule value={proposal.rateSchedule ?? emptyRateSchedule()} editable={false} />
+          </div>
           {editable ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
               <div>
