@@ -154,17 +154,11 @@ export function PrepareQuotation({ c }: { c: Case }) {
   // Completeness for sending the rate request.
   const reqComplete = effectiveReqs.every((r) => r.status !== 'Requested')
   const memberComplete = c.memberData.importProcessed || masterlistAttached
-  const rateFormComplete =
-    form.requestedPlans.trim() !== '' &&
-    form.roomBoard.trim() !== '' &&
-    form.mblOptions.trim() !== '' &&
-    form.dependentCoverage.trim() !== '' &&
-    form.paymentModes.length > 0
-  const canSubmit = reqComplete && memberComplete && rateFormComplete
+  // Rate-request fields are optional — they no longer gate submission.
+  const canSubmit = reqComplete && memberComplete
   const submitBlockers = [
     !reqComplete && 'address every requirement',
     !memberComplete && 'validate Member Data',
-    !rateFormComplete && 'complete the rate request',
   ].filter(Boolean) as string[]
 
   function patchQ(recipe: (c: Case) => Case) {
@@ -620,13 +614,13 @@ export function PrepareQuotation({ c }: { c: Case }) {
         </Typography.Title>
         {assembling ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <LabeledInput label="Requested plans" value={form.requestedPlans} onChange={(v) => setForm({ ...form, requestedPlans: v })} required />
-            <LabeledInput label="Room & board levels" value={form.roomBoard} onChange={(v) => setForm({ ...form, roomBoard: v })} required />
-            <LabeledInput label="MBL options" value={form.mblOptions} onChange={(v) => setForm({ ...form, mblOptions: v })} required />
-            <LabeledInput label="Dependent coverage" value={form.dependentCoverage} onChange={(v) => setForm({ ...form, dependentCoverage: v })} required />
+            <LabeledInput label="Requested plans" value={form.requestedPlans} onChange={(v) => setForm({ ...form, requestedPlans: v })} />
+            <LabeledInput label="Room & board levels" value={form.roomBoard} onChange={(v) => setForm({ ...form, roomBoard: v })} />
+            <LabeledInput label="MBL options" value={form.mblOptions} onChange={(v) => setForm({ ...form, mblOptions: v })} />
+            <LabeledInput label="Dependent coverage" value={form.dependentCoverage} onChange={(v) => setForm({ ...form, dependentCoverage: v })} />
             <LabeledInput label="Target rates" value={form.targetRates} onChange={(v) => setForm({ ...form, targetRates: v })} />
             <div>
-              <Typography.Text>Payment modes *</Typography.Text>
+              <Typography.Text>Payment modes</Typography.Text>
               <div style={{ marginTop: 6 }}>
                 <Checkbox.Group
                   options={PAYMENT_MODES}
