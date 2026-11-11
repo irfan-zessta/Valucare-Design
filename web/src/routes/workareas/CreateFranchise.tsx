@@ -840,12 +840,6 @@ export function CreateFranchise({ c }: { c: Case }) {
   const decisionsTab = (
     <Section title="Decisions and extensions" hint="Review outcome, validity and any extension requests.">
       <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-        <div className="app-decision-row">
-          <span>Current status</span>
-          <Tag color={c.franchise.status === 'returned' ? 'red' : c.franchise.status === 'submitted' ? 'blue' : 'default'}>
-            {c.franchise.status}
-          </Tag>
-        </div>
         {c.franchise.submittedAt && (
           <div className="app-decision-row">
             <span>Submitted</span>
