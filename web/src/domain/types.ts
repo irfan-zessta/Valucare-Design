@@ -153,6 +153,8 @@ export interface QuotationRequirement {
   label: string
   status: 'Requested' | 'Received' | 'Not Available'
   note?: string
+  /** A document attached directly on this requirement (overrides a franchise-form doc). */
+  fileName?: string
 }
 
 /** A structured TOR (current benefits) line. */

@@ -25,8 +25,17 @@ import {
   Tag,
   Tooltip,
   Typography,
+  Upload,
 } from 'antd'
-import { CheckCircleOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons'
+import {
+  CheckCircleOutlined,
+  CloudUploadOutlined,
+  DownloadOutlined,
+  EyeOutlined,
+  PaperClipOutlined,
+  PlusOutlined,
+  SendOutlined,
+} from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Case, QuotationRequirement, RateRow, RateSheet, TorLine } from '../../domain/types'
@@ -42,7 +51,6 @@ const DEFAULT_REQUIREMENTS: QuotationRequirement[] = [
   { key: 'intent', label: 'Signed letter of intent', status: 'Requested' },
   { key: 'target_rates', label: 'Target rates', status: 'Requested' },
 ]
-const REQ_STATUSES = ['Requested', 'Received', 'Not Available'] as const
 const PAYMENT_MODES = ['Annual', 'Semi-annual', 'Quarterly', 'Monthly']
 
 const SAMPLE_TOR: TorLine[] = [
@@ -73,6 +81,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
   const [clarifyAsk, setClarifyAsk] = useState(false)
   const [clarifyText, setClarifyText] = useState('')
   const [answerText, setAnswerText] = useState('')
+  const [viewDoc, setViewDoc] = useState<string | null>(null)
 
   const requirements = q.requirements ?? DEFAULT_REQUIREMENTS
   const torLines = q.torLines ?? []
@@ -97,8 +106,19 @@ export function PrepareQuotation({ c }: { c: Case }) {
   const awaitingClarification = q.status === 'clarification'
   const responded = q.status === 'responded'
 
+  // Each requirement's effective document + status. A document uploaded on the
+  // franchise form (matching slot) auto-attaches here and forces "Received"; a
+  // document attached directly on the requirement overrides it.
+  const effectiveReqs = requirements.map((r) => {
+    const franchiseDoc = c.franchise.documents?.find((d) => d.slot === r.key)
+    const fileName = r.fileName ?? franchiseDoc?.fileName
+    const fromForm = !r.fileName && !!franchiseDoc
+    const status: QuotationRequirement['status'] = fileName ? 'Received' : r.status
+    return { ...r, fileName, fromForm, status }
+  })
+
   // Completeness for sending the rate request.
-  const reqComplete = requirements.every((r) => r.status !== 'Requested')
+  const reqComplete = effectiveReqs.every((r) => r.status !== 'Requested')
   const memberComplete = c.memberData.importProcessed
   const rateFormComplete =
     form.requestedPlans.trim() !== '' &&
@@ -130,16 +150,45 @@ export function PrepareQuotation({ c }: { c: Case }) {
       },
     }))
   }
-  function markAllReceived() {
+  function attachRequirement(key: string, fileName: string) {
+    setRequirement(key, { fileName, status: 'Received' })
+    message.success(`Attached ${fileName}.`)
+  }
+  function attachSampleToMissing() {
+    const missing = effectiveReqs.filter((r) => !r.fileName)
+    if (missing.length === 0) {
+      message.info('Every requirement already has a document.')
+      return
+    }
     patchQ((prev) => ({
       ...prev,
       quotation: {
         ...prev.quotation,
         status: prev.quotation.status === 'not-started' ? 'preparing' : prev.quotation.status,
-        requirements: (prev.quotation.requirements ?? DEFAULT_REQUIREMENTS).map((r) => ({ ...r, status: 'Received' as const })),
+        requirements: (prev.quotation.requirements ?? DEFAULT_REQUIREMENTS).map((r) => {
+          const franchiseDoc = prev.franchise.documents?.find((d) => d.slot === r.key)
+          if (r.fileName || franchiseDoc) return r
+          return { ...r, fileName: `${r.key}-sample.pdf`, status: 'Received' as const }
+        }),
       },
     }))
-    message.success('All requirements marked received (sample).')
+    message.success('Sample documents attached to the remaining requirements.')
+  }
+
+  // View / download a (simulated) document.
+  function downloadDoc(fileName: string) {
+    const blob = new Blob(
+      [`Simulated document: ${fileName}\n\nPrototype placeholder — no real file content.`],
+      { type: 'text/plain' },
+    )
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   }
 
   // ---- TOR -----------------------------------------------------------------
@@ -257,32 +306,80 @@ export function PrepareQuotation({ c }: { c: Case }) {
   }
 
   // ---- Tab contents --------------------------------------------------------
+  type EffReq = (typeof effectiveReqs)[number]
   const requirementsTab = (
     <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
       <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
         Owner: AAT handler · request from {c.company.businessSource !== 'Direct' ? 'the agent/broker' : 'the client'}.
-        Each requirement must be Received or marked Not Available before the rate request goes out.
+        Documents uploaded on the franchise form attach here automatically and mark the item Received. Attach
+        anything missing, or mark it Not Available with a note.
       </Typography.Paragraph>
-      <Table<QuotationRequirement>
+      <Table<EffReq>
         rowKey="key"
         size="small"
         pagination={false}
-        dataSource={requirements}
+        dataSource={effectiveReqs}
         columns={[
           { title: 'Requirement', dataIndex: 'label', render: (v) => <strong>{v}</strong> },
           {
             title: 'Status',
             dataIndex: 'status',
-            width: 180,
-            render: (_v, row) => (
-              <Select
-                size="small"
-                style={{ width: 160 }}
-                value={row.status}
-                options={REQ_STATUSES.map((s) => ({ value: s, label: s }))}
-                onChange={(val) => setRequirement(row.key, { status: val as QuotationRequirement['status'] })}
-              />
-            ),
+            width: 190,
+            render: (_v, row) =>
+              row.fileName ? (
+                <Tag color="green" icon={<CheckCircleOutlined />}>
+                  Received
+                </Tag>
+              ) : (
+                <Select
+                  size="small"
+                  style={{ width: 160 }}
+                  value={row.status}
+                  options={['Requested', 'Not Available'].map((s) => ({ value: s, label: s }))}
+                  onChange={(val) => setRequirement(row.key, { status: val as QuotationRequirement['status'] })}
+                />
+              ),
+          },
+          {
+            title: 'Document',
+            dataIndex: 'fileName',
+            render: (_v, row) =>
+              row.fileName ? (
+                <Space wrap size={4}>
+                  <PaperClipOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />
+                  <Typography.Text>{row.fileName}</Typography.Text>
+                  <Tag>{row.fromForm ? 'from franchise form' : 'attached here'}</Tag>
+                  <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setViewDoc(row.fileName!)}>
+                    View
+                  </Button>
+                  <Button type="link" size="small" icon={<DownloadOutlined />} onClick={() => downloadDoc(row.fileName!)}>
+                    Download
+                  </Button>
+                  <Upload
+                    showUploadList={false}
+                    beforeUpload={(file) => {
+                      attachRequirement(row.key, file.name)
+                      return false
+                    }}
+                  >
+                    <Button type="link" size="small" icon={<CloudUploadOutlined />}>
+                      Re-attach
+                    </Button>
+                  </Upload>
+                </Space>
+              ) : (
+                <Upload
+                  showUploadList={false}
+                  beforeUpload={(file) => {
+                    attachRequirement(row.key, file.name)
+                    return false
+                  }}
+                >
+                  <Button size="small" icon={<CloudUploadOutlined />}>
+                    Attach
+                  </Button>
+                </Upload>
+              ),
           },
           {
             title: 'Note',
@@ -299,8 +396,8 @@ export function PrepareQuotation({ c }: { c: Case }) {
         ]}
       />
       <div>
-        <Button size="small" onClick={markAllReceived}>
-          Mark all received (sample)
+        <Button size="small" onClick={attachSampleToMissing}>
+          Attach sample documents
         </Button>
       </div>
     </Space>
@@ -512,7 +609,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
     </Space>
   )
 
-  const reqOutstanding = requirements.filter((r) => r.status === 'Requested').length
+  const reqOutstanding = effectiveReqs.filter((r) => r.status === 'Requested').length
   const items = [
     { key: 'requirements', label: `Requirements${reqOutstanding ? ` (${reqOutstanding})` : ' ✓'}`, children: requirementsTab },
     { key: 'tor', label: 'TOR', children: torTab },
@@ -555,6 +652,36 @@ export function PrepareQuotation({ c }: { c: Case }) {
           )}
         </div>
       </div>
+
+      {/* ---- Document preview ----------------------------------------------- */}
+      <Modal
+        open={viewDoc !== null}
+        title={viewDoc ?? ''}
+        onCancel={() => setViewDoc(null)}
+        footer={[
+          viewDoc && (
+            <Button key="dl" icon={<DownloadOutlined />} onClick={() => downloadDoc(viewDoc)}>
+              Download
+            </Button>
+          ),
+          <Button key="close" onClick={() => setViewDoc(null)}>
+            Close
+          </Button>,
+        ]}
+      >
+        <div
+          style={{
+            border: '1px dashed rgba(0,0,0,0.15)',
+            borderRadius: 8,
+            padding: 32,
+            textAlign: 'center',
+            background: 'rgba(0,0,0,0.02)',
+            color: 'rgba(0,0,0,0.45)',
+          }}
+        >
+          Prototype: uploaded documents are simulated, so there’s no file content to display.
+        </div>
+      </Modal>
 
       {/* ---- Issue rate sheet dialog ---------------------------------------- */}
       <Modal
