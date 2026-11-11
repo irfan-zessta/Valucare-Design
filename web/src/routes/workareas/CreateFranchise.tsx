@@ -838,7 +838,7 @@ export function CreateFranchise({ c }: { c: Case }) {
   )
 
   const decisionsTab = (
-    <Section title="Decisions and extensions" hint="Review outcome, validity and any extension requests.">
+    <section style={{ marginBottom: 28 }}>
       <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
         {c.franchise.submittedAt && (
           <div className="app-decision-row">
@@ -895,7 +895,7 @@ export function CreateFranchise({ c }: { c: Case }) {
           <Button onClick={requestExtension}>Request extension</Button>
         </div>
       </Space>
-    </Section>
+    </section>
   )
 
   return (
