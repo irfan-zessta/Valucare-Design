@@ -370,9 +370,10 @@ export function PrepareQuotation({ c }: { c: Case }) {
             title: 'Note',
             dataIndex: 'note',
             render: (_v, row) => (
-              <Space.Compact style={{ width: '100%' }}>
+              <Space size={8} style={{ display: 'flex', width: '100%' }}>
                 <Input
                   size="small"
+                  style={{ flex: 1 }}
                   placeholder={row.key === 'target_rates' ? 'Enter the target rates' : 'Optional note'}
                   value={row.note}
                   onChange={(e) => setRequirement(row.key, { note: e.target.value })}
@@ -402,10 +403,10 @@ export function PrepareQuotation({ c }: { c: Case }) {
                       ],
                     }}
                   >
-                    <Button size="small" icon={<MoreOutlined />} aria-label="Document actions" />
+                    <Button type="text" size="small" icon={<MoreOutlined />} aria-label="Document actions" />
                   </Dropdown>
                 )}
-              </Space.Compact>
+              </Space>
             ),
           },
         ]}
