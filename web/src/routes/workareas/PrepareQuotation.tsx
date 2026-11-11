@@ -660,9 +660,13 @@ export function PrepareQuotation({ c }: { c: Case }) {
           </Descriptions>
         )}
       </section>
+    </Space>
+  )
 
+  const sheetsTab = (
+    <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
       <section>
-        <Typography.Title level={5}>Clarifications</Typography.Title>
+        <Typography.Title level={5} style={{ marginTop: 0 }}>Clarifications</Typography.Title>
         {clarifications.length === 0 ? (
           <Typography.Text type="secondary">No clarifications.</Typography.Text>
         ) : (
@@ -746,7 +750,8 @@ export function PrepareQuotation({ c }: { c: Case }) {
     { key: 'requirements', label: `Requirements${reqOutstanding ? ` (${reqOutstanding})` : ''}`, children: requirementsTab },
     { key: 'tor', label: 'TOR', children: torTab },
     { key: 'members', label: 'Member Data', children: memberTab },
-    { key: 'rates', label: 'Rate request & sheets', children: ratesTab },
+    { key: 'rates', label: 'Rate request', children: ratesTab },
+    { key: 'sheets', label: `Clarifications & rate sheets${sheets.length ? ` (${sheets.length})` : ''}`, children: sheetsTab },
   ]
 
   return (
@@ -757,7 +762,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
       <div className="app-form-floatbar" style={{ marginTop: 16 }}>
         <Typography.Text type="secondary">
           {submitted && 'Submitted — waiting for Actuarial to issue a rate sheet.'}
-          {awaitingClarification && 'Actuarial raised a clarification — answer it on the Rate request tab.'}
+          {awaitingClarification && 'Actuarial raised a clarification — answer it on the Clarifications & rate sheets tab.'}
           {responded && 'Rate sheet received — select one to finalize the offer.'}
         </Typography.Text>
         <div className="app-form-floatbar__actions">
