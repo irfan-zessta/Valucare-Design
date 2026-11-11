@@ -786,7 +786,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
       {/* ---- Floating action bar (consistent with the other flows) ---------- */}
       <div className="app-form-floatbar" style={{ marginTop: 16 }}>
         <Typography.Text type="secondary">
-          {assembling && 'Assemble the package, then send the rate request.'}
           {submitted && 'Submitted — waiting for Actuarial to issue a rate sheet.'}
           {awaitingClarification && 'Actuarial raised a clarification — answer it on the Rate request tab.'}
           {responded && 'Rate sheet received — select one to finalize the offer.'}
