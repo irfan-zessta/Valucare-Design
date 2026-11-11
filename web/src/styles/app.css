@@ -557,6 +557,27 @@ button.app-stepper__item {
   margin-inline-start: auto;
 }
 
+/* Numbered activity header (Finalize Offer draft step: the 4 Sales activities). */
+.app-activity-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.app-activity-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 24px;
+  block-size: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #cb0a2f;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
 /* Compact journey stepper inside the floating action bar. */
 .app-ministepper {
   display: flex;

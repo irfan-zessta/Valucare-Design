@@ -11,6 +11,7 @@
 // Revise creates a fresh draft version; earlier approvals stay in history.
 // ===========================================================================
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   Alert,
   App,
@@ -65,6 +66,19 @@ const SAMPLE_SOB_TEMPLATE: SobLine[] = [
   { benefit: 'Dental', limit: 'Php 5,000', note: 'Annual' },
   { benefit: 'Annual physical exam', limit: 'Covered', note: 'Template standard' },
   { benefit: 'Pre-existing conditions', limit: 'Covered after 6 months', note: '' },
+]
+// The marked Summary of Benefits Actuarial releases alongside the rate sheet.
+// Every line carries Actuarial's mark; Sales reviews it rather than building it.
+const MARKED_SOB_VERSION = 1
+const SAMPLE_MARKED_SOB: SobLine[] = [
+  { benefit: 'Room & Board', limit: 'Php 5,000/day', note: 'Semi-private', mark: 'Covered' },
+  { benefit: 'Annual Benefit Limit (MBL)', limit: 'Php 200,000', note: 'Per member/year', mark: 'Covered' },
+  { benefit: 'Outpatient', limit: 'Full coverage', note: 'Consultations, labs, minor procedures', mark: 'Covered' },
+  { benefit: 'Emergency care', limit: 'Full coverage', note: 'Accident & illness', mark: 'Covered' },
+  { benefit: 'Dental', limit: 'Php 5,000', note: 'Annual', mark: 'Capped' },
+  { benefit: 'Annual physical exam', limit: 'Covered', note: 'Template standard', mark: 'Covered' },
+  { benefit: 'Pre-existing conditions', limit: 'Covered after 6 months', note: '', mark: 'Waiting period' },
+  { benefit: 'Maternity', limit: 'Not covered', note: 'Optional rider available', mark: 'Excluded' },
 ]
 const SOB_EXCLUSIONS = [
   'Cosmetic procedures',
@@ -171,13 +185,15 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
   // ---- SOB (Summary of Benefits) -------------------------------------------
   const sobEditable = sob?.status === 'draft'
-  function createSob(source: 'template' | 'tor') {
+  function createSob(source: 'actuarial' | 'template' | 'tor') {
     const lines: SobLine[] =
-      source === 'tor'
-        ? (c.quotation.torLines ?? []).map((t) => ({ benefit: t.benefit, limit: t.limit, note: t.note }))
-        : SAMPLE_SOB_TEMPLATE.map((l) => ({ ...l }))
+      source === 'actuarial'
+        ? SAMPLE_MARKED_SOB.map((l) => ({ ...l }))
+        : source === 'tor'
+          ? (c.quotation.torLines ?? []).map((t) => ({ benefit: t.benefit, limit: t.limit, note: t.note }))
+          : SAMPLE_SOB_TEMPLATE.map((l) => ({ ...l }))
     const draft: SobDraft = {
-      version: 1,
+      version: source === 'actuarial' ? MARKED_SOB_VERSION : 1,
       status: 'draft',
       source,
       templateVersion: source === 'template' ? SOB_TEMPLATE_VERSION : undefined,
@@ -187,9 +203,11 @@ export function FinalizeOffer({ c }: { c: Case }) {
     }
     patchCase(c.id, (prev) => ({ ...prev, offer: { ...prev.offer, sob: draft } }))
     message.success(
-      source === 'template'
-        ? `SOB draft created from the approved template (v${SOB_TEMPLATE_VERSION}).`
-        : 'SOB draft created from the structured TOR.',
+      source === 'actuarial'
+        ? `Marked SOB received from Actuarial (v${MARKED_SOB_VERSION}) — review before using it.`
+        : source === 'template'
+          ? `SOB draft created from the approved template (v${SOB_TEMPLATE_VERSION}).`
+          : 'SOB draft created from the structured TOR.',
     )
   }
   function patchSob(recipe: (s: SobDraft) => SobDraft) {
@@ -250,6 +268,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
   // ---- Draft edits ----------------------------------------------------------
   const editable = proposal?.status === 'draft'
+  // Activity 1 — Sales confirms it has checked Actuarial's rate sheet.
+  function toggleRateSheetChecked() {
+    patchProposal((p) => ({ ...p, rateSheetCheckedAt: p.rateSheetCheckedAt ? undefined : new Date().toISOString() }))
+  }
   function saveDraft(submit = false) {
     if (!proposal) return
     patchProposal((p) => ({
@@ -411,11 +433,14 @@ export function FinalizeOffer({ c }: { c: Case }) {
       {!sob ? (
         <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
           <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
-            Start the SOB from the Actuarial-owned approved template, or from the client's structured TOR. It backs the
-            proposal and is validated before the client signs.
+            Actuarial releases a marked SOB alongside the rate sheet. Receive it to review Actuarial's marks, then validate
+            it before the client signs. You can also start from the approved template or the client's structured TOR.
           </Typography.Paragraph>
           <Space wrap>
-            <Button type="primary" onClick={() => createSob('template')}>
+            <Button type="primary" onClick={() => createSob('actuarial')}>
+              Receive marked SOB from Actuarial (v{MARKED_SOB_VERSION})
+            </Button>
+            <Button onClick={() => createSob('template')}>
               Start from approved template (v{SOB_TEMPLATE_VERSION})
             </Button>
             <Tooltip title={torCount ? '' : 'Digitise the TOR in Prepare Quotation first.'}>
@@ -428,8 +453,13 @@ export function FinalizeOffer({ c }: { c: Case }) {
       ) : (
         <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Source: {sob.source === 'template' ? `approved template v${sob.templateVersion}` : 'structured TOR'} ·{' '}
-            {sob.lines.length} benefit line{sob.lines.length === 1 ? '' : 's'}
+            Source:{' '}
+            {sob.source === 'actuarial'
+              ? `received from Actuarial (marked) · v${sob.version}`
+              : sob.source === 'template'
+                ? `approved template v${sob.templateVersion}`
+                : 'structured TOR'}{' '}
+            · {sob.lines.length} benefit line{sob.lines.length === 1 ? '' : 's'}
           </Typography.Text>
           <Table<SobLine & { _i: number }>
             rowKey="_i"
@@ -440,6 +470,27 @@ export function FinalizeOffer({ c }: { c: Case }) {
               { title: 'Benefit', dataIndex: 'benefit', render: renderSobCell('benefit') },
               { title: 'Limit', dataIndex: 'limit', render: renderSobCell('limit') },
               { title: 'Note', dataIndex: 'note', render: renderSobCell('note') },
+              ...(sob.source === 'actuarial'
+                ? [
+                    {
+                      title: 'Actuarial mark',
+                      dataIndex: 'mark',
+                      width: 140,
+                      render: (_v: unknown, row: SobLine & { _i: number }) =>
+                        row.mark ? (
+                          <Tag
+                            color={
+                              row.mark === 'Excluded' ? 'red' : row.mark === 'Covered' ? 'green' : 'gold'
+                            }
+                          >
+                            {row.mark}
+                          </Tag>
+                        ) : (
+                          <Typography.Text type="secondary">—</Typography.Text>
+                        ),
+                    },
+                  ]
+                : []),
               ...(sobEditable
                 ? [
                     {
@@ -496,6 +547,19 @@ export function FinalizeOffer({ c }: { c: Case }) {
         </Space>
       )}
     </section>
+  )
+
+  // Numbered header for one of the four Sales activities in the draft step.
+  const activityHead = (n: number, title: string, right?: ReactNode) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+      <div className="app-activity-head">
+        <span className="app-activity-badge">{n}</span>
+        <Typography.Title level={5} style={{ margin: 0 }}>
+          {title}
+        </Typography.Title>
+      </div>
+      {right}
+    </div>
   )
 
   // ---- Empty state (no proposal yet) ----------------------------------------
@@ -599,16 +663,18 @@ export function FinalizeOffer({ c }: { c: Case }) {
           )}
         </section>
 
-        {/* ---- Rates & recommendation --------------------------------------- */}
+        {/* ---- Activity 1 · Rate sheet checking ----------------------------- */}
         <section>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-            <Typography.Title level={5} style={{ margin: 0 }}>
-              Rates and recommendation
-            </Typography.Title>
+          {activityHead(
+            1,
+            'Rate sheet checking',
             <Button size="small" icon={<RollbackOutlined />} onClick={() => setReturning(true)}>
               Return to Actuarial
-            </Button>
-          </div>
+            </Button>,
+          )}
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+            Review the membership-fee rate sheet Actuarial released before using it in the proposal.
+          </Typography.Paragraph>
           <div
             className="app-decision-row"
             style={{ marginTop: 12, border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}
@@ -624,6 +690,37 @@ export function FinalizeOffer({ c }: { c: Case }) {
               View
             </Button>
           </div>
+          <div style={{ marginTop: 12 }}>
+            {proposal.rateSheetCheckedAt ? (
+              <Space>
+                <Tag color="green" icon={<CheckCircleOutlined />}>
+                  Checked
+                </Tag>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  Marked checked {dayjs(proposal.rateSheetCheckedAt).format('YYYY-MM-DD HH:mm')}
+                </Typography.Text>
+                {editable && (
+                  <Button size="small" type="link" onClick={toggleRateSheetChecked}>
+                    Undo
+                  </Button>
+                )}
+              </Space>
+            ) : editable ? (
+              <Button icon={<CheckCircleOutlined />} onClick={toggleRateSheetChecked}>
+                Mark rate sheet as checked
+              </Button>
+            ) : (
+              <Tag>Not checked</Tag>
+            )}
+          </div>
+        </section>
+
+        {/* ---- Activity 2 · Rates recommendation ---------------------------- */}
+        <section>
+          {activityHead(2, 'Rates recommendation')}
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+            Recommend the rates to present to {recipient}.
+          </Typography.Paragraph>
           {editable ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
               <div>
@@ -651,15 +748,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
                   onChange={(e) => setDraft({ ...draft, recommendation: e.target.value })}
                 />
               </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <Typography.Text>Rates justification *</Typography.Text>
-                <Input.TextArea
-                  rows={2}
-                  style={{ marginTop: 6 }}
-                  value={draft.justification}
-                  onChange={(e) => setDraft({ ...draft, justification: e.target.value })}
-                />
-              </div>
             </div>
           ) : (
             <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered style={{ marginTop: 16 }}>
@@ -668,10 +756,50 @@ export function FinalizeOffer({ c }: { c: Case }) {
               <Descriptions.Item label="Recommendation" span={{ xs: 1, md: 2 }}>
                 {proposal.recommendation || '—'}
               </Descriptions.Item>
-              <Descriptions.Item label="Justification" span={{ xs: 1, md: 2 }}>
-                {proposal.justification || '—'}
-              </Descriptions.Item>
             </Descriptions>
+          )}
+        </section>
+
+        {/* ---- Activity 3 · Rates justification ------------------------------ */}
+        <section>
+          {activityHead(3, 'Rates justification')}
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+            Prepare the explanation supporting the recommended rates.
+          </Typography.Paragraph>
+          {editable ? (
+            <div style={{ marginTop: 12 }}>
+              <Typography.Text>Rates justification *</Typography.Text>
+              <Input.TextArea
+                rows={3}
+                style={{ marginTop: 6 }}
+                value={draft.justification}
+                onChange={(e) => setDraft({ ...draft, justification: e.target.value })}
+              />
+            </div>
+          ) : (
+            <Typography.Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
+              {proposal.justification || '—'}
+            </Typography.Paragraph>
+          )}
+        </section>
+
+        {/* ---- Activity 4 · Proposal preparation ---------------------------- */}
+        <section>
+          {activityHead(4, 'Proposal preparation')}
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+            Assemble the company details, benefits, pricing and terms into the client-facing proposal. The full proposal
+            template (eligibility, plan options, network, terms, exclusions and sign-offs) is prepared in a later step.
+          </Typography.Paragraph>
+          <div style={{ marginTop: 16 }}>{sobSection}</div>
+          {proposal.templateAdditions.length > 0 && (
+            <Alert
+              style={{ marginTop: 16 }}
+              type="info"
+              showIcon
+              icon={<FileTextOutlined />}
+              title="Template benefits added beyond the requested TOR"
+              description={proposal.templateAdditions.join('; ')}
+            />
           )}
         </section>
 
@@ -707,18 +835,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
             Approvals are bound to the reviewed version — a material change creates a new version and these no longer apply.
           </Typography.Paragraph>
         </section>
-
-        {/* ---- Summary of Benefits (create + edit the SOB) ------------------ */}
-        {sobSection}
-        {proposal.templateAdditions.length > 0 && (
-          <Alert
-            type="info"
-            showIcon
-            icon={<FileTextOutlined />}
-            title="Template benefits added beyond the requested TOR"
-            description={proposal.templateAdditions.join('; ')}
-          />
-        )}
 
         {/* ---- Negotiation rounds ------------------------------------------- */}
         {['sent', 'feedback', 'accepted'].includes(proposal.status) && (
@@ -785,8 +901,20 @@ export function FinalizeOffer({ c }: { c: Case }) {
               <Button icon={<EditOutlined />} onClick={() => saveDraft(false)}>
                 Save draft
               </Button>
-              <Tooltip title={draft.justification.trim() ? '' : 'Add a rates justification to submit.'}>
-                <Button type="primary" disabled={!draft.justification.trim()} onClick={() => saveDraft(true)}>
+              <Tooltip
+                title={
+                  !proposal.rateSheetCheckedAt
+                    ? 'Check the rate sheet (activity 1) before submitting.'
+                    : !draft.justification.trim()
+                      ? 'Add a rates justification to submit.'
+                      : ''
+                }
+              >
+                <Button
+                  type="primary"
+                  disabled={!proposal.rateSheetCheckedAt || !draft.justification.trim()}
+                  onClick={() => saveDraft(true)}
+                >
                   Submit for internal review
                 </Button>
               </Tooltip>

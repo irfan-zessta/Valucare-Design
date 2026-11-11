@@ -259,6 +259,8 @@ export interface ProposalVersion {
   code?: string
   /** The rate-sheet version this proposal's rates were taken from. */
   rateSheetVersion?: number
+  /** When Sales marked the Actuarial rate sheet as checked (activity 1). */
+  rateSheetCheckedAt?: string
   /** Offer validity date. */
   validUntil?: string
   /** Proposed-rate lines (actuarial vs proposed). */
@@ -385,6 +387,8 @@ export interface SobLine {
   benefit: string
   limit: string
   note?: string
+  /** Actuarial's mark on this benefit line when the SOB was sent marked (e.g. "Covered", "Capped", "Excluded"). */
+  mark?: string
 }
 
 export type SobStatus = 'draft' | 'validated' | 'approved' | 'signed' | 'codified'
@@ -393,8 +397,8 @@ export type SobStatus = 'draft' | 'validated' | 'approved' | 'signed' | 'codifie
 export interface SobDraft {
   version: number
   status: SobStatus
-  /** Whether it was started from the approved template or the structured TOR. */
-  source: 'template' | 'tor'
+  /** Where the SOB came from: marked by Actuarial, the approved template, or the structured TOR. */
+  source: 'actuarial' | 'template' | 'tor'
   templateVersion?: number
   lines: SobLine[]
   exclusions: string[]
