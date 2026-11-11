@@ -185,6 +185,40 @@ export interface RateRequest {
   submittedAt?: string
 }
 
+/** A proposed-rate line on a proposal — the actuarial rate with Sales' proposed rate. */
+export interface ProposalRateItem {
+  plan: string
+  roomBoard: string
+  mbl: number
+  memberType: string
+  paymentMode: string
+  actuarialRate: number
+  proposedRate: number
+}
+
+/** One decision in the two-level pricing maker-checker on a proposal version. */
+export interface ProposalApproval {
+  stage: 'first' | 'second'
+  decision: 'approve' | 'return'
+  byName: string
+  at: string
+  remarks?: string
+  version: number
+}
+
+/** A logged negotiation round with the client (or intermediary). */
+export interface NegotiationRound {
+  n: number
+  date: string
+  channel: string
+  summary: string
+  participants?: string
+  counterOffer?: string
+  commissionChange?: string
+  benefitChanges?: string
+  outcome?: string
+}
+
 export interface ProposalVersion {
   id: string
   version: number
@@ -195,6 +229,31 @@ export interface ProposalVersion {
   acceptedAt?: string
   /** Benefits added from the template beyond the requested TOR (disclosed). */
   templateAdditions: string[]
+  // --- Full offer flow (ported from the legacy proposal journey) -------------
+  /** Human-readable proposal reference, e.g. PR-2026-0024. */
+  code?: string
+  /** The rate-sheet version this proposal's rates were taken from. */
+  rateSheetVersion?: number
+  /** Offer validity date. */
+  validUntil?: string
+  /** Proposed-rate lines (actuarial vs proposed). */
+  items?: ProposalRateItem[]
+  commissionPct?: number
+  commissionNote?: string
+  recommendation?: string
+  justification?: string
+  /** Reason the proposal was returned to the AAT handler for this version. */
+  returnReason?: string
+  /** Pricing approvals recorded against versions of this proposal. */
+  approvals?: ProposalApproval[]
+  sentAt?: string
+  sentTo?: string
+  /** Negotiation rounds logged after the proposal was sent. */
+  rounds?: NegotiationRound[]
+  /** Client decline reason, when the proposal was declined. */
+  declineReason?: string
+  /** Client acceptance record. */
+  acceptance?: { date: string; notes?: string; version: number }
 }
 
 export interface PlanCode {

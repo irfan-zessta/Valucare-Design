@@ -1,11 +1,11 @@
-import { Alert, Card, Descriptions, Space, Tag } from 'antd'
+import { Card, Descriptions, Space, Tag } from 'antd'
 import type { Case, WorkAreaId } from '../../domain/types'
 import { WORK_AREA_LABELS } from '../../domain/types'
-import { currentProposal } from '../../domain/progress'
 import { formatDate, formatCount } from '../../lib/format'
 import { CreateFranchise } from './CreateFranchise'
 import { FranchiseReview } from './FranchiseReview'
 import { PrepareQuotation } from './PrepareQuotation'
+import { FinalizeOffer } from './FinalizeOffer'
 
 // Read-only work-area summaries. Each work area's interactive task flow is layered
 // on in its own phase; these panels already read from the one shared case model
@@ -28,26 +28,8 @@ function renderArea(c: Case, workArea: WorkAreaId) {
       return <FranchiseReview c={c} />
     case 'prepare-quotation':
       return <PrepareQuotation c={c} />
-    case 'finalize-offer': {
-      const p = currentProposal(c)
-      return (
-        <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-          <Descriptions column={1} size="small">
-            <Descriptions.Item label="Proposal version">{p ? `v${p.version}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="SOB version">{p ? `v${p.sobVersion}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="Review status">{p ? p.status : 'Not started'}</Descriptions.Item>
-          </Descriptions>
-          {p && p.templateAdditions.length > 0 && (
-            <Alert
-              type="info"
-              showIcon
-              title="Template benefits added beyond the requested TOR"
-              description={p.templateAdditions.join('; ')}
-            />
-          )}
-        </Space>
-      )
-    }
+    case 'finalize-offer':
+      return <FinalizeOffer c={c} />
     case 'setup-account':
       return (
         <Descriptions column={1} size="small">
