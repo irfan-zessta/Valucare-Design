@@ -393,16 +393,108 @@ export interface SobLine {
 
 export type SobStatus = 'draft' | 'validated' | 'approved' | 'signed' | 'codified'
 
+// --- Rich SOB document model (WESUPPORT-style builder) ----------------------
+// These back the full document builder. The flat `lines`/`exclusions` above are
+// kept for the legacy quick paths (marked / template / TOR); the builder reads
+// and writes the structured fields below.
+
+/** Coverage is a single, mutually-exclusive selection per benefit line. */
+export type SobCoverage = 'covered' | 'not-covered' | 'not-specified'
+
+/** Document header — carried from the case, editable where permitted. */
+export interface SobDocHeader {
+  companyName: string
+  programTitle: string
+  /** Who the document applies to, e.g. "Principal", "Dependent", "Principal & Dependent". */
+  applicability: string
+  memberCount?: string
+  documentDate?: string
+  originalEffectiveDate?: string
+  currentEffectiveDate?: string
+  expiryDate?: string
+  /** Document reference code, e.g. "WS-DEP-2026-001". */
+  reference?: string
+}
+
+/** Free-text eligibility descriptions per applicable group. */
+export interface SobEligibility {
+  principal?: string
+  dependent?: string
+  extendedDependent?: string
+  other?: string
+}
+
+/** One plan row in the Plans & Maximum Benefit Limits table. */
+export interface SobPlan {
+  id: string
+  planId: string
+  roomBoard: string
+  mblAmount: string
+  /** Basis for the limit, e.g. "per illness/year". */
+  limitBasis: string
+  notes?: string
+}
+
+/**
+ * One benefit line. Numbering (1, 2.1, 2.1.a) is derived from tree position,
+ * not stored. Structured limit facets are optional and never auto-inferred
+ * from the free-text `limits` wording.
+ */
+export interface SobBenefitLine {
+  id: string
+  description: string
+  coverage: SobCoverage
+  /** Original limits/conditions wording — multiline, preserved verbatim. */
+  limits: string
+  // Optional structured facets (entered deliberately, never parsed from wording).
+  limitAmount?: string
+  limitPctOfMbl?: string
+  limitSessions?: string
+  limitFrequency?: string
+  sharedOpIp?: boolean
+  /** Applicable plan identifier or member type for this line. */
+  applicablePlan?: string
+  /** Nested sub-items (2.1 → 2.1.a). */
+  children?: SobBenefitLine[]
+}
+
+/** A freeform supporting table inside a section (e.g. a refund schedule). */
+export interface SobSectionTable {
+  title: string
+  headers: string[]
+  rows: string[][]
+}
+
+/** A benefit section (grouping) from the reference document. */
+export interface SobSection {
+  id: string
+  title: string
+  /** Optional parent band, e.g. "Medical Procedures / Modalities". */
+  group?: string
+  note?: string
+  eligibilityConditions?: string
+  exclusions?: string[]
+  lines: SobBenefitLine[]
+  tables?: SobSectionTable[]
+}
+
 /** The Summary of Benefits draft that backs the proposal (parent account). */
 export interface SobDraft {
   version: number
   status: SobStatus
-  /** Where the SOB came from: marked by Actuarial, the approved template, or the structured TOR. */
-  source: 'actuarial' | 'template' | 'tor'
+  /** Where the SOB came from. */
+  source: 'actuarial' | 'template' | 'tor' | 'manual' | 'upload'
   templateVersion?: number
   lines: SobLine[]
   exclusions: string[]
   createdAt: string
+  // --- Rich document model (the full builder) -------------------------------
+  header?: SobDocHeader
+  eligibility?: SobEligibility
+  plans?: SobPlan[]
+  sections?: SobSection[]
+  /** Last successful save of the rich builder. */
+  savedAt?: string
 }
 
 export interface OfferState {

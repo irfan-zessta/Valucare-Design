@@ -16,6 +16,7 @@ import {
   Alert,
   App,
   Button,
+  Card,
   DatePicker,
   Descriptions,
   Input,
@@ -34,6 +35,7 @@ import {
   EditOutlined,
   EyeOutlined,
   FileTextOutlined,
+  InboxOutlined,
   PlusOutlined,
   RollbackOutlined,
   SendOutlined,
@@ -52,6 +54,8 @@ import { useCases } from '../../state/CaseProvider'
 import { currentProposal } from '../../domain/progress'
 import { uid } from '../../domain/ids'
 import { ProposalRateSchedule, emptyRateSchedule, sampleRateSchedule } from './ProposalRateSchedule'
+import { SobBuilder, type SaveState } from './sob/SobBuilder'
+import { emptyRichSob, isRichSob } from '../../domain/sobModel'
 
 const CHANNELS = ['Email', 'Call', 'Meeting', 'Through intermediary']
 
@@ -215,6 +219,25 @@ export function FinalizeOffer({ c }: { c: Case }) {
   }
   function setSobLines(lines: SobLine[]) {
     patchSob((s) => ({ ...s, lines }))
+  }
+
+  // ---- Full document builder (Create manually / Upload template) -----------
+  const [sobUploadMode, setSobUploadMode] = useState(false)
+  const [sobSaveState, setSobSaveState] = useState<SaveState>('idle')
+  function createRichSob(source: 'manual' | 'upload') {
+    patchCase(c.id, (prev) => ({ ...prev, offer: { ...prev.offer, sob: emptyRichSob(c, source) } }))
+    setSobUploadMode(source === 'upload')
+    message.success(
+      source === 'upload'
+        ? 'SOB builder opened — download the template or build it below.'
+        : 'SOB builder opened — the document header was carried from the case.',
+    )
+  }
+  function saveSobDraft() {
+    setSobSaveState('saving')
+    // Edits already write through to case state; this stamps the saved point.
+    patchSob((s) => ({ ...s, savedAt: new Date().toISOString() }))
+    window.setTimeout(() => setSobSaveState('saved'), 400)
   }
   function advanceSob() {
     if (!sob) return
@@ -431,24 +454,68 @@ export function FinalizeOffer({ c }: { c: Case }) {
         )}
       </Typography.Title>
       {!sob ? (
-        <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
+        <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
           <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
-            Actuarial releases a marked SOB alongside the rate sheet. Receive it to review Actuarial's marks, then validate
-            it before the client signs. You can also start from the approved template or the client's structured TOR.
+            Build the full Summary of Benefits document. Start from a blank structured document, or upload an existing
+            template to review and continue editing — both open the same editable builder.
           </Typography.Paragraph>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Card size="small" hoverable style={{ cursor: 'pointer' }} onClick={() => createRichSob('manual')}>
+              <Typography.Title level={5} style={{ marginTop: 0 }}>
+                <FileTextOutlined style={{ color: '#CB0A2F', marginInlineEnd: 8 }} />
+                Create manually
+              </Typography.Title>
+              <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+                Start with the document header and section structure, then add benefit lines individually.
+              </Typography.Paragraph>
+              <Button type="primary">Create manually</Button>
+            </Card>
+            <Card size="small" hoverable style={{ cursor: 'pointer' }} onClick={() => createRichSob('upload')}>
+              <Typography.Title level={5} style={{ marginTop: 0 }}>
+                <InboxOutlined style={{ color: '#CB0A2F', marginInlineEnd: 8 }} />
+                Upload template
+              </Typography.Title>
+              <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+                Upload an existing SOB template, review the imported information, and continue editing.
+              </Typography.Paragraph>
+              <Button>Upload template</Button>
+            </Card>
+          </div>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Or quick-start a simple benefit list:
+          </Typography.Text>
           <Space wrap>
-            <Button type="primary" onClick={() => createSob('actuarial')}>
+            <Button size="small" onClick={() => createSob('actuarial')}>
               Receive marked SOB from Actuarial (v{MARKED_SOB_VERSION})
             </Button>
-            <Button onClick={() => createSob('template')}>
-              Start from approved template (v{SOB_TEMPLATE_VERSION})
+            <Button size="small" onClick={() => createSob('template')}>
+              Approved template (v{SOB_TEMPLATE_VERSION})
             </Button>
             <Tooltip title={torCount ? '' : 'Digitise the TOR in Prepare Quotation first.'}>
-              <Button disabled={!torCount} onClick={() => createSob('tor')}>
-                Start from structured TOR{torCount ? ` (${torCount} lines)` : ' (no TOR lines)'}
+              <Button size="small" disabled={!torCount} onClick={() => createSob('tor')}>
+                Structured TOR{torCount ? ` (${torCount})` : ''}
               </Button>
             </Tooltip>
           </Space>
+        </Space>
+      ) : isRichSob(sob) ? (
+        <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+          <SobBuilder
+            c={c}
+            sob={sob}
+            patchSob={patchSob}
+            editable={sobEditable}
+            onSaveDraft={saveSobDraft}
+            saveState={sobSaveState}
+            showUpload={sobUploadMode}
+          />
+          {sob.status !== 'approved' && sob.status !== 'signed' && sob.status !== 'codified' && (
+            <div>
+              <Button type="primary" onClick={advanceSob}>
+                {sob.status === 'draft' ? 'Send for validation' : 'Approve SOB'}
+              </Button>
+            </div>
+          )}
         </Space>
       ) : (
         <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
