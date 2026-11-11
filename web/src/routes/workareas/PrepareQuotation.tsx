@@ -31,6 +31,7 @@ import {
 import {
   CheckCircleOutlined,
   CloudUploadOutlined,
+  DeleteOutlined,
   DownloadOutlined,
   EyeOutlined,
   MoreOutlined,
@@ -212,6 +213,15 @@ export function PrepareQuotation({ c }: { c: Case }) {
   function loadSampleTor() {
     setTorLines(SAMPLE_TOR)
     message.success('Sample TOR benefit lines loaded.')
+  }
+  function removeTorLine(i: number) {
+    setTorLines(torLines.filter((_, idx) => idx !== i))
+  }
+  // Replace the attached TOR document and refresh the digitised baseline from it.
+  function reuploadTor(fileName: string) {
+    setRequirement('tor', { fileName, status: 'Received' })
+    setTorLines(SAMPLE_TOR)
+    message.success(`Re-uploaded ${fileName} — TOR baseline refreshed for review.`)
   }
 
   // ---- Member Data ---------------------------------------------------------
@@ -455,27 +465,58 @@ export function PrepareQuotation({ c }: { c: Case }) {
           size="small"
           pagination={false}
           dataSource={torLines.map((t, i) => ({ ...t, _i: i }))}
-          columns={torColumns.map((col) => ({
-            ...col,
-            render: (_v: unknown, row: TorLine & { _i: number }) => (
-              <Input
-                size="small"
-                value={(row as unknown as Record<string, string>)[col.dataIndex]}
-                onChange={(e) =>
-                  setTorLines(torLines.map((t, i) => (i === row._i ? { ...t, [col.dataIndex]: e.target.value } : t)))
-                }
-              />
-            ),
-          }))}
+          columns={[
+            ...torColumns.map((col) => ({
+              ...col,
+              render: (_v: unknown, row: TorLine & { _i: number }) => (
+                <Input
+                  size="small"
+                  value={(row as unknown as Record<string, string>)[col.dataIndex]}
+                  onChange={(e) =>
+                    setTorLines(torLines.map((t, i) => (i === row._i ? { ...t, [col.dataIndex]: e.target.value } : t)))
+                  }
+                />
+              ),
+            })),
+            {
+              title: '',
+              dataIndex: '_remove',
+              width: 48,
+              align: 'center' as const,
+              render: (_v: unknown, row: TorLine & { _i: number }) => (
+                <Tooltip title="Remove line">
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    aria-label="Remove line"
+                    onClick={() => removeTorLine(row._i)}
+                  />
+                </Tooltip>
+              ),
+            },
+          ]}
         />
       )}
-      <Space>
+      <Space wrap>
         <Button size="small" icon={<PlusOutlined />} onClick={addTorLine}>
           Add line
         </Button>
         <Button size="small" onClick={loadSampleTor}>
           Load sample TOR
         </Button>
+        <Upload
+          showUploadList={false}
+          beforeUpload={(file) => {
+            reuploadTor(file.name)
+            return false
+          }}
+        >
+          <Button size="small" icon={<CloudUploadOutlined />}>
+            {torAttached ? 'Re-upload TOR' : 'Upload TOR'}
+          </Button>
+        </Upload>
       </Space>
     </Space>
   )
