@@ -622,7 +622,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
             dataSource={SAMPLE_MEMBERS}
             columns={[
               { title: 'Company ID', dataIndex: 'companyId' },
-              { title: 'Date of Birth', dataIndex: 'dob', render: (v: string) => dayjs(v).format('YYYY-MM-DD') },
+              { title: 'Date of Birth', dataIndex: 'dob', render: (v: string) => dayjs(v).format('MM-DD-YYYY') },
               { title: 'Age', dataIndex: 'dob', key: 'age', align: 'right', render: (v: string) => dayjs().diff(v, 'year') },
               { title: 'Gender', dataIndex: 'gender' },
             ]}
