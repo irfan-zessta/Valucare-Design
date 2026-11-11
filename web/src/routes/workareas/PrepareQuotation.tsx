@@ -588,6 +588,27 @@ export function PrepareQuotation({ c }: { c: Case }) {
       <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
         Validate the master list for quotation. A clean import also receives the Member Data requirement.
       </Typography.Paragraph>
+      <Space wrap style={{ justifyContent: 'flex-end', width: '100%' }}>
+        <Button size="small" onClick={validateMemberData}>
+          {c.memberData.importProcessed ? 'Re-validate sample data' : 'Validate sample Member Data'}
+        </Button>
+        <Upload
+          showUploadList={false}
+          beforeUpload={(file) => {
+            reuploadMasterlist(file.name)
+            return false
+          }}
+        >
+          <Button size="small" icon={<CloudUploadOutlined />}>
+            {masterlistAttached ? 'Re-upload master list' : 'Upload master list'}
+          </Button>
+        </Upload>
+        {(c.memberData.importProcessed || masterlistAttached) && (
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={removeMemberData}>
+            Remove
+          </Button>
+        )}
+      </Space>
       {!c.memberData.importProcessed && masterlistAttached && (
         <Alert
           type="info"
@@ -629,27 +650,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
           />
         </div>
       )}
-      <Space wrap>
-        <Button size="small" onClick={validateMemberData}>
-          {c.memberData.importProcessed ? 'Re-validate sample data' : 'Validate sample Member Data'}
-        </Button>
-        <Upload
-          showUploadList={false}
-          beforeUpload={(file) => {
-            reuploadMasterlist(file.name)
-            return false
-          }}
-        >
-          <Button size="small" icon={<CloudUploadOutlined />}>
-            {masterlistAttached ? 'Re-upload master list' : 'Upload master list'}
-          </Button>
-        </Upload>
-        {(c.memberData.importProcessed || masterlistAttached) && (
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={removeMemberData}>
-            Remove
-          </Button>
-        )}
-      </Space>
     </Space>
   )
 
