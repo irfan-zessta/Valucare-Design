@@ -348,6 +348,8 @@ export function CreateFranchise({ c }: { c: Case }) {
         affiliateRows: hasAffiliates ? affiliates : [],
         returnReasons: status === 'submitted' ? undefined : prev.franchise.returnReasons,
         submittedAt: status === 'submitted' ? new Date().toISOString() : prev.franchise.submittedAt,
+        // Each submission to review is a new revision the reviewer approves against.
+        version: status === 'submitted' ? (prev.franchise.version ?? 0) + 1 : prev.franchise.version,
       },
     }))
   }

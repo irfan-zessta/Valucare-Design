@@ -200,8 +200,11 @@ export interface Franchise {
   /** Specific corrections requested when the franchise was returned. */
   returnReasons?: { field: string; message: string }[]
   submittedAt?: string
-  /** When the franchise was approved/accepted (prototype admin action). */
+  /** Revision number — bumped each time the franchise is submitted to review. */
+  version?: number
+  /** When the franchise was approved/accepted (prototype admin action), and any remarks. */
   acceptedAt?: string
+  acceptedRemarks?: string
   /** When the franchise was rejected, and the reason given (prototype admin action). */
   rejectedAt?: string
   rejectedReason?: string

@@ -71,6 +71,12 @@ export function FranchiseReview({ c }: { c: Case }) {
   const [viewingDoc, setViewingDoc] = useState<{ slot: string; fileName: string } | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [approving, setApproving] = useState(false)
+  const [approveRemarks, setApproveRemarks] = useState('')
+  // The revision captured when the reviewer opened the approve dialog.
+  const [reviewVersion, setReviewVersion] = useState<number>(1)
+
+  const version = c.franchise.version ?? 1
 
   // Ownership: take over the submitted form and edit it in place. Saving or
   // resubmitting from the editable form updates the case status directly.
@@ -93,12 +99,34 @@ export function FranchiseReview({ c }: { c: Case }) {
     )
   }
 
-  function approve() {
+  function openApprove() {
+    setReviewVersion(version)
+    setApproveRemarks('')
+    setApproving(true)
+  }
+
+  function confirmApprove() {
+    // Concurrency: if the handler resubmitted a newer revision while the dialog
+    // was open, bounce the reviewer back to re-check the latest version.
+    if ((c.franchise.version ?? 1) !== reviewVersion) {
+      setApproving(false)
+      message.warning('The franchise changed since you opened this — please review the latest version again.')
+      return
+    }
     patchCase(c.id, (prev) => ({
       ...prev,
       currentWorkArea: 'prepare-quotation',
-      franchise: { ...prev.franchise, status: 'accepted', returnReasons: undefined, rejectedAt: undefined, rejectedReason: undefined, acceptedAt: new Date().toISOString() },
+      franchise: {
+        ...prev.franchise,
+        status: 'accepted',
+        returnReasons: undefined,
+        rejectedAt: undefined,
+        rejectedReason: undefined,
+        acceptedAt: new Date().toISOString(),
+        acceptedRemarks: approveRemarks.trim() || undefined,
+      },
     }))
+    setApproving(false)
     message.success('Franchise approved — moving on to Prepare Quotation.')
     navigate(`/cases/${c.id}/prepare-quotation`)
   }
@@ -240,9 +268,12 @@ export function FranchiseReview({ c }: { c: Case }) {
           icon={<CheckCircleOutlined />}
           title="Franchise approved"
           description={
-            c.franchise.acceptedAt
-              ? `Approved on ${dayjs(c.franchise.acceptedAt).format('YYYY-MM-DD HH:mm')}.`
-              : 'This franchise has been approved.'
+            <>
+              {c.franchise.acceptedAt
+                ? `Approved on ${dayjs(c.franchise.acceptedAt).format('YYYY-MM-DD HH:mm')}.`
+                : 'This franchise has been approved.'}
+              {c.franchise.acceptedRemarks ? ` Remarks: ${c.franchise.acceptedRemarks}` : ''}
+            </>
           }
         />
       )}
@@ -302,7 +333,7 @@ export function FranchiseReview({ c }: { c: Case }) {
               Reject
             </Button>
             <Tooltip title={allChecked ? '' : 'Tick every checklist item to approve.'}>
-              <Button type="primary" icon={<CheckCircleOutlined />} disabled={!allChecked} onClick={approve}>
+              <Button type="primary" icon={<CheckCircleOutlined />} disabled={!allChecked} onClick={openApprove}>
                 Approve request
               </Button>
             </Tooltip>
@@ -350,6 +381,32 @@ export function FranchiseReview({ c }: { c: Case }) {
             </div>
           </Space>
         )}
+      </Modal>
+
+      {/* ---- Approve dialog -------------------------------------------------- */}
+      <Modal
+        open={approving}
+        title="Approve franchise"
+        okText="Approve"
+        onOk={confirmApprove}
+        onCancel={() => setApproving(false)}
+      >
+        <Typography.Paragraph>
+          You are deciding on <strong>version {version}</strong> of {c.id}. If the AAT handler changes
+          it before you finish, you'll be asked to review again.
+        </Typography.Paragraph>
+        <Typography.Paragraph type="secondary">
+          On approval: validity starts today, the franchise is accepted and moves to Prepare Quotation
+          (for rates), and the AAT handler is notified (simulated email).
+        </Typography.Paragraph>
+        <Typography.Text>Remarks (optional)</Typography.Text>
+        <Input.TextArea
+          rows={3}
+          style={{ marginTop: 6 }}
+          value={approveRemarks}
+          onChange={(e) => setApproveRemarks(e.target.value)}
+          placeholder="Any notes for the AAT handler"
+        />
       </Modal>
 
       {/* ---- Reject dialog --------------------------------------------------- */}
