@@ -5,6 +5,7 @@ import { currentProposal } from '../../domain/progress'
 import { formatDate, formatCount } from '../../lib/format'
 import { CreateFranchise } from './CreateFranchise'
 import { FranchiseReview } from './FranchiseReview'
+import { PrepareQuotation } from './PrepareQuotation'
 
 // Read-only work-area summaries. Each work area's interactive task flow is layered
 // on in its own phase; these panels already read from the one shared case model
@@ -26,25 +27,7 @@ function renderArea(c: Case, workArea: WorkAreaId) {
       // Submitted/accepted: read-only summary plus the admin review decision.
       return <FranchiseReview c={c} />
     case 'prepare-quotation':
-      return (
-        <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-          <Descriptions column={1} size="small">
-            <Descriptions.Item label="Rate request reference">{c.quotation.requestRef ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Rate sheets received">
-              {c.quotation.rateSheets.length === 0
-                ? 'None yet'
-                : c.quotation.rateSheets.map((rs) => (
-                    <Tag key={rs.id} color={rs.status === 'selected' ? 'green' : 'default'}>
-                      v{rs.version} · {rs.status}
-                    </Tag>
-                  ))}
-            </Descriptions.Item>
-          </Descriptions>
-          {c.quotation.clarification && (
-            <Alert type="info" showIcon title="Clarification from Actuarial" description={c.quotation.clarification} />
-          )}
-        </Space>
-      )
+      return <PrepareQuotation c={c} />
     case 'finalize-offer': {
       const p = currentProposal(c)
       return (

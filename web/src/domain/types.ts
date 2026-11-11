@@ -127,6 +127,15 @@ export interface CaseDocument {
   simulated: boolean // true = fictional sample / simulated upload
 }
 
+export interface RateRow {
+  plan: string
+  roomBoard: string
+  mbl: number
+  memberType: string
+  paymentMode: string
+  rate: number
+}
+
 export interface RateSheet {
   id: string
   version: number
@@ -134,6 +143,44 @@ export interface RateSheet {
   receivedAt: string
   preparedBy: string // Actuarial
   note?: string
+  /** Imported rate rows (prototype — sample data). */
+  rows?: RateRow[]
+}
+
+/** A single supporting-requirement line on the quotation package. */
+export interface QuotationRequirement {
+  key: string
+  label: string
+  status: 'Requested' | 'Received' | 'Not Available'
+  note?: string
+}
+
+/** A structured TOR (current benefits) line. */
+export interface TorLine {
+  benefit: string
+  limit: string
+  note?: string
+}
+
+/** A clarification round between the AAT handler and Actuarial on the rate request. */
+export interface RateClarification {
+  question: string
+  answer?: string
+  askedAt: string
+  answeredAt?: string
+}
+
+/** The rate request sent to Actuarial (replaces the legacy Actuarial form). */
+export interface RateRequest {
+  requestedPlans?: string
+  roomBoard?: string
+  mblOptions?: string
+  dependentCoverage?: string
+  targetRates?: string
+  paymentModes?: string[]
+  specialRequirements?: string
+  jumbo?: boolean
+  submittedAt?: string
 }
 
 export interface ProposalVersion {
@@ -235,6 +282,14 @@ export interface QuotationPackage {
   requestRef?: string // e.g. RR-2026-0001
   clarification?: string
   rateSheets: RateSheet[]
+  /** Supporting-requirements checklist for the quotation package. */
+  requirements?: QuotationRequirement[]
+  /** Structured TOR (current benefits) captured for the TOR-vs-SOB baseline. */
+  torLines?: TorLine[]
+  /** The rate request detail sent to Actuarial. */
+  rateRequest?: RateRequest
+  /** Clarification rounds raised by Actuarial on the rate request. */
+  clarifications?: RateClarification[]
 }
 
 export interface OfferState {
