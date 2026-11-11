@@ -33,6 +33,7 @@ import {
   EditOutlined,
   FileTextOutlined,
   PlusOutlined,
+  RollbackOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -42,14 +43,13 @@ import type {
   NegotiationRound,
   ProposalApproval,
   ProposalVersion,
-  RateSchedule,
   SobDraft,
   SobLine,
 } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
 import { currentProposal } from '../../domain/progress'
 import { uid } from '../../domain/ids'
-import { ProposalRateSchedule, emptyRateSchedule } from './ProposalRateSchedule'
+import { ProposalRateSchedule, emptyRateSchedule, sampleRateSchedule } from './ProposalRateSchedule'
 
 const CHANNELS = ['Email', 'Call', 'Meeting', 'Through intermediary']
 
@@ -95,7 +95,6 @@ function proposalCode(c: Case): string {
 }
 
 interface DraftForm {
-  schedule: RateSchedule
   commissionPct: string
   commissionNote: string
   recommendation: string
@@ -103,7 +102,6 @@ interface DraftForm {
 }
 function initDraft(p?: ProposalVersion): DraftForm {
   return {
-    schedule: p?.rateSchedule ?? emptyRateSchedule(),
     commissionPct: p?.commissionPct != null ? String(p.commissionPct) : '',
     commissionNote: p?.commissionNote ?? '',
     recommendation: p?.recommendation ?? '',
@@ -153,6 +151,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
   const [roundOpen, setRoundOpen] = useState(false)
   const emptyRound = { channel: 'Email', summary: '', participants: '', counterOffer: '', outcome: '' }
   const [round, setRound] = useState(emptyRound)
+  const [returning, setReturning] = useState(false)
+  const [returnConcern, setReturnConcern] = useState('')
 
   function patchProposal(recipe: (p: ProposalVersion) => ProposalVersion, extra?: (c: Case) => Case) {
     patchCase(c.id, (prev) => {
@@ -203,6 +203,28 @@ export function FinalizeOffer({ c }: { c: Case }) {
     message.success(next === 'validated' ? 'SOB sent for validation (validated).' : 'SOB approved.')
   }
 
+  // ---- Return the rate sheet to Actuarial (Sales raises a concern) ---------
+  function returnToActuarial() {
+    const concern = returnConcern.trim()
+    if (!concern) return
+    patchCase(c.id, (prev) => ({
+      ...prev,
+      currentWorkArea: 'prepare-quotation',
+      quotation: {
+        ...prev.quotation,
+        status: 'clarification',
+        clarifications: [
+          ...(prev.quotation.clarifications ?? []),
+          { question: concern, askedAt: new Date().toISOString(), raisedBy: 'Sales' },
+        ],
+      },
+    }))
+    setReturning(false)
+    setReturnConcern('')
+    message.warning('Rate concern sent to Actuarial — the case is back in Prepare Quotation.')
+    navigate(`/cases/${c.id}/prepare-quotation`)
+  }
+
   // ---- Create proposal ------------------------------------------------------
   function createProposal() {
     const newProp: ProposalVersion = {
@@ -215,7 +237,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
       createdAt: new Date().toISOString(),
       validUntil: dayjs().add(30, 'day').toISOString(),
       code: proposalCode(c),
-      rateSchedule: emptyRateSchedule(),
+      // Rates come from Actuarial's rate sheet — Sales views, never edits them.
+      rateSchedule: sampleRateSchedule(),
       commissionPct: inter ? 10 : undefined,
       templateAdditions: ['Annual physical exam (template standard — not in requested TOR)'],
     }
@@ -229,7 +252,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
     if (!proposal) return
     patchProposal((p) => ({
       ...p,
-      rateSchedule: draft.schedule,
       commissionPct: draft.commissionPct.trim() === '' ? undefined : Number(draft.commissionPct),
       commissionNote: draft.commissionNote.trim() || undefined,
       recommendation: draft.recommendation.trim() || undefined,
@@ -577,12 +599,22 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
         {/* ---- Rates & recommendation --------------------------------------- */}
         <section>
-          <Typography.Title level={5}>Rates and recommendation</Typography.Title>
-          <ProposalRateSchedule
-            value={editable ? draft.schedule : proposal.rateSchedule ?? emptyRateSchedule()}
-            editable={editable}
-            onChange={(schedule) => setDraft((d) => ({ ...d, schedule }))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              Rates and recommendation
+            </Typography.Title>
+            <Button size="small" icon={<RollbackOutlined />} onClick={() => setReturning(true)}>
+              Return to Actuarial
+            </Button>
+          </div>
+          <Alert
+            type="info"
+            showIcon
+            style={{ margin: '12px 0' }}
+            title="Rates are issued by Actuarial — view only"
+            description="Sales does not edit the rate sheet. If a rate looks wrong, return it to Actuarial with a concern."
           />
+          <ProposalRateSchedule value={proposal.rateSchedule ?? emptyRateSchedule()} editable={false} />
           {editable ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
               <div>
@@ -899,6 +931,29 @@ export function FinalizeOffer({ c }: { c: Case }) {
         <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12, marginBottom: 0 }}>
           If rates, commission or benefits change, use “Revise (new version)” so the proposal is re-approved.
         </Typography.Paragraph>
+      </Modal>
+
+      {/* ---- Return to Actuarial (rate concern) ---------------------------- */}
+      <Modal
+        open={returning}
+        title="Return rate sheet to Actuarial"
+        okText="Send to Actuarial"
+        okButtonProps={{ danger: true, disabled: !returnConcern.trim() }}
+        onOk={returnToActuarial}
+        onCancel={() => setReturning(false)}
+      >
+        <Typography.Paragraph type="secondary">
+          Sales does not edit the rates. Describe the concern and the case returns to Prepare Quotation for Actuarial to
+          review and re-issue the rate sheet.
+        </Typography.Paragraph>
+        <Typography.Text>Concern *</Typography.Text>
+        <Input.TextArea
+          rows={3}
+          style={{ marginTop: 6 }}
+          placeholder="e.g. Ward rate for the WITH-network tier looks higher than the quoted target."
+          value={returnConcern}
+          onChange={(e) => setReturnConcern(e.target.value)}
+        />
       </Modal>
 
       {/* ---- Record acceptance --------------------------------------------- */}

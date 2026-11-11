@@ -675,11 +675,18 @@ export function PrepareQuotation({ c }: { c: Case }) {
               <Alert
                 key={i}
                 type={cl.answer ? 'success' : 'warning'}
-                title={<strong>Actuarial asked: {cl.question}</strong>}
+                title={
+                  <strong>
+                    {cl.raisedBy === 'Sales' ? 'Sales returned a rate concern: ' : 'Actuarial asked: '}
+                    {cl.question}
+                  </strong>
+                }
                 description={
                   cl.answer
                     ? `Answered: ${cl.answer}`
-                    : 'Awaiting the AAT handler’s answer.'
+                    : cl.raisedBy === 'Sales'
+                      ? 'Actuarial to review and re-issue the rate sheet.'
+                      : 'Awaiting the AAT handler’s answer.'
                 }
               />
             ))}

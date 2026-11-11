@@ -170,6 +170,8 @@ export interface RateClarification {
   answer?: string
   askedAt: string
   answeredAt?: string
+  /** Who raised it — Actuarial asking for info, or Sales returning a rate concern. */
+  raisedBy?: 'Actuarial' | 'Sales'
 }
 
 /** The rate request sent to Actuarial (replaces the legacy Actuarial form). */

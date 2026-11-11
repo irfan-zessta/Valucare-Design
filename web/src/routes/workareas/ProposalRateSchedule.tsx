@@ -43,18 +43,54 @@ export function emptyRateSchedule(): RateSchedule {
   return { cells: {}, benCodes: {}, participationPct: 80, optionalBenefits: DEFAULT_OPTIONAL.map((o) => ({ ...o })) }
 }
 
+// Actuarial-issued rates — Sales views these read-only (they are not re-typed).
+// Derived from a base annual before-VAT per tier, scaled by network, member
+// class and payment mode so every cell is populated for the demo.
+const BASE_ANNUAL = [12000, 11000, 9500, 8000, 6500, 6000, 5000, 4500]
+const BENCODES = ['LP-200', 'RP-200', 'RP-150', 'RP-110', 'SP-90', 'SP-80', 'WD-70', 'WD-60']
+const MODE_FACTOR: Record<PaymentMode, number> = { ANNUAL: 1, 'SEMI-ANNUAL': 0.52, QUARTERLY: 0.27 }
+export function sampleRateSchedule(): RateSchedule {
+  const cells: Record<string, number | null> = {}
+  const benCodes: Record<string, string> = {}
+  const classes = ['PRINCIPAL', 'DEPENDENTS']
+  classes.forEach((cls) => {
+    BENCODES.forEach((bc, row) => {
+      benCodes[`${cls}|${row}`] = bc
+    })
+    PAYMENT_MODES.forEach((mode) => {
+      ;[0, 1].forEach((net) => {
+        ROOM_BOARD_ROWS.forEach((_r, row) => {
+          const netF = net === 1 ? 1.18 : 1
+          const clsF = cls === 'DEPENDENTS' ? 0.88 : 1
+          cells[`${mode}|${cls}|${net}|${row}`] = Math.round((BASE_ANNUAL[row] * netF * clsF * MODE_FACTOR[mode]) / 10) * 10
+        })
+      })
+    })
+  })
+  return {
+    cells,
+    benCodes,
+    participationPct: 80,
+    optionalBenefits: [
+      { benefit: 'CSR', benCode: 'CSR-01', limit: 'Php 50,000', beforeVat: 1200 },
+      { benefit: 'OP Meds', benCode: 'OPM-01', limit: 'Php 10,000', beforeVat: 1800 },
+      { benefit: 'Maternity Benefits', benCode: 'MAT-01', limit: 'Php 40,000', beforeVat: 3500 },
+    ],
+  }
+}
+
 const VAT = 1.12
 const peso = (n: number | null | undefined) =>
   n == null || n === 0 ? '₱ -' : `₱ ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export function ProposalRateSchedule({
   value,
-  editable,
-  onChange,
+  editable = false,
+  onChange = () => {},
 }: {
   value: RateSchedule
-  editable: boolean
-  onChange: (next: RateSchedule) => void
+  editable?: boolean
+  onChange?: (next: RateSchedule) => void
 }) {
   const [mode, setMode] = useState<PaymentMode>('ANNUAL')
 
