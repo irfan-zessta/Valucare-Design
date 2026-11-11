@@ -129,7 +129,8 @@ export function FranchiseReview({ c }: { c: Case }) {
   }
 
   return (
-    <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+    <div>
+      <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
       {/* ---- Full submitted form (read-only) --------------------------------- */}
       <section>
         <Typography.Title level={5} style={{ marginTop: 0 }}>
@@ -258,11 +259,6 @@ export function FranchiseReview({ c }: { c: Case }) {
               {c.franchise.rejectedReason ? `Reason: ${c.franchise.rejectedReason}` : 'No reason recorded.'}
             </>
           }
-          action={
-            <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(true)}>
-              Reopen & edit
-            </Button>
-          }
         />
       )}
 
@@ -274,7 +270,7 @@ export function FranchiseReview({ c }: { c: Case }) {
           <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
             Confirm each item before approving.
           </Typography.Paragraph>
-          <Space orientation="vertical" size="small" style={{ display: 'flex', marginBottom: 16 }}>
+          <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
             {CHECKLIST.map((item, i) => (
               <Checkbox
                 key={i}
@@ -287,12 +283,17 @@ export function FranchiseReview({ c }: { c: Case }) {
               </Checkbox>
             ))}
           </Space>
-          <Space wrap>
-            <Tooltip title={allChecked ? '' : 'Tick every checklist item to approve.'}>
-              <Button type="primary" icon={<CheckCircleOutlined />} disabled={!allChecked} onClick={approve}>
-                Approve request
-              </Button>
-            </Tooltip>
+        </section>
+      )}
+      </Space>
+
+      {/* ---- Floating decision bar (consistent with the Create Franchise form) */}
+      {!accepted && !rejected && (
+        <div className="app-form-floatbar" style={{ marginTop: 16 }}>
+          <Typography.Text type="secondary">
+            {checked.filter(Boolean).length}/{CHECKLIST.length} checks complete
+          </Typography.Text>
+          <div className="app-form-floatbar__actions">
             <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
               Edit franchise form
             </Button>
@@ -300,8 +301,24 @@ export function FranchiseReview({ c }: { c: Case }) {
             <Button danger icon={<CloseCircleOutlined />} onClick={() => setRejecting(true)}>
               Reject
             </Button>
-          </Space>
-        </section>
+            <Tooltip title={allChecked ? '' : 'Tick every checklist item to approve.'}>
+              <Button type="primary" icon={<CheckCircleOutlined />} disabled={!allChecked} onClick={approve}>
+                Approve request
+              </Button>
+            </Tooltip>
+          </div>
+        </div>
+      )}
+
+      {rejected && (
+        <div className="app-form-floatbar" style={{ marginTop: 16 }}>
+          <Typography.Text type="secondary">This franchise was rejected.</Typography.Text>
+          <div className="app-form-floatbar__actions">
+            <Button type="primary" icon={<EditOutlined />} onClick={() => setEditing(true)}>
+              Reopen & edit
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* ---- Document preview ------------------------------------------------ */}
@@ -354,6 +371,6 @@ export function FranchiseReview({ c }: { c: Case }) {
           placeholder="Reason for rejection (optional)"
         />
       </Modal>
-    </Space>
+    </div>
   )
 }
