@@ -673,18 +673,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
               </Descriptions.Item>
             </Descriptions>
           )}
-          {editable && (
-            <Space style={{ marginTop: 12 }}>
-              <Button icon={<EditOutlined />} onClick={() => saveDraft(false)}>
-                Save draft
-              </Button>
-              <Tooltip title={draft.justification.trim() ? '' : 'Add a rates justification to submit.'}>
-                <Button type="primary" disabled={!draft.justification.trim()} onClick={() => saveDraft(true)}>
-                  Submit for internal review
-                </Button>
-              </Tooltip>
-            </Space>
-          )}
         </section>
 
         {/* ---- Pricing approvals -------------------------------------------- */}
@@ -792,6 +780,18 @@ export function FinalizeOffer({ c }: { c: Case }) {
           {proposal.status === 'accepted' && 'Accepted — continue to Set Up Account.'}
         </Typography.Text>
         <div className="app-form-floatbar__actions">
+          {proposal.status === 'draft' && (
+            <>
+              <Button icon={<EditOutlined />} onClick={() => saveDraft(false)}>
+                Save draft
+              </Button>
+              <Tooltip title={draft.justification.trim() ? '' : 'Add a rates justification to submit.'}>
+                <Button type="primary" disabled={!draft.justification.trim()} onClick={() => saveDraft(true)}>
+                  Submit for internal review
+                </Button>
+              </Tooltip>
+            </>
+          )}
           {proposal.status === 'in-review' && !fullyApproved && (
             <Button
               type="primary"
