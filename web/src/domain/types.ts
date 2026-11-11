@@ -219,6 +219,27 @@ export interface NegotiationRound {
   outcome?: string
 }
 
+/** An optional-benefit line on the membership-fee schedule (CSR, OP Meds, etc.). */
+export interface RateScheduleOptionalBenefit {
+  benefit: string
+  benCode?: string
+  limit?: string
+  beforeVat?: number | null
+}
+
+/**
+ * The structured membership-fee schedule shown on the proposal. Rates are kept
+ * as before-VAT values; with-VAT is derived (×1.12). Cell keys are
+ * `${mode}|${memberClass}|${network}|${rowIndex}` and BenCodes key by
+ * `${memberClass}|${rowIndex}` (shared across modes/networks).
+ */
+export interface RateSchedule {
+  cells: Record<string, number | null>
+  benCodes: Record<string, string>
+  participationPct: number
+  optionalBenefits: RateScheduleOptionalBenefit[]
+}
+
 export interface ProposalVersion {
   id: string
   version: number
@@ -242,6 +263,8 @@ export interface ProposalVersion {
   commissionNote?: string
   recommendation?: string
   justification?: string
+  /** Structured HMO membership-fee schedule (Principal & Dependents). */
+  rateSchedule?: RateSchedule
   /** Reason the proposal was returned to the AAT handler for this version. */
   returnReason?: string
   /** Pricing approvals recorded against versions of this proposal. */

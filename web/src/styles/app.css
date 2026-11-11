@@ -641,3 +641,105 @@ button.app-stepper__item {
   gap: 8px;
   align-items: baseline;
 }
+
+/* --- Proposal rate schedule (membership-fee layout) --------------------- */
+.rs-mode-note {
+  margin-inline-start: 12px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+.rs-table-wrap {
+  overflow-x: auto;
+  margin-block-end: 20px;
+}
+.rs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+.rs-table th,
+.rs-table td {
+  border: 1px solid #d9d9d9;
+  padding: 6px 10px;
+  vertical-align: middle;
+}
+.rs-title {
+  background: #fde9ba;
+  text-align: center;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.rs-band {
+  text-align: center;
+  font-style: italic;
+  font-weight: 700;
+}
+.rs-band--dep {
+  background: #f6c9a6;
+}
+.rs-band--grey {
+  background: #d9d9d9;
+  text-align: start;
+}
+.rs-head {
+  background: #fcdd98;
+  font-weight: 700;
+  font-style: italic;
+  text-align: center;
+}
+.rs-head--mbl {
+  color: #c0392b;
+}
+.rs-head--mode {
+  background: #f6c15a;
+}
+.rs-head--sub {
+  font-size: 12px;
+}
+.rs-banner {
+  background: #d9d9d9;
+}
+.rs-banner td {
+  font-style: italic;
+  font-weight: 700;
+  padding: 10px 12px;
+}
+.rs-rb {
+  text-align: center;
+  font-weight: 600;
+}
+.rs-bencode {
+  width: 90px;
+}
+.rs-mbl {
+  text-align: center;
+}
+.rs-num {
+  width: 130px;
+  text-align: right;
+  white-space: nowrap;
+}
+.rs-vat {
+  color: rgba(0, 0, 0, 0.55);
+}
+.rs-footer {
+  margin-block-start: 4px;
+}
+.rs-participation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-block-end: 8px;
+}
+.rs-participation-val {
+  border: 1px solid #d9d9d9;
+  padding: 2px 14px;
+  color: #c0392b;
+  font-weight: 700;
+}
+.rs-note {
+  margin-block-start: 10px;
+  font-weight: 600;
+}

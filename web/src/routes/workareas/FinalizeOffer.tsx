@@ -41,17 +41,16 @@ import type {
   Case,
   NegotiationRound,
   ProposalApproval,
-  ProposalRateItem,
   ProposalVersion,
-  RateSheet,
+  RateSchedule,
   SobDraft,
   SobLine,
 } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
 import { currentProposal } from '../../domain/progress'
 import { uid } from '../../domain/ids'
+import { ProposalRateSchedule, emptyRateSchedule } from './ProposalRateSchedule'
 
-const money = (n: number) => `Php ${Number(n || 0).toLocaleString()}`
 const CHANNELS = ['Email', 'Call', 'Meeting', 'Through intermediary']
 
 // Approved standard SOB template (Actuarial-owned) — the starting point for a
@@ -95,21 +94,8 @@ function proposalCode(c: Case): string {
   return `PR-${c.id.replace(/^[A-Z]+-/, '')}`
 }
 
-// Build proposal rate lines from a rate sheet's rows (proposed = actuarial initially).
-function itemsFromSheet(sheet?: RateSheet): ProposalRateItem[] {
-  return (sheet?.rows ?? []).map((r) => ({
-    plan: r.plan,
-    roomBoard: r.roomBoard,
-    mbl: r.mbl,
-    memberType: r.memberType,
-    paymentMode: r.paymentMode,
-    actuarialRate: r.rate,
-    proposedRate: r.rate,
-  }))
-}
-
 interface DraftForm {
-  items: ProposalRateItem[]
+  schedule: RateSchedule
   commissionPct: string
   commissionNote: string
   recommendation: string
@@ -117,7 +103,7 @@ interface DraftForm {
 }
 function initDraft(p?: ProposalVersion): DraftForm {
   return {
-    items: p?.items ?? [],
+    schedule: p?.rateSchedule ?? emptyRateSchedule(),
     commissionPct: p?.commissionPct != null ? String(p.commissionPct) : '',
     commissionNote: p?.commissionNote ?? '',
     recommendation: p?.recommendation ?? '',
@@ -229,7 +215,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
       createdAt: new Date().toISOString(),
       validUntil: dayjs().add(30, 'day').toISOString(),
       code: proposalCode(c),
-      items: itemsFromSheet(selectedSheet),
+      rateSchedule: emptyRateSchedule(),
       commissionPct: inter ? 10 : undefined,
       templateAdditions: ['Annual physical exam (template standard — not in requested TOR)'],
     }
@@ -243,7 +229,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
     if (!proposal) return
     patchProposal((p) => ({
       ...p,
-      items: draft.items,
+      rateSchedule: draft.schedule,
       commissionPct: draft.commissionPct.trim() === '' ? undefined : Number(draft.commissionPct),
       commissionNote: draft.commissionNote.trim() || undefined,
       recommendation: draft.recommendation.trim() || undefined,
@@ -258,13 +244,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
         : {}),
     }))
     message.success(submit ? 'Submitted for internal pricing review.' : 'Draft saved.')
-  }
-  function setProposedRate(i: number, value: string) {
-    const n = value.replace(/,/g, '')
-    setDraft((d) => ({
-      ...d,
-      items: d.items.map((it, idx) => (idx === i ? { ...it, proposedRate: n === '' ? 0 : Number(n) } : it)),
-    }))
   }
 
   // ---- Review (two-level maker-checker) ------------------------------------
@@ -599,48 +578,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
         {/* ---- Rates & recommendation --------------------------------------- */}
         <section>
           <Typography.Title level={5}>Rates and recommendation</Typography.Title>
-          <Table<ProposalRateItem>
-            rowKey={(r) => `${r.plan}-${r.memberType}-${r.paymentMode}`}
-            size="small"
-            pagination={false}
-            dataSource={editable ? draft.items : proposal.items ?? []}
-            columns={[
-              { title: 'Plan', dataIndex: 'plan' },
-              { title: 'Room & board', dataIndex: 'roomBoard' },
-              { title: 'MBL', dataIndex: 'mbl', align: 'right', render: (v: number) => money(v) },
-              { title: 'Member type', dataIndex: 'memberType' },
-              { title: 'Payment mode', dataIndex: 'paymentMode' },
-              { title: 'Actuarial rate', dataIndex: 'actuarialRate', align: 'right', render: (v: number) => money(v) },
-              {
-                title: 'Proposed rate',
-                dataIndex: 'proposedRate',
-                align: 'right',
-                render: (v: number, _r, i) =>
-                  editable ? (
-                    <Input
-                      size="small"
-                      style={{ width: 120, textAlign: 'right' }}
-                      value={v}
-                      onChange={(e) => setProposedRate(i, e.target.value)}
-                    />
-                  ) : (
-                    money(v)
-                  ),
-              },
-              {
-                title: 'Discount',
-                key: 'discount',
-                align: 'right',
-                render: (_v, r) => {
-                  const d = r.actuarialRate ? ((r.actuarialRate - r.proposedRate) / r.actuarialRate) * 100 : 0
-                  return (
-                    <Typography.Text type={d > 10 ? 'danger' : undefined}>
-                      {isFinite(d) ? `${d.toFixed(1)}%` : ''}
-                    </Typography.Text>
-                  )
-                },
-              },
-            ]}
+          <ProposalRateSchedule
+            value={editable ? draft.schedule : proposal.rateSchedule ?? emptyRateSchedule()}
+            editable={editable}
+            onChange={(schedule) => setDraft((d) => ({ ...d, schedule }))}
           />
           {editable ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
