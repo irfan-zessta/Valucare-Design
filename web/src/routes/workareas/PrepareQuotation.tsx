@@ -97,6 +97,13 @@ export function PrepareQuotation({ c }: { c: Case }) {
     !!requirements.find((r) => r.key === 'tor')?.fileName ||
     !!c.franchise.documents?.find((d) => d.slot === 'tor')
   const torLines = q.torLines ?? (torAttached ? SAMPLE_TOR : [])
+  // Same idea for the Member Data master list: if it's attached (on the
+  // requirement or carried over from the franchise form) the member list is
+  // already on file, so the Member Data tab shows the validated counts from it
+  // instead of an empty "not validated" state.
+  const masterlistAttached =
+    !!requirements.find((r) => r.key === 'masterlist')?.fileName ||
+    !!c.franchise.documents?.find((d) => d.slot === 'masterlist')
   const rr = q.rateRequest ?? {}
   const clarifications = q.clarifications ?? []
   const openClarification = clarifications.find((x) => !x.answer)
@@ -131,7 +138,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
 
   // Completeness for sending the rate request.
   const reqComplete = effectiveReqs.every((r) => r.status !== 'Requested')
-  const memberComplete = c.memberData.importProcessed
+  const memberComplete = c.memberData.importProcessed || masterlistAttached
   const rateFormComplete =
     form.requestedPlans.trim() !== '' &&
     form.roomBoard.trim() !== '' &&
@@ -235,6 +242,46 @@ export function PrepareQuotation({ c }: { c: Case }) {
     // Validating the master list also receives the Member Data requirement.
     setRequirement('masterlist', { status: 'Received' })
     message.success('Member Data validated (sample).')
+  }
+  // Derived counts shown when a master list is attached but not yet validated.
+  const memberPreview = (() => {
+    const total = (c.franchise.estimatedPrincipals || 0) + (c.franchise.estimatedDependents || 0) || 440
+    const rejected = Math.max(0, Math.round(total * 0.01))
+    return { total, accepted: total - rejected, rejected }
+  })()
+  // Remove the member data and detach the master list everywhere, so the
+  // Member Data requirement goes back to outstanding (symmetric with upload).
+  function removeMemberData() {
+    patchQ((prev) => ({
+      ...prev,
+      memberData: { total: 0, accepted: 0, rejected: 0, importProcessed: false },
+      franchise: {
+        ...prev.franchise,
+        documents: (prev.franchise.documents ?? []).filter((d) => d.slot !== 'masterlist'),
+      },
+      quotation: {
+        ...prev.quotation,
+        requirements: (prev.quotation.requirements ?? DEFAULT_REQUIREMENTS).map((r) =>
+          r.key === 'masterlist' ? { ...r, fileName: undefined, status: 'Requested' } : r,
+        ),
+      },
+    }))
+    message.success('Member Data removed.')
+  }
+  // Replace the attached master list and re-validate the member list from it.
+  function reuploadMasterlist(fileName: string) {
+    const { total, accepted, rejected } = memberPreview
+    patchQ((prev) => ({
+      ...prev,
+      memberData: { total, accepted, rejected, importProcessed: true },
+      quotation: {
+        ...prev.quotation,
+        requirements: (prev.quotation.requirements ?? DEFAULT_REQUIREMENTS).map((r) =>
+          r.key === 'masterlist' ? { ...r, fileName, status: 'Received' } : r,
+        ),
+      },
+    }))
+    message.success(`Re-uploaded ${fileName} — Member Data re-validated.`)
   }
 
   // ---- Rate request --------------------------------------------------------
@@ -526,21 +573,48 @@ export function PrepareQuotation({ c }: { c: Case }) {
       <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
         Validate the master list for quotation. A clean import also receives the Member Data requirement.
       </Typography.Paragraph>
-      {c.memberData.importProcessed ? (
+      {!c.memberData.importProcessed && masterlistAttached && (
+        <Alert
+          type="info"
+          showIcon
+          title="Loaded from the attached master list"
+          description="These counts were pre-filled from the master list on file. Review and validate them before quoting."
+        />
+      )}
+      {c.memberData.importProcessed || masterlistAttached ? (
         <Alert
           type="success"
           showIcon
-          title="Member Data validated"
-          description={`${formatCount(c.memberData.total)} total · ${formatCount(c.memberData.accepted)} accepted · ${formatCount(c.memberData.rejected)} rejected.`}
+          title={c.memberData.importProcessed ? 'Member Data validated' : 'Member Data from attached master list'}
+          description={(() => {
+            const d = c.memberData.importProcessed ? c.memberData : memberPreview
+            return `${formatCount(d.total)} total · ${formatCount(d.accepted)} accepted · ${formatCount(d.rejected)} rejected.`
+          })()}
         />
       ) : (
         <Alert type="warning" showIcon title="Member Data not yet validated for quotation." />
       )}
-      <div>
+      <Space wrap>
         <Button size="small" onClick={validateMemberData}>
           {c.memberData.importProcessed ? 'Re-validate sample data' : 'Validate sample Member Data'}
         </Button>
-      </div>
+        <Upload
+          showUploadList={false}
+          beforeUpload={(file) => {
+            reuploadMasterlist(file.name)
+            return false
+          }}
+        >
+          <Button size="small" icon={<CloudUploadOutlined />}>
+            {masterlistAttached ? 'Re-upload master list' : 'Upload master list'}
+          </Button>
+        </Upload>
+        {(c.memberData.importProcessed || masterlistAttached) && (
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={removeMemberData}>
+            Remove
+          </Button>
+        )}
+      </Space>
     </Space>
   )
 
