@@ -720,67 +720,35 @@ export function PrepareQuotation({ c }: { c: Case }) {
         {sheets.length === 0 ? (
           <Typography.Text type="secondary">No rate sheet issued yet.</Typography.Text>
         ) : (
-          (() => {
-            const viewing =
-              sheets.find((s) => s.id === viewSheetId) ??
-              sheets.find((s) => s.status === 'selected') ??
-              sheets[0]
-            return (
-              <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-                {/* Version history — click a version to view it */}
-                <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
-                  {sheets.map((s) => {
-                    const active = s.id === viewing.id
-                    return (
-                      <div
-                        key={s.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setViewSheetId(s.id)}
-                        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setViewSheetId(s.id)}
-                        className="app-decision-row"
-                        style={{
-                          cursor: 'pointer',
-                          border: `1px solid ${active ? '#9f1239' : '#f0f0f0'}`,
-                          background: active ? 'rgba(159,18,57,0.04)' : undefined,
-                          borderRadius: 8,
-                          padding: '8px 12px',
-                        }}
-                      >
-                        <Space>
-                          <strong>Rate sheet v{s.version}</strong>
-                          <Tag color={s.status === 'selected' ? 'green' : s.status === 'superseded' ? 'default' : 'blue'}>
-                            {s.status}
-                          </Tag>
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            issued {dayjs(s.receivedAt).format('YYYY-MM-DD HH:mm')} by {s.preparedBy}
-                          </Typography.Text>
-                        </Space>
-                        <Space onClick={(e) => e.stopPropagation()}>
-                          {active && <Tag color="default">Viewing</Tag>}
-                          {s.status !== 'selected' && (
-                            <Button size="small" onClick={() => selectRateSheet(s.id)}>
-                              Select this version
-                            </Button>
-                          )}
-                        </Space>
-                      </div>
-                    )
-                  })}
-                </Space>
-
-                {/* The selected/viewing rate sheet, in the membership-fee layout */}
-                <div>
+          <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
+            {sheets.map((s) => (
+              <div
+                key={s.id}
+                className="app-decision-row"
+                style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}
+              >
+                <Space>
+                  <strong>Rate sheet v{s.version}</strong>
+                  <Tag color={s.status === 'selected' ? 'green' : s.status === 'superseded' ? 'default' : 'blue'}>
+                    {s.status}
+                  </Tag>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    Viewing rate sheet v{viewing.version} ({viewing.status})
+                    issued {dayjs(s.receivedAt).format('YYYY-MM-DD HH:mm')} by {s.preparedBy}
                   </Typography.Text>
-                  <div style={{ marginTop: 8 }}>
-                    <ProposalRateSchedule value={viewing.schedule ?? emptyRateSchedule()} editable={false} />
-                  </div>
-                </div>
-              </Space>
-            )
-          })()
+                </Space>
+                <Space>
+                  <Button size="small" icon={<EyeOutlined />} onClick={() => setViewSheetId(s.id)}>
+                    View
+                  </Button>
+                  {s.status !== 'selected' && (
+                    <Button size="small" type="primary" onClick={() => selectRateSheet(s.id)}>
+                      Select this version
+                    </Button>
+                  )}
+                </Space>
+              </div>
+            ))}
+          </Space>
         )}
       </section>
     </Space>
@@ -852,6 +820,38 @@ export function PrepareQuotation({ c }: { c: Case }) {
           )}
         </div>
       </div>
+
+      {/* ---- Rate sheet viewer (pop-up) ------------------------------------ */}
+      {(() => {
+        const vs = sheets.find((s) => s.id === viewSheetId)
+        return (
+          <Modal
+            open={viewSheetId !== null}
+            width={1100}
+            title={vs ? `Rate sheet v${vs.version} · ${vs.status} · issued ${dayjs(vs.receivedAt).format('YYYY-MM-DD HH:mm')} by ${vs.preparedBy}` : 'Rate sheet'}
+            onCancel={() => setViewSheetId(null)}
+            footer={[
+              vs && vs.status !== 'selected' && (
+                <Button
+                  key="select"
+                  type="primary"
+                  onClick={() => {
+                    selectRateSheet(vs.id)
+                    setViewSheetId(null)
+                  }}
+                >
+                  Select this version
+                </Button>
+              ),
+              <Button key="close" onClick={() => setViewSheetId(null)}>
+                Close
+              </Button>,
+            ]}
+          >
+            {vs && <ProposalRateSchedule value={vs.schedule ?? emptyRateSchedule()} editable={false} />}
+          </Modal>
+        )
+      })()}
 
       {/* ---- Document preview ----------------------------------------------- */}
       <Modal
