@@ -352,6 +352,35 @@ body {
     white-space: normal;
   }
 }
+/* Reached steps are clickable to revisit earlier sections. */
+button.app-stepper__item {
+  appearance: none;
+  background: none;
+  border: none;
+  font: inherit;
+  padding-block: 0;
+}
+.app-stepper__item.is-clickable {
+  cursor: pointer;
+}
+.app-stepper__item.is-clickable:hover .app-stepper__dot {
+  border-color: #cb0a2f;
+  color: #cb0a2f;
+}
+.app-stepper__item.is-clickable:hover .app-stepper__label {
+  color: #cb0a2f;
+}
+.app-stepper__item.is-clickable.is-active:hover .app-stepper__dot {
+  color: #fff;
+}
+.app-stepper__item.is-clickable:focus-visible {
+  outline: 2px solid #cb0a2f;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.app-stepper__item.is-viewing .app-stepper__dot {
+  box-shadow: 0 0 0 3px rgba(203, 10, 47, 0.18);
+}
 
 /* --- Form panel + action row --------------------------------------------- */
 .app-form-panel {

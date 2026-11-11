@@ -57,7 +57,11 @@ export default function CaseWorkspace() {
           extra={<CaseStatusTag c={c} />}
         />
         <div className="app-pageheader-card__stepper">
-          <JourneyStepper current={c.currentWorkArea} />
+          <JourneyStepper
+            current={c.currentWorkArea}
+            viewing={activeWorkArea}
+            onSelect={(wa) => navigate(`/cases/${c.id}/${wa}`)}
+          />
         </div>
       </div>
 

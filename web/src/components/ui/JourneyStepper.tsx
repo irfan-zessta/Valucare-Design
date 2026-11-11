@@ -30,9 +30,15 @@ function stateClass(i: number, currentIdx: number) {
 export function JourneyStepper({
   current,
   variant = 'full',
+  viewing,
+  onSelect,
 }: {
   current: WorkAreaId
   variant?: 'full' | 'mini'
+  /** The step currently being viewed (may be a past step), outlined for orientation. */
+  viewing?: WorkAreaId
+  /** When provided, reached steps (current and earlier) become clickable. */
+  onSelect?: (wa: WorkAreaId) => void
 }) {
   const currentIdx = WORK_AREA_ORDER.indexOf(current)
 
@@ -70,13 +76,38 @@ export function JourneyStepper({
 
   return (
     <div className="app-stepper">
-      {WORK_AREA_ORDER.map((wa, i) => (
-        <div key={wa} className={`app-stepper__item${stateClass(i, currentIdx)}`}>
-          <span className={`app-stepper__dot${stateClass(i, currentIdx)}`}>{STEP_ICONS[wa]}</span>
-          <div className="app-stepper__label">{WORK_AREA_LABELS[wa]}</div>
-          <div className="app-stepper__desc">{STEP_DESC[wa]}</div>
-        </div>
-      ))}
+      {WORK_AREA_ORDER.map((wa, i) => {
+        // Reached steps (current and earlier) are navigable when onSelect is given.
+        const reached = i <= currentIdx
+        const clickable = Boolean(onSelect) && reached
+        const cls =
+          `app-stepper__item${stateClass(i, currentIdx)}` +
+          (clickable ? ' is-clickable' : '') +
+          (viewing === wa ? ' is-viewing' : '')
+        const inner = (
+          <>
+            <span className={`app-stepper__dot${stateClass(i, currentIdx)}`}>{STEP_ICONS[wa]}</span>
+            <div className="app-stepper__label">{WORK_AREA_LABELS[wa]}</div>
+            <div className="app-stepper__desc">{STEP_DESC[wa]}</div>
+          </>
+        )
+        return clickable ? (
+          <button
+            key={wa}
+            type="button"
+            className={cls}
+            onClick={() => onSelect!(wa)}
+            aria-label={`Go to ${WORK_AREA_LABELS[wa]}`}
+            aria-current={viewing === wa ? 'step' : undefined}
+          >
+            {inner}
+          </button>
+        ) : (
+          <div key={wa} className={cls}>
+            {inner}
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { Alert, App, Button, Card, Descriptions, Space, Tag } from 'antd'
 import { CheckCircleOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Case, WorkAreaId } from '../../domain/types'
 import { WORK_AREA_LABELS } from '../../domain/types'
@@ -112,19 +113,23 @@ function renderArea(c: Case, workArea: WorkAreaId) {
 function FranchiseReview({ c }: { c: Case }) {
   const { patchCase } = useCases()
   const { message } = App.useApp()
+  const navigate = useNavigate()
   const accepted = c.franchise.status === 'accepted'
 
   function approve() {
     patchCase(c.id, (prev) => ({
       ...prev,
+      currentWorkArea: 'prepare-quotation',
       franchise: { ...prev.franchise, status: 'accepted', returnReasons: undefined, acceptedAt: new Date().toISOString() },
     }))
-    message.success('Franchise approved.')
+    message.success('Franchise approved — moving on to Prepare Quotation.')
+    navigate(`/cases/${c.id}/prepare-quotation`)
   }
 
   function returnForCorrections() {
     patchCase(c.id, (prev) => ({
       ...prev,
+      currentWorkArea: 'create-franchise',
       franchise: { ...prev.franchise, status: 'returned', acceptedAt: undefined },
     }))
     message.info('Franchise returned for corrections.')
