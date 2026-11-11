@@ -685,9 +685,9 @@ export function PrepareQuotation({ c }: { c: Case }) {
 
   const reqOutstanding = effectiveReqs.filter((r) => r.status === 'Requested').length
   const items = [
-    { key: 'requirements', label: `Requirements${reqOutstanding ? ` (${reqOutstanding})` : ' ✓'}`, children: requirementsTab },
+    { key: 'requirements', label: `Requirements${reqOutstanding ? ` (${reqOutstanding})` : ''}`, children: requirementsTab },
     { key: 'tor', label: 'TOR', children: torTab },
-    { key: 'members', label: `Member Data${memberComplete ? ' ✓' : ''}`, children: memberTab },
+    { key: 'members', label: 'Member Data', children: memberTab },
     { key: 'rates', label: 'Rate request & sheets', children: ratesTab },
   ]
 
