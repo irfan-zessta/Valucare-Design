@@ -16,6 +16,7 @@ import {
   Button,
   Checkbox,
   Descriptions,
+  Dropdown,
   Input,
   Modal,
   Select,
@@ -32,6 +33,7 @@ import {
   CloudUploadOutlined,
   DownloadOutlined,
   EyeOutlined,
+  MoreOutlined,
   PaperClipOutlined,
   PlusOutlined,
   SendOutlined,
@@ -349,23 +351,32 @@ export function PrepareQuotation({ c }: { c: Case }) {
                   <PaperClipOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />
                   <Typography.Text>{row.fileName}</Typography.Text>
                   <Tag>{row.fromForm ? 'from franchise form' : 'attached here'}</Tag>
-                  <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setViewDoc(row.fileName!)}>
-                    View
-                  </Button>
-                  <Button type="link" size="small" icon={<DownloadOutlined />} onClick={() => downloadDoc(row.fileName!)}>
-                    Download
-                  </Button>
-                  <Upload
-                    showUploadList={false}
-                    beforeUpload={(file) => {
-                      attachRequirement(row.key, file.name)
-                      return false
+                  <Dropdown
+                    trigger={['click']}
+                    menu={{
+                      items: [
+                        { key: 'view', icon: <EyeOutlined />, label: 'View', onClick: () => setViewDoc(row.fileName!) },
+                        { key: 'download', icon: <DownloadOutlined />, label: 'Download', onClick: () => downloadDoc(row.fileName!) },
+                        {
+                          key: 'reattach',
+                          icon: <CloudUploadOutlined />,
+                          label: (
+                            <Upload
+                              showUploadList={false}
+                              beforeUpload={(file) => {
+                                attachRequirement(row.key, file.name)
+                                return false
+                              }}
+                            >
+                              Re-attach
+                            </Upload>
+                          ),
+                        },
+                      ],
                     }}
                   >
-                    <Button type="link" size="small" icon={<CloudUploadOutlined />}>
-                      Re-attach
-                    </Button>
-                  </Upload>
+                    <Button type="text" size="small" icon={<MoreOutlined />} aria-label="Document actions" />
+                  </Dropdown>
                 </Space>
               ) : (
                 <Upload
