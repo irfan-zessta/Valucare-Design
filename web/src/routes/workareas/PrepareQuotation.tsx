@@ -41,10 +41,11 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import type { Case, QuotationRequirement, RateRow, RateSheet, TorLine } from '../../domain/types'
+import type { Case, QuotationRequirement, RateSheet, TorLine } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
 import { makeRequestRef, uid } from '../../domain/ids'
 import { formatCount } from '../../lib/format'
+import { ProposalRateSchedule, emptyRateSchedule, sampleRateSchedule } from './ProposalRateSchedule'
 
 // Default supporting-requirements checklist (mirrors the legacy meta.requirements).
 const DEFAULT_REQUIREMENTS: QuotationRequirement[] = [
@@ -64,13 +65,6 @@ const SAMPLE_TOR: TorLine[] = [
   { benefit: 'Pre-existing conditions', limit: 'Covered after 6 months', note: '' },
 ]
 
-const SAMPLE_RATE_ROWS: RateRow[] = [
-  { plan: 'Plan A', roomBoard: 'Php 5,000', mbl: 200000, memberType: 'Principal', paymentMode: 'Annual', rate: 12500 },
-  { plan: 'Plan A', roomBoard: 'Php 5,000', mbl: 200000, memberType: 'Dependent', paymentMode: 'Annual', rate: 10800 },
-  { plan: 'Plan B', roomBoard: 'Php 8,000', mbl: 300000, memberType: 'Principal', paymentMode: 'Annual', rate: 16400 },
-  { plan: 'Plan B', roomBoard: 'Php 8,000', mbl: 300000, memberType: 'Dependent', paymentMode: 'Annual', rate: 14200 },
-]
-
 // Sample member roster for initial data gathering — the raw list captured from
 // the master list. Prototype: a representative sample of the full membership.
 const SAMPLE_MEMBERS: { companyId: string; dob: string; gender: 'Male' | 'Female' }[] = [
@@ -86,7 +80,6 @@ const SAMPLE_MEMBERS: { companyId: string; dob: string; gender: 'Male' | 'Female
   { companyId: 'EMP-0010', dob: '1982-06-28', gender: 'Male' },
 ]
 
-const money = (n: number) => `Php ${n.toLocaleString()}`
 
 export function PrepareQuotation({ c }: { c: Case }) {
   const { patchCase } = useCases()
@@ -100,6 +93,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
   const [clarifyText, setClarifyText] = useState('')
   const [answerText, setAnswerText] = useState('')
   const [viewDoc, setViewDoc] = useState<string | null>(null)
+  const [viewSheetId, setViewSheetId] = useState<string | null>(null)
 
   const requirements = q.requirements ?? DEFAULT_REQUIREMENTS
   // A TOR document attached on the requirement — or carried over from the
@@ -352,7 +346,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
         status: 'received',
         receivedAt: new Date().toISOString(),
         preparedBy: 'Actuarial',
-        rows: SAMPLE_RATE_ROWS,
+        schedule: sampleRateSchedule(),
       }
       return {
         ...prev,
@@ -367,18 +361,26 @@ export function PrepareQuotation({ c }: { c: Case }) {
     message.success('Rate sheet issued by Actuarial (simulated).')
   }
 
-  function selectAndFinalize(sheetId: string) {
+  // Mark a rate-sheet version as the selected one (supersedes the previous pick).
+  function selectRateSheet(sheetId: string) {
     patchQ((prev) => ({
       ...prev,
-      currentWorkArea: 'finalize-offer',
       quotation: {
         ...prev.quotation,
         rateSheets: (prev.quotation.rateSheets ?? []).map((s) =>
-          s.id === sheetId ? { ...s, status: 'selected' } : s.status === 'selected' ? { ...s, status: 'superseded' } : s,
+          s.id === sheetId
+            ? { ...s, status: 'selected' }
+            : s.status === 'selected'
+              ? { ...s, status: 'superseded' }
+              : s,
         ),
       },
     }))
-    message.success('Rate sheet selected — moving on to Finalize Offer.')
+    message.success('Rate sheet version selected.')
+  }
+  function selectAndFinalize(sheetId: string) {
+    selectRateSheet(sheetId)
+    patchQ((prev) => ({ ...prev, currentWorkArea: 'finalize-offer' }))
     navigate(`/cases/${c.id}/finalize-offer`)
   }
 
@@ -718,35 +720,67 @@ export function PrepareQuotation({ c }: { c: Case }) {
         {sheets.length === 0 ? (
           <Typography.Text type="secondary">No rate sheet issued yet.</Typography.Text>
         ) : (
-          <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-            {sheets.map((s) => (
-              <div key={s.id}>
-                <Space style={{ marginBottom: 8 }}>
-                  <strong>Rate sheet v{s.version}</strong>
-                  <Tag color={s.status === 'selected' ? 'green' : s.status === 'superseded' ? 'default' : 'blue'}>
-                    {s.status}
-                  </Tag>
-                  <Typography.Text type="secondary">
-                    issued {dayjs(s.receivedAt).format('YYYY-MM-DD HH:mm')} by {s.preparedBy}
-                  </Typography.Text>
+          (() => {
+            const viewing =
+              sheets.find((s) => s.id === viewSheetId) ??
+              sheets.find((s) => s.status === 'selected') ??
+              sheets[0]
+            return (
+              <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+                {/* Version history — click a version to view it */}
+                <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
+                  {sheets.map((s) => {
+                    const active = s.id === viewing.id
+                    return (
+                      <div
+                        key={s.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setViewSheetId(s.id)}
+                        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setViewSheetId(s.id)}
+                        className="app-decision-row"
+                        style={{
+                          cursor: 'pointer',
+                          border: `1px solid ${active ? '#9f1239' : '#f0f0f0'}`,
+                          background: active ? 'rgba(159,18,57,0.04)' : undefined,
+                          borderRadius: 8,
+                          padding: '8px 12px',
+                        }}
+                      >
+                        <Space>
+                          <strong>Rate sheet v{s.version}</strong>
+                          <Tag color={s.status === 'selected' ? 'green' : s.status === 'superseded' ? 'default' : 'blue'}>
+                            {s.status}
+                          </Tag>
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            issued {dayjs(s.receivedAt).format('YYYY-MM-DD HH:mm')} by {s.preparedBy}
+                          </Typography.Text>
+                        </Space>
+                        <Space onClick={(e) => e.stopPropagation()}>
+                          {active && <Tag color="default">Viewing</Tag>}
+                          {s.status !== 'selected' && (
+                            <Button size="small" onClick={() => selectRateSheet(s.id)}>
+                              Select this version
+                            </Button>
+                          )}
+                        </Space>
+                      </div>
+                    )
+                  })}
                 </Space>
-                <Table<RateRow>
-                  rowKey={(r) => `${r.plan}-${r.memberType}-${r.paymentMode}`}
-                  size="small"
-                  pagination={false}
-                  dataSource={s.rows ?? []}
-                  columns={[
-                    { title: 'Plan', dataIndex: 'plan' },
-                    { title: 'Room & board', dataIndex: 'roomBoard' },
-                    { title: 'MBL', dataIndex: 'mbl', align: 'right', render: (v: number) => money(v) },
-                    { title: 'Member type', dataIndex: 'memberType' },
-                    { title: 'Payment mode', dataIndex: 'paymentMode' },
-                    { title: 'Rate', dataIndex: 'rate', align: 'right', render: (v: number) => money(v) },
-                  ]}
-                />
-              </div>
-            ))}
-          </Space>
+
+                {/* The selected/viewing rate sheet, in the membership-fee layout */}
+                <div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    Viewing rate sheet v{viewing.version} ({viewing.status})
+                  </Typography.Text>
+                  <div style={{ marginTop: 8 }}>
+                    <ProposalRateSchedule value={viewing.schedule ?? emptyRateSchedule()} editable={false} />
+                  </div>
+                </div>
+              </Space>
+            )
+          })()
         )}
       </section>
     </Space>

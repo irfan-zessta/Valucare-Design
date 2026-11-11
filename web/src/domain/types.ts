@@ -145,6 +145,8 @@ export interface RateSheet {
   note?: string
   /** Imported rate rows (prototype — sample data). */
   rows?: RateRow[]
+  /** Structured membership-fee schedule (same layout used on the proposal). */
+  schedule?: RateSchedule
 }
 
 /** A single supporting-requirement line on the quotation package. */
