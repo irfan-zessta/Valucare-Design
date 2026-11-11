@@ -31,6 +31,7 @@ import {
   CheckCircleOutlined,
   DeleteOutlined,
   EditOutlined,
+  EyeOutlined,
   FileTextOutlined,
   PlusOutlined,
   RollbackOutlined,
@@ -153,6 +154,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
   const [round, setRound] = useState(emptyRound)
   const [returning, setReturning] = useState(false)
   const [returnConcern, setReturnConcern] = useState('')
+  const [viewRates, setViewRates] = useState(false)
 
   function patchProposal(recipe: (p: ProposalVersion) => ProposalVersion, extra?: (c: Case) => Case) {
     patchCase(c.id, (prev) => {
@@ -607,8 +609,20 @@ export function FinalizeOffer({ c }: { c: Case }) {
               Return to Actuarial
             </Button>
           </div>
-          <div style={{ marginTop: 12 }}>
-            <ProposalRateSchedule value={proposal.rateSchedule ?? emptyRateSchedule()} editable={false} />
+          <div
+            className="app-decision-row"
+            style={{ marginTop: 12, border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}
+          >
+            <Space>
+              <strong>Membership-fee rate sheet</strong>
+              <Tag color="green">from Actuarial</Tag>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                rate sheet v{proposal.rateSheetVersion ?? selectedSheet?.version ?? 1} · view only
+              </Typography.Text>
+            </Space>
+            <Button size="small" icon={<EyeOutlined />} onClick={() => setViewRates(true)}>
+              View
+            </Button>
           </div>
           {editable ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
@@ -926,6 +940,24 @@ export function FinalizeOffer({ c }: { c: Case }) {
         <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12, marginBottom: 0 }}>
           If rates, commission or benefits change, use “Revise (new version)” so the proposal is re-approved.
         </Typography.Paragraph>
+      </Modal>
+
+      {/* ---- Rate sheet viewer (pop-up) ------------------------------------ */}
+      <Modal
+        open={viewRates}
+        width={1100}
+        title={`Membership-fee rate sheet · rate sheet v${proposal.rateSheetVersion ?? selectedSheet?.version ?? 1} (from Actuarial · view only)`}
+        onCancel={() => setViewRates(false)}
+        footer={[
+          <Button key="return" icon={<RollbackOutlined />} onClick={() => { setViewRates(false); setReturning(true) }}>
+            Return to Actuarial
+          </Button>,
+          <Button key="close" type="primary" onClick={() => setViewRates(false)}>
+            Close
+          </Button>,
+        ]}
+      >
+        <ProposalRateSchedule value={proposal.rateSchedule ?? emptyRateSchedule()} editable={false} />
       </Modal>
 
       {/* ---- Return to Actuarial (rate concern) ---------------------------- */}
