@@ -31,16 +31,24 @@ export function JourneyStepper({
   current,
   variant = 'full',
   viewing,
+  reachable,
   onSelect,
 }: {
   current: WorkAreaId
   variant?: 'full' | 'mini'
   /** The step currently being viewed (may be a past step), outlined for orientation. */
   viewing?: WorkAreaId
-  /** When provided, reached steps (current and earlier) become clickable. */
+  /**
+   * The furthest step the case has reached — gates how far navigation can jump.
+   * Defaults to `current`; pass a later step when the progress pointer lags the
+   * real next action so the user is never trapped on a step they've moved past.
+   */
+  reachable?: WorkAreaId
+  /** When provided, reached steps (up to `reachable`) become clickable. */
   onSelect?: (wa: WorkAreaId) => void
 }) {
   const currentIdx = WORK_AREA_ORDER.indexOf(current)
+  const reachableIdx = Math.max(currentIdx, WORK_AREA_ORDER.indexOf(reachable ?? current))
 
   if (variant === 'mini') {
     return (
@@ -77,8 +85,8 @@ export function JourneyStepper({
   return (
     <div className="app-stepper">
       {WORK_AREA_ORDER.map((wa, i) => {
-        // Reached steps (current and earlier) are navigable when onSelect is given.
-        const reached = i <= currentIdx
+        // Reached steps (up to the furthest reached) are navigable when onSelect is given.
+        const reached = i <= reachableIdx
         const clickable = Boolean(onSelect) && reached
         const cls =
           `app-stepper__item${stateClass(i, currentIdx)}` +

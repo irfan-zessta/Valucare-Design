@@ -7,7 +7,7 @@ import {
   WORK_AREA_ORDER,
   type WorkAreaId,
 } from '../domain/types'
-import { meaningfulStatus, nextAction, responsibleDepartment } from '../domain/progress'
+import { furthestWorkArea, meaningfulStatus, nextAction, responsibleDepartment } from '../domain/progress'
 import { CaseStatusTag } from '../components/CaseStatusTag'
 import { PageHeader } from '../components/ui/PageHeader'
 import { JourneyStepper } from '../components/ui/JourneyStepper'
@@ -60,15 +60,21 @@ export default function CaseWorkspace() {
           <JourneyStepper
             current={c.currentWorkArea}
             viewing={activeWorkArea}
+            reachable={furthestWorkArea(c)}
             onSelect={(wa) => navigate(`/cases/${c.id}/${wa}`)}
           />
         </div>
       </div>
 
-      {/* What to do next — one primary action, honest ownership. On the Create
-          Franchise step the work area offers an upload-to-autofill card instead,
-          so this guidance card is hidden there while it's the user's turn. */}
-      {!(activeWorkArea === 'create-franchise' && !action.waiting) && (
+      {/* What to do next — one primary action, honest ownership. Hidden only
+          while the editable Create Franchise form is on screen (draft/returned),
+          because that view offers its own upload-to-autofill card. Once the
+          franchise is submitted/accepted, the read-only review shows and this
+          card stays — so stepping back to check docs keeps the forward button. */}
+      {!(
+        activeWorkArea === 'create-franchise' &&
+        (c.franchise.status === 'draft' || c.franchise.status === 'returned')
+      ) && (
       <Card size="small" style={{ margin: '12px 0 20px' }}>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           What to do next · {WORK_AREA_LABELS[c.currentWorkArea]}

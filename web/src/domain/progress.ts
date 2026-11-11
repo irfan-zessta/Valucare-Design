@@ -124,6 +124,21 @@ export function nextAction(c: Case): NextAction {
   }
 }
 
+/**
+ * The furthest work area the case has legitimately reached — the later of the
+ * progress pointer and the next action's work area. `currentWorkArea` only
+ * advances when a step's own action runs (e.g. approving the franchise), so a
+ * case whose franchise is already accepted can still point at 'create-franchise'
+ * while its real next action is 'prepare-quotation'. Navigation uses this so a
+ * user who steps back to review an earlier work area is never trapped behind a
+ * stale pointer.
+ */
+export function furthestWorkArea(c: Case): WorkAreaId {
+  const currentIdx = WORK_AREA_ORDER.indexOf(c.currentWorkArea)
+  const nextIdx = WORK_AREA_ORDER.indexOf(nextAction(c).workArea)
+  return WORK_AREA_ORDER[Math.max(currentIdx, nextIdx)]
+}
+
 /** Completion state for each work area, for the case-navigation group. */
 export function workAreaState(c: Case, id: WorkAreaId): WorkAreaState {
   const currentIdx = WORK_AREA_ORDER.indexOf(c.currentWorkArea)
