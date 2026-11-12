@@ -707,7 +707,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
         </section>
 
         {/* ---- Activity 1 · Rate sheet checking ----------------------------- */}
-        <section>
+        <Card>
           {activityHead(
             1,
             'Rate sheet checking',
@@ -756,10 +756,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
               <Tag>Not checked</Tag>
             )}
           </div>
-        </section>
+        </Card>
 
         {/* ---- Activity 2 · Rates recommendation ---------------------------- */}
-        <section>
+        <Card>
           {activityHead(2, 'Rates recommendation')}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
             Recommend the rates to present to {recipient}.
@@ -801,10 +801,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
               </Descriptions.Item>
             </Descriptions>
           )}
-        </section>
+        </Card>
 
         {/* ---- Activity 3 · Rates justification ------------------------------ */}
-        <section>
+        <Card>
           {activityHead(3, 'Rates justification')}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
             Prepare the explanation supporting the recommended rates.
@@ -824,10 +824,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
               {proposal.justification || '—'}
             </Typography.Paragraph>
           )}
-        </section>
+        </Card>
 
         {/* ---- Activity 4 · Proposal preparation ---------------------------- */}
-        <section>
+        <Card>
           {activityHead(4, 'Proposal preparation')}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
             Assemble the company details, benefits, pricing and terms into the client-facing proposal. The full proposal
@@ -844,7 +844,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
               description={proposal.templateAdditions.join('; ')}
             />
           )}
-        </section>
+        </Card>
 
         {/* ---- Pricing approvals -------------------------------------------- */}
         <section>
