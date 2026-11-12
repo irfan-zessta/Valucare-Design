@@ -1,13 +1,11 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import { Alert, Button, Card, Result, Space, Typography } from 'antd'
-import { ArrowRightOutlined } from '@ant-design/icons'
+import { Button, Result, Space } from 'antd'
 import { useCases } from '../state/CaseProvider'
 import {
-  WORK_AREA_LABELS,
   WORK_AREA_ORDER,
   type WorkAreaId,
 } from '../domain/types'
-import { furthestWorkArea, meaningfulStatus, nextAction, responsibleDepartment } from '../domain/progress'
+import { furthestWorkArea } from '../domain/progress'
 import { CaseStatusTag } from '../components/CaseStatusTag'
 import { PageHeader } from '../components/ui/PageHeader'
 import { JourneyStepper } from '../components/ui/JourneyStepper'
@@ -40,7 +38,6 @@ export default function CaseWorkspace() {
   }
 
   const activeWorkArea = (WORK_AREAS.has(workArea) ? workArea : c.currentWorkArea) as WorkAreaId
-  const action = nextAction(c)
 
   return (
     <div className="app-page app-page--wide">
@@ -65,41 +62,6 @@ export default function CaseWorkspace() {
           />
         </div>
       </div>
-
-      {/* What to do next — one primary action, honest ownership. Hidden only
-          while the editable Create Franchise form is on screen (draft/returned),
-          because that view offers its own upload-to-autofill card. Once the
-          franchise is submitted/accepted, the read-only review shows and this
-          card stays — so stepping back to check docs keeps the forward button. */}
-      {!(
-        activeWorkArea === 'create-franchise' &&
-        (c.franchise.status === 'draft' || c.franchise.status === 'returned')
-      ) && (
-      <Card size="small" style={{ margin: '12px 0 20px' }}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          What to do next · {WORK_AREA_LABELS[c.currentWorkArea]}
-        </Typography.Text>
-        <Typography.Title level={5} style={{ margin: '4px 0 12px' }}>
-          {action.label}
-        </Typography.Title>
-        {action.waiting ? (
-          <Alert
-            type="info"
-            showIcon
-            title={meaningfulStatus(c)}
-            description={`This case is with ${responsibleDepartment(c)}. You'll be able to continue once they respond.`}
-          />
-        ) : action.workArea !== activeWorkArea ? (
-          <Button type="primary" icon={<ArrowRightOutlined />} onClick={() => navigate(`/cases/${c.id}/${action.workArea}`)}>
-            {action.label}
-          </Button>
-        ) : (
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Complete this in the {WORK_AREA_LABELS[activeWorkArea]} tasks below.
-          </Typography.Paragraph>
-        )}
-      </Card>
-      )}
 
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
         <WorkAreaPanel c={c} workArea={activeWorkArea} />
