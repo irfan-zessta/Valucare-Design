@@ -320,6 +320,17 @@ export function FranchiseReview({ c }: { c: Case }) {
         </div>
       )}
 
+      {accepted && (
+        <div className="app-form-floatbar" style={{ marginTop: 16 }}>
+          <Typography.Text type="secondary">This franchise was approved.</Typography.Text>
+          <div className="app-form-floatbar__actions">
+            <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
+              Edit franchise form
+            </Button>
+          </div>
+        </div>
+      )}
+
       {rejected && (
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
           <Typography.Text type="secondary">This franchise was rejected.</Typography.Text>
