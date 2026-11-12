@@ -8,6 +8,7 @@ import { CreateFranchise } from './CreateFranchise'
 import { FranchiseReview } from './FranchiseReview'
 import { PrepareQuotation } from './PrepareQuotation'
 import { FinalizeOffer } from './FinalizeOffer'
+import { SetupAccount } from './SetupAccount'
 
 // Compact decision badge shown at the right corner of the Create Franchise card
 // header once the franchise has been approved or rejected.
@@ -46,9 +47,9 @@ function franchiseDecisionBadge(c: Case) {
 // so the data stays consistent as the flows are added.
 
 export function WorkAreaPanel({ c, workArea }: { c: Case; workArea: WorkAreaId }) {
-  // Finalize Offer renders each step as its own card (and its own header card),
-  // so the shared panel background is dropped here to avoid a card-in-card look.
-  if (workArea === 'finalize-offer') {
+  // Finalize Offer and Set Up Account render their own cards/panels, so the
+  // shared panel background is dropped here to avoid a card-in-card look.
+  if (workArea === 'finalize-offer' || workArea === 'setup-account') {
     return renderArea(c, workArea)
   }
   const extra = workArea === 'create-franchise' ? franchiseDecisionBadge(c) : null
@@ -73,15 +74,7 @@ function renderArea(c: Case, workArea: WorkAreaId) {
     case 'finalize-offer':
       return <FinalizeOffer c={c} />
     case 'setup-account':
-      return (
-        <Descriptions column={1} size="small">
-          <Descriptions.Item label="Account reference">{c.account.accountRef ?? 'Not created'}</Descriptions.Item>
-          <Descriptions.Item label="Account status">{c.account.status}</Descriptions.Item>
-          <Descriptions.Item label="Plan codes">
-            {c.account.planCodes.length} · {c.account.planCodeSetStatus}
-          </Descriptions.Item>
-        </Descriptions>
-      )
+      return <SetupAccount c={c} />
     case 'activate-handover':
       return (
         <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>

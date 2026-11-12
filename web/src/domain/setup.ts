@@ -4,12 +4,7 @@
 // from the wireframe account/plan-code schemas). Kept data-driven so the panels
 // stay compact and field parity is explicit.
 // ===========================================================================
-import type {
-  Case,
-  SetupState,
-  SetupTaskId,
-  SobDraft,
-} from './types'
+import type { Case, SetupState, SetupTaskId } from './types'
 
 // --- Task list (the required order) ----------------------------------------
 
@@ -99,10 +94,19 @@ export function setupTaskMeta(id: SetupTaskId): SetupTaskMeta {
 
 // --- Carry-forward initialisation ------------------------------------------
 
+/** Normalise any date-ish string to a clean YYYY-MM-DD. */
+function dateOnly(v?: string): string | undefined {
+  if (!v) return undefined
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? v.slice(0, 10) : d.toISOString().slice(0, 10)
+}
+
 /** Effective date carried from the franchise / accepted proposal, if any. */
 function carriedEffectiveDate(c: Case): string | undefined {
   const fromForm = (c.franchise.formData?.targetEffectiveDate as string) || undefined
-  return c.coverage.effectiveDate || c.franchise.coverageStart || fromForm || c.offer.sob?.header?.currentEffectiveDate
+  return dateOnly(
+    c.coverage.effectiveDate || c.franchise.coverageStart || fromForm || c.offer.sob?.header?.currentEffectiveDate,
+  )
 }
 
 /** Expiry = one year minus a day from effectivity (same rule as the wireframe). */
@@ -119,7 +123,7 @@ function computeExpiry(effective?: string): string | undefined {
 /** A fresh Set Up Account state with the accepted details carried forward. */
 export function makeInitialSetup(c: Case): SetupState {
   const effective = carriedEffectiveDate(c)
-  const expiry = c.offer.sob?.header?.expiryDate || computeExpiry(effective)
+  const expiry = dateOnly(c.offer.sob?.header?.expiryDate) || computeExpiry(effective)
   return {
     alignment: {
       billing: { status: 'pending' },

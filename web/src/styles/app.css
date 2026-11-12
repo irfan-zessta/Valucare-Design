@@ -601,6 +601,115 @@ button.app-stepper__item {
   margin-inline-start: auto;
 }
 
+/* Set Up Account — ordered task rail + single active content panel. */
+.app-setup {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  /* Keep content clear of the fixed floating action bar. */
+  padding-block-end: 64px;
+}
+.app-setup-rail {
+  flex: 0 0 248px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 8px;
+  position: sticky;
+  inset-block-start: 16px;
+}
+.app-setup-rail__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: start;
+  inline-size: 100%;
+  appearance: none;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font: inherit;
+  color: rgba(0, 0, 0, 0.45);
+}
+.app-setup-rail__item:disabled {
+  cursor: default;
+}
+.app-setup-rail__item.is-reachable {
+  color: rgba(0, 0, 0, 0.88);
+}
+.app-setup-rail__item.is-reachable:hover {
+  background: #fafafa;
+}
+.app-setup-rail__item.is-active {
+  background: rgba(203, 10, 47, 0.06);
+}
+.app-setup-rail__badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 22px;
+  block-size: 22px;
+  border-radius: 50%;
+  border: 1px solid #d9d9d9;
+  background: #fff;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-block-start: 1px;
+}
+.app-setup-rail__item.is-active .app-setup-rail__badge {
+  background: #cb0a2f;
+  border-color: #cb0a2f;
+  color: #fff;
+}
+.app-setup-rail__item.is-done .app-setup-rail__badge {
+  border-color: #52c41a;
+  color: #52c41a;
+}
+.app-setup-rail__label {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.app-setup-rail__item.is-active .app-setup-rail__label {
+  color: #cb0a2f;
+}
+.app-setup-rail__status {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.45);
+}
+.app-setup__panel {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 20px 24px;
+}
+@media (max-width: 900px) {
+  .app-setup {
+    flex-direction: column;
+  }
+  .app-setup-rail {
+    flex: 1 1 auto;
+    inline-size: 100%;
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .app-setup-rail__item {
+    inline-size: auto;
+  }
+}
+
 /* Numbered activity header (Finalize Offer draft step: the 4 Sales activities). */
 .app-activity-head {
   display: flex;

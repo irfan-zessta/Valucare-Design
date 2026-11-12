@@ -207,24 +207,7 @@ export function PlanCodes({
             )}
             {reviewCount > 0 && (
               <>
-                <Button
-                  danger
-                  onClick={() =>
-                    Modal.confirm({
-                      title: 'Return plan codes for correction',
-                      content: (
-                        <Input.TextArea
-                          id="pc-return-reason"
-                          rows={3}
-                          placeholder="Reason for return"
-                          onChange={(e) => ((window as unknown as Record<string, string>).__pcReason = e.target.value)}
-                        />
-                      ),
-                      onOk: () =>
-                        bulkSet(['for-approval'], 'returned', (window as unknown as Record<string, string>).__pcReason || 'Returned for correction'),
-                    })
-                  }
-                >
+                <Button danger onClick={() => setReturning(true)}>
                   Return
                 </Button>
                 <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => bulkSet(['for-approval'], 'approved')}>
@@ -235,6 +218,26 @@ export function PlanCodes({
           </div>
         </div>
       )}
+
+      <Modal
+        open={returning}
+        title="Return plan codes for correction"
+        okText="Return for correction"
+        okButtonProps={{ danger: true, disabled: !returnReason.trim() }}
+        onCancel={() => setReturning(false)}
+        onOk={() => {
+          bulkSet(['for-approval'], 'returned', returnReason.trim() || 'Returned for correction')
+          setReturning(false)
+          setReturnReason('')
+        }}
+      >
+        <Input.TextArea
+          rows={3}
+          placeholder="Reason for return"
+          value={returnReason}
+          onChange={(e) => setReturnReason(e.target.value)}
+        />
+      </Modal>
 
       <Modal
         open={adding}
