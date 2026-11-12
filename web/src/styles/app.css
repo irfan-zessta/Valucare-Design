@@ -543,7 +543,10 @@ button.app-stepper__item {
 }
 .app-login__card {
   inline-size: 100%;
-  max-inline-size: 480px;
+  max-inline-size: 560px;
+}
+.app-login__card .ant-card-body {
+  padding: 40px;
 }
 .app-login__brand {
   margin-block-end: 20px;
