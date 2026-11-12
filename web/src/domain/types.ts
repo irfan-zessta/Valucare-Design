@@ -677,6 +677,8 @@ export interface CocState {
   approvedAt?: string
   releasedAt?: string
   remarks?: string
+  /** Commission arrangement — captured for every account, incl. Direct. */
+  commission?: { type?: string; rate?: number; basis?: string; payee?: string; note?: string }
 }
 
 export type AccountFormStatus = 'pending-setup' | 'for-approval' | 'approved' | 'returned'

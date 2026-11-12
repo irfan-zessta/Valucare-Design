@@ -19,6 +19,7 @@ import {
   Descriptions,
   Divider,
   Input,
+  InputNumber,
   Select,
   Space,
   Tabs,
@@ -952,6 +953,20 @@ export function SetupAccount({ c }: { c: Case }) {
     // Details stay editable until the COC is generated or sent back as a draft.
     const cocEditable = coc.status === 'not-generated' || coc.status === 'draft'
 
+    // Commission rate — captured for every account; Direct accounts still record it.
+    const isIntermediary = c.company.businessSource !== 'Direct'
+    const commission = coc.commission ?? {
+      type: isIntermediary ? 'Percentage of premium' : 'None',
+      rate: accepted?.commissionPct ?? (isIntermediary ? 10 : 0),
+      basis: 'Gross premium',
+      payee: isIntermediary ? c.company.intermediaryName ?? '' : 'In-house (Direct)',
+      note: accepted?.commissionNote ?? (isIntermediary ? '' : 'Direct account — recorded for reference.'),
+    }
+    const setCommission = (patchFields: Partial<NonNullable<typeof coc.commission>>) =>
+      setCoc({ commission: { ...commission, ...patchFields } })
+    const COMMISSION_TYPES = ['Percentage of premium', 'Percentage of net premium', 'Fixed amount', 'None']
+    const COMMISSION_BASES = ['Gross premium', 'Net premium', 'Per enrollee', 'N/A']
+
     function generate() {
       setCoc({
         status: 'in-review',
@@ -1028,6 +1043,76 @@ export function SetupAccount({ c }: { c: Case }) {
               ? 'Edit the details below, then generate the COC. A separate reviewer approves before release.'
               : 'Generated from the company, coverage dates and the onboarding SOB benefits. A separate reviewer approves before release.'}
           </Typography.Paragraph>
+        </FormSection>
+
+        <FormSection
+          title="Commission rate"
+          description={
+            isIntermediary
+              ? `Intermediary account (${c.company.businessSource}) — commission paid to the agent/broker.`
+              : 'Direct account — no external intermediary, but the commission arrangement is still recorded here.'
+          }
+          wide
+        >
+          {cocEditable ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Commission type</div>
+                <Select
+                  style={{ width: '100%' }}
+                  value={commission.type}
+                  onChange={(v) => setCommission({ type: v })}
+                  options={COMMISSION_TYPES.map((o) => ({ value: o, label: o }))}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>
+                  {commission.type === 'Fixed amount' ? 'Commission amount' : 'Commission rate (%)'}
+                </div>
+                <InputNumber
+                  style={{ width: '100%' }}
+                  min={0}
+                  value={commission.rate}
+                  onChange={(v) => setCommission({ rate: v ?? undefined })}
+                  disabled={commission.type === 'None'}
+                  prefix={commission.type === 'Fixed amount' ? '₱' : undefined}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Computation basis</div>
+                <Select
+                  style={{ width: '100%' }}
+                  value={commission.basis}
+                  onChange={(v) => setCommission({ basis: v })}
+                  options={COMMISSION_BASES.map((o) => ({ value: o, label: o }))}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Payee</div>
+                <Input value={commission.payee ?? ''} onChange={(e) => setCommission({ payee: e.target.value })} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Note</div>
+                <Input.TextArea rows={2} value={commission.note ?? ''} onChange={(e) => setCommission({ note: e.target.value })} />
+              </div>
+            </div>
+          ) : (
+            <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
+              <Descriptions.Item label="Commission type">{commission.type || '—'}</Descriptions.Item>
+              <Descriptions.Item label={commission.type === 'Fixed amount' ? 'Commission amount' : 'Commission rate'}>
+                {commission.type === 'None'
+                  ? '—'
+                  : commission.rate == null
+                    ? '—'
+                    : commission.type === 'Fixed amount'
+                      ? `₱${commission.rate}`
+                      : `${commission.rate}%`}
+              </Descriptions.Item>
+              <Descriptions.Item label="Computation basis">{commission.basis || '—'}</Descriptions.Item>
+              <Descriptions.Item label="Payee">{commission.payee || '—'}</Descriptions.Item>
+              {commission.note && <Descriptions.Item label="Note" span={2}>{commission.note}</Descriptions.Item>}
+            </Descriptions>
+          )}
         </FormSection>
 
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
