@@ -679,8 +679,11 @@ export interface BenefitUploadState {
 }
 
 export interface SetupState {
-  /** Internal alignment with the two downstream departments. */
-  alignment: { billing: DeptAlignment; mda: DeptAlignment }
+  /**
+   * Internal alignment with the two downstream departments, plus the documents
+   * Sales shares with them (SOB, proposal, rate sheet, franchise docs, uploads).
+   */
+  alignment: { billing: DeptAlignment; mda: DeptAlignment; sharedDocs?: SetupAttachment[] }
   legal: LegalRequest
   contracts: SetupContracts
   clientSend: ClientSend

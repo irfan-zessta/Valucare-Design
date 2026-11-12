@@ -32,6 +32,7 @@ import {
   CheckCircleFilled,
   CloudUploadOutlined,
   EyeOutlined,
+  FileTextOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -299,6 +300,24 @@ export function SetupAccount({ c }: { c: Case }) {
       )
     }
 
+    // ---- Documents Sales shares with Billing & Collections and MDA ----------
+    const shared = a.sharedDocs ?? []
+    const setSharedDocs = (next: typeof shared) =>
+      patchSetup((s) => ({ ...s, alignment: { ...s.alignment, sharedDocs: next } }))
+    const isShared = (slot: string) => shared.some((x) => x.slot === slot)
+    const shareDoc = (slot: string, fileName: string) =>
+      setSharedDocs([...shared.filter((x) => x.slot !== slot), { slot, fileName, uploadedBy: uploader, uploadedAt: new Date().toISOString() }])
+    const unshareDoc = (slot: string) => setSharedDocs(shared.filter((x) => x.slot !== slot))
+
+    const selRate = c.quotation.rateSheets.find((r) => r.status === 'selected')
+    const suggestions: { slot: string; label: string; fileName: string }[] = []
+    if (c.offer.sob) suggestions.push({ slot: 'sob', label: `Summary of Benefits · v${c.offer.sob.version}`, fileName: `SOB-${c.company.shortName}-v${c.offer.sob.version}.pdf` })
+    if (accepted) suggestions.push({ slot: 'proposal', label: `Accepted proposal · v${accepted.version}`, fileName: `Proposal-${c.company.shortName}-v${accepted.version}.pdf` })
+    if (selRate) suggestions.push({ slot: 'ratesheet', label: `Rate sheet · v${selRate.version}`, fileName: `RateSheet-${c.company.shortName}-v${selRate.version}.pdf` })
+    ;(c.franchise.documents ?? []).forEach((doc) =>
+      suggestions.push({ slot: `fr-${doc.slot}`, label: doc.slot, fileName: doc.fileName }),
+    )
+
     return (
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
         <FormSection title="Accepted details (carried forward)" wide>
@@ -319,6 +338,83 @@ export function SetupAccount({ c }: { c: Case }) {
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
             Review this information shared with Billing &amp; Collections and MDA, then record the coordination outcome for each.
           </Typography.Paragraph>
+        </FormSection>
+
+        <FormSection
+          title="Documents shared with Billing & Collections and MDA"
+          description="Share the SOB, accepted proposal, rate sheet, franchise documents, or upload additional files."
+          extra={
+            <Space>
+              <Button
+                size="small"
+                onClick={() =>
+                  setSharedDocs([
+                    ...shared.filter((x) => !suggestions.some((sg) => sg.slot === x.slot)),
+                    ...suggestions.map((sg) => ({ slot: sg.slot, fileName: sg.fileName, uploadedBy: uploader, uploadedAt: new Date().toISOString() })),
+                  ])
+                }
+                disabled={suggestions.length === 0}
+              >
+                Share all
+              </Button>
+              <Upload
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  shareDoc(`up-${Date.now()}`, file.name)
+                  return false
+                }}
+              >
+                <Button size="small" icon={<CloudUploadOutlined />}>
+                  Upload &amp; share
+                </Button>
+              </Upload>
+            </Space>
+          }
+          wide
+        >
+          <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
+            {suggestions.map((sg) => (
+              <div key={sg.slot} className="app-decision-row">
+                <Space>
+                  <FileTextOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />
+                  <span>{sg.label}</span>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    {sg.fileName}
+                  </Typography.Text>
+                  {isShared(sg.slot) && <Tag color="green">Shared</Tag>}
+                </Space>
+                {isShared(sg.slot) ? (
+                  <Button size="small" type="text" danger onClick={() => unshareDoc(sg.slot)}>
+                    Remove
+                  </Button>
+                ) : (
+                  <Button size="small" icon={<SendOutlined />} onClick={() => shareDoc(sg.slot, sg.fileName)}>
+                    Share
+                  </Button>
+                )}
+              </div>
+            ))}
+
+            {shared.filter((x) => !suggestions.some((sg) => sg.slot === x.slot)).map((x) => (
+              <div key={x.slot} className="app-decision-row">
+                <Space>
+                  <FileTextOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />
+                  <span>{x.fileName}</span>
+                  <Tag color="green">Shared (uploaded)</Tag>
+                </Space>
+                <Button size="small" type="text" danger onClick={() => unshareDoc(x.slot)}>
+                  Remove
+                </Button>
+              </div>
+            ))}
+
+            {suggestions.length === 0 && shared.length === 0 && (
+              <Typography.Text type="secondary">No carried-forward documents found — upload files to share.</Typography.Text>
+            )}
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {shared.length} document(s) shared with Billing &amp; Collections and MDA.
+            </Typography.Text>
+          </Space>
         </FormSection>
 
         {deptCard('billing', 'Billing & Collections')}
