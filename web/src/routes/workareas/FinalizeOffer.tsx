@@ -684,7 +684,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
         <Card>
           <Typography.Title level={5} style={{ margin: 0 }}>
-            Finalize Offer
+            Proposal
           </Typography.Title>
         </Card>
         {sobSection}
@@ -765,10 +765,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
           >
             <div>
               <Typography.Title level={5} style={{ marginTop: 0 }}>
-                Finalize Offer
+                Proposal
               </Typography.Title>
               <Typography.Title level={5} style={{ marginTop: 0 }}>
-                Proposal {proposal.code ?? proposalCode(c)} · version {proposal.version} {statusTag}
+                {proposal.code ?? proposalCode(c)} · version {proposal.version} {statusTag}
               </Typography.Title>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 Rate sheet v{proposal.rateSheetVersion ?? selectedSheet?.version ?? 1} · SOB v{sobVersion}
