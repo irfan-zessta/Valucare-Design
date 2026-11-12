@@ -530,7 +530,8 @@ button.app-stepper__item {
 
 /* --- Login --------------------------------------------------------------- */
 .app-login {
-  min-block-size: 100vh;
+  block-size: 100vh;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -544,6 +545,8 @@ button.app-stepper__item {
 .app-login__card {
   inline-size: 100%;
   max-inline-size: 560px;
+  max-block-size: calc(100vh - 64px);
+  overflow: auto;
 }
 .app-login__card .ant-card-body {
   padding: 40px;

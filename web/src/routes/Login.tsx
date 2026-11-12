@@ -59,7 +59,7 @@ export default function Login() {
     <div className="app-login">
       <Card className="app-login__card">
         <div className="app-login__brand">
-          <ValucareLogo size={32} />
+          <ValucareLogo size={48} />
         </div>
         <Typography.Title level={3} style={{ marginBottom: 4 }}>
           Sign in to ValuCare HMS
