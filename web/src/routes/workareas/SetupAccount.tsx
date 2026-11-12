@@ -1185,47 +1185,6 @@ export function SetupAccount({ c }: { c: Case }) {
     )
   }
 
-  // ===== Completion summary =================================================
-  if (setup.completed) {
-    return (
-      <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-        <Alert
-          type="success"
-          showIcon
-          title="Set Up Account completed"
-          description="Onboarding, account setup, benefit uploading and plan-code approval are complete. Coverage is not yet activated — that happens in Activate & Handover."
-        />
-        <FormSection title="Summary" wide>
-          <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
-            <Descriptions.Item label="Account number">{c.account.accountRef || '—'}</Descriptions.Item>
-            <Descriptions.Item label="Account status">{c.account.status}</Descriptions.Item>
-            <Descriptions.Item label="Onboarding SOB">{setup.onboardingSob ? `v${setup.onboardingSob.version} · ${setup.onboardingSob.status}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="COC">{setup.coc.status}</Descriptions.Item>
-            <Descriptions.Item label="Plan codes">{c.account.planCodes.length} · {c.account.planCodeSetStatus}</Descriptions.Item>
-            <Descriptions.Item label="Contract">
-              {setup.contracts.contract.versions.map((v) => `v${v.version} ${STAGE_LABEL[v.stage]}`).join(' · ') || '—'}
-            </Descriptions.Item>
-          </Descriptions>
-        </FormSection>
-        <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Typography.Text type="secondary">Coverage is activated separately in the next work area.</Typography.Text>
-          <div className="app-form-floatbar__actions">
-            <Button onClick={() => patchSetup((s) => ({ ...s, completed: false }))}>Reopen tasks</Button>
-            <Button
-              type="primary"
-              onClick={() => {
-                patch((prev) => ({ ...prev, currentWorkArea: 'activate-handover' }))
-                navigate(`/cases/${c.id}/activate-handover`)
-              }}
-            >
-              Continue to Activate &amp; Handover
-            </Button>
-          </div>
-        </div>
-      </Space>
-    )
-  }
-
   // ---- Layout: grouped tabs + active panel ---------------------------------
   return (
     <div className="app-setup">
