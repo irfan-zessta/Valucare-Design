@@ -536,6 +536,10 @@ button.app-stepper__item {
   justify-content: center;
   padding: 32px 16px;
   background-color: #f4f4f4;
+  background-image: url('../assets/login-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 .app-login__card {
   inline-size: 100%;
