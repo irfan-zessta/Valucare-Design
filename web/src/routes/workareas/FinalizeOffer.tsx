@@ -930,10 +930,11 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
         {/* ---- Activity 4 · Proposal preparation ---------------------------- */}
         <Card>
-          {activityHead(4, 'Proposal preparation')}
+          {activityHead(4, 'SOB creation')}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-            Assemble the company details, benefits, pricing and terms into the client-facing proposal. The full proposal
-            template (eligibility, plan options, network, terms, exclusions and sign-offs) is prepared in a later step.
+            Build the Summary of Benefits — company details, benefits, pricing and terms — into the client-facing proposal.
+            The full proposal template (eligibility, plan options, network, terms, exclusions and sign-offs) is prepared in
+            a later step.
           </Typography.Paragraph>
           <div style={{ marginTop: 16 }}>{sobSection}</div>
           {proposal.templateAdditions.length > 0 && (
