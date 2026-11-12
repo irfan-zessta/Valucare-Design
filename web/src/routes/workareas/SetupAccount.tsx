@@ -31,6 +31,7 @@ import {
   CheckCircleOutlined,
   CheckCircleFilled,
   CloudUploadOutlined,
+  EditOutlined,
   EyeOutlined,
   FileTextOutlined,
   SendOutlined,
@@ -883,10 +884,25 @@ export function SetupAccount({ c }: { c: Case }) {
         </FormSection>
 
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Typography.Text type="secondary">
-            {k.status === 'cleared' ? 'KYC cleared.' : 'Record a cleared result to continue.'}
-          </Typography.Text>
+          <Typography.Text type="secondary">{k.status === 'cleared' ? 'KYC cleared.' : ''}</Typography.Text>
           <div className="app-form-floatbar__actions">
+            <Button
+              icon={<EditOutlined />}
+              onClick={() =>
+                setKyc({
+                  status: 'cleared',
+                  externalRef: k.externalRef || `SOL-${c.company.shortName}-${dayjs().format('YYYYMMDD')}`,
+                  checkDate: k.checkDate || dayjs().format('YYYY-MM-DD'),
+                  checkerName: k.checkerName || 'Demo Admin',
+                  flagDescription: undefined,
+                  documents: (k.documents ?? []).some((d) => d.slot === 'kyc_form')
+                    ? k.documents
+                    : [...(k.documents ?? []), { slot: 'kyc_form', fileName: `KYC-Form-${c.company.shortName}.pdf` }],
+                })
+              }
+            >
+              Fill sample data
+            </Button>
             <Tooltip title={canClear ? '' : 'Upload the KYC form and record reference + date first.'}>
               <Button
                 type="primary"
