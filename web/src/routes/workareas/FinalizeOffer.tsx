@@ -26,7 +26,6 @@ import {
   Table,
   Tabs,
   Tag,
-  theme,
   Tooltip,
   Typography,
 } from 'antd'
@@ -98,30 +97,10 @@ function initDraft(p?: ProposalVersion): DraftForm {
   }
 }
 
-// The four client-facing stages of a proposal, shown as a segmented progress
-// bar beside the header. Each proposal status maps to one of these steps.
-const PROGRESS_STEPS = ['Preparing proposal', 'Sending for review', 'Send to client', 'Client accepted'] as const
-function progressStep(status: string): number {
-  switch (status) {
-    case 'draft':
-      return 1
-    case 'in-review':
-      return 2
-    case 'sent':
-    case 'feedback':
-      return 3
-    case 'accepted':
-      return 4
-    default:
-      return 1
-  }
-}
-
 export function FinalizeOffer({ c }: { c: Case }) {
   const { patchCase } = useCases()
   const { message } = App.useApp()
   const navigate = useNavigate()
-  const { token } = theme.useToken()
 
   const inter = c.company.businessSource !== 'Direct'
   const recipient = inter ? c.company.intermediaryName ?? 'the agent/broker' : 'the client'
@@ -649,30 +628,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
     )
   }
 
-  const statusTag = (
-    <Tag
-      color={
-        proposal.status === 'accepted'
-          ? 'green'
-          : proposal.status === 'sent'
-            ? 'blue'
-            : proposal.status === 'feedback'
-              ? 'orange'
-              : proposal.status === 'in-review'
-                ? 'gold'
-                : 'default'
-      }
-    >
-      {proposal.status === 'in-review'
-        ? fullyApproved
-          ? 'Approved — ready to send'
-          : 'In pricing review'
-        : proposal.status === 'feedback'
-          ? 'Under negotiation'
-          : proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}
-    </Tag>
-  )
-
   // Open the tab that matches where the proposal is in its lifecycle.
   const defaultTab =
     proposal.status === 'in-review'
@@ -686,79 +641,22 @@ export function FinalizeOffer({ c }: { c: Case }) {
   return (
     <div>
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-        {/* ---- Header + workflow stepper ------------------------------------ */}
-        <Card>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              gap: 24,
-              flexWrap: 'wrap',
-            }}
-          >
-            <div>
-              <Typography.Title level={5} style={{ marginTop: 0 }}>
-                Proposal
-              </Typography.Title>
-              <Typography.Title level={5} style={{ marginTop: 0 }}>
-                {proposal.code ?? proposalCode(c)} · version {proposal.version} {statusTag}
-              </Typography.Title>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                Rate sheet v{proposal.rateSheetVersion ?? selectedSheet?.version ?? 1} · SOB v{sobVersion}
-                {proposal.validUntil ? ` · valid until ${dayjs(proposal.validUntil).format('YYYY-MM-DD')}` : ''}
-              </Typography.Text>
-            </div>
-            {/* Segmented progress bar for the four proposal stages. */}
-            {(() => {
-              const step = progressStep(proposal.status)
-              return (
-                <div style={{ flex: '0 0 auto', minWidth: 260, maxWidth: 320, width: '100%' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
-                    <Typography.Text strong style={{ fontSize: 13 }}>
-                      {PROGRESS_STEPS[step - 1]}
-                    </Typography.Text>
-                    <Typography.Text type="secondary" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>
-                      Step {step} of {PROGRESS_STEPS.length}
-                    </Typography.Text>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {PROGRESS_STEPS.map((label, i) => (
-                      <div
-                        key={label}
-                        title={label}
-                        style={{
-                          flex: 1,
-                          height: 6,
-                          borderRadius: 999,
-                          background: i < step ? token.colorPrimary : token.colorFillSecondary,
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )
-            })()}
-          </div>
-          {proposal.returnReason && proposal.status === 'draft' && (
-            <Alert
-              style={{ marginTop: 12 }}
-              type="warning"
-              showIcon
-              title="Returned — needs resubmission"
-              description={proposal.returnReason}
-            />
-          )}
-          {proposal.declineReason && (
-            <Alert
-              style={{ marginTop: 12 }}
-              type="error"
-              showIcon
-              title="Client declined"
-              description={`${proposal.declineReason} Revise the offer (new version) or close the lead.`}
-            />
-          )}
-        </Card>
+        {proposal.returnReason && proposal.status === 'draft' && (
+          <Alert
+            type="warning"
+            showIcon
+            title="Returned — needs resubmission"
+            description={proposal.returnReason}
+          />
+        )}
+        {proposal.declineReason && (
+          <Alert
+            type="error"
+            showIcon
+            title="Client declined"
+            description={`${proposal.declineReason} Revise the offer (new version) or close the lead.`}
+          />
+        )}
 
         <Tabs
           defaultActiveKey={defaultTab}
