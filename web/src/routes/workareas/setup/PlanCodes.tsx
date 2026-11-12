@@ -560,7 +560,9 @@ export function PlanCodes({
       <Modal
         open={adding}
         title="Add plan code"
-        width={760}
+        width="90vw"
+        style={{ top: 24, maxWidth: 1400, paddingBottom: 0 }}
+        styles={{ body: { maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' } }}
         onCancel={() => setAdding(false)}
         onOk={addManual}
         okText="Add plan code"
