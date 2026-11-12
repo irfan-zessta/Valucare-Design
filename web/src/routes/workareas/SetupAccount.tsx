@@ -240,6 +240,7 @@ export function SetupAccount({ c }: { c: Case }) {
           {meta.label}
         </Typography.Title>
         {statusTag}
+        {meta.optional && <Tag>Optional</Tag>}
       </Space>
       <Typography.Paragraph type="secondary" style={{ margin: '4px 0 0' }}>
         {meta.blurb} <Typography.Text type="secondary">· Next: {meta.whatNext}</Typography.Text>
