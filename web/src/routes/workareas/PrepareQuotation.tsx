@@ -502,7 +502,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
         Digitise the client's current benefits (Terms of Reference). This becomes the baseline for the
         TOR-vs-SOB comparison in Finalize Offer. The original TOR file stays attached in Requirements.
       </Typography.Paragraph>
-      <Space wrap>
+      <Space wrap style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Button size="small" icon={<PlusOutlined />} onClick={addTorLine}>
           Add line
         </Button>
