@@ -488,11 +488,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
           },
         ]}
       />
-      <div>
-        <Button size="small" onClick={attachSampleToMissing}>
-          Attach sample documents
-        </Button>
-      </div>
     </Space>
   )
 
@@ -775,6 +770,11 @@ export function PrepareQuotation({ c }: { c: Case }) {
           {responded && 'Rate sheet received — select one to finalize the offer.'}
         </Typography.Text>
         <div className="app-form-floatbar__actions">
+          {tab === 'requirements' && (
+            <Button size="small" onClick={attachSampleToMissing}>
+              Attach sample documents
+            </Button>
+          )}
           {tab === 'members' && (
             <>
               <Button size="small" onClick={validateMemberData}>
