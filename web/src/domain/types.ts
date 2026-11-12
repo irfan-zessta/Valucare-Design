@@ -566,7 +566,6 @@ export type SetupTaskId =
   | 'onboarding-sob'
   | 'coc'
   | 'account-creation'
-  | 'benefit-upload'
   | 'plan-codes'
 
 /** A single named/dated file reference (prototype — file name only). */

@@ -7,7 +7,7 @@
 //
 // Order (required): Internal alignment → Request Legal review → Upload contract
 // & DSA → Send to client → Signed/notarize/return → KYC → Onboarding SOB → COC
-// → Account-number creation → Benefit uploading → Plan-code creation/approval.
+// → Account-number creation → Plan-code creation/approval.
 // ===========================================================================
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -95,7 +95,7 @@ const TAB_GROUPS: SetupTabGroup[] = [
   {
     key: 'onboarding',
     label: 'Onboarding',
-    tasks: ['onboarding-sob', 'coc', 'account-creation', 'benefit-upload', 'plan-codes'],
+    tasks: ['onboarding-sob', 'coc', 'account-creation', 'plan-codes'],
   },
 ]
 
@@ -265,8 +265,6 @@ export function SetupAccount({ c }: { c: Case }) {
         return CocPanel()
       case 'account-creation':
         return <AccountForm c={c} setup={setup!} patchCase={patch} onApproved={() => completeTask('account-creation')} />
-      case 'benefit-upload':
-        return BenefitUpload()
       case 'plan-codes':
         return PlanCodesPanel()
       default:
@@ -1061,72 +1059,6 @@ export function SetupAccount({ c }: { c: Case }) {
             {coc.status === 'released' && (
               <Button type="primary" onClick={() => completeTask('coc')}>
                 Continue to account creation
-              </Button>
-            )}
-          </div>
-        </div>
-      </Space>
-    )
-  }
-
-  // ===== Benefit uploading ==================================================
-  function BenefitUpload() {
-    const b = setup!.benefitUpload
-    const onb = setup!.onboardingSob ?? c.offer.sob
-    const plans = onb?.plans ?? []
-    const lineCount = (onb?.sections ?? []).reduce((acc, s) => acc + (s.lines?.length ?? 0), 0)
-    const issues: string[] = []
-    if (!c.account.accountRef) issues.push('Account number not yet created — create the account first.')
-    if (!plans.length) issues.push('The onboarding SOB has no plans to map.')
-
-    function upload() {
-      patchSetup((s) => ({ ...s, benefitUpload: { status: 'uploaded', sobVersion: onb?.version, uploadedAt: new Date().toISOString(), issues } }))
-      message.success('Benefits uploaded into the account.')
-    }
-
-    return (
-      <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-        <FormSection title="Benefit upload review" wide>
-          <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
-            <Descriptions.Item label="Account reference">{c.account.accountRef || '—'}</Descriptions.Item>
-            <Descriptions.Item label="SOB version">{onb ? `v${onb.version}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="Plans">{plans.length}</Descriptions.Item>
-            <Descriptions.Item label="Benefit lines">{lineCount}</Descriptions.Item>
-          </Descriptions>
-          {plans.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <Typography.Text strong>Plans &amp; limits</Typography.Text>
-              <Descriptions column={1} size="small" bordered style={{ marginTop: 6 }}>
-                {plans.map((p, i) => (
-                  <Descriptions.Item key={p.id || i} label={p.planId || `Plan ${i + 1}`}>
-                    {[p.roomBoard, p.mblAmount, p.limitBasis].filter(Boolean).join(' · ') || '—'}
-                  </Descriptions.Item>
-                ))}
-              </Descriptions>
-            </div>
-          )}
-          {issues.length > 0 && (
-            <Alert type="warning" showIcon style={{ marginTop: 12 }} title="Resolve before upload" description={<ul style={{ margin: 0, paddingInlineStart: 18 }}>{issues.map((x) => <li key={x}>{x}</li>)}</ul>} />
-          )}
-          {b.status !== 'not-started' && (
-            <Alert type="success" showIcon style={{ marginTop: 12 }} title={`Benefits uploaded from SOB v${b.sobVersion} on ${b.uploadedAt ? dayjs(b.uploadedAt).format('YYYY-MM-DD HH:mm') : ''}.`} />
-          )}
-        </FormSection>
-
-        <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Typography.Text type="secondary">
-            {b.status !== 'not-started' ? 'Benefits uploaded.' : 'Upload the SOB benefits into the account.'}
-          </Typography.Text>
-          <div className="app-form-floatbar__actions">
-            {b.status === 'not-started' ? (
-              <Tooltip title={issues.length ? 'Resolve the issues first.' : ''}>
-                <Button type="primary" disabled={issues.length > 0} onClick={upload}>
-                  Upload benefits
-                </Button>
-              </Tooltip>
-            ) : (
-              <Button type="primary" onClick={() => completeTask('benefit-upload')}>
-                Continue to plan codes
               </Button>
             )}
           </div>

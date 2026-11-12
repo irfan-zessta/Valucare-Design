@@ -58,12 +58,6 @@ export const SETUP_TASKS: SetupTaskMeta[] = [
     id: 'account-creation',
     label: 'Account-number creation',
     blurb: 'Complete and approve the account record, including any affiliates; the account number is issued here.',
-    whatNext: 'Upload the SOB benefits into the account.',
-  },
-  {
-    id: 'benefit-upload',
-    label: 'Benefit uploading',
-    blurb: 'Transfer the onboarding SOB benefits into the account and verify the mapping.',
     whatNext: 'Create and approve plan codes.',
   },
   {
