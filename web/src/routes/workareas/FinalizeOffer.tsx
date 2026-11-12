@@ -309,6 +309,26 @@ export function FinalizeOffer({ c }: { c: Case }) {
     message.success(submit ? 'Submitted for internal pricing review.' : 'Draft saved.')
   }
 
+  // Populate the proposal-preparation fields with sample values for a quick demo.
+  function fillSampleData() {
+    const sample = {
+      commissionPct: inter ? '10' : '',
+      commissionNote: inter ? 'Standard intermediary commission.' : 'Direct account — no commission.',
+      recommendation: 'Present rates at the Actuarial-released sheet; 5% principal discount within tolerance.',
+      justification: 'Rates held at actuarial; discount approved under the standing pricing policy for this segment.',
+    }
+    setDraft((d) => ({ ...d, ...sample }))
+    patchProposal((p) => ({
+      ...p,
+      commissionPct: sample.commissionPct.trim() === '' ? undefined : Number(sample.commissionPct),
+      commissionNote: sample.commissionNote || undefined,
+      recommendation: sample.recommendation,
+      justification: sample.justification,
+      rateSheetCheckedAt: p.rateSheetCheckedAt ?? new Date().toISOString(),
+    }))
+    message.success('Sample data filled in.')
+  }
+
   // Customize just the rates recommendation (commission + sales recommendation),
   // available after the draft stage via an inline Edit toggle.
   function saveRates() {
@@ -1071,14 +1091,13 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
       {/* ---- Floating action bar ------------------------------------------- */}
       <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-        <Typography.Text type="secondary">
-          {proposal.status === 'draft' && 'Prepare the proposal, then submit it for internal pricing review.'}
-          {proposal.status === 'in-review' &&
-            (fullyApproved ? 'Approved — send the proposal to the client.' : 'Awaiting two-level pricing approval.')}
-          {proposal.status === 'sent' && 'Sent — log negotiation rounds or record the client’s decision.'}
-          {proposal.status === 'feedback' && 'In negotiation — record the client’s decision when ready.'}
-          {proposal.status === 'accepted' && 'Accepted — continue to Set Up Account.'}
-        </Typography.Text>
+        <div>
+          {editable && (
+            <Button icon={<EditOutlined />} onClick={fillSampleData}>
+              Fill sample data
+            </Button>
+          )}
+        </div>
         <div className="app-form-floatbar__actions">
           {proposal.status === 'draft' && (
             <>
