@@ -36,7 +36,6 @@ import {
   EditOutlined,
   EyeOutlined,
   FileTextOutlined,
-  InboxOutlined,
   PlusOutlined,
   RollbackOutlined,
   SendOutlined,
@@ -60,9 +59,8 @@ import { emptyRichSob, isRichSob } from '../../domain/sobModel'
 
 const CHANNELS = ['Email', 'Call', 'Meeting', 'Through intermediary']
 
-// Approved standard SOB template (Actuarial-owned) — the starting point for a
-// new Summary of Benefits when not built from the client's structured TOR.
-const SOB_TEMPLATE_VERSION = 3
+// Approved standard SOB template (Actuarial-owned) — used by the "load template"
+// shortcut in the simple benefit-line editor.
 const SAMPLE_SOB_TEMPLATE: SobLine[] = [
   { benefit: 'Room & Board', limit: 'Php 5,000/day', note: 'Semi-private' },
   { benefit: 'Annual Benefit Limit (MBL)', limit: 'Php 200,000', note: 'Per member/year' },
@@ -71,25 +69,6 @@ const SAMPLE_SOB_TEMPLATE: SobLine[] = [
   { benefit: 'Dental', limit: 'Php 5,000', note: 'Annual' },
   { benefit: 'Annual physical exam', limit: 'Covered', note: 'Template standard' },
   { benefit: 'Pre-existing conditions', limit: 'Covered after 6 months', note: '' },
-]
-// The marked Summary of Benefits Actuarial releases alongside the rate sheet.
-// Every line carries Actuarial's mark; Sales reviews it rather than building it.
-const MARKED_SOB_VERSION = 1
-const SAMPLE_MARKED_SOB: SobLine[] = [
-  { benefit: 'Room & Board', limit: 'Php 5,000/day', note: 'Semi-private', mark: 'Covered' },
-  { benefit: 'Annual Benefit Limit (MBL)', limit: 'Php 200,000', note: 'Per member/year', mark: 'Covered' },
-  { benefit: 'Outpatient', limit: 'Full coverage', note: 'Consultations, labs, minor procedures', mark: 'Covered' },
-  { benefit: 'Emergency care', limit: 'Full coverage', note: 'Accident & illness', mark: 'Covered' },
-  { benefit: 'Dental', limit: 'Php 5,000', note: 'Annual', mark: 'Capped' },
-  { benefit: 'Annual physical exam', limit: 'Covered', note: 'Template standard', mark: 'Covered' },
-  { benefit: 'Pre-existing conditions', limit: 'Covered after 6 months', note: '', mark: 'Waiting period' },
-  { benefit: 'Maternity', limit: 'Not covered', note: 'Optional rider available', mark: 'Excluded' },
-]
-const SOB_EXCLUSIONS = [
-  'Cosmetic procedures',
-  'Experimental or investigational treatments',
-  'Injuries from illegal acts',
-  'Custodial or long-term care',
 ]
 const SOB_STATUS_LABEL: Record<string, string> = {
   draft: 'Draft',
@@ -160,6 +139,16 @@ export function FinalizeOffer({ c }: { c: Case }) {
   const sob = c.offer.sob
   const sobVersion = sob?.version ?? proposal?.sobVersion ?? 1
 
+  // Start the Summary of Benefits in the manual builder by default — no chooser.
+  useEffect(() => {
+    if (!sob) {
+      patchCase(c.id, (prev) =>
+        prev.offer.sob ? prev : { ...prev, offer: { ...prev.offer, sob: emptyRichSob(c, 'manual') } },
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sob, c.id])
+
   // Local edit buffer for the draft form; reset whenever the active version changes.
   const [draft, setDraft] = useState<DraftForm>(() => initDraft(proposal))
   useEffect(() => {
@@ -203,31 +192,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
   // ---- SOB (Summary of Benefits) -------------------------------------------
   const sobEditable = sob?.status === 'draft'
-  function createSob(source: 'actuarial' | 'template' | 'tor') {
-    const lines: SobLine[] =
-      source === 'actuarial'
-        ? SAMPLE_MARKED_SOB.map((l) => ({ ...l }))
-        : source === 'tor'
-          ? (c.quotation.torLines ?? []).map((t) => ({ benefit: t.benefit, limit: t.limit, note: t.note }))
-          : SAMPLE_SOB_TEMPLATE.map((l) => ({ ...l }))
-    const draft: SobDraft = {
-      version: source === 'actuarial' ? MARKED_SOB_VERSION : 1,
-      status: 'draft',
-      source,
-      templateVersion: source === 'template' ? SOB_TEMPLATE_VERSION : undefined,
-      lines,
-      exclusions: SOB_EXCLUSIONS,
-      createdAt: new Date().toISOString(),
-    }
-    patchCase(c.id, (prev) => ({ ...prev, offer: { ...prev.offer, sob: draft } }))
-    message.success(
-      source === 'actuarial'
-        ? `Marked SOB received from Actuarial (v${MARKED_SOB_VERSION}) — review before using it.`
-        : source === 'template'
-          ? `SOB draft created from the approved template (v${SOB_TEMPLATE_VERSION}).`
-          : 'SOB draft created from the structured TOR.',
-    )
-  }
   function patchSob(recipe: (s: SobDraft) => SobDraft) {
     patchCase(c.id, (prev) => (prev.offer.sob ? { ...prev, offer: { ...prev.offer, sob: recipe(prev.offer.sob) } } : prev))
   }
@@ -235,18 +199,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
     patchSob((s) => ({ ...s, lines }))
   }
 
-  // ---- Full document builder (Create manually / Upload template) -----------
-  const [sobUploadMode, setSobUploadMode] = useState(false)
+  // ---- Full document builder ------------------------------------------------
   const [sobSaveState, setSobSaveState] = useState<SaveState>('idle')
-  function createRichSob(source: 'manual' | 'upload') {
-    patchCase(c.id, (prev) => ({ ...prev, offer: { ...prev.offer, sob: emptyRichSob(c, source) } }))
-    setSobUploadMode(source === 'upload')
-    message.success(
-      source === 'upload'
-        ? 'SOB builder opened — download the template or build it below.'
-        : 'SOB builder opened — the document header was carried from the case.',
-    )
-  }
   function saveSobDraft() {
     setSobSaveState('saving')
     // Edits already write through to case state; this stamps the saved point.
@@ -488,7 +442,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
         <Typography.Text>{(row[field] as string) || '—'}</Typography.Text>
       )
   }
-  const torCount = c.quotation.torLines?.length ?? 0
   const sobSection = (
     <section>
       <Typography.Title level={5} style={{ marginTop: 0 }}>
@@ -502,52 +455,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
           </>
         )}
       </Typography.Title>
-      {!sob ? (
-        <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-          <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
-            Build the full Summary of Benefits document. Start from a blank structured document, or upload an existing
-            template to review and continue editing — both open the same editable builder.
-          </Typography.Paragraph>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Card size="small" hoverable style={{ cursor: 'pointer' }} onClick={() => createRichSob('manual')}>
-              <Typography.Title level={5} style={{ marginTop: 0 }}>
-                <FileTextOutlined style={{ color: '#CB0A2F', marginInlineEnd: 8 }} />
-                Create manually
-              </Typography.Title>
-              <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                Start with the document header and section structure, then add benefit lines individually.
-              </Typography.Paragraph>
-              <Button type="primary">Create manually</Button>
-            </Card>
-            <Card size="small" hoverable style={{ cursor: 'pointer' }} onClick={() => createRichSob('upload')}>
-              <Typography.Title level={5} style={{ marginTop: 0 }}>
-                <InboxOutlined style={{ color: '#CB0A2F', marginInlineEnd: 8 }} />
-                Upload template
-              </Typography.Title>
-              <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                Upload an existing SOB template, review the imported information, and continue editing.
-              </Typography.Paragraph>
-              <Button>Upload template</Button>
-            </Card>
-          </div>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Or quick-start a simple benefit list:
-          </Typography.Text>
-          <Space wrap>
-            <Button size="small" onClick={() => createSob('actuarial')}>
-              Receive marked SOB from Actuarial (v{MARKED_SOB_VERSION})
-            </Button>
-            <Button size="small" onClick={() => createSob('template')}>
-              Approved template (v{SOB_TEMPLATE_VERSION})
-            </Button>
-            <Tooltip title={torCount ? '' : 'Digitise the TOR in Prepare Quotation first.'}>
-              <Button size="small" disabled={!torCount} onClick={() => createSob('tor')}>
-                Structured TOR{torCount ? ` (${torCount})` : ''}
-              </Button>
-            </Tooltip>
-          </Space>
-        </Space>
-      ) : isRichSob(sob) ? (
+      {!sob ? null : isRichSob(sob) ? (
         <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
           <SobBuilder
             c={c}
@@ -556,7 +464,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
             editable={sobEditable}
             onSaveDraft={saveSobDraft}
             saveState={sobSaveState}
-            showUpload={sobUploadMode}
+            showUpload={false}
           />
           {sob.status !== 'approved' && sob.status !== 'signed' && sob.status !== 'codified' && (
             <div>
