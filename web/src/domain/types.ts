@@ -566,7 +566,6 @@ export type SetupTaskId =
   | 'onboarding-sob'
   | 'coc'
   | 'account-creation'
-  | 'affiliates'
   | 'benefit-upload'
   | 'plan-codes'
 

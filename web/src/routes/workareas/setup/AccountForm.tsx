@@ -16,12 +16,13 @@ import {
   InputNumber,
   Select,
   Space,
+  Table,
   Tooltip,
   Typography,
 } from 'antd'
-import { CheckCircleOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import type { Case, SetupState } from '../../../domain/types'
+import type { Case, FranchiseAffiliate, SetupState } from '../../../domain/types'
 import { ACCOUNT_SCHEMA, prefillAccountForm, type SetupField } from '../../../domain/setup'
 import { makeAccountRef } from '../../../domain/ids'
 import { FormSection } from '../../../components/ui/FormSection'
@@ -52,6 +53,25 @@ export function AccountForm({
   const [form, setForm] = useState<Record<string, unknown>>(initial)
   const [submitted, setSubmitted] = useState(false)
 
+  // Affiliates (optional) — prefilled from the franchise rows if none captured yet.
+  const [affiliates, setAffiliates] = useState<FranchiseAffiliate[]>(
+    () => setup.affiliates ?? c.franchise.affiliateRows ?? [],
+  )
+  const blankAffiliate: FranchiseAffiliate = {
+    name: '',
+    address: '',
+    email: '',
+    contactPerson: '',
+    contactNumber: '',
+    financialAssistance: '',
+    financialAssistanceName: '',
+  }
+  const addAffiliate = () => setAffiliates((prev) => [...prev, { ...blankAffiliate }])
+  const updateAffiliate = (i: number, key: keyof FranchiseAffiliate, value: string) =>
+    setAffiliates((prev) => prev.map((a, idx) => (idx === i ? { ...a, [key]: value } : a)))
+  const removeAffiliate = (i: number) => setAffiliates((prev) => prev.filter((_, idx) => idx !== i))
+  const affiliateNameMissing = affiliates.some((a) => !a.name.trim())
+
   const set = (key: string, value: unknown) => setForm((p) => ({ ...p, [key]: value }))
 
   const visibleFields = (s: { fields: SetupField[] }) =>
@@ -72,14 +92,23 @@ export function AccountForm({
     const eff = form.effectivityDate as string
     const exp = form.expiryDate as string
     if (eff && exp && dayjs(exp).isBefore(dayjs(eff))) e.push('Expiry Date (must be after Effectivity)')
+    // Affiliates are optional, but any added row needs a name.
+    if (affiliateNameMissing) e.push('Affiliate name (or remove the empty row)')
     return e
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, isIntermediary])
+  }, [form, isIntermediary, affiliateNameMissing])
+
+  const affiliateNames = () => affiliates.map((a) => a.name.trim()).filter(Boolean)
 
   function persist(next: Record<string, unknown>, extra: (s: SetupState) => SetupState) {
+    const names = affiliateNames()
     patchCase((prev) =>
       prev.account.setup
-        ? { ...prev, account: { ...prev.account, setup: extra({ ...prev.account.setup, accountForm: next }) } }
+        ? {
+            ...prev,
+            company: { ...prev.company, affiliates: names.length ? names : undefined },
+            account: { ...prev.account, setup: extra({ ...prev.account.setup, accountForm: next, affiliates }) },
+          }
         : prev,
     )
   }
@@ -92,15 +121,17 @@ export function AccountForm({
     }
     const ref = c.account.accountRef ?? makeAccountRef(caseSeq(c.id))
     const next = { ...form, maCode: ref }
+    const names = affiliateNames()
     patchCase((prev) =>
       prev.account.setup
         ? {
             ...prev,
+            company: { ...prev.company, affiliates: names.length ? names : undefined },
             account: {
               ...prev.account,
               status: 'created',
               accountRef: ref,
-              setup: { ...prev.account.setup, accountForm: next, accountFormStatus: 'for-approval' },
+              setup: { ...prev.account.setup, accountForm: next, affiliates, accountFormStatus: 'for-approval' },
             },
           }
         : prev,
@@ -163,6 +194,27 @@ export function AccountForm({
               </Descriptions>
             </div>
           ))}
+        </FormSection>
+
+        <FormSection title="Affiliates" description="Affiliated / sister companies enrolled under this account." wide>
+          {affiliates.length ? (
+            <Table<FranchiseAffiliate>
+              size="small"
+              pagination={false}
+              rowKey={(_, i) => String(i)}
+              dataSource={affiliates}
+              scroll={{ x: 'max-content' }}
+              columns={[
+                { title: 'Name', dataIndex: 'name', render: (v: string) => v || '—' },
+                { title: 'Address', dataIndex: 'address', render: (v: string) => v || '—' },
+                { title: 'Email', dataIndex: 'email', render: (v: string) => v || '—' },
+                { title: 'Contact Person', dataIndex: 'contactPerson', render: (v: string) => v || '—' },
+                { title: 'Contact Number', dataIndex: 'contactNumber', render: (v: string) => v || '—' },
+              ]}
+            />
+          ) : (
+            <Typography.Text type="secondary">No affiliates for this account.</Typography.Text>
+          )}
         </FormSection>
 
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
@@ -277,6 +329,78 @@ export function AccountForm({
           </FormSection>
         )
       })}
+
+      <FormSection
+        title="Affiliates"
+        description="Optional — affiliated / sister companies enrolled under this account. Each can later get its own account reference and plan codes."
+        extra={
+          <Button icon={<PlusOutlined />} onClick={addAffiliate}>
+            Add affiliate
+          </Button>
+        }
+        wide
+      >
+        <Table<FranchiseAffiliate>
+          size="small"
+          pagination={false}
+          rowKey={(_, i) => String(i)}
+          dataSource={affiliates}
+          scroll={{ x: 'max-content' }}
+          locale={{ emptyText: 'No affiliates — add one if this account has sister companies.' }}
+          columns={[
+            {
+              title: 'Name',
+              dataIndex: 'name',
+              render: (_: unknown, _r: FranchiseAffiliate, i: number) => (
+                <Input
+                  status={submitted && !affiliates[i].name.trim() ? 'error' : undefined}
+                  value={affiliates[i].name}
+                  onChange={(e) => updateAffiliate(i, 'name', e.target.value)}
+                />
+              ),
+            },
+            {
+              title: 'Address',
+              dataIndex: 'address',
+              render: (_: unknown, _r: FranchiseAffiliate, i: number) => (
+                <Input value={affiliates[i].address} onChange={(e) => updateAffiliate(i, 'address', e.target.value)} />
+              ),
+            },
+            {
+              title: 'Email',
+              dataIndex: 'email',
+              render: (_: unknown, _r: FranchiseAffiliate, i: number) => (
+                <Input value={affiliates[i].email} onChange={(e) => updateAffiliate(i, 'email', e.target.value)} />
+              ),
+            },
+            {
+              title: 'Contact Person',
+              dataIndex: 'contactPerson',
+              render: (_: unknown, _r: FranchiseAffiliate, i: number) => (
+                <Input value={affiliates[i].contactPerson} onChange={(e) => updateAffiliate(i, 'contactPerson', e.target.value)} />
+              ),
+            },
+            {
+              title: 'Contact Number',
+              dataIndex: 'contactNumber',
+              render: (_: unknown, _r: FranchiseAffiliate, i: number) => (
+                <Input value={affiliates[i].contactNumber} onChange={(e) => updateAffiliate(i, 'contactNumber', e.target.value)} />
+              ),
+            },
+            {
+              title: '',
+              dataIndex: 'x',
+              width: 48,
+              align: 'center',
+              render: (_: unknown, _r: FranchiseAffiliate, i: number) => (
+                <Tooltip title="Remove affiliate">
+                  <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove affiliate" onClick={() => removeAffiliate(i)} />
+                </Tooltip>
+              ),
+            },
+          ]}
+        />
+      </FormSection>
 
       <div className="app-form-floatbar" style={{ marginTop: 16 }}>
         <Typography.Text type={submitted && errors.length ? 'danger' : 'secondary'}>

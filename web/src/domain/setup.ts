@@ -15,8 +15,6 @@ export interface SetupTaskMeta {
   blurb: string
   /** One line: what happens after this task. */
   whatNext: string
-  /** Optional steps can be skipped without entering any data. */
-  optional?: boolean
 }
 
 export const SETUP_TASKS: SetupTaskMeta[] = [
@@ -59,15 +57,8 @@ export const SETUP_TASKS: SetupTaskMeta[] = [
   {
     id: 'account-creation',
     label: 'Account-number creation',
-    blurb: 'Complete and approve the account record; the account number is issued here.',
-    whatNext: 'Add any affiliated / sister companies.',
-  },
-  {
-    id: 'affiliates',
-    label: 'Affiliates',
-    blurb: 'Optional — add any affiliated / sister companies enrolled under this account, or skip.',
+    blurb: 'Complete and approve the account record, including any affiliates; the account number is issued here.',
     whatNext: 'Upload the SOB benefits into the account.',
-    optional: true,
   },
   {
     id: 'benefit-upload',
