@@ -123,10 +123,13 @@ export function SetupAccount({ c }: { c: Case }) {
     patch((prev) => (prev.account.setup ? { ...prev, account: { ...prev.account, setup: recipe(prev.account.setup) } } : prev))
 
   const completed = (id: SetupTaskId) => setup.completedTasks.includes(id)
-  const maxReachable = Math.max(
-    SETUP_TASK_ORDER.indexOf(setup.activeTask ?? 'internal-alignment'),
-    ...setup.completedTasks.map((t) => SETUP_TASK_ORDER.indexOf(t)),
-  )
+  // Reachable up to the active task, and always one step past the furthest
+  // completed task — so finishing a step unlocks the next even if the active
+  // pointer was left behind (e.g. re-opening an already-completed task).
+  const completedIdx = setup.completedTasks.map((t) => SETUP_TASK_ORDER.indexOf(t)).filter((i) => i >= 0)
+  const furthestCompleted = completedIdx.length ? Math.max(...completedIdx) : -1
+  const activeIdx = SETUP_TASK_ORDER.indexOf(setup.activeTask ?? 'internal-alignment')
+  const maxReachable = Math.max(activeIdx, furthestCompleted + 1)
   // Fall back if a persisted active task was removed from the flow (e.g. the old
   // Legal-review step), so we never try to render a panel that no longer exists.
   const rawActive = setup.activeTask ?? 'internal-alignment'

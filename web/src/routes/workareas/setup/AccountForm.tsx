@@ -230,6 +230,11 @@ export function AccountForm({
                 </Button>
               </>
             )}
+            {status === 'approved' && (
+              <Button type="primary" onClick={onApproved}>
+                Continue to plan codes
+              </Button>
+            )}
           </div>
         </div>
       </Space>
