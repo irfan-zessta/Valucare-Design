@@ -705,10 +705,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
                     </Button>
                   )}
                 </Space>
-              ) : editable ? (
-                <Button icon={<CheckCircleOutlined />} onClick={toggleRateSheetChecked}>
-                  Mark rate sheet as checked
-                </Button>
               ) : (
                 <Tag>Not checked</Tag>
               )}
@@ -1064,18 +1060,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
               <Button icon={<EditOutlined />} onClick={() => saveDraft(false)}>
                 Save draft
               </Button>
-              <Tooltip
-                title={
-                  !proposal.rateSheetCheckedAt
-                    ? 'Check the rate sheet (activity 1) before submitting.'
-                    : !draft.justification.trim()
-                      ? 'Add a rates justification to submit.'
-                      : ''
-                }
-              >
+              <Tooltip title={!draft.justification.trim() ? 'Add a rates justification to submit.' : ''}>
                 <Button
                   type="primary"
-                  disabled={!proposal.rateSheetCheckedAt || !draft.justification.trim()}
+                  disabled={!draft.justification.trim()}
                   onClick={() => saveDraft(true)}
                 >
                   Submit for internal review
