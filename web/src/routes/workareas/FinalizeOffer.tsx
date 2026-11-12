@@ -1206,59 +1206,95 @@ export function FinalizeOffer({ c }: { c: Case }) {
               children: (
                 <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
 
-        {!['sent', 'feedback', 'accepted'].includes(proposal.status) && (
-          <Typography.Text type="secondary">
-            Negotiation and acceptance become available once the proposal is sent to the client.
-          </Typography.Text>
-        )}
+                  {!['sent', 'feedback', 'accepted'].includes(proposal.status) && (
+                    <Typography.Text type="secondary">
+                      Negotiation and acceptance become available once the proposal is sent to the client.
+                    </Typography.Text>
+                  )}
 
-        {/* ---- Negotiation rounds ------------------------------------------- */}
-        {['sent', 'feedback', 'accepted'].includes(proposal.status) && (
-          <section>
-            <Typography.Title level={5}>Negotiation rounds ({proposal.rounds?.length ?? 0})</Typography.Title>
-            {proposal.sentAt && (
-              <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                Sent {dayjs(proposal.sentAt).format('YYYY-MM-DD HH:mm')} to {proposal.sentTo} ·{' '}
-                <Tag>Email simulated</Tag>
-              </Typography.Paragraph>
-            )}
-            {proposal.rounds?.length ? (
-              <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
-                {proposal.rounds.map((r) => (
-                  <Alert
-                    key={r.n}
-                    type="info"
-                    title={
-                      <strong>
-                        Round {r.n} · {r.channel} · {dayjs(r.date).format('YYYY-MM-DD')}
-                      </strong>
-                    }
-                    description={
-                      <>
-                        {r.summary}
-                        {r.participants ? ` · Participants: ${r.participants}` : ''}
-                        {r.counterOffer ? ` · Counter-offer: ${r.counterOffer}` : ''}
-                        {r.outcome ? ` · Outcome: ${r.outcome}` : ''}
-                      </>
-                    }
-                  />
-                ))}
-              </Space>
-            ) : (
-              <Typography.Text type="secondary">No rounds logged.</Typography.Text>
-            )}
-          </section>
-        )}
+                  {/* ---- Negotiation rounds --------------------------------- */}
+                  {['sent', 'feedback', 'accepted'].includes(proposal.status) && (
+                    <Card>
+                      <Typography.Title level={5} style={{ marginTop: 0 }}>
+                        Negotiation rounds ({proposal.rounds?.length ?? 0})
+                      </Typography.Title>
+                      {proposal.sentAt && (
+                        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+                          Sent {dayjs(proposal.sentAt).format('YYYY-MM-DD HH:mm')} to {proposal.sentTo} ·{' '}
+                          <Tag>Email simulated</Tag>
+                        </Typography.Paragraph>
+                      )}
+                      {proposal.rounds?.length ? (
+                        <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
+                          {proposal.rounds.map((r) => (
+                            <Alert
+                              key={r.n}
+                              type="info"
+                              title={
+                                <strong>
+                                  Round {r.n} · {r.channel} · {dayjs(r.date).format('YYYY-MM-DD')}
+                                </strong>
+                              }
+                              description={
+                                <>
+                                  {r.summary}
+                                  {r.participants ? ` · Participants: ${r.participants}` : ''}
+                                  {r.counterOffer ? ` · Counter-offer: ${r.counterOffer}` : ''}
+                                  {r.outcome ? ` · Outcome: ${r.outcome}` : ''}
+                                </>
+                              }
+                            />
+                          ))}
+                        </Space>
+                      ) : (
+                        <Typography.Text type="secondary">No rounds logged.</Typography.Text>
+                      )}
+                    </Card>
+                  )}
 
-        {proposal.status === 'accepted' && proposal.acceptance && (
-          <Alert
-            type="success"
-            showIcon
-            icon={<CheckCircleOutlined />}
-            title="Proposal accepted"
-            description={`Accepted on ${dayjs(proposal.acceptance.date).format('YYYY-MM-DD')} (version ${proposal.acceptance.version})${proposal.acceptance.notes ? ` · ${proposal.acceptance.notes}` : ''}.`}
-          />
-        )}
+                  {/* ---- Acceptance ----------------------------------------- */}
+                  {proposal.status === 'accepted' && proposal.acceptance && (
+                    <Card>
+                      <Typography.Title level={5} style={{ marginTop: 0 }}>
+                        Acceptance
+                      </Typography.Title>
+                      <Table
+                        size="small"
+                        style={{ marginTop: 12 }}
+                        dataSource={[proposal]}
+                        rowKey="id"
+                        pagination={false}
+                        columns={[
+                          {
+                            title: 'Version',
+                            render: () => (
+                              <Space>
+                                <strong>v{proposal.acceptance!.version}</strong>
+                                <Tag color="blue">current</Tag>
+                              </Space>
+                            ),
+                          },
+                          {
+                            title: 'Status',
+                            render: () => <Tag color="green">Accepted</Tag>,
+                          },
+                          {
+                            title: 'Created',
+                            render: () =>
+                              proposal.createdAt ? dayjs(proposal.createdAt).format('YYYY-MM-DD') : '—',
+                          },
+                          {
+                            title: 'Accepted',
+                            render: () => dayjs(proposal.acceptance!.date).format('YYYY-MM-DD'),
+                          },
+                          {
+                            title: 'Notes',
+                            render: () => proposal.acceptance!.notes || '—',
+                          },
+                        ]}
+                      />
+                    </Card>
+                  )}
 
                 </Space>
               ),
