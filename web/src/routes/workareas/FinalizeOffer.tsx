@@ -329,6 +329,71 @@ export function FinalizeOffer({ c }: { c: Case }) {
     message.success('Sample data filled in.')
   }
 
+  // Build a printable proposal document and open the browser print dialog
+  // (Save as PDF) via a hidden iframe — no external PDF library needed.
+  function generateProposalPdf() {
+    if (!proposal) return
+    const esc = (s: unknown) =>
+      String(s ?? '').replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch] as string)
+    const code = proposal.code ?? proposalCode(c)
+    const sobRows =
+      sob && isRichSob(sob)
+        ? (sob.sections ?? [])
+            .map(
+              (sec) =>
+                `<tr><td colspan="3" class="sec">${esc(sec.title)}</td></tr>` +
+                (sec.lines ?? [])
+                  .map(
+                    (l) =>
+                      `<tr><td>${esc(l.description)}</td><td>${esc(l.coverage)}</td><td>${esc(l.limits)}</td></tr>`,
+                  )
+                  .join(''),
+            )
+            .join('')
+        : (sob?.lines ?? [])
+            .map((l) => `<tr><td>${esc(l.benefit)}</td><td>${esc(l.mark ?? '')}</td><td>${esc(l.limit)}</td></tr>`)
+            .join('')
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(code)}</title>
+      <style>
+        body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a;margin:40px;}
+        h1{font-size:20px;margin:0 0 4px;} h2{font-size:14px;margin:24px 0 8px;border-bottom:1px solid #ddd;padding-bottom:4px;}
+        .meta{color:#666;font-size:12px;margin-bottom:16px;}
+        .field{margin:6px 0;font-size:13px;} .label{color:#666;}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;}
+        th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top;}
+        th{background:#f5f5f5;} td.sec{background:#fafafa;font-weight:600;}
+      </style></head><body>
+      <h1>Proposal ${esc(code)}</h1>
+      <div class="meta">${esc(c.company.name)} · version ${esc(proposal.version)} · ${esc(proposal.status)}${
+        proposal.validUntil ? ` · valid until ${dayjs(proposal.validUntil).format('YYYY-MM-DD')}` : ''
+      }</div>
+      <h2>Rates recommendation</h2>
+      <div class="field"><span class="label">Commission %:</span> ${esc(proposal.commissionPct ?? '—')}</div>
+      <div class="field"><span class="label">Commission note:</span> ${esc(proposal.commissionNote || '—')}</div>
+      <div class="field"><span class="label">Recommendation:</span> ${esc(proposal.recommendation || '—')}</div>
+      <h2>Rates justification</h2>
+      <div class="field">${esc(proposal.justification || '—')}</div>
+      <h2>Summary of Benefits${sob ? ` · v${esc(sob.version)}` : ''}</h2>
+      ${sobRows ? `<table><thead><tr><th>Benefit</th><th>Coverage</th><th>Limits</th></tr></thead><tbody>${sobRows}</tbody></table>` : '<div class="field">No benefit lines yet.</div>'}
+      </body></html>`
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    document.body.appendChild(iframe)
+    const doc = iframe.contentWindow?.document
+    if (!doc) return
+    doc.open()
+    doc.write(html)
+    doc.close()
+    iframe.contentWindow?.focus()
+    iframe.contentWindow?.print()
+    window.setTimeout(() => document.body.removeChild(iframe), 1000)
+  }
+
   // Customize just the rates recommendation (commission + sales recommendation),
   // available after the draft stage via an inline Edit toggle.
   function saveRates() {
@@ -1082,6 +1147,9 @@ export function FinalizeOffer({ c }: { c: Case }) {
           )}
         </div>
         <div className="app-form-floatbar__actions">
+          <Button icon={<FileTextOutlined />} onClick={generateProposalPdf}>
+            Generate proposal PDF
+          </Button>
           {proposal.status === 'draft' && (
             <>
               <Button icon={<EditOutlined />} onClick={() => saveDraft(false)}>
