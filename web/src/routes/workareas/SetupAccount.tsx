@@ -21,6 +21,7 @@ import {
   Input,
   Select,
   Space,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -41,12 +42,7 @@ import type {
   SetupTaskId,
 } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
-import {
-  SETUP_TASKS,
-  SETUP_TASK_ORDER,
-  makeInitialSetup,
-  setupTaskMeta,
-} from '../../domain/setup'
+import { SETUP_TASK_ORDER, makeInitialSetup, setupTaskMeta } from '../../domain/setup'
 import { makeRequestRef } from '../../domain/ids'
 import { emptyRichSob } from '../../domain/sobModel'
 import { FormSection } from '../../components/ui/FormSection'
@@ -62,6 +58,27 @@ const STAGE_LABEL: Record<SetupDocStage, string> = {
 
 /** Display a date-ish value as a clean YYYY-MM-DD (handles ISO datetimes). */
 const fmtDate = (v?: string) => (v ? dayjs(v).format('YYYY-MM-DD') : '—')
+
+interface SetupTabGroup {
+  key: string
+  label: string
+  tasks: SetupTaskId[]
+}
+
+// The 11 tasks grouped into three top-level tabs.
+const TAB_GROUPS: SetupTabGroup[] = [
+  { key: 'alignment', label: 'Internal alignment', tasks: ['internal-alignment'] },
+  {
+    key: 'contract',
+    label: 'Contract & KYC',
+    tasks: ['legal-request', 'upload-documents', 'send-to-client', 'notarization', 'kyc'],
+  },
+  {
+    key: 'onboarding',
+    label: 'Onboarding',
+    tasks: ['onboarding-sob', 'coc', 'account-creation', 'benefit-upload', 'plan-codes'],
+  },
+]
 
 export function SetupAccount({ c }: { c: Case }) {
   const { patchCase } = useCases()
@@ -132,38 +149,54 @@ export function SetupAccount({ c }: { c: Case }) {
     })
   }
 
-  // ---- Task list rail -------------------------------------------------------
-  const rail = (
-    <nav className="app-setup-rail" aria-label="Set Up Account tasks">
-      {SETUP_TASKS.map((t, i) => {
-        const isDone = completed(t.id)
-        const isActive = activeId === t.id && !setup.completed
-        const reachable = i <= maxReachable
-        const cls =
-          'app-setup-rail__item' +
-          (isActive ? ' is-active' : '') +
-          (isDone ? ' is-done' : '') +
-          (reachable ? ' is-reachable' : '')
-        return (
-          <button
-            key={t.id}
-            type="button"
-            className={cls}
-            disabled={!reachable}
-            onClick={() => reachable && openTask(t.id)}
-          >
-            <span className="app-setup-rail__badge">{isDone ? <CheckCircleFilled /> : i + 1}</span>
-            <span className="app-setup-rail__label">
-              {t.label}
-              <span className="app-setup-rail__status">
-                {isDone ? 'Completed' : isActive ? 'In progress' : reachable ? 'Pending' : 'Upcoming'}
-              </span>
-            </span>
-          </button>
-        )
-      })}
-    </nav>
+  // ---- Tabs (grouped tasks) + per-tab sub-navigation ------------------------
+  const activeGroup = TAB_GROUPS.find((g) => g.tasks.includes(activeId)) ?? TAB_GROUPS[0]
+  const groupReachable = (g: SetupTabGroup) => SETUP_TASK_ORDER.indexOf(g.tasks[0]) <= maxReachable
+
+  function openGroup(g: SetupTabGroup) {
+    const reachable = g.tasks.filter((t) => SETUP_TASK_ORDER.indexOf(t) <= maxReachable)
+    if (!reachable.length) return
+    const firstIncomplete = reachable.find((t) => !completed(t))
+    openTask(firstIncomplete ?? reachable[reachable.length - 1])
+  }
+
+  const tabs = (
+    <Tabs
+      activeKey={activeGroup.key}
+      onChange={(k) => {
+        const g = TAB_GROUPS.find((x) => x.key === k)
+        if (g) openGroup(g)
+      }}
+      items={TAB_GROUPS.map((g) => ({
+        key: g.key,
+        label: g.label,
+        disabled: !groupReachable(g),
+      }))}
+    />
   )
+
+  // A compact sub-task nav shown inside tabs that group several tasks.
+  const subNav =
+    activeGroup.tasks.length > 1 ? (
+      <div className="app-setup-subnav" role="tablist" aria-label={`${activeGroup.label} tasks`}>
+        {activeGroup.tasks.map((t) => {
+          const isDone = completed(t)
+          const isActive = activeId === t
+          const reachable = SETUP_TASK_ORDER.indexOf(t) <= maxReachable
+          const cls =
+            'app-setup-subnav__item' +
+            (isActive ? ' is-active' : '') +
+            (isDone ? ' is-done' : '') +
+            (reachable ? ' is-reachable' : '')
+          return (
+            <button key={t} type="button" className={cls} disabled={!reachable} onClick={() => reachable && openTask(t)}>
+              {isDone ? <CheckCircleFilled className="app-setup-subnav__icon" /> : <span className="app-setup-subnav__dot" />}
+              {setupTaskMeta(t).label}
+            </button>
+          )
+        })}
+      </div>
+    ) : null
 
   // ---- Panel header (what to do / status / what's next) ---------------------
   const meta = setupTaskMeta(activeId)
@@ -1071,11 +1104,12 @@ export function SetupAccount({ c }: { c: Case }) {
     )
   }
 
-  // ---- Layout: task rail + active panel ------------------------------------
+  // ---- Layout: grouped tabs + active panel ---------------------------------
   return (
     <div className="app-setup">
-      {rail}
+      {tabs}
       <div className="app-setup__panel">
+        {subNav}
         {panelHead}
         <Divider style={{ margin: '0 0 16px' }} />
         {panel}
