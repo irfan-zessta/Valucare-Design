@@ -25,6 +25,7 @@ import {
   Space,
   Table,
   Tag,
+  theme,
   Tooltip,
   Typography,
 } from 'antd'
@@ -117,10 +118,30 @@ function initDraft(p?: ProposalVersion): DraftForm {
   }
 }
 
+// The four client-facing stages of a proposal, shown as a segmented progress
+// bar beside the header. Each proposal status maps to one of these steps.
+const PROGRESS_STEPS = ['Preparing proposal', 'Sending for review', 'Send to client', 'Client accepted'] as const
+function progressStep(status: string): number {
+  switch (status) {
+    case 'draft':
+      return 1
+    case 'in-review':
+      return 2
+    case 'sent':
+    case 'feedback':
+      return 3
+    case 'accepted':
+      return 4
+    default:
+      return 1
+  }
+}
+
 export function FinalizeOffer({ c }: { c: Case }) {
   const { patchCase } = useCases()
   const { message } = App.useApp()
   const navigate = useNavigate()
+  const { token } = theme.useToken()
 
   const inter = c.company.businessSource !== 'Direct'
   const recipient = inter ? c.company.intermediaryName ?? 'the agent/broker' : 'the client'
@@ -722,16 +743,58 @@ export function FinalizeOffer({ c }: { c: Case }) {
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
         {/* ---- Header + workflow stepper ------------------------------------ */}
         <Card>
-          <Typography.Title level={5} style={{ marginTop: 0 }}>
-            Finalize Offer
-          </Typography.Title>
-          <Typography.Title level={5} style={{ marginTop: 0 }}>
-            Proposal {proposal.code ?? proposalCode(c)} · version {proposal.version} {statusTag}
-          </Typography.Title>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Rate sheet v{proposal.rateSheetVersion ?? selectedSheet?.version ?? 1} · SOB v{sobVersion}
-            {proposal.validUntil ? ` · valid until ${dayjs(proposal.validUntil).format('YYYY-MM-DD')}` : ''}
-          </Typography.Text>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: 24,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <Typography.Title level={5} style={{ marginTop: 0 }}>
+                Finalize Offer
+              </Typography.Title>
+              <Typography.Title level={5} style={{ marginTop: 0 }}>
+                Proposal {proposal.code ?? proposalCode(c)} · version {proposal.version} {statusTag}
+              </Typography.Title>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Rate sheet v{proposal.rateSheetVersion ?? selectedSheet?.version ?? 1} · SOB v{sobVersion}
+                {proposal.validUntil ? ` · valid until ${dayjs(proposal.validUntil).format('YYYY-MM-DD')}` : ''}
+              </Typography.Text>
+            </div>
+            {/* Segmented progress bar for the four proposal stages. */}
+            {(() => {
+              const step = progressStep(proposal.status)
+              return (
+                <div style={{ flex: '0 0 auto', minWidth: 260, maxWidth: 320, width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+                    <Typography.Text strong style={{ fontSize: 13 }}>
+                      {PROGRESS_STEPS[step - 1]}
+                    </Typography.Text>
+                    <Typography.Text type="secondary" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>
+                      Step {step} of {PROGRESS_STEPS.length}
+                    </Typography.Text>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {PROGRESS_STEPS.map((label, i) => (
+                      <div
+                        key={label}
+                        title={label}
+                        style={{
+                          flex: 1,
+                          height: 6,
+                          borderRadius: 999,
+                          background: i < step ? token.colorPrimary : token.colorFillSecondary,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
           {proposal.returnReason && proposal.status === 'draft' && (
             <Alert
               style={{ marginTop: 12 }}
