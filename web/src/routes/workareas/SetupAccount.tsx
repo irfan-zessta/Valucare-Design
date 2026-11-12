@@ -1167,8 +1167,16 @@ export function SetupAccount({ c }: { c: Case }) {
           </Typography.Text>
           <div className="app-form-floatbar__actions">
             <Tooltip title={allApproved ? '' : 'Approve at least one plan code (and resolve any drafts).'}>
-              <Button type="primary" disabled={!allApproved} onClick={() => completeTask('plan-codes')}>
-                Finish plan codes
+              <Button
+                type="primary"
+                disabled={!allApproved}
+                onClick={() => {
+                  completeTask('plan-codes')
+                  patch((prev) => ({ ...prev, currentWorkArea: 'activate-handover' }))
+                  navigate(`/cases/${c.id}/activate-handover`)
+                }}
+              >
+                Continue to Activate &amp; Handover
               </Button>
             </Tooltip>
           </div>
