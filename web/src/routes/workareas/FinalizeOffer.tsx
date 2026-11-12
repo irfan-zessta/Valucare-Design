@@ -162,8 +162,9 @@ export function FinalizeOffer({ c }: { c: Case }) {
   const [returning, setReturning] = useState(false)
   const [returnConcern, setReturnConcern] = useState('')
   const [viewRates, setViewRates] = useState(false)
-  // Inline customization of the rates recommendation outside the draft stage.
+  // Inline customization of the rates recommendation / justification outside the draft stage.
   const [editRates, setEditRates] = useState(false)
+  const [editJustification, setEditJustification] = useState(false)
 
   function patchProposal(recipe: (p: ProposalVersion) => ProposalVersion, extra?: (c: Case) => Case) {
     patchCase(c.id, (prev) => {
@@ -327,6 +328,18 @@ export function FinalizeOffer({ c }: { c: Case }) {
       recommendation: proposal?.recommendation ?? '',
     }))
     setEditRates(false)
+  }
+
+  // Customize just the rates justification, available after the draft stage.
+  function saveJustification() {
+    if (!proposal) return
+    patchProposal((p) => ({ ...p, justification: draft.justification.trim() || undefined }))
+    setEditJustification(false)
+    message.success('Rates justification updated.')
+  }
+  function cancelJustification() {
+    setDraft((d) => ({ ...d, justification: proposal?.justification ?? '' }))
+    setEditJustification(false)
   }
 
   // ---- Review (two-level maker-checker) ------------------------------------
@@ -858,11 +871,19 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
         {/* ---- Activity 3 · Rates justification ------------------------------ */}
         <Card>
-          {activityHead(3, 'Rates justification')}
+          {activityHead(
+            3,
+            'Rates justification',
+            !editable && !editJustification ? (
+              <Button size="small" icon={<EditOutlined />} onClick={() => setEditJustification(true)}>
+                Customize
+              </Button>
+            ) : undefined,
+          )}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
             Prepare the explanation supporting the recommended rates.
           </Typography.Paragraph>
-          {editable ? (
+          {editable || editJustification ? (
             <div style={{ marginTop: 12 }}>
               <Typography.Text>Rates justification *</Typography.Text>
               <Input.TextArea
@@ -871,6 +892,16 @@ export function FinalizeOffer({ c }: { c: Case }) {
                 value={draft.justification}
                 onChange={(e) => setDraft({ ...draft, justification: e.target.value })}
               />
+              {/* In draft, the floating bar saves everything; outside draft this
+                  inline toggle commits just the justification. */}
+              {!editable && editJustification && (
+                <Space style={{ marginTop: 16 }}>
+                  <Button type="primary" icon={<CheckCircleOutlined />} onClick={saveJustification}>
+                    Save justification
+                  </Button>
+                  <Button onClick={cancelJustification}>Cancel</Button>
+                </Space>
+              )}
             </div>
           ) : (
             <Typography.Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
