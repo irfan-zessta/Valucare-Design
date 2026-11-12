@@ -533,8 +533,8 @@ button.app-stepper__item {
   min-block-size: 100vh;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 32px 16px;
+  justify-content: flex-end;
+  padding: 32px clamp(16px, 8vw, 120px);
   background-color: #f4f4f4;
   background-image: url('../assets/login-bg.png');
   background-size: cover;
@@ -543,7 +543,7 @@ button.app-stepper__item {
 }
 .app-login__card {
   inline-size: 100%;
-  max-inline-size: 400px;
+  max-inline-size: 480px;
 }
 .app-login__brand {
   margin-block-end: 20px;
