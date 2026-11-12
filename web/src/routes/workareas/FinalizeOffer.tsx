@@ -24,6 +24,7 @@ import {
   Select,
   Space,
   Table,
+  Tabs,
   Tag,
   theme,
   Tooltip,
@@ -738,6 +739,16 @@ export function FinalizeOffer({ c }: { c: Case }) {
     </Tag>
   )
 
+  // Open the tab that matches where the proposal is in its lifecycle.
+  const defaultTab =
+    proposal.status === 'in-review'
+      ? 'pricing'
+      : proposal.status === 'sent' || proposal.status === 'feedback' || proposal.status === 'accepted'
+        ? 'negotiation'
+        : 'prep'
+  // All versions of this proposal, newest first, for the documents tab.
+  const allVersions = [...(c.offer.proposals ?? [])].sort((a, b) => b.version - a.version)
+
   return (
     <div>
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
@@ -814,6 +825,16 @@ export function FinalizeOffer({ c }: { c: Case }) {
             />
           )}
         </Card>
+
+        <Tabs
+          defaultActiveKey={defaultTab}
+          size="large"
+          items={[
+            {
+              key: 'prep',
+              label: 'Proposal preparation',
+              children: (
+                <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
 
         {/* ---- Activity 1 · Rate sheet checking ----------------------------- */}
         <Card>
@@ -993,7 +1014,14 @@ export function FinalizeOffer({ c }: { c: Case }) {
           )}
         </Card>
 
-        {/* ---- Pricing approvals -------------------------------------------- */}
+                </Space>
+              ),
+            },
+            {
+              key: 'pricing',
+              label: 'Pricing and approvals',
+              children: (
+        /* ---- Pricing approvals ---- */
         <section>
           <Typography.Title level={5}>Pricing approvals</Typography.Title>
           <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
@@ -1025,6 +1053,20 @@ export function FinalizeOffer({ c }: { c: Case }) {
             Approvals are bound to the reviewed version — a material change creates a new version and these no longer apply.
           </Typography.Paragraph>
         </section>
+
+              ),
+            },
+            {
+              key: 'negotiation',
+              label: 'Negotiation and acceptance',
+              children: (
+                <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+
+        {!['sent', 'feedback', 'accepted'].includes(proposal.status) && (
+          <Typography.Text type="secondary">
+            Negotiation and acceptance become available once the proposal is sent to the client.
+          </Typography.Text>
+        )}
 
         {/* ---- Negotiation rounds ------------------------------------------- */}
         {['sent', 'feedback', 'accepted'].includes(proposal.status) && (
@@ -1073,6 +1115,105 @@ export function FinalizeOffer({ c }: { c: Case }) {
             description={`Accepted on ${dayjs(proposal.acceptance.date).format('YYYY-MM-DD')} (version ${proposal.acceptance.version})${proposal.acceptance.notes ? ` · ${proposal.acceptance.notes}` : ''}.`}
           />
         )}
+
+                </Space>
+              ),
+            },
+            {
+              key: 'documents',
+              label: 'Proposal documents and versions',
+              children: (
+                <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+                  {/* ---- Attached documents --------------------------------- */}
+                  <Card>
+                    <Typography.Title level={5} style={{ marginTop: 0 }}>
+                      Documents
+                    </Typography.Title>
+                    <div
+                      className="app-decision-row"
+                      style={{ marginTop: 12, border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}
+                    >
+                      <Space>
+                        <FileTextOutlined />
+                        <strong>Summary of Benefits</strong>
+                        {sob ? (
+                          <>
+                            <Tag>v{sob.version}</Tag>
+                            <Tag color={sob.status === 'approved' ? 'green' : sob.status === 'validated' ? 'blue' : 'default'}>
+                              {sob.status}
+                            </Tag>
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                              {sob.lines?.length ?? 0} benefit lines · source: {sob.source ?? 'template'}
+                            </Typography.Text>
+                          </>
+                        ) : (
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            Not created yet
+                          </Typography.Text>
+                        )}
+                      </Space>
+                    </div>
+                    <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+                      The full client-facing proposal document is assembled in the Proposal preparation tab.
+                    </Typography.Paragraph>
+                  </Card>
+
+                  {/* ---- Version history ------------------------------------ */}
+                  <Card>
+                    <Typography.Title level={5} style={{ marginTop: 0 }}>
+                      Versions ({allVersions.length})
+                    </Typography.Title>
+                    <Table
+                      size="small"
+                      style={{ marginTop: 12 }}
+                      dataSource={allVersions}
+                      rowKey="id"
+                      pagination={false}
+                      columns={[
+                        {
+                          title: 'Version',
+                          dataIndex: 'version',
+                          render: (_: unknown, r: ProposalVersion) => (
+                            <Space>
+                              <strong>v{r.version}</strong>
+                              {r.id === proposal.id && <Tag color="blue">current</Tag>}
+                            </Space>
+                          ),
+                        },
+                        {
+                          title: 'Status',
+                          dataIndex: 'status',
+                          render: (s: string) => s.charAt(0).toUpperCase() + s.slice(1),
+                        },
+                        {
+                          title: 'Rate sheet',
+                          render: (_: unknown, r: ProposalVersion) => `v${r.rateSheetVersion ?? '—'}`,
+                        },
+                        { title: 'SOB', render: (_: unknown, r: ProposalVersion) => `v${r.sobVersion}` },
+                        {
+                          title: 'Created',
+                          dataIndex: 'createdAt',
+                          render: (d: string) => (d ? dayjs(d).format('YYYY-MM-DD') : '—'),
+                        },
+                        {
+                          title: 'Notes',
+                          render: (_: unknown, r: ProposalVersion) =>
+                            r.acceptance
+                              ? `Accepted ${dayjs(r.acceptance.date).format('YYYY-MM-DD')}${r.acceptance.notes ? ` · ${r.acceptance.notes}` : ''}`
+                              : r.declineReason
+                                ? `Declined · ${r.declineReason}`
+                                : r.returnReason
+                                  ? `Returned · ${r.returnReason}`
+                                  : '—',
+                        },
+                      ]}
+                    />
+                  </Card>
+                </Space>
+              ),
+            },
+          ]}
+        />
       </Space>
 
       {/* ---- Floating action bar ------------------------------------------- */}
