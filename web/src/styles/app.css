@@ -550,7 +550,8 @@ button.app-stepper__item {
   align-items: center;
   background: #fff;
   border-block-start: 1px solid #e8e8e8;
-  padding: 12px 24px;
+  /* 8px block padding matches the sidebar's "Collapse" footer row height. */
+  padding: 8px 24px;
   box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08);
   z-index: 10;
 }
