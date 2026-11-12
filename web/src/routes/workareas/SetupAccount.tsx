@@ -949,6 +949,10 @@ export function SetupAccount({ c }: { c: Case }) {
     const coc = setup!.coc
     const onbVersion = setup!.onboardingSob?.version ?? sobVersion
     const setCoc = (patchFields: Partial<typeof coc>) => patchSetup((s) => ({ ...s, coc: { ...s.coc, ...patchFields } }))
+    const setLegalDate = (field: 'effectiveDate' | 'expiryDate', v?: string) =>
+      patchSetup((s) => ({ ...s, legal: { ...s.legal, [field]: v } }))
+    // Details stay editable until the COC is generated or sent back as a draft.
+    const cocEditable = coc.status === 'not-generated' || coc.status === 'draft'
 
     function generate() {
       setCoc({
@@ -963,20 +967,68 @@ export function SetupAccount({ c }: { c: Case }) {
     return (
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
         <FormSection title="Certificate of Coverage" wide>
-          <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
-            <Descriptions.Item label="Company">{c.company.name}</Descriptions.Item>
-            <Descriptions.Item label="Reference">{coc.reference || '(assigned on generate)'}</Descriptions.Item>
-            <Descriptions.Item label="Effective date">{fmtDate(setup!.legal.effectiveDate)}</Descriptions.Item>
-            <Descriptions.Item label="Expiry date">{fmtDate(setup!.legal.expiryDate)}</Descriptions.Item>
-            <Descriptions.Item label="SOB version">{onbVersion ? `v${onbVersion}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="Status">
-              <Tag color={coc.status === 'approved' || coc.status === 'released' ? 'green' : coc.status === 'in-review' ? 'blue' : 'default'}>
-                {coc.status}
-              </Tag>
-            </Descriptions.Item>
-          </Descriptions>
+          {cocEditable ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Company</div>
+                <Input value={c.company.name} readOnly />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Reference</div>
+                <Input
+                  value={coc.reference ?? ''}
+                  placeholder={`COC-${c.id}`}
+                  onChange={(e) => setCoc({ reference: e.target.value })}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>SOB version</div>
+                <Input value={onbVersion ? `v${onbVersion}` : '—'} readOnly />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Effective date</div>
+                <DatePicker
+                  style={{ width: '100%' }}
+                  value={setup!.legal.effectiveDate ? dayjs(setup!.legal.effectiveDate) : null}
+                  onChange={(d) => setLegalDate('effectiveDate', d ? d.format('YYYY-MM-DD') : undefined)}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Expiry date</div>
+                <DatePicker
+                  style={{ width: '100%' }}
+                  value={setup!.legal.expiryDate ? dayjs(setup!.legal.expiryDate) : null}
+                  onChange={(d) => setLegalDate('expiryDate', d ? d.format('YYYY-MM-DD') : undefined)}
+                />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Remarks</div>
+                <Input.TextArea
+                  rows={2}
+                  value={coc.remarks ?? ''}
+                  onChange={(e) => setCoc({ remarks: e.target.value })}
+                />
+              </div>
+            </div>
+          ) : (
+            <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
+              <Descriptions.Item label="Company">{c.company.name}</Descriptions.Item>
+              <Descriptions.Item label="Reference">{coc.reference || '(assigned on generate)'}</Descriptions.Item>
+              <Descriptions.Item label="Effective date">{fmtDate(setup!.legal.effectiveDate)}</Descriptions.Item>
+              <Descriptions.Item label="Expiry date">{fmtDate(setup!.legal.expiryDate)}</Descriptions.Item>
+              <Descriptions.Item label="SOB version">{onbVersion ? `v${onbVersion}` : '—'}</Descriptions.Item>
+              <Descriptions.Item label="Status">
+                <Tag color={coc.status === 'approved' || coc.status === 'released' ? 'green' : coc.status === 'in-review' ? 'blue' : 'default'}>
+                  {coc.status}
+                </Tag>
+              </Descriptions.Item>
+              {coc.remarks && <Descriptions.Item label="Remarks" span={2}>{coc.remarks}</Descriptions.Item>}
+            </Descriptions>
+          )}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-            Generated from the company, coverage dates and the onboarding SOB benefits. A separate reviewer approves before release.
+            {cocEditable
+              ? 'Edit the details below, then generate the COC. A separate reviewer approves before release.'
+              : 'Generated from the company, coverage dates and the onboarding SOB benefits. A separate reviewer approves before release.'}
           </Typography.Paragraph>
         </FormSection>
 
