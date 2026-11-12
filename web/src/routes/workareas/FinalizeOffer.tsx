@@ -727,11 +727,9 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
   // Open the tab that matches where the proposal is in its lifecycle.
   const defaultTab =
-    proposal.status === 'in-review'
-      ? 'pricing'
-      : proposal.status === 'sent' || proposal.status === 'feedback' || proposal.status === 'accepted'
-        ? 'negotiation'
-        : 'prep'
+    proposal.status === 'sent' || proposal.status === 'feedback' || proposal.status === 'accepted'
+      ? 'negotiation'
+      : 'prep'
   // All versions of this proposal, newest first, for the documents tab.
   const allVersions = [...(c.offer.proposals ?? [])].sort((a, b) => b.version - a.version)
 
@@ -936,45 +934,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
         </Card>
 
                 </Space>
-              ),
-            },
-            {
-              key: 'pricing',
-              label: 'Pricing and approvals',
-              children: (
-        /* ---- Pricing approvals ---- */
-        <section>
-          <Typography.Title level={5}>Pricing approvals</Typography.Title>
-          <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
-            {(['first', 'second'] as const).map((stage) => {
-              const a = approvalsThis.filter((x) => x.stage === stage).slice(-1)[0]
-              return (
-                <Space key={stage}>
-                  <Typography.Text strong style={{ minWidth: 220, display: 'inline-block' }}>
-                    {stage === 'first' ? '1. First-level pricing review' : '2. Second-level pricing approval'}
-                  </Typography.Text>
-                  {a ? (
-                    <>
-                      <Tag color={a.decision === 'approve' ? 'green' : 'red'}>
-                        {a.decision === 'approve' ? 'Approved' : 'Returned'}
-                      </Tag>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {a.byName} · {dayjs(a.at).format('YYYY-MM-DD HH:mm')}
-                        {a.remarks ? ` · ${a.remarks}` : ''}
-                      </Typography.Text>
-                    </>
-                  ) : (
-                    <Tag>Not yet decided</Tag>
-                  )}
-                </Space>
-              )
-            })}
-          </Space>
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-            Approvals are bound to the reviewed version — a material change creates a new version and these no longer apply.
-          </Typography.Paragraph>
-        </section>
-
               ),
             },
             {
