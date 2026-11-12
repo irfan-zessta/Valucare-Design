@@ -21,6 +21,7 @@ import {
   Input,
   Select,
   Space,
+  Table,
   Tabs,
   Tag,
   Tooltip,
@@ -33,13 +34,16 @@ import {
   CloudUploadOutlined,
   EditOutlined,
   EyeOutlined,
+  DeleteOutlined,
   FileTextOutlined,
   ImportOutlined,
+  PlusOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type {
   Case,
+  FranchiseAffiliate,
   SetupDocStage,
   SetupState,
   SetupTaskId,
@@ -95,7 +99,7 @@ const TAB_GROUPS: SetupTabGroup[] = [
   {
     key: 'onboarding',
     label: 'Onboarding',
-    tasks: ['onboarding-sob', 'coc', 'account-creation', 'benefit-upload', 'plan-codes'],
+    tasks: ['onboarding-sob', 'coc', 'account-creation', 'affiliates', 'benefit-upload', 'plan-codes'],
   },
 ]
 
@@ -265,6 +269,8 @@ export function SetupAccount({ c }: { c: Case }) {
         return CocPanel()
       case 'account-creation':
         return <AccountForm c={c} setup={setup!} patchCase={patch} onApproved={() => completeTask('account-creation')} />
+      case 'affiliates':
+        return AffiliatesPanel()
       case 'benefit-upload':
         return BenefitUpload()
       case 'plan-codes':
@@ -1063,6 +1069,104 @@ export function SetupAccount({ c }: { c: Case }) {
                 Continue to account creation
               </Button>
             )}
+          </div>
+        </div>
+      </Space>
+    )
+  }
+
+  // ===== Affiliates =========================================================
+  function AffiliatesPanel() {
+    // Prefill from the franchise affiliate rows if setup has none yet.
+    const rows: FranchiseAffiliate[] = setup!.affiliates ?? c.franchise.affiliateRows ?? []
+    const setRows = (next: FranchiseAffiliate[]) => patchSetup((s) => ({ ...s, affiliates: next }))
+
+    const blankRow: FranchiseAffiliate = {
+      name: '',
+      address: '',
+      email: '',
+      contactPerson: '',
+      contactNumber: '',
+      financialAssistance: '',
+      financialAssistanceName: '',
+    }
+    const addRow = () => setRows([...rows, { ...blankRow }])
+    const updateRow = (i: number, key: keyof FranchiseAffiliate, value: string) =>
+      setRows(rows.map((r, idx) => (idx === i ? { ...r, [key]: value } : r)))
+    const removeRow = (i: number) => setRows(rows.filter((_, idx) => idx !== i))
+
+    const hasEmptyName = rows.some((r) => !r.name.trim())
+    const cell = (key: keyof FranchiseAffiliate) =>
+      (_: unknown, _r: FranchiseAffiliate, i: number) => (
+        <Input value={rows[i][key]} onChange={(e) => updateRow(i, key, e.target.value)} />
+      )
+
+    return (
+      <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+        <FormSection
+          title="Affiliates"
+          description="Affiliated or sister companies enrolled under this account. Each can later get its own account reference and plan codes."
+          extra={
+            <Button icon={<PlusOutlined />} onClick={addRow}>
+              Add affiliate
+            </Button>
+          }
+          wide
+        >
+          <Table<FranchiseAffiliate>
+            size="small"
+            pagination={false}
+            rowKey={(_, i) => String(i)}
+            dataSource={rows}
+            scroll={{ x: 'max-content' }}
+            locale={{ emptyText: 'No affiliates yet — add one, or continue if this account has none.' }}
+            columns={[
+              { title: 'Name', dataIndex: 'name', render: (_: unknown, _r: FranchiseAffiliate, i: number) => (
+                <Input
+                  status={!rows[i].name.trim() ? 'error' : undefined}
+                  value={rows[i].name}
+                  onChange={(e) => updateRow(i, 'name', e.target.value)}
+                />
+              ) },
+              { title: 'Address', dataIndex: 'address', render: cell('address') },
+              { title: 'Email', dataIndex: 'email', render: cell('email') },
+              { title: 'Contact Person', dataIndex: 'contactPerson', render: cell('contactPerson') },
+              { title: 'Contact Number', dataIndex: 'contactNumber', render: cell('contactNumber') },
+              { title: '', dataIndex: 'x', width: 48, align: 'center', render: (_: unknown, _r: FranchiseAffiliate, i: number) => (
+                <Tooltip title="Remove affiliate">
+                  <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove affiliate" onClick={() => removeRow(i)} />
+                </Tooltip>
+              ) },
+            ]}
+          />
+        </FormSection>
+
+        <div className="app-form-floatbar" style={{ marginTop: 16 }}>
+          <Typography.Text type={hasEmptyName && rows.length ? 'danger' : 'secondary'}>
+            {rows.length === 0
+              ? 'No affiliates — you can continue.'
+              : hasEmptyName
+                ? 'Each affiliate needs a name (or remove the empty row).'
+                : `${rows.length} affiliate${rows.length === 1 ? '' : 's'} recorded.`}
+          </Typography.Text>
+          <div className="app-form-floatbar__actions">
+            <Tooltip title={hasEmptyName && rows.length ? 'Name every affiliate first.' : ''}>
+              <Button
+                type="primary"
+                disabled={hasEmptyName && rows.length > 0}
+                onClick={() => {
+                  // Keep company.affiliates (names) in sync for downstream use.
+                  const names = rows.map((r) => r.name.trim()).filter(Boolean)
+                  patch((prev) => ({
+                    ...prev,
+                    company: { ...prev.company, affiliates: names.length ? names : undefined },
+                  }))
+                  completeTask('affiliates')
+                }}
+              >
+                {rows.length ? 'Save affiliates and continue' : 'Continue without affiliates'}
+              </Button>
+            </Tooltip>
           </div>
         </div>
       </Space>

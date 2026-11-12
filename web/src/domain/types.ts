@@ -566,6 +566,7 @@ export type SetupTaskId =
   | 'onboarding-sob'
   | 'coc'
   | 'account-creation'
+  | 'affiliates'
   | 'benefit-upload'
   | 'plan-codes'
 
@@ -709,6 +710,8 @@ export interface SetupState {
   /** Account-number creation form (mirrors the wireframe account schema). */
   accountForm?: Record<string, unknown>
   accountFormStatus?: AccountFormStatus
+  /** Affiliated / sister companies enrolled under this account. */
+  affiliates?: FranchiseAffiliate[]
   benefitUpload: BenefitUploadState
   /** Tasks the user has marked complete (drives the task-list state). */
   completedTasks: SetupTaskId[]

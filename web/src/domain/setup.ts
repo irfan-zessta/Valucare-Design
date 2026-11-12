@@ -58,6 +58,12 @@ export const SETUP_TASKS: SetupTaskMeta[] = [
     id: 'account-creation',
     label: 'Account-number creation',
     blurb: 'Complete and approve the account record; the account number is issued here.',
+    whatNext: 'Add any affiliated / sister companies.',
+  },
+  {
+    id: 'affiliates',
+    label: 'Affiliates',
+    blurb: 'Add the affiliated / sister companies enrolled under this account.',
     whatNext: 'Upload the SOB benefits into the account.',
   },
   {
@@ -131,6 +137,7 @@ export function makeInitialSetup(c: Case): SetupState {
     notarization: { status: 'awaiting-signed' },
     kyc: { status: 'pending' },
     coc: { status: 'not-generated' },
+    affiliates: c.franchise.affiliateRows ? c.franchise.affiliateRows.map((a) => ({ ...a })) : [],
     benefitUpload: { status: 'not-started' },
     completedTasks: [],
     activeTask: 'internal-alignment',
