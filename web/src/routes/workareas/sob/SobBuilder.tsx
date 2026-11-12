@@ -61,14 +61,12 @@ export function SobBuilder({
   sob,
   patchSob,
   editable,
-  saveState,
   showUpload = false,
 }: {
   c: Case
   sob: SobDraft
   patchSob: (recipe: (s: SobDraft) => SobDraft) => void
   editable: boolean
-  saveState: SaveState
   showUpload?: boolean
 }) {
   const { notification, message } = App.useApp()
@@ -149,18 +147,6 @@ export function SobBuilder({
     patchSob((s) => ({ ...s, sections: (s.sections ?? []).filter((x) => x.id !== sectionId) }))
 
   const activeLine = drawer ? findLine(sections.find((s) => s.id === drawer.sectionId)?.lines ?? [], drawer.lineId) : undefined
-
-  // ---- Save state banner ----------------------------------------------------
-  const saveTag =
-    saveState === 'saving' ? (
-      <Tag color="processing">Saving…</Tag>
-    ) : saveState === 'error' ? (
-      <Tag color="red">Save failed</Tag>
-    ) : sob.savedAt ? (
-      <Tag color="green">Saved {dayjs(sob.savedAt).format('HH:mm:ss')}</Tag>
-    ) : (
-      <Tag>Unsaved draft</Tag>
-    )
 
   // ---- Benefit table columns ------------------------------------------------
   const sectionColumns = (sectionId: string) => [
@@ -262,23 +248,6 @@ export function SobBuilder({
 
   return (
     <div>
-      {/* ---- Builder toolbar --------------------------------------------- */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 12,
-          marginBottom: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <Space>
-          <Typography.Text strong>SOB document builder</Typography.Text>
-          {saveTag}
-        </Space>
-      </div>
-
       {showUpload && editable && <UploadPanel />}
 
       <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>

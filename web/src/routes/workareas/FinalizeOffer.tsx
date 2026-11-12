@@ -488,7 +488,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
             sob={sob}
             patchSob={patchSob}
             editable={sobEditable}
-            saveState="idle"
             showUpload={false}
           />
           {sob.status !== 'approved' && sob.status !== 'signed' && sob.status !== 'codified' && (
