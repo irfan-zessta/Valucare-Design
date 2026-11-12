@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "StructuredListWrapper",
+    "filePath": "web/node_modules/@carbon/react/es/components/StructuredList/StructuredList.js"
+  },
+  "codeProperties": {
+    "isCondensed": {
+      "type": "boolean",
+      "name": "Is Condensed",
+      "description": "Specify if the structured list is condensed."
+    },
+    "isFlush": {
+      "type": "boolean",
+      "name": "Is Flush",
+      "description": "Specify if the structured list is flush. Not valid for the selection variant."
+    },
+    "selection": {
+      "type": "boolean",
+      "name": "Selection",
+      "description": "Specify whether the list should have selections."
+    },
+    "selectedInitialRow": {
+      "type": "string",
+      "name": "Selected Initial Row",
+      "description": "Specify which row will be selected initially."
+    }
+  }
+}

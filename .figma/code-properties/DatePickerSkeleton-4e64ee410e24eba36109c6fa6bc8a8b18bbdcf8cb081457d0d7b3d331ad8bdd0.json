@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "DatePickerSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/DatePicker/next/components/DatePickerSkeleton.js"
+  },
+  "codeProperties": {
+    "range": {
+      "type": "boolean",
+      "name": "Range",
+      "defaultValue": false
+    }
+  }
+}

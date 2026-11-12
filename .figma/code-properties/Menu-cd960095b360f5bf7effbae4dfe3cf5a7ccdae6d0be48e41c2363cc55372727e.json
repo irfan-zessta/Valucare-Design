@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Menu",
+    "filePath": "web/node_modules/@carbon/react/es/components/Menu/Menu.js"
+  },
+  "codeProperties": {
+    "backgroundToken": {
+      "type": "string",
+      "name": "Background Token",
+      "defaultValue": "layer",
+      "options": [
+        "layer",
+        "background"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "layer": "Layer",
+          "background": "Background"
+        }
+      }
+    },
+    "border": {
+      "type": "boolean",
+      "name": "Border",
+      "defaultValue": false
+    },
+    "label": {
+      "type": "string",
+      "name": "Label"
+    },
+    "open": {
+      "type": "boolean",
+      "name": "Open"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "defaultValue": "sm",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

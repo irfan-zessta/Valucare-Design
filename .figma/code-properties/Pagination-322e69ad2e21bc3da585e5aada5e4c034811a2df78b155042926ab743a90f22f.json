@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Pagination",
+    "filePath": "web/node_modules/@carbon/react/es/components/Pagination/Pagination.js"
+  },
+  "codeProperties": {
+    "backwardText": {
+      "type": "string",
+      "name": "Backward Text",
+      "description": "The description for the backward icon.",
+      "defaultValue": "Previous page"
+    },
+    "backwardTextTooltipPosition": {
+      "type": "string",
+      "name": "Backward Tooltip Position",
+      "description": "The tooltip position for the backward button.",
+      "defaultValue": "top",
+      "options": [
+        "top",
+        "right",
+        "bottom",
+        "left"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "right": "Right",
+          "bottom": "Bottom",
+          "left": "Left"
+        }
+      }
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "True if the backward/forward buttons, as well as the page select elements, should be disabled.",
+      "defaultValue": false
+    },
+    "forwardText": {
+      "type": "string",
+      "name": "Forward Text",
+      "description": "The description for the forward icon.",
+      "defaultValue": "Next page"
+    },
+    "forwardTextTooltipPosition": {
+      "type": "string",
+      "name": "Forward Tooltip Position",
+      "description": "The tooltip position for the forward button.",
+      "defaultValue": "top",
+      "options": [
+        "top",
+        "right",
+        "bottom",
+        "left"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "right": "Right",
+          "bottom": "Bottom",
+          "left": "Left"
+        }
+      }
+    },
+    "isLastPage": {
+      "type": "boolean",
+      "name": "Is Last Page",
+      "description": "True if the current page should be the last page.",
+      "defaultValue": false
+    },
+    "itemsPerPageText": {
+      "type": "string",
+      "name": "Items Per Page Text",
+      "description": "The translatable text indicating the number of items per page.",
+      "defaultValue": "Items per page:"
+    },
+    "page": {
+      "type": "number",
+      "name": "Page",
+      "description": "The current page.",
+      "defaultValue": 1
+    },
+    "pageInputDisabled": {
+      "type": "boolean",
+      "name": "Page Input Disabled",
+      "description": "True if the select box to change the page should be disabled."
+    },
+    "pageSize": {
+      "type": "number",
+      "name": "Page Size",
+      "description": "The number dictating how many items a page contains."
+    },
+    "pageSizeInputDisabled": {
+      "type": "boolean",
+      "name": "Page Size Input Disabled",
+      "description": "True if the select box to change the items per page should be disabled."
+    },
+    "pagesUnknown": {
+      "type": "boolean",
+      "name": "Pages Unknown",
+      "description": "True if the total number of items is unknown.",
+      "defaultValue": false
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the Pagination.",
+      "defaultValue": "md",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    },
+    "totalItems": {
+      "type": "number",
+      "name": "Total Items",
+      "description": "The total number of items."
+    }
+  }
+}

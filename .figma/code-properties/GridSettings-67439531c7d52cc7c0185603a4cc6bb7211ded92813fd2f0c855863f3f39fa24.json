@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "GridSettings",
+    "filePath": "web/node_modules/@carbon/react/es/components/Grid/GridContext.js"
+  },
+  "codeProperties": {
+    "mode": {
+      "type": "string",
+      "name": "Mode",
+      "options": [
+        "flexbox",
+        "css-grid"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "flexbox": "Flexbox",
+          "css-grid": "CSS Grid"
+        }
+      },
+      "description": "Specify the gutter mode for the GridContext"
+    },
+    "subgrid": {
+      "type": "boolean",
+      "name": "Subgrid",
+      "defaultValue": false,
+      "description": "Specify whether subgrid should be enabled"
+    }
+  }
+}

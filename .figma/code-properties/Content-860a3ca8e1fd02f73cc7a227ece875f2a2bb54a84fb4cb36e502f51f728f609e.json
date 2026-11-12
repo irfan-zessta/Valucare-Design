@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Content",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/Content.js"
+  },
+  "codeProperties": {
+    "tagName": {
+      "type": "string",
+      "name": "Tag Name",
+      "description": "Optionally specify the tag of the content node.",
+      "defaultValue": "main"
+    }
+  }
+}

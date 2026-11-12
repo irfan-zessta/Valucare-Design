@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TableDecoratorRow",
+    "filePath": "web/node_modules/@carbon/react/es/components/DataTable/TableDecoratorRow.js"
+  },
+  "codeProperties": {
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "control": false
+    }
+  }
+}

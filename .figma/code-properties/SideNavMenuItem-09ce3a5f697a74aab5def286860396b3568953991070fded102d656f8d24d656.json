@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SideNavMenuItem",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/SideNavMenuItem.js"
+  },
+  "codeProperties": {
+    "href": {
+      "type": "string",
+      "name": "Href",
+      "description": "The `href` for the rendered link."
+    },
+    "isActive": {
+      "type": "boolean",
+      "name": "Is Active",
+      "description": "Optionally specify whether the link is \"active\". An active link is one that has an href that is the same as the current page."
+    }
+  }
+}

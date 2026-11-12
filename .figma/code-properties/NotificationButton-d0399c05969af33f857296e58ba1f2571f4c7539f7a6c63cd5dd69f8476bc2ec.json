@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "NotificationButton",
+    "filePath": "web/node_modules/@carbon/react/es/components/Notification/Notification.js"
+  },
+  "codeProperties": {
+    "notificationType": {
+      "type": "string",
+      "name": "Notification Type",
+      "defaultValue": "toast",
+      "options": [
+        "toast",
+        "inline",
+        "actionable"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "toast": "Toast",
+          "inline": "Inline",
+          "actionable": "Actionable"
+        }
+      }
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "control": false,
+      "name": "Icon"
+    }
+  }
+}

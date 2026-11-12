@@ -1,0 +1,910 @@
+/* ===========================================================================
+   Global app styles. Ant Design components carry most of the styling via the
+   central theme (see theme.ts); this file only covers the shell layout plumbing
+   and a few brand touches that live outside component tokens.
+   =========================================================================== */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background-color: #f4f4f4;
+}
+
+/* Utility */
+.app-muted {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* --- Brand logo ----------------------------------------------------------- */
+.app-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.app-logo svg {
+  display: block;
+  flex: none;
+}
+.app-logo__mark {
+  display: block;
+  flex: none;
+  object-fit: contain;
+}
+.app-logo__wordmark {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+/* --- Header --------------------------------------------------------------- */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.app-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-inline: 8px;
+  color: rgba(0, 0, 0, 0.88);
+}
+.app-header__appname {
+  color: rgba(0, 0, 0, 0.45);
+}
+.app-header__crumbs {
+  margin-inline-start: 12px;
+  padding-inline-start: 16px;
+  border-inline-start: 1px solid #f0f0f0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+/* When the breadcrumb is the leftmost header element (desktop, no logo), drop
+   the divider and align it with the content padding below. */
+.app-header__crumbs--lead {
+  margin-inline-start: 0;
+  padding-inline-start: 12px;
+  border-inline-start: 0;
+}
+/* Trail segments are muted; the current page (last) reads solid and bold. */
+.app-header__crumbs .ant-breadcrumb-link,
+.app-header__crumbs .ant-breadcrumb-separator {
+  color: rgba(0, 0, 0, 0.45);
+}
+.app-header__crumbs a.ant-breadcrumb-link,
+.app-header__crumbs .ant-breadcrumb-link a {
+  color: rgba(0, 0, 0, 0.45);
+}
+.app-header__crumbs a:hover {
+  color: #cb0a2f;
+}
+.app-header__crumbs li:last-child .ant-breadcrumb-link {
+  color: rgba(0, 0, 0, 0.88);
+  font-weight: 600;
+}
+.app-header__crumbs .anticon-home {
+  font-size: 15px;
+  vertical-align: -1px;
+}
+.app-header__spacer {
+  flex: 1 1 auto;
+}
+.app-header__user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.app-header__user:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* --- Sider --------------------------------------------------------------- */
+.app-sider {
+  position: sticky;
+  top: 0;
+  height: 100vh; /* full height — brand sits in the top-left corner */
+  border-inline-end: 1px solid #f0f0f0;
+}
+.app-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.app-sider-menu {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-inline-end: 0 !important;
+}
+
+/* Brand pinned to the top of the sidebar (replaces the old header logo). */
+.app-sider-brand {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 56px;
+  padding-inline: 16px;
+  border-block-end: 1px solid #f0f0f0;
+  color: rgba(0, 0, 0, 0.88);
+}
+.app-sider-brand--collapsed {
+  justify-content: center;
+  padding-inline: 0;
+}
+.app-sider-brand__appname {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* Collapse/expand arrow pinned to the bottom of the sidebar. */
+.app-sider-toggle {
+  flex: none;
+  border-block-start: 1px solid #f0f0f0;
+  padding: 8px;
+}
+.app-sider-toggle--collapsed {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+.app-sider-toggle__btn.ant-btn {
+  color: rgba(0, 0, 0, 0.65);
+  justify-content: flex-start;
+  gap: 8px;
+}
+.app-sider-toggle--collapsed .app-sider-toggle__btn.ant-btn {
+  justify-content: center;
+}
+
+/* Selected navigation: clear brand-red left indicator (pale-red surface comes
+   from the Menu itemSelectedBg token). Hide Ant's default right indicator so
+   there is a single, consistent marker. */
+.app-sider-menu.ant-menu-inline .ant-menu-item::after,
+.app-sider-menu.ant-menu-inline .ant-menu-submenu-title::after {
+  display: none !important;
+}
+.app-sider-menu.ant-menu-inline .ant-menu-item-selected::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 3px;
+  background-color: #cb0a2f;
+  border-start-end-radius: 2px;
+  border-end-end-radius: 2px;
+}
+
+/* Coming-soon label inside a menu item: truncate the name, keep the tag. */
+.app-sider-menu .ant-menu-title-content {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.app-nav__label-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-nav__soon {
+  flex: none;
+  margin-inline-start: 8px;
+}
+
+/* Mobile nav drawer width (~256px, matching the expanded sider) */
+.app-nav-drawer .ant-drawer-content-wrapper {
+  width: 256px !important;
+}
+
+/* --- Content ------------------------------------------------------------- */
+.app-content {
+  padding: 24px;
+  /* Room so content never hides behind the fixed bottom action bar. */
+  padding-block-end: 88px;
+}
+.app-page {
+  max-inline-size: 1120px;
+}
+/* Dashboards span the full content width (tables + stats fill the screen). */
+.app-page--wide {
+  max-inline-size: none;
+}
+
+/* --- Page header --------------------------------------------------------- */
+.app-pageheader {
+  margin-block-end: 24px;
+}
+.app-pageheader__crumb {
+  margin-block-end: 12px;
+}
+.app-pageheader__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.app-pageheader__heading {
+  min-inline-size: 0;
+}
+.app-pageheader__overline {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #cb0a2f;
+  margin-block-end: 6px;
+}
+.app-pageheader__title.ant-typography {
+  margin: 0 0 6px;
+  font-size: 28px;
+  line-height: 1.25;
+  font-weight: 600;
+}
+.app-pageheader__supporting.ant-typography {
+  margin: 0;
+  padding: 0;
+}
+.app-pageheader__extra {
+  flex: none;
+}
+
+/* Page header on a white surface (used on the case workspace). */
+.app-pageheader-card {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-block-end: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.app-pageheader-card .app-pageheader {
+  margin-block-end: 0;
+}
+.app-pageheader-card__stepper {
+  margin-block-start: 16px;
+  padding-block-start: 16px;
+  border-block-start: 1px solid #f0f0f0;
+}
+
+/* Case header laid out as two side-by-side cards: business name + stepper. */
+.app-pageheader-cards {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: stretch;
+  margin-block-end: 16px;
+}
+.app-pageheader-cards > .app-pageheader-card {
+  margin-block-end: 0;
+}
+.app-pageheader-card--name {
+  flex: 1 1 calc(60% - 8px);
+}
+.app-pageheader-card--stepper {
+  flex: 1 1 calc(40% - 8px);
+  display: flex;
+  align-items: center;
+}
+.app-pageheader-card--stepper .app-stepper {
+  inline-size: 100%;
+}
+
+/* Full journey stepper (case header): icon dot + label + description. */
+.app-stepper {
+  display: flex;
+  align-items: flex-start;
+}
+.app-stepper__item {
+  flex: 1 1 0;
+  text-align: center;
+  position: relative;
+  padding-inline: 8px;
+  min-inline-size: 0;
+}
+/* Connector line between dots (sits behind the dots). */
+.app-stepper__item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 15px;
+  inset-inline-start: 50%;
+  inline-size: 100%;
+  block-size: 2px;
+  background: #e8e8e8;
+  z-index: 0;
+}
+.app-stepper__item.is-done::before {
+  background: #cb0a2f;
+}
+.app-stepper__dot {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: 50%;
+  border: 1px solid #d9d9d9;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 15px;
+  margin-block-end: 8px;
+}
+.app-stepper__dot.is-active {
+  background: #cb0a2f;
+  border-color: #cb0a2f;
+  color: #fff;
+}
+.app-stepper__dot.is-done {
+  border-color: #cb0a2f;
+  color: #cb0a2f;
+}
+.app-stepper__label {
+  font-weight: 600;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-stepper__item.is-active .app-stepper__label,
+.app-stepper__item.is-done .app-stepper__label {
+  color: rgba(0, 0, 0, 0.88);
+}
+.app-stepper__desc {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+/* Minimal variant: smaller dots, labels only, no descriptions. */
+.app-stepper--minimal .app-stepper__dot {
+  inline-size: 26px;
+  block-size: 26px;
+  font-size: 12px;
+  margin-block-end: 6px;
+}
+.app-stepper--minimal .app-stepper__item:not(:last-child)::before {
+  inset-block-start: 12px;
+}
+.app-stepper--minimal .app-stepper__label {
+  font-size: 12px;
+  white-space: normal;
+  overflow: visible;
+  line-height: 1.25;
+}
+@media (max-width: 767px) {
+  .app-stepper__desc {
+    display: none;
+  }
+  .app-stepper__label {
+    font-size: 11px;
+    white-space: normal;
+  }
+}
+/* Reached steps are clickable to revisit earlier sections. */
+button.app-stepper__item {
+  appearance: none;
+  background: none;
+  border: none;
+  font: inherit;
+  padding-block: 0;
+}
+.app-stepper__item.is-clickable {
+  cursor: pointer;
+}
+.app-stepper__item.is-clickable:hover .app-stepper__dot {
+  border-color: #cb0a2f;
+  color: #cb0a2f;
+}
+.app-stepper__item.is-clickable:hover .app-stepper__label {
+  color: #cb0a2f;
+}
+.app-stepper__item.is-clickable.is-active:hover .app-stepper__dot {
+  color: #fff;
+}
+.app-stepper__item.is-clickable:focus-visible {
+  outline: 2px solid #cb0a2f;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.app-stepper__item.is-viewing .app-stepper__dot {
+  box-shadow: 0 0 0 3px rgba(203, 10, 47, 0.18);
+}
+
+/* --- Form panel + action row --------------------------------------------- */
+.app-form-panel {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 28px 32px;
+  max-inline-size: 860px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.app-form-panel--wide {
+  max-inline-size: none;
+}
+.app-form-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-block-end: 24px;
+}
+.app-form-panel__head-text {
+  min-inline-size: 0;
+}
+.app-form-panel__title.ant-typography {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.app-form-panel__desc.ant-typography {
+  margin: 0;
+}
+.app-form-panel__head-extra {
+  flex: none;
+}
+
+.app-form-actions {
+  margin-block-start: 28px;
+  padding-block-start: 20px;
+  border-block-start: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.app-form-actions__buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.app-form-actions__note {
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+}
+
+/* Required marker: hide Ant's leading asterisk in this form and place our own
+   red "*" on the right of the label text instead. */
+.app-form-panel .ant-form-item-required::before {
+  display: none !important;
+}
+.app-req {
+  color: #ff4d4f;
+  margin-inline-start: 4px;
+}
+
+/* Field label with a trailing inline action (e.g. "Search existing companies"). */
+.app-field-label-item .ant-form-item-label,
+.app-field-label-item .ant-form-item-label > label {
+  width: 100%;
+}
+.app-field-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.app-field-label__action.ant-btn {
+  height: auto;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+@media (max-width: 767px) {
+  .app-form-panel {
+    padding: 20px 16px;
+  }
+  .app-pageheader__title.ant-typography {
+    font-size: 24px;
+  }
+}
+
+/* Stat cards: edges flush with the toolbar/table (no gutter negative margin). */
+.app-dashboard__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 20px 0 8px;
+}
+@media (max-width: 767px) {
+  .app-dashboard__stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* --- Login --------------------------------------------------------------- */
+.app-login {
+  block-size: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 32px clamp(16px, 8vw, 120px);
+  background-color: #f4f4f4;
+  background-image: url('../assets/login-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.app-login__card {
+  inline-size: 100%;
+  max-inline-size: 560px;
+  max-block-size: calc(100vh - 64px);
+  overflow: auto;
+}
+.app-login__card .ant-card-body {
+  padding: 40px;
+}
+.app-login__brand {
+  margin-block-end: 20px;
+}
+.app-login__demo {
+  margin-block-start: 20px;
+  padding-block-start: 16px;
+  border-block-start: 1px solid #f0f0f0;
+}
+
+/* --- Create Franchise: upload-to-autofill -------------------------------- */
+.app-franchise-upload {
+  margin-block-end: 28px;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-drag {
+  min-block-size: 0 !important;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-drag .ant-upload {
+  padding-block: 12px !important;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-drag-icon {
+  margin-bottom: 4px !important;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-drag-icon .anticon {
+  font-size: 22px !important;
+  color: #cb0a2f !important;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-text {
+  font-size: 14px !important;
+  margin: 0 !important;
+}
+.app-franchise-upload .ant-upload-wrapper .ant-upload-hint {
+  font-size: 12px !important;
+  margin: 2px 0 0 !important;
+}
+/* Floating action bar — sticks near the viewport bottom while scrolling. */
+.app-form-floatbar {
+  /* Pinned to the bottom of the screen, spanning the content column only
+     (offset past the sidebar via the --app-sider-w variable from the shell). */
+  position: fixed;
+  inset-inline: var(--app-sider-w, 0) 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  background: #fff;
+  border-block-start: 1px solid #e8e8e8;
+  /* 8px block padding matches the sidebar's "Collapse" footer row height. */
+  padding: 8px 24px;
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+}
+.app-form-floatbar__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+/* Activation success overlay — animated check with an expanding ring. */
+.activate-success {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  margin: 8px auto 12px;
+}
+.activate-success__check {
+  font-size: 72px;
+  color: #52c41a;
+  animation: activate-pop 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.activate-success__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid #52c41a;
+  animation: activate-ring 900ms ease-out 120ms 1 both;
+}
+@keyframes activate-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes activate-ring {
+  0% { transform: scale(0.5); opacity: 0.55; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+/* Set Up Account — grouped tabs + single active content panel. */
+.app-setup {
+  /* Keep content clear of the fixed floating action bar. */
+  padding-block-end: 64px;
+}
+.app-setup__panel {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 20px 24px;
+}
+/* Compact sub-task nav shown inside tabs that group several tasks. */
+.app-setup-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-end: 16px;
+}
+.app-setup-subnav__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  appearance: none;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 16px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.45);
+}
+.app-setup-subnav__item.is-reachable {
+  color: rgba(0, 0, 0, 0.88);
+}
+.app-setup-subnav__item:disabled {
+  cursor: default;
+}
+.app-setup-subnav__item.is-active {
+  border-color: #cb0a2f;
+  color: #cb0a2f;
+  background: rgba(203, 10, 47, 0.06);
+}
+.app-setup-subnav__dot {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  border: 1px solid #d9d9d9;
+}
+.app-setup-subnav__item.is-active .app-setup-subnav__dot {
+  background: #cb0a2f;
+  border-color: #cb0a2f;
+}
+.app-setup-subnav__icon {
+  color: #52c41a;
+  font-size: 13px;
+}
+
+/* Numbered activity header (Finalize Offer draft step: the 4 Sales activities). */
+.app-activity-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.app-activity-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 24px;
+  block-size: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #cb0a2f;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Compact journey stepper inside the floating action bar. */
+.app-ministepper {
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+.app-ministepper__item {
+  display: flex;
+  align-items: center;
+}
+.app-ministepper__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 26px;
+  block-size: 26px;
+  border-radius: 50%;
+  border: 1px solid #d9d9d9;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  flex: none;
+}
+.app-ministepper__dot.is-active {
+  background: #cb0a2f;
+  border-color: #cb0a2f;
+  color: #fff;
+}
+.app-ministepper__dot.is-done {
+  border-color: #cb0a2f;
+  color: #cb0a2f;
+}
+.app-ministepper__line {
+  inline-size: 16px;
+  block-size: 2px;
+  background: #eee;
+  margin-inline: 4px;
+}
+.app-ministepper__line.is-done {
+  background: #cb0a2f;
+}
+.app-ministepper__label {
+  margin-inline-start: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
+@media (max-width: 767px) {
+  .app-ministepper__label {
+    display: none;
+  }
+}
+.app-doc-slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+.app-doc-slot__info {
+  min-inline-size: 0;
+}
+.app-doc-slot__title {
+  display: flex;
+  align-items: center;
+}
+.app-decision-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-block-end: 1px solid #f5f5f5;
+}
+
+/* --- Home ---------------------------------------------------------------- */
+.app-home__recent-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+/* --- Proposal rate schedule (membership-fee layout) --------------------- */
+.rs-mode-note {
+  margin-inline-start: 12px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+.rs-table-wrap {
+  overflow-x: auto;
+  margin-block-end: 20px;
+}
+.rs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+.rs-table th,
+.rs-table td {
+  border: 1px solid #d9d9d9;
+  padding: 6px 10px;
+  vertical-align: middle;
+}
+.rs-title {
+  background: #fde9ba;
+  text-align: center;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.rs-band {
+  text-align: center;
+  font-style: italic;
+  font-weight: 700;
+}
+.rs-band--dep {
+  background: #f6c9a6;
+}
+.rs-band--grey {
+  background: #d9d9d9;
+  text-align: start;
+}
+.rs-head {
+  background: #fcdd98;
+  font-weight: 700;
+  font-style: italic;
+  text-align: center;
+}
+.rs-head--mbl {
+  color: #c0392b;
+}
+.rs-head--mode {
+  background: #f6c15a;
+}
+.rs-head--sub {
+  font-size: 12px;
+}
+.rs-banner {
+  background: #d9d9d9;
+}
+.rs-banner td {
+  font-style: italic;
+  font-weight: 700;
+  padding: 10px 12px;
+}
+.rs-rb {
+  text-align: center;
+  font-weight: 600;
+}
+.rs-bencode {
+  width: 90px;
+}
+.rs-mbl {
+  text-align: center;
+}
+.rs-num {
+  width: 130px;
+  text-align: right;
+  white-space: nowrap;
+}
+.rs-vat {
+  color: rgba(0, 0, 0, 0.55);
+}
+.rs-footer {
+  margin-block-start: 4px;
+}
+.rs-participation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-block-end: 8px;
+}
+.rs-participation-val {
+  border: 1px solid #d9d9d9;
+  padding: 2px 14px;
+  color: #c0392b;
+  font-weight: 700;
+}
+.rs-note {
+  margin-block-start: 10px;
+  font-weight: 600;
+}

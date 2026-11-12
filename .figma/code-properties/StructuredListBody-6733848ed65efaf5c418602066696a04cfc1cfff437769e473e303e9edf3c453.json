@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "StructuredListBody",
+    "filePath": "web/node_modules/@carbon/react/es/components/StructuredList/StructuredList.js"
+  },
+  "codeProperties": {
+    "head": {
+      "type": "boolean",
+      "name": "Head"
+    }
+  }
+}

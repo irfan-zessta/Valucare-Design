@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ListBoxMenuIcon",
+    "filePath": "web/node_modules/@carbon/react/es/components/ListBox/ListBoxMenuIcon.js"
+  },
+  "codeProperties": {
+    "isOpen": {
+      "type": "boolean",
+      "name": "Is Open",
+      "description": "Specify whether the menu is currently open, which will influence the direction of the menu icon"
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "DataTable",
+    "filePath": "web/node_modules/@carbon/react/es/components/DataTable/DataTable.js"
+  },
+  "codeProperties": {
+    "experimentalAutoAlign": {
+      "type": "boolean",
+      "name": "Experimental Auto Align",
+      "description": "Aligns cell contents to the top if there is text wrapping."
+    },
+    "isSortable": {
+      "type": "boolean",
+      "name": "Sortable",
+      "description": "Whether the table can be sorted by its headers."
+    },
+    "overflowMenuOnHover": {
+      "type": "boolean",
+      "name": "Overflow Menu On Hover",
+      "defaultValue": false,
+      "description": "Whether the overflow menu is shown only on hover."
+    },
+    "radio": {
+      "type": "boolean",
+      "name": "Radio",
+      "description": "Whether the selection control is a radio button instead of an inline checkbox."
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "defaultValue": "lg",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg",
+        "xl"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large",
+          "xl": "Extra Large"
+        }
+      }
+    },
+    "stickyHeader": {
+      "type": "boolean",
+      "name": "Sticky Header",
+      "description": "Whether the header should be sticky."
+    },
+    "useStaticWidth": {
+      "type": "boolean",
+      "name": "Use Static Width",
+      "description": "If true, sets the table width to auto instead of 100%."
+    },
+    "useZebraStyles": {
+      "type": "boolean",
+      "name": "Use Zebra Styles",
+      "description": "True to add zebra striping."
+    }
+  }
+}

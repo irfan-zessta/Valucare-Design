@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FluidTimePickerSelect",
+    "filePath": "web/node_modules/@carbon/react/es/components/FluidTimePickerSelect/FluidTimePickerSelect.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "labelText": {
+      "type": "string",
+      "name": "Label Text"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    }
+  }
+}

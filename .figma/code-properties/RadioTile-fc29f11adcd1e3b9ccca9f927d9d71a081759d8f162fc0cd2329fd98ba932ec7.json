@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "RadioTile",
+    "filePath": "web/node_modules/@carbon/react/es/components/RadioTile/RadioTile.js"
+  },
+  "codeProperties": {
+    "checked": {
+      "type": "boolean",
+      "name": "Checked",
+      "description": "Specify whether the RadioTile should be checked."
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "control": false,
+      "name": "Decorator",
+      "description": "Experimental: a decorator component to be rendered inside the RadioTile."
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "Specify whether the RadioTile should be disabled."
+    },
+    "hasRoundedCorners": {
+      "type": "boolean",
+      "name": "Has Rounded Corners",
+      "description": "Render with rounded corners. Only valid when a decorator or slug is present."
+    },
+    "light": {
+      "type": "boolean",
+      "name": "Light",
+      "description": "Use the light version. Deprecated in favor of the Layer component."
+    },
+    "required": {
+      "type": "boolean",
+      "name": "Required",
+      "description": "Specify if the control is required."
+    },
+    "tabIndex": {
+      "type": "number",
+      "name": "Tab Index",
+      "defaultValue": 0,
+      "description": "Specify the tab index of the underlying input."
+    },
+    "value": {
+      "type": "string",
+      "name": "Value",
+      "description": "Specify the value of the underlying input."
+    }
+  }
+}

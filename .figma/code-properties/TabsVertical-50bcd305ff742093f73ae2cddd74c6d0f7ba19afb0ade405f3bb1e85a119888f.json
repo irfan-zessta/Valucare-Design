@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TabsVertical",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tabs/Tabs.js"
+  },
+  "codeProperties": {
+    "defaultSelectedIndex": {
+      "type": "number",
+      "name": "Default Selected Index",
+      "defaultValue": 0
+    },
+    "selectedIndex": {
+      "type": "number",
+      "name": "Selected Index"
+    },
+    "height": {
+      "type": "string",
+      "name": "Height",
+      "description": "Option to set a height style only if using vertical variation"
+    }
+  }
+}

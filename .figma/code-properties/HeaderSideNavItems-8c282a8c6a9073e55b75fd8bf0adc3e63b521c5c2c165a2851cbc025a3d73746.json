@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "HeaderSideNavItems",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/HeaderSideNavItems.js"
+  },
+  "codeProperties": {
+    "hasDivider": {
+      "type": "boolean",
+      "name": "Has Divider",
+      "description": "Optionally specify if container will have a bottom divider to differentiate between original sidenav items and header menu items.",
+      "defaultValue": false
+    }
+  }
+}

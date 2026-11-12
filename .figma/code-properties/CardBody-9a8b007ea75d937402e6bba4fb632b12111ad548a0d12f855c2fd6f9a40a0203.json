@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "CardBody",
+    "filePath": "web/node_modules/@carbon/react/es/components/Card/CardBody.js"
+  },
+  "codeProperties": {
+    "isFlush": {
+      "type": "boolean",
+      "name": "Is Flush",
+      "defaultValue": false
+    }
+  }
+}

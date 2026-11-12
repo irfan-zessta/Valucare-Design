@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TabContent",
+    "filePath": "web/node_modules/@carbon/react/es/components/TabContent/TabContent.js"
+  },
+  "codeProperties": {
+    "selected": {
+      "type": "boolean",
+      "name": "Selected",
+      "description": "Specify whether the TabContent is selected."
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ModalWrapper",
+    "filePath": "web/node_modules/@carbon/react/es/components/ModalWrapper/ModalWrapper.js"
+  },
+  "codeProperties": {
+    "buttonTriggerText": {
+      "type": "string",
+      "name": "Trigger Button Text"
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    },
+    "modalHeading": {
+      "type": "string",
+      "name": "Modal Heading"
+    },
+    "modalLabel": {
+      "type": "string",
+      "name": "Modal Label"
+    },
+    "modalText": {
+      "type": "string",
+      "name": "Modal Text"
+    },
+    "passiveModal": {
+      "type": "boolean",
+      "name": "Passive Modal"
+    },
+    "primaryButtonText": {
+      "type": "string",
+      "name": "Primary Button Text",
+      "defaultValue": "Save"
+    },
+    "secondaryButtonText": {
+      "type": "string",
+      "name": "Secondary Button Text",
+      "defaultValue": "Cancel"
+    },
+    "shouldCloseAfterSubmit": {
+      "type": "boolean",
+      "name": "Close After Submit"
+    },
+    "preventCloseOnClickOutside": {
+      "type": "boolean",
+      "name": "Prevent Close On Click Outside"
+    },
+    "triggerButtonKind": {
+      "type": "string",
+      "name": "Trigger Button Kind",
+      "defaultValue": "primary",
+      "options": [
+        "primary",
+        "secondary",
+        "danger",
+        "ghost",
+        "danger--primary",
+        "danger--ghost",
+        "danger--tertiary",
+        "tertiary"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "primary": "Primary",
+          "secondary": "Secondary",
+          "danger": "Danger",
+          "ghost": "Ghost",
+          "danger--primary": "Danger Primary",
+          "danger--ghost": "Danger Ghost",
+          "danger--tertiary": "Danger Tertiary",
+          "tertiary": "Tertiary"
+        }
+      }
+    },
+    "triggerButtonIconDescription": {
+      "type": "string",
+      "name": "Trigger Icon Description",
+      "defaultValue": "Provide icon description if icon is used"
+    },
+    "withHeader": {
+      "type": "boolean",
+      "name": "With Header"
+    }
+  }
+}

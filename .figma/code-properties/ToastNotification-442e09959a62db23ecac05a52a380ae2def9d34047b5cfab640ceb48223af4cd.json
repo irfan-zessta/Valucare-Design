@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ToastNotification",
+    "filePath": "web/node_modules/@carbon/react/es/components/Notification/Notification.js"
+  },
+  "codeProperties": {
+    "caption": {
+      "type": "string",
+      "name": "Caption"
+    },
+    "hideCloseButton": {
+      "type": "boolean",
+      "name": "Hide Close Button",
+      "defaultValue": false
+    },
+    "kind": {
+      "type": "string",
+      "name": "Kind",
+      "defaultValue": "error",
+      "options": [
+        "error",
+        "info",
+        "info-square",
+        "success",
+        "warning",
+        "warning-alt"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "error": "Error",
+          "info": "Info",
+          "info-square": "Info Square",
+          "success": "Success",
+          "warning": "Warning",
+          "warning-alt": "Warning Alt"
+        }
+      }
+    },
+    "lowContrast": {
+      "type": "boolean",
+      "name": "Low Contrast"
+    },
+    "role": {
+      "type": "string",
+      "name": "Role",
+      "defaultValue": "status",
+      "options": [
+        "alert",
+        "log",
+        "status"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "alert": "Alert",
+          "log": "Log",
+          "status": "Status"
+        }
+      }
+    },
+    "statusIconDescription": {
+      "type": "string",
+      "name": "Status Icon Description"
+    },
+    "subtitle": {
+      "type": "string",
+      "name": "Subtitle"
+    },
+    "timeout": {
+      "type": "number",
+      "name": "Timeout",
+      "defaultValue": 0
+    },
+    "title": {
+      "type": "string",
+      "name": "Title"
+    }
+  }
+}

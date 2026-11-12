@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ExpandableTile",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tile/Tile.js"
+  },
+  "codeProperties": {
+    "expanded": {
+      "type": "boolean",
+      "name": "Expanded",
+      "defaultValue": false
+    },
+    "hasRoundedCorners": {
+      "type": "boolean",
+      "name": "Has Rounded Corners"
+    },
+    "tileCollapsedLabel": {
+      "type": "string",
+      "name": "Collapsed Label"
+    },
+    "tileExpandedLabel": {
+      "type": "string",
+      "name": "Expanded Label"
+    },
+    "tileCollapsedIconText": {
+      "type": "string",
+      "name": "Collapsed Icon Text",
+      "defaultValue": "Interact to expand Tile"
+    },
+    "tileExpandedIconText": {
+      "type": "string",
+      "name": "Expanded Icon Text",
+      "defaultValue": "Interact to collapse Tile"
+    },
+    "tileMaxHeight": {
+      "type": "number",
+      "name": "Tile Max Height",
+      "defaultValue": 0
+    },
+    "tilePadding": {
+      "type": "number",
+      "name": "Tile Padding",
+      "defaultValue": 0
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "control": false
+    }
+  }
+}

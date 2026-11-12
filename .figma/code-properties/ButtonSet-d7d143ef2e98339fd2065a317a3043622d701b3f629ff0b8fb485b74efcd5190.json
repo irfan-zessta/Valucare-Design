@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ButtonSet",
+    "filePath": "web/node_modules/@carbon/react/es/components/ButtonSet/ButtonSet.js"
+  },
+  "codeProperties": {
+    "fluid": {
+      "type": "boolean",
+      "name": "Fluid",
+      "description": "Button set resizes to the size of the container up to a maximum dependent on the number of buttons."
+    },
+    "stacked": {
+      "type": "boolean",
+      "name": "Stacked",
+      "description": "Specify the button arrangement of the set (vertically stacked or horizontal). Ignored when fluid is true."
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SelectItemGroup",
+    "filePath": "web/node_modules/@carbon/react/es/components/SelectItemGroup/SelectItemGroup.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false,
+      "description": "Specify whether the SelectItemGroup should be disabled."
+    },
+    "label": {
+      "type": "string",
+      "name": "Label",
+      "description": "Specify the label to be displayed."
+    }
+  }
+}

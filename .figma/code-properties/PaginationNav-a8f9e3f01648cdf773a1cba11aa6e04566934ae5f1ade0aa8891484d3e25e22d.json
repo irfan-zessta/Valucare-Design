@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "PaginationNav",
+    "filePath": "web/node_modules/@carbon/react/es/components/PaginationNav/PaginationNav.js"
+  },
+  "codeProperties": {
+    "disableOverflow": {
+      "type": "boolean",
+      "name": "Disable Overflow",
+      "description": "If true, the '...' pagination overflow will not render page links between the first and last rendered buttons."
+    },
+    "itemsShown": {
+      "type": "number",
+      "name": "Items Shown",
+      "description": "The number of items to be shown (minimum of 4 unless props.items < 4).",
+      "defaultValue": 10
+    },
+    "loop": {
+      "type": "boolean",
+      "name": "Loop",
+      "description": "Whether user should be able to loop through the items when reaching first / last.",
+      "defaultValue": false
+    },
+    "page": {
+      "type": "number",
+      "name": "Page",
+      "description": "The index of current page.",
+      "defaultValue": 0
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the PaginationNav.",
+      "defaultValue": "lg",
+      "options": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    },
+    "tooltipAlignment": {
+      "type": "string",
+      "name": "Tooltip Alignment",
+      "description": "Specify the alignment of the tooltip for the icon-only prev/next buttons.",
+      "options": [
+        "start",
+        "center",
+        "end"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "start": "Start",
+          "center": "Center",
+          "end": "End"
+        }
+      }
+    },
+    "tooltipPosition": {
+      "type": "string",
+      "name": "Tooltip Position",
+      "description": "Specify the position of the tooltip for the icon-only prev/next buttons.",
+      "options": [
+        "top",
+        "right",
+        "bottom",
+        "left"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "right": "Right",
+          "bottom": "Bottom",
+          "left": "Left"
+        }
+      }
+    },
+    "totalItems": {
+      "type": "number",
+      "name": "Total Items",
+      "description": "The total number of items."
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "AISkeletonText",
+    "filePath": "web/node_modules/@carbon/react/es/components/AISkeleton/AISkeletonText.js"
+  },
+  "codeProperties": {
+    "heading": {
+      "type": "boolean",
+      "name": "Heading",
+      "description": "generates skeleton text at a larger size"
+    },
+    "lineCount": {
+      "type": "number",
+      "name": "Line Count",
+      "description": "the number of lines shown if paragraph is true"
+    },
+    "paragraph": {
+      "type": "boolean",
+      "name": "Paragraph",
+      "description": "will generate multiple lines of text"
+    },
+    "width": {
+      "type": "string",
+      "name": "Width",
+      "description": "width (in px or %) of single line of text or max-width of paragraph lines"
+    }
+  }
+}

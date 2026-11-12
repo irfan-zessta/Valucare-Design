@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TabsSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tabs/Tabs.Skeleton.js"
+  },
+  "codeProperties": {
+    "contained": {
+      "type": "boolean",
+      "name": "Contained",
+      "description": "Provide the type of Tab"
+    }
+  }
+}

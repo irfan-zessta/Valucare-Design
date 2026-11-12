@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Dropdown",
+    "filePath": "web/node_modules/@carbon/react/es/components/Dropdown/Dropdown.js"
+  },
+  "codeProperties": {
+    "titleText": {
+      "type": "string",
+      "name": "Title Text",
+      "defaultValue": ""
+    },
+    "label": {
+      "type": "string",
+      "name": "Label"
+    },
+    "helperText": {
+      "type": "string",
+      "name": "Helper Text",
+      "defaultValue": ""
+    },
+    "type": {
+      "type": "string",
+      "name": "Type",
+      "defaultValue": "default",
+      "options": [
+        "default",
+        "inline"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "default": "Default",
+          "inline": "Inline"
+        }
+      }
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "options": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    },
+    "direction": {
+      "type": "string",
+      "name": "Direction",
+      "defaultValue": "bottom",
+      "options": [
+        "top",
+        "bottom"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "bottom": "Bottom"
+        }
+      }
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    },
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "control": false
+    }
+  }
+}

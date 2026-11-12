@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TableSlugRow",
+    "filePath": "web/node_modules/@carbon/react/es/components/DataTable/TableSlugRow.js"
+  },
+  "codeProperties": {
+    "slug": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Slug",
+      "control": false
+    }
+  }
+}

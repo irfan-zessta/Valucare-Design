@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Button",
+    "filePath": "web/node_modules/@carbon/react/es/components/Button/Button.js"
+  },
+  "codeProperties": {
+    "kind": {
+      "type": "string",
+      "name": "Kind",
+      "defaultValue": "primary",
+      "description": "Specify the kind of Button you want to create",
+      "options": [
+        "primary",
+        "secondary",
+        "danger",
+        "ghost",
+        "danger--primary",
+        "danger--ghost",
+        "danger--tertiary",
+        "tertiary"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "primary": "Primary",
+          "secondary": "Secondary",
+          "danger": "Danger",
+          "ghost": "Ghost",
+          "danger--primary": "Danger Primary",
+          "danger--ghost": "Danger Ghost",
+          "danger--tertiary": "Danger Tertiary",
+          "tertiary": "Tertiary"
+        }
+      }
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the button",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg",
+        "xl",
+        "2xl"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large",
+          "xl": "Extra Large",
+          "2xl": "2X Large"
+        }
+      }
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false,
+      "description": "Specify whether the Button should be disabled, or not"
+    },
+    "hasIconOnly": {
+      "type": "boolean",
+      "name": "Has Icon Only",
+      "defaultValue": false,
+      "description": "Specify if the button is an icon-only button"
+    },
+    "isExpressive": {
+      "type": "boolean",
+      "name": "Is Expressive",
+      "description": "Specify whether the Button is expressive, or not"
+    },
+    "isSelected": {
+      "type": "boolean",
+      "name": "Is Selected",
+      "description": "Specify whether the Button is currently selected. Only applies to the icon only Ghost variant."
+    },
+    "iconDescription": {
+      "type": "string",
+      "name": "Icon Description",
+      "description": "Description for the icon that can be read by screen readers"
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Icon",
+      "description": "A component used to render an icon.",
+      "control": false
+    },
+    "tooltipAlignment": {
+      "type": "string",
+      "name": "Tooltip Alignment",
+      "defaultValue": "center",
+      "description": "Alignment of the tooltip for icon-only buttons.",
+      "options": [
+        "start",
+        "center",
+        "end"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "start": "Start",
+          "center": "Center",
+          "end": "End"
+        }
+      }
+    },
+    "tooltipPosition": {
+      "type": "string",
+      "name": "Tooltip Position",
+      "defaultValue": "top",
+      "description": "Direction of the tooltip for icon-only buttons.",
+      "options": [
+        "top",
+        "right",
+        "bottom",
+        "left"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "right": "Right",
+          "bottom": "Bottom",
+          "left": "Left"
+        }
+      }
+    },
+    "tooltipDropShadow": {
+      "type": "boolean",
+      "name": "Tooltip Drop Shadow",
+      "defaultValue": false,
+      "description": "Enable drop shadow for tooltips for icon-only buttons."
+    },
+    "tooltipHighContrast": {
+      "type": "boolean",
+      "name": "Tooltip High Contrast",
+      "defaultValue": true,
+      "description": "Enable high-contrast theme for tooltips for icon-only buttons."
+    },
+    "type": {
+      "type": "string",
+      "name": "Type",
+      "description": "Optional prop to specify the type of the Button",
+      "options": [
+        "button",
+        "reset",
+        "submit"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "button": "Button",
+          "reset": "Reset",
+          "submit": "Submit"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "CodeSnippet",
+    "filePath": "web/node_modules/@carbon/react/es/components/CodeSnippet/CodeSnippet.js"
+  },
+  "codeProperties": {
+    "align": {
+      "type": "string",
+      "name": "Align",
+      "description": "Specify how the trigger should align with the tooltip",
+      "defaultValue": "bottom",
+      "options": [
+        "top",
+        "top-start",
+        "top-end",
+        "bottom",
+        "bottom-start",
+        "bottom-end",
+        "left",
+        "left-start",
+        "left-end",
+        "right",
+        "right-start",
+        "right-end"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "top-start": "Top Start",
+          "top-end": "Top End",
+          "bottom": "Bottom",
+          "bottom-start": "Bottom Start",
+          "bottom-end": "Bottom End",
+          "left": "Left",
+          "left-start": "Left Start",
+          "left-end": "Left End",
+          "right": "Right",
+          "right-start": "Right Start",
+          "right-end": "Right End"
+        }
+      }
+    },
+    "autoAlign": {
+      "type": "boolean",
+      "name": "Auto Align",
+      "description": "Experimental: Will attempt to automatically align the tooltip."
+    },
+    "copyButtonDescription": {
+      "type": "string",
+      "name": "Copy Button Description",
+      "description": "Specify the description for the Copy Button"
+    },
+    "copyText": {
+      "type": "string",
+      "name": "Copy Text",
+      "description": "Optional text to copy. If not specified, the children node's innerText will be used."
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "Specify whether or not the CodeSnippet should be disabled"
+    },
+    "feedback": {
+      "type": "string",
+      "name": "Feedback",
+      "description": "Specify the string displayed when the snippet is copied"
+    },
+    "feedbackTimeout": {
+      "type": "number",
+      "name": "Feedback Timeout",
+      "description": "Specify the time it takes for the feedback message to timeout"
+    },
+    "hideCopyButton": {
+      "type": "boolean",
+      "name": "Hide Copy Button",
+      "description": "Specify whether or not a copy button should be used/rendered."
+    },
+    "maxCollapsedNumberOfRows": {
+      "type": "number",
+      "name": "Max Collapsed Rows",
+      "description": "Specify the maximum number of rows to be shown when in collapsed view",
+      "defaultValue": 15
+    },
+    "maxExpandedNumberOfRows": {
+      "type": "number",
+      "name": "Max Expanded Rows",
+      "description": "Specify the maximum number of rows to be shown when in expanded view",
+      "defaultValue": 0
+    },
+    "minCollapsedNumberOfRows": {
+      "type": "number",
+      "name": "Min Collapsed Rows",
+      "description": "Specify the minimum number of rows to be shown when in collapsed view",
+      "defaultValue": 3
+    },
+    "minExpandedNumberOfRows": {
+      "type": "number",
+      "name": "Min Expanded Rows",
+      "description": "Specify the minimum number of rows to be shown when in expanded view",
+      "defaultValue": 16
+    },
+    "showLessText": {
+      "type": "string",
+      "name": "Show Less Text",
+      "description": "String displayed when the Code Snippet has been interacted with to show more lines",
+      "defaultValue": "Show less"
+    },
+    "showMoreText": {
+      "type": "string",
+      "name": "Show More Text",
+      "description": "String displayed when the Code Snippet text is more than 15 lines",
+      "defaultValue": "Show more"
+    },
+    "type": {
+      "type": "string",
+      "name": "Type",
+      "description": "Provide the type of Code Snippet",
+      "defaultValue": "single",
+      "options": [
+        "single",
+        "inline",
+        "multi"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "single": "Single",
+          "inline": "Inline",
+          "multi": "Multi"
+        }
+      }
+    },
+    "wrapText": {
+      "type": "boolean",
+      "name": "Wrap Text",
+      "description": "Specify whether or not to wrap the text.",
+      "defaultValue": false
+    }
+  }
+}

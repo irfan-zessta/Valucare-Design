@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FluidDropdown",
+    "filePath": "web/node_modules/@carbon/react/es/components/FluidDropdown/FluidDropdown.js"
+  },
+  "codeProperties": {
+    "direction": {
+      "type": "string",
+      "name": "Direction",
+      "options": [
+        "top",
+        "bottom"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "top": "Top",
+          "bottom": "Bottom"
+        }
+      }
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "isCondensed": {
+      "type": "boolean",
+      "name": "Condensed"
+    },
+    "label": {
+      "type": "string",
+      "name": "Label"
+    },
+    "titleText": {
+      "type": "string",
+      "name": "Title Text"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    }
+  }
+}

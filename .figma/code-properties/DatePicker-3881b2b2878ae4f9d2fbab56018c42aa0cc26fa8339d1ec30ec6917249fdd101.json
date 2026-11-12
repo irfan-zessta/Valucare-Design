@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "DatePicker",
+    "filePath": "web/node_modules/@carbon/react/es/components/DatePicker/DatePicker.js"
+  },
+  "codeProperties": {
+    "allowInput": {
+      "type": "boolean",
+      "name": "Allow Input",
+      "description": "Enables direct date input."
+    },
+    "closeOnSelect": {
+      "type": "boolean",
+      "name": "Close On Select",
+      "defaultValue": true
+    },
+    "dateFormat": {
+      "type": "string",
+      "name": "Date Format",
+      "defaultValue": "m/d/Y"
+    },
+    "datePickerType": {
+      "type": "string",
+      "name": "Date Picker Type",
+      "options": [
+        "simple",
+        "single",
+        "range"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "simple": "Simple",
+          "single": "Single",
+          "range": "Range"
+        }
+      }
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn"
+    },
+    "maxDate": {
+      "type": "string",
+      "name": "Max Date",
+      "description": "The maximum date that a user can pick."
+    },
+    "minDate": {
+      "type": "string",
+      "name": "Min Date",
+      "description": "The minimum date that a user can start picking from."
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only",
+      "defaultValue": false
+    },
+    "short": {
+      "type": "boolean",
+      "name": "Short",
+      "defaultValue": false
+    }
+  }
+}

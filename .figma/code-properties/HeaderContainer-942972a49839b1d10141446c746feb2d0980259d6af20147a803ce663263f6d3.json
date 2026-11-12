@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "HeaderContainer",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/HeaderContainer.js"
+  },
+  "codeProperties": {
+    "isSideNavExpanded": {
+      "type": "boolean",
+      "name": "Is Side Nav Expanded",
+      "defaultValue": false
+    }
+  }
+}

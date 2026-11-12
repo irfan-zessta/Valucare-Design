@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Slider",
+    "filePath": "web/node_modules/@carbon/react/es/components/Slider/Slider.js"
+  },
+  "codeProperties": {
+    "labelText": {
+      "type": "string",
+      "name": "Label Text",
+      "description": "The label for the slider."
+    },
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label",
+      "description": "Specify whether you want the underlying label to be visually hidden"
+    },
+    "min": {
+      "type": "number",
+      "name": "Min",
+      "description": "The minimum value."
+    },
+    "max": {
+      "type": "number",
+      "name": "Max",
+      "description": "The maximum value."
+    },
+    "minLabel": {
+      "type": "string",
+      "name": "Min Label",
+      "description": "The label associated with the minimum value."
+    },
+    "maxLabel": {
+      "type": "string",
+      "name": "Max Label",
+      "description": "The label associated with the maximum value."
+    },
+    "value": {
+      "type": "number",
+      "name": "Value",
+      "description": "The value of the slider. When there are two handles, value is the lower bound."
+    },
+    "step": {
+      "type": "number",
+      "name": "Step",
+      "defaultValue": 1,
+      "description": "How much the value should increase/decrease by moving the thumb by mouse."
+    },
+    "stepMultiplier": {
+      "type": "number",
+      "name": "Step Multiplier",
+      "defaultValue": 4,
+      "description": "How much the value changes with Shift+arrow keys."
+    },
+    "hideTextInput": {
+      "type": "boolean",
+      "name": "Hide Text Input",
+      "defaultValue": false,
+      "description": "true to hide the number input box."
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "defaultValue": false
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only",
+      "defaultValue": false
+    },
+    "required": {
+      "type": "boolean",
+      "name": "Required"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text",
+      "description": "Text displayed when the Slider is in an invalid state"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn",
+      "defaultValue": false
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text",
+      "description": "Text displayed when the Slider is in a warning state."
+    }
+  }
+}

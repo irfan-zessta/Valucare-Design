@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SideNavItem",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/SideNavItem.js"
+  },
+  "codeProperties": {
+    "large": {
+      "type": "boolean",
+      "name": "Large",
+      "description": "Specify if this is a large variation of the SideNavItem",
+      "defaultValue": false
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FluidSearch",
+    "filePath": "web/node_modules/@carbon/react/es/components/FluidSearch/FluidSearch.js"
+  },
+  "codeProperties": {
+    "autoComplete": {
+      "type": "string",
+      "name": "Auto Complete"
+    },
+    "closeButtonLabelText": {
+      "type": "string",
+      "name": "Close Button Label Text"
+    },
+    "defaultValue": {
+      "type": "string",
+      "name": "Default Value"
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "labelText": {
+      "type": "string",
+      "name": "Label Text"
+    },
+    "placeholder": {
+      "type": "string",
+      "name": "Placeholder"
+    },
+    "role": {
+      "type": "string",
+      "name": "Role"
+    },
+    "type": {
+      "type": "string",
+      "name": "Type"
+    },
+    "value": {
+      "type": "string",
+      "name": "Value"
+    }
+  }
+}

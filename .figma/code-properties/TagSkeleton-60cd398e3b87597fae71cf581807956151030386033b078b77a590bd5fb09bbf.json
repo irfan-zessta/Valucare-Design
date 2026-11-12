@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TagSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/Tag/Tag.Skeleton.js"
+  },
+  "codeProperties": {
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the Tag.",
+      "options": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

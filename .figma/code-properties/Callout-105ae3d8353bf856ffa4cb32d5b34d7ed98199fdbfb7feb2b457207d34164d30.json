@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Callout",
+    "filePath": "web/node_modules/@carbon/react/es/components/Notification/Notification.js"
+  },
+  "codeProperties": {
+    "actionButtonLabel": {
+      "type": "string",
+      "name": "Action Button Label"
+    },
+    "kind": {
+      "type": "string",
+      "name": "Kind",
+      "defaultValue": "info",
+      "options": [
+        "error",
+        "info",
+        "info-square",
+        "success",
+        "warning",
+        "warning-alt"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "error": "Error",
+          "info": "Info",
+          "info-square": "Info Square",
+          "success": "Success",
+          "warning": "Warning",
+          "warning-alt": "Warning Alt"
+        }
+      }
+    },
+    "lowContrast": {
+      "type": "boolean",
+      "name": "Low Contrast"
+    },
+    "statusIconDescription": {
+      "type": "string",
+      "name": "Status Icon Description"
+    },
+    "subtitle": {
+      "type": "string",
+      "name": "Subtitle"
+    },
+    "title": {
+      "type": "string",
+      "name": "Title"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SkeletonText",
+    "filePath": "web/node_modules/@carbon/react/es/components/SkeletonText/SkeletonText.js"
+  },
+  "codeProperties": {
+    "heading": {
+      "type": "boolean",
+      "name": "Heading",
+      "defaultValue": false,
+      "description": "Generates skeleton text at a larger size."
+    },
+    "lineCount": {
+      "type": "number",
+      "name": "Line Count",
+      "defaultValue": 3,
+      "description": "Number of lines shown if paragraph is true."
+    },
+    "paragraph": {
+      "type": "boolean",
+      "name": "Paragraph",
+      "defaultValue": false,
+      "description": "Generates multiple lines of text."
+    },
+    "width": {
+      "type": "string",
+      "name": "Width",
+      "defaultValue": "100%",
+      "description": "Width (in px or %) of a single line of text or max-width of paragraph lines."
+    }
+  }
+}

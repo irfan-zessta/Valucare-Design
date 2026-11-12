@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SideNavItems",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/SideNavItems.js"
+  },
+  "codeProperties": {
+    "isSideNavExpanded": {
+      "type": "boolean",
+      "name": "Is Side Nav Expanded",
+      "description": "Property to indicate if the side nav container is open (or not). Use to keep local state and styling in step with the SideNav expansion state."
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "LayoutDirection",
+    "filePath": "web/node_modules/@carbon/react/es/components/LayoutDirection/LayoutDirection.js"
+  },
+  "codeProperties": {
+    "dir": {
+      "type": "string",
+      "name": "Direction",
+      "options": [
+        "ltr",
+        "rtl"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "ltr": "Left to Right",
+          "rtl": "Right to Left"
+        }
+      },
+      "description": "Specify the layout direction of this part of the page"
+    }
+  }
+}

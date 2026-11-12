@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ChatButton",
+    "filePath": "web/node_modules/@carbon/react/es/components/ChatButton/ChatButton.js"
+  },
+  "codeProperties": {
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "Specify whether the ChatButton should be disabled"
+    },
+    "isQuickAction": {
+      "type": "boolean",
+      "name": "Is Quick Action",
+      "description": "Specify whether the ChatButton should be rendered as a quick action button"
+    },
+    "isSelected": {
+      "type": "boolean",
+      "name": "Is Selected",
+      "description": "Specify whether the quick action ChatButton should be rendered as selected."
+    },
+    "kind": {
+      "type": "string",
+      "name": "Kind",
+      "description": "Specify the kind of ChatButton you want to create",
+      "options": [
+        "primary",
+        "secondary",
+        "danger",
+        "ghost",
+        "tertiary"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "primary": "Primary",
+          "secondary": "Secondary",
+          "danger": "Danger",
+          "ghost": "Ghost",
+          "tertiary": "Tertiary"
+        }
+      }
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Icon",
+      "description": "A component used to render an icon.",
+      "control": false
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the ChatButton",
+      "options": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "Stack",
+    "filePath": "web/node_modules/@carbon/react/es/components/Stack/Stack.js"
+  },
+  "codeProperties": {
+    "orientation": {
+      "type": "string",
+      "name": "Orientation",
+      "defaultValue": "vertical",
+      "options": [
+        "horizontal",
+        "vertical"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "horizontal": "Horizontal",
+          "vertical": "Vertical"
+        }
+      },
+      "description": "Specify the orientation of the items in the Stack"
+    },
+    "gap": {
+      "type": "string",
+      "name": "Gap",
+      "description": "Custom gap value for the layout"
+    }
+  }
+}

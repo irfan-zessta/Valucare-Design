@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ErrorBoundary",
+    "filePath": "web/node_modules/@carbon/react/es/components/ErrorBoundary/ErrorBoundary.js"
+  },
+  "codeProperties": {
+    "fallback": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Fallback",
+      "control": false
+    }
+  }
+}

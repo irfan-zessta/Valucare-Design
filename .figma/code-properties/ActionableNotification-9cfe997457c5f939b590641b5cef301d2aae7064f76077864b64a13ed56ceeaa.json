@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ActionableNotification",
+    "filePath": "web/node_modules/@carbon/react/es/components/Notification/Notification.js"
+  },
+  "codeProperties": {
+    "actionButtonLabel": {
+      "type": "string",
+      "name": "Action Button Label"
+    },
+    "caption": {
+      "type": "string",
+      "name": "Caption"
+    },
+    "closeOnEscape": {
+      "type": "boolean",
+      "name": "Close On Escape",
+      "defaultValue": true
+    },
+    "hideCloseButton": {
+      "type": "boolean",
+      "name": "Hide Close Button",
+      "defaultValue": false
+    },
+    "inline": {
+      "type": "boolean",
+      "name": "Inline",
+      "defaultValue": false
+    },
+    "kind": {
+      "type": "string",
+      "name": "Kind",
+      "defaultValue": "error",
+      "options": [
+        "error",
+        "info",
+        "info-square",
+        "success",
+        "warning",
+        "warning-alt"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "error": "Error",
+          "info": "Info",
+          "info-square": "Info Square",
+          "success": "Success",
+          "warning": "Warning",
+          "warning-alt": "Warning Alt"
+        }
+      }
+    },
+    "lowContrast": {
+      "type": "boolean",
+      "name": "Low Contrast"
+    },
+    "statusIconDescription": {
+      "type": "string",
+      "name": "Status Icon Description"
+    },
+    "subtitle": {
+      "type": "string",
+      "name": "Subtitle"
+    },
+    "title": {
+      "type": "string",
+      "name": "Title"
+    }
+  }
+}

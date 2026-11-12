@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "OrderedList",
+    "filePath": "web/node_modules/@carbon/react/es/components/OrderedList/OrderedList.js"
+  },
+  "codeProperties": {
+    "nested": {
+      "type": "boolean",
+      "name": "Nested",
+      "description": "Specify whether this ordered list is nested inside of another nested list",
+      "defaultValue": false
+    },
+    "native": {
+      "type": "boolean",
+      "name": "Native",
+      "description": "Specify whether this ordered list should use native list styles instead of custom counter",
+      "defaultValue": false
+    },
+    "isExpressive": {
+      "type": "boolean",
+      "name": "Expressive",
+      "description": "Specify whether this ordered list is expressive or not",
+      "defaultValue": false
+    }
+  }
+}

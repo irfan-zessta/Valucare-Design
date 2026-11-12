@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FileUploader",
+    "filePath": "web/node_modules/@carbon/react/es/components/FileUploader/FileUploader.js"
+  },
+  "codeProperties": {
+    "buttonKind": {
+      "type": "string",
+      "name": "Button Kind",
+      "options": [
+        "primary",
+        "secondary",
+        "danger",
+        "ghost",
+        "danger--primary",
+        "danger--ghost",
+        "danger--tertiary",
+        "tertiary"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "primary": "Primary",
+          "secondary": "Secondary",
+          "danger": "Danger",
+          "ghost": "Ghost",
+          "danger--primary": "Danger Primary",
+          "danger--ghost": "Danger Ghost",
+          "danger--tertiary": "Danger Tertiary",
+          "tertiary": "Tertiary"
+        }
+      }
+    },
+    "buttonLabel": {
+      "type": "string",
+      "name": "Button Label"
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "filenameStatus": {
+      "type": "string",
+      "name": "Filename Status",
+      "options": [
+        "edit",
+        "complete",
+        "uploading"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "edit": "Edit",
+          "complete": "Complete",
+          "uploading": "Uploading"
+        }
+      }
+    },
+    "iconDescription": {
+      "type": "string",
+      "name": "Icon Description"
+    },
+    "labelDescription": {
+      "type": "string",
+      "name": "Label Description"
+    },
+    "labelTitle": {
+      "type": "string",
+      "name": "Label Title"
+    },
+    "maxFileSize": {
+      "type": "number",
+      "name": "Max File Size"
+    },
+    "multiple": {
+      "type": "boolean",
+      "name": "Multiple"
+    },
+    "name": {
+      "type": "string",
+      "name": "Name"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "options": [
+        "sm",
+        "small",
+        "md",
+        "field",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "sm": "Small (sm)",
+          "small": "Small",
+          "md": "Medium",
+          "field": "Field",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

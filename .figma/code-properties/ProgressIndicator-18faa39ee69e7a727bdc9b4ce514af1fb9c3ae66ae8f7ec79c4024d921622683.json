@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ProgressIndicator",
+    "filePath": "web/node_modules/@carbon/react/es/components/ProgressIndicator/ProgressIndicator.js"
+  },
+  "codeProperties": {
+    "currentIndex": {
+      "type": "number",
+      "name": "Current Index",
+      "description": "Optionally specify the current step array index",
+      "defaultValue": 0
+    },
+    "spaceEqually": {
+      "type": "boolean",
+      "name": "Space Equally",
+      "description": "Specify whether the progress steps should be split equally in size in the div"
+    },
+    "vertical": {
+      "type": "boolean",
+      "name": "Vertical",
+      "description": "Determines whether or not the ProgressIndicator should be rendered vertically."
+    }
+  }
+}

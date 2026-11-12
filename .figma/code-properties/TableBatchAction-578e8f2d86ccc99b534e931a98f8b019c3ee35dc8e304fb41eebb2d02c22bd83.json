@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TableBatchAction",
+    "filePath": "web/node_modules/@carbon/react/es/components/DataTable/TableBatchAction.js"
+  },
+  "codeProperties": {
+    "hasIconOnly": {
+      "type": "boolean",
+      "name": "Has Icon Only"
+    },
+    "iconDescription": {
+      "type": "string",
+      "name": "Icon Description",
+      "defaultValue": "Add"
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Render Icon",
+      "control": false
+    }
+  }
+}

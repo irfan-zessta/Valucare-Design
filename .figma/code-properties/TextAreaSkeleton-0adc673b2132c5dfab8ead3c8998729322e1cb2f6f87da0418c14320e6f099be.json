@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "TextAreaSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/TextArea/TextArea.Skeleton.js"
+  },
+  "codeProperties": {
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label",
+      "description": "Specify whether the label should be hidden, or not"
+    }
+  }
+}

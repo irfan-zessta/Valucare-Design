@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ExpandableSearch",
+    "filePath": "web/node_modules/@carbon/react/es/components/ExpandableSearch/ExpandableSearch.js"
+  },
+  "codeProperties": {
+    "isExpanded": {
+      "type": "boolean",
+      "name": "Expanded",
+      "defaultValue": false
+    },
+    "defaultValue": {
+      "type": "string",
+      "name": "Default Value"
+    }
+  }
+}

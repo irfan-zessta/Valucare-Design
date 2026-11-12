@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "CardMedia",
+    "filePath": "web/node_modules/@carbon/react/es/components/Card/CardMedia.js"
+  },
+  "codeProperties": {
+    "mediaWidth": {
+      "type": "string",
+      "name": "Media Width",
+      "description": "Width of the media in horizontal mode.",
+      "defaultValue": "33.33%"
+    }
+  }
+}

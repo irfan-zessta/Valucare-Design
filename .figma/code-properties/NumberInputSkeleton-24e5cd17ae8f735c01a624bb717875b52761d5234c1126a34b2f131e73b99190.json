@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "NumberInputSkeleton",
+    "filePath": "web/node_modules/@carbon/react/es/components/NumberInput/NumberInput.Skeleton.js"
+  },
+  "codeProperties": {
+    "hideLabel": {
+      "type": "boolean",
+      "name": "Hide Label",
+      "description": "Specify whether the label should be hidden, or not"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size of the Number Input.",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

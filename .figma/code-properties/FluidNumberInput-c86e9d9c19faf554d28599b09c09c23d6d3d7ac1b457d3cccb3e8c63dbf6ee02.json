@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "FluidNumberInput",
+    "filePath": "web/node_modules/@carbon/react/es/components/FluidNumberInput/FluidNumberInput.js"
+  },
+  "codeProperties": {
+    "allowEmpty": {
+      "type": "boolean",
+      "name": "Allow Empty"
+    },
+    "defaultValue": {
+      "type": "string",
+      "name": "Default Value"
+    },
+    "disableWheel": {
+      "type": "boolean",
+      "name": "Disable Wheel"
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "iconDescription": {
+      "type": "string",
+      "name": "Icon Description"
+    },
+    "inputMode": {
+      "type": "string",
+      "name": "Input Mode",
+      "options": [
+        "none",
+        "text",
+        "tel",
+        "url",
+        "email",
+        "numeric",
+        "decimal",
+        "search"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "none": "None",
+          "text": "Text",
+          "tel": "Tel",
+          "url": "URL",
+          "email": "Email",
+          "numeric": "Numeric",
+          "decimal": "Decimal",
+          "search": "Search"
+        }
+      }
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid"
+    },
+    "invalidText": {
+      "type": "string",
+      "name": "Invalid Text"
+    },
+    "label": {
+      "type": "string",
+      "name": "Label"
+    },
+    "locale": {
+      "type": "string",
+      "name": "Locale"
+    },
+    "max": {
+      "type": "number",
+      "name": "Max"
+    },
+    "min": {
+      "type": "number",
+      "name": "Min"
+    },
+    "pattern": {
+      "type": "string",
+      "name": "Pattern"
+    },
+    "step": {
+      "type": "number",
+      "name": "Step"
+    },
+    "type": {
+      "type": "string",
+      "name": "Type",
+      "options": [
+        "number",
+        "text"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "number": "Number",
+          "text": "Text"
+        }
+      }
+    },
+    "value": {
+      "type": "string",
+      "name": "Value"
+    },
+    "warn": {
+      "type": "boolean",
+      "name": "Warn"
+    },
+    "warnText": {
+      "type": "string",
+      "name": "Warn Text"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "name": "Read Only"
+    }
+  }
+}

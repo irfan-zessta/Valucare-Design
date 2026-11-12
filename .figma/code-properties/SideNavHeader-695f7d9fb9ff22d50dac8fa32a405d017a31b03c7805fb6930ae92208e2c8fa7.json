@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "SideNavHeader",
+    "filePath": "web/node_modules/@carbon/react/es/components/UIShell/SideNavHeader.js"
+  },
+  "codeProperties": {
+    "isSideNavExpanded": {
+      "type": "boolean",
+      "name": "Is Side Nav Expanded",
+      "description": "Property to indicate if the side nav container is open (or not). Use to keep local state and styling in step with the SideNav expansion state."
+    },
+    "renderIcon": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Icon",
+      "description": "A component used to render an icon.",
+      "control": false
+    }
+  }
+}

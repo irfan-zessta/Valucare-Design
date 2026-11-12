@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ProgressStep",
+    "filePath": "web/node_modules/@carbon/react/es/components/ProgressIndicator/ProgressIndicator.js"
+  },
+  "codeProperties": {
+    "complete": {
+      "type": "boolean",
+      "name": "Complete",
+      "description": "Specify whether the step has been completed"
+    },
+    "current": {
+      "type": "boolean",
+      "name": "Current",
+      "description": "Specify whether the step is the current step"
+    },
+    "description": {
+      "type": "string",
+      "name": "Description",
+      "description": "Provide a description for the ProgressStep"
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled",
+      "description": "Specify whether the step is disabled"
+    },
+    "invalid": {
+      "type": "boolean",
+      "name": "Invalid",
+      "description": "Specify whether the step is invalid"
+    },
+    "label": {
+      "type": "string",
+      "name": "Label",
+      "description": "Provide the label for the ProgressStep"
+    },
+    "secondaryLabel": {
+      "type": "string",
+      "name": "Secondary Label",
+      "description": "Provide an optional secondary label"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "NotificationActionButton",
+    "filePath": "web/node_modules/@carbon/react/es/components/Notification/Notification.js"
+  },
+  "codeProperties": {
+    "inline": {
+      "type": "boolean",
+      "name": "Inline"
+    }
+  }
+}

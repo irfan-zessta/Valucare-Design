@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "ComposedModal",
+    "filePath": "web/node_modules/@carbon/react/es/components/ComposedModal/ComposedModal.js"
+  },
+  "codeProperties": {
+    "danger": {
+      "type": "boolean",
+      "name": "Danger",
+      "description": "Specify whether the primary button should be replaced with danger button."
+    },
+    "decorator": {
+      "type": {
+        "name": "other",
+        "value": "figma-reference"
+      },
+      "name": "Decorator",
+      "description": "Experimental: Provide a decorator component to be rendered inside the ComposedModal component",
+      "control": false
+    },
+    "isFullWidth": {
+      "type": "boolean",
+      "name": "Is Full Width",
+      "description": "Specify whether the Modal content should have any inner padding."
+    },
+    "open": {
+      "type": "boolean",
+      "name": "Open",
+      "description": "Specify whether the Modal is currently open"
+    },
+    "preventCloseOnClickOutside": {
+      "type": "boolean",
+      "name": "Prevent Close On Click Outside"
+    },
+    "size": {
+      "type": "string",
+      "name": "Size",
+      "description": "Specify the size variant.",
+      "options": [
+        "xs",
+        "sm",
+        "md",
+        "lg"
+      ],
+      "control": {
+        "type": "select",
+        "labels": {
+          "xs": "Extra Small",
+          "sm": "Small",
+          "md": "Medium",
+          "lg": "Large"
+        }
+      }
+    }
+  }
+}

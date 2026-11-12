@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "componentName": "default",
+    "filePath": "web/node_modules/@carbon/react/es/components/Switch/Switch.js"
+  },
+  "codeProperties": {
+    "text": {
+      "type": "string",
+      "name": "Text",
+      "description": "Provide the contents of your Switch"
+    },
+    "disabled": {
+      "type": "boolean",
+      "name": "Disabled"
+    },
+    "selected": {
+      "type": "boolean",
+      "name": "Selected",
+      "defaultValue": false,
+      "description": "Whether your Switch is selected."
+    }
+  }
+}
