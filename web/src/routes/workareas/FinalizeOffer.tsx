@@ -162,6 +162,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
   const [returning, setReturning] = useState(false)
   const [returnConcern, setReturnConcern] = useState('')
   const [viewRates, setViewRates] = useState(false)
+  // Inline customization of the rates recommendation outside the draft stage.
+  const [editRates, setEditRates] = useState(false)
 
   function patchProposal(recipe: (p: ProposalVersion) => ProposalVersion, extra?: (c: Case) => Case) {
     patchCase(c.id, (prev) => {
@@ -302,6 +304,29 @@ export function FinalizeOffer({ c }: { c: Case }) {
         : {}),
     }))
     message.success(submit ? 'Submitted for internal pricing review.' : 'Draft saved.')
+  }
+
+  // Customize just the rates recommendation (commission + sales recommendation),
+  // available after the draft stage via an inline Edit toggle.
+  function saveRates() {
+    if (!proposal) return
+    patchProposal((p) => ({
+      ...p,
+      commissionPct: draft.commissionPct.trim() === '' ? undefined : Number(draft.commissionPct),
+      commissionNote: draft.commissionNote.trim() || undefined,
+      recommendation: draft.recommendation.trim() || undefined,
+    }))
+    setEditRates(false)
+    message.success('Rates recommendation updated.')
+  }
+  function cancelRates() {
+    setDraft((d) => ({
+      ...d,
+      commissionPct: proposal?.commissionPct != null ? String(proposal.commissionPct) : '',
+      commissionNote: proposal?.commissionNote ?? '',
+      recommendation: proposal?.recommendation ?? '',
+    }))
+    setEditRates(false)
   }
 
   // ---- Review (two-level maker-checker) ------------------------------------
@@ -768,38 +793,58 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
         {/* ---- Activity 2 · Rates recommendation ---------------------------- */}
         <Card>
-          {activityHead(2, 'Rates recommendation')}
+          {activityHead(
+            2,
+            'Rates recommendation',
+            !editable && !editRates ? (
+              <Button size="small" icon={<EditOutlined />} onClick={() => setEditRates(true)}>
+                Customize
+              </Button>
+            ) : undefined,
+          )}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
             Recommend the rates to present to {recipient}.
           </Typography.Paragraph>
-          {editable ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
-              <div>
-                <Typography.Text>Commission %{inter ? ' (intermediary)' : ''}</Typography.Text>
-                <Input
-                  style={{ marginTop: 6 }}
-                  value={draft.commissionPct}
-                  onChange={(e) => setDraft({ ...draft, commissionPct: e.target.value })}
-                />
+          {editable || editRates ? (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+                <div>
+                  <Typography.Text>Commission %{inter ? ' (intermediary)' : ''}</Typography.Text>
+                  <Input
+                    style={{ marginTop: 6 }}
+                    value={draft.commissionPct}
+                    onChange={(e) => setDraft({ ...draft, commissionPct: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Typography.Text>Commission adjustment note</Typography.Text>
+                  <Input
+                    style={{ marginTop: 6 }}
+                    value={draft.commissionNote}
+                    onChange={(e) => setDraft({ ...draft, commissionNote: e.target.value })}
+                  />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Typography.Text>Sales recommendation</Typography.Text>
+                  <Input.TextArea
+                    rows={2}
+                    style={{ marginTop: 6 }}
+                    value={draft.recommendation}
+                    onChange={(e) => setDraft({ ...draft, recommendation: e.target.value })}
+                  />
+                </div>
               </div>
-              <div>
-                <Typography.Text>Commission adjustment note</Typography.Text>
-                <Input
-                  style={{ marginTop: 6 }}
-                  value={draft.commissionNote}
-                  onChange={(e) => setDraft({ ...draft, commissionNote: e.target.value })}
-                />
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <Typography.Text>Sales recommendation</Typography.Text>
-                <Input.TextArea
-                  rows={2}
-                  style={{ marginTop: 6 }}
-                  value={draft.recommendation}
-                  onChange={(e) => setDraft({ ...draft, recommendation: e.target.value })}
-                />
-              </div>
-            </div>
+              {/* In draft, the floating bar saves everything; outside draft this
+                  inline toggle commits just the rates recommendation. */}
+              {!editable && editRates && (
+                <Space style={{ marginTop: 16 }}>
+                  <Button type="primary" icon={<CheckCircleOutlined />} onClick={saveRates}>
+                    Save recommendation
+                  </Button>
+                  <Button onClick={cancelRates}>Cancel</Button>
+                </Space>
+              )}
+            </>
           ) : (
             <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered style={{ marginTop: 16 }}>
               <Descriptions.Item label="Commission %">{proposal.commissionPct ?? '—'}</Descriptions.Item>
