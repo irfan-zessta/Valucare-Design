@@ -459,7 +459,7 @@ export function SetupAccount({ c }: { c: Case }) {
           ) : (
             <Typography.Text type="secondary">No document uploaded yet.</Typography.Text>
           )}
-          <Space style={{ marginTop: 12 }}>
+          <Space style={{ marginTop: 12 }} wrap>
             <Button size="small" icon={<EyeOutlined />} disabled={!latest} onClick={() => message.info('Preview is simulated in this prototype.')}>
               Preview / download
             </Button>
@@ -476,6 +476,16 @@ export function SetupAccount({ c }: { c: Case }) {
                 {latest ? 'Replace document' : 'Upload document'}
               </Button>
             </Upload>
+            <Button
+              size="small"
+              icon={<FileTextOutlined />}
+              onClick={() => {
+                addDocVersion(kind, 'legal-reviewed', `Sample-${kind === 'dsa' ? 'DSA' : 'Contract'}-${c.company.shortName}.pdf`)
+                message.success(`Sample ${title} uploaded (Legal-reviewed).`)
+              }}
+            >
+              Upload sample document
+            </Button>
           </Space>
         </FormSection>
       )
@@ -492,9 +502,7 @@ export function SetupAccount({ c }: { c: Case }) {
         {docRow('dsa', 'DSA (Deed of Service Agreement)')}
 
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Typography.Text type="secondary">
-            {hasBoth ? 'Both documents uploaded.' : 'Upload both the contract and the DSA to continue.'}
-          </Typography.Text>
+          <Typography.Text type="secondary">{hasBoth ? 'Both documents uploaded.' : ''}</Typography.Text>
           <div className="app-form-floatbar__actions">
             <Tooltip title={hasBoth ? '' : 'Upload both documents first.'}>
               <Button type="primary" disabled={!hasBoth} onClick={() => completeTask('upload-documents')}>
