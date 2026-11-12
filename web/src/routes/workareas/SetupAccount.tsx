@@ -522,7 +522,7 @@ export function SetupAccount({ c }: { c: Case }) {
           <div className="app-form-floatbar__actions">
             <Tooltip title={hasBoth ? '' : 'Upload both documents first.'}>
               <Button type="primary" disabled={!hasBoth} onClick={() => completeTask('upload-documents')}>
-                Save documents and continue
+                Send to client
               </Button>
             </Tooltip>
           </div>
