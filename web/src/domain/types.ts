@@ -282,7 +282,13 @@ export interface ProposalVersion {
   /** Client decline reason, when the proposal was declined. */
   declineReason?: string
   /** Client acceptance record. */
-  acceptance?: { date: string; notes?: string; version: number }
+  acceptance?: {
+    date: string
+    notes?: string
+    version: number
+    /** Client-signed SOB attached as proof of acceptance. */
+    signedSob?: { name: string; attachedAt: string }
+  }
 }
 
 export interface PlanCode {

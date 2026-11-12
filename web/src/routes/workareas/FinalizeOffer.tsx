@@ -643,6 +643,16 @@ export function FinalizeOffer({ c }: { c: Case }) {
     navigate(`/cases/${c.id}/setup-account`)
   }
 
+  // Attach the client-signed SOB against the recorded acceptance.
+  function attachSignedSob(fileName: string) {
+    patchProposal((p) =>
+      p.acceptance
+        ? { ...p, acceptance: { ...p.acceptance, signedSob: { name: fileName, attachedAt: new Date().toISOString() } } }
+        : p,
+    )
+    message.success(`Attached client-signed SOB “${fileName}”.`)
+  }
+
   // ---- Revise (new version) -------------------------------------------------
   function reviseProposal() {
     if (!proposal) return
@@ -1290,6 +1300,33 @@ export function FinalizeOffer({ c }: { c: Case }) {
                           {
                             title: 'Notes',
                             render: () => proposal.acceptance!.notes || '—',
+                          },
+                          {
+                            title: 'Signed SOB',
+                            render: () => {
+                              const signed = proposal.acceptance!.signedSob
+                              return (
+                                <Space>
+                                  {signed && (
+                                    <Tag color="green" icon={<FileTextOutlined />}>
+                                      {signed.name}
+                                    </Tag>
+                                  )}
+                                  <Upload
+                                    showUploadList={false}
+                                    accept=".pdf,.xlsx,.csv,.png,.jpg,.jpeg"
+                                    beforeUpload={(file) => {
+                                      attachSignedSob(file.name)
+                                      return false
+                                    }}
+                                  >
+                                    <Button size="small" icon={<CloudUploadOutlined />}>
+                                      {signed ? 'Replace' : 'Attach signed SOB'}
+                                    </Button>
+                                  </Upload>
+                                </Space>
+                              )
+                            },
                           },
                         ]}
                       />
