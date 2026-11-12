@@ -61,7 +61,6 @@ export function SobBuilder({
   sob,
   patchSob,
   editable,
-  onSaveDraft,
   saveState,
   showUpload = false,
 }: {
@@ -69,7 +68,6 @@ export function SobBuilder({
   sob: SobDraft
   patchSob: (recipe: (s: SobDraft) => SobDraft) => void
   editable: boolean
-  onSaveDraft: () => void
   saveState: SaveState
   showUpload?: boolean
 }) {
@@ -279,11 +277,6 @@ export function SobBuilder({
           <Typography.Text strong>SOB document builder</Typography.Text>
           {saveTag}
         </Space>
-        {editable && (
-          <Button type="primary" loading={saveState === 'saving'} onClick={onSaveDraft}>
-            Save draft
-          </Button>
-        )}
       </div>
 
       {showUpload && editable && <UploadPanel />}

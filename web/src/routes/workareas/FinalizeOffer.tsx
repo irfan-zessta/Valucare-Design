@@ -53,7 +53,7 @@ import { useCases } from '../../state/CaseProvider'
 import { currentProposal } from '../../domain/progress'
 import { uid } from '../../domain/ids'
 import { ProposalRateSchedule, emptyRateSchedule, sampleRateSchedule } from './ProposalRateSchedule'
-import { SobBuilder, type SaveState } from './sob/SobBuilder'
+import { SobBuilder } from './sob/SobBuilder'
 import { emptyRichSob, isRichSob } from '../../domain/sobModel'
 
 const CHANNELS = ['Email', 'Call', 'Meeting', 'Through intermediary']
@@ -205,13 +205,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
   }
 
   // ---- Full document builder ------------------------------------------------
-  const [sobSaveState, setSobSaveState] = useState<SaveState>('idle')
-  function saveSobDraft() {
-    setSobSaveState('saving')
-    // Edits already write through to case state; this stamps the saved point.
-    patchSob((s) => ({ ...s, savedAt: new Date().toISOString() }))
-    window.setTimeout(() => setSobSaveState('saved'), 400)
-  }
   function advanceSob() {
     if (!sob) return
     const next: SobDraft['status'] = sob.status === 'draft' ? 'validated' : 'approved'
@@ -467,8 +460,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
             sob={sob}
             patchSob={patchSob}
             editable={sobEditable}
-            onSaveDraft={saveSobDraft}
-            saveState={sobSaveState}
+            saveState="idle"
             showUpload={false}
           />
           {sob.status !== 'approved' && sob.status !== 'signed' && sob.status !== 'codified' && (
