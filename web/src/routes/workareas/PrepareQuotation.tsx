@@ -502,6 +502,25 @@ export function PrepareQuotation({ c }: { c: Case }) {
         Digitise the client's current benefits (Terms of Reference). This becomes the baseline for the
         TOR-vs-SOB comparison in Finalize Offer. The original TOR file stays attached in Requirements.
       </Typography.Paragraph>
+      <Space wrap>
+        <Button size="small" icon={<PlusOutlined />} onClick={addTorLine}>
+          Add line
+        </Button>
+        <Button size="small" onClick={loadSampleTor}>
+          Load sample TOR
+        </Button>
+        <Upload
+          showUploadList={false}
+          beforeUpload={(file) => {
+            reuploadTor(file.name)
+            return false
+          }}
+        >
+          <Button size="small" icon={<CloudUploadOutlined />}>
+            {torAttached ? 'Re-upload TOR' : 'Upload TOR'}
+          </Button>
+        </Upload>
+      </Space>
       {torAttached && q.torLines === undefined && (
         <Alert
           type="info"
@@ -552,25 +571,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
           ]}
         />
       )}
-      <Space wrap>
-        <Button size="small" icon={<PlusOutlined />} onClick={addTorLine}>
-          Add line
-        </Button>
-        <Button size="small" onClick={loadSampleTor}>
-          Load sample TOR
-        </Button>
-        <Upload
-          showUploadList={false}
-          beforeUpload={(file) => {
-            reuploadTor(file.name)
-            return false
-          }}
-        >
-          <Button size="small" icon={<CloudUploadOutlined />}>
-            {torAttached ? 'Re-upload TOR' : 'Upload TOR'}
-          </Button>
-        </Upload>
-      </Space>
     </Space>
   )
 
