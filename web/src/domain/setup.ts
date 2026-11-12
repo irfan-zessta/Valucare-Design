@@ -164,6 +164,8 @@ export interface SetupField {
   required?: boolean
   options?: string[]
   wide?: boolean
+  /** Placeholder / hint text for text inputs. */
+  placeholder?: string
   /** Only required/relevant when the business source is Agent/Broker. */
   intermediaryOnly?: boolean
 }
@@ -293,7 +295,104 @@ export function prefillAccountForm(c: Case, setup: SetupState): Record<string, u
 const PLAN_TYPE = ['CORP-STD', 'CORP-EXEC', 'CORP-DEP']
 const ROOM_TYPE = ['Ward', 'Semi-private', 'Private', 'Suite']
 const MEMBER_TYPE = ['Principal', 'Dependent']
+const CIVIL_STATUS = ['Any', 'Single', 'Married', 'Widowed', 'Separated']
 
 export const PLAN_CODE_TYPE_OPTIONS = PLAN_TYPE
 export const PLAN_CODE_ROOM_OPTIONS = ROOM_TYPE
 export const PLAN_CODE_MEMBER_OPTIONS = MEMBER_TYPE
+
+/**
+ * The full HMS3 plan-code capture schema (Identity → Dates), grouped into the
+ * same sections as the wireframe's "Add Plan Code" dialog. `code`, `accountRef`
+ * and `linkedSobVersion` are contextual (shown read-only / entered once); the
+ * rest are editable. VAT fields are entered as provided — no formula applied.
+ */
+export const PLAN_CODE_SCHEMA: SetupSection[] = [
+  {
+    key: 'identity',
+    title: 'Identity',
+    fields: [
+      { key: 'code', label: 'Plan code', type: 'text', required: true },
+      { key: 'accountRef', label: 'Account / affiliate', type: 'readonly' },
+      { key: 'linkedSobVersion', label: 'SOB version', type: 'readonly' },
+    ],
+  },
+  {
+    key: 'plan',
+    title: 'Plan',
+    fields: [
+      { key: 'planType', label: 'Plan Type', type: 'select', options: PLAN_TYPE, required: true },
+      { key: 'mbl', label: 'MBL', type: 'money', required: true },
+      { key: 'mblDescription', label: 'MBL description', type: 'text' },
+      { key: 'businessSource', label: 'Business Source', type: 'select', options: BUSINESS_SOURCE, required: true },
+      { key: 'roomType', label: 'Room Type', type: 'select', options: ROOM_TYPE, required: true },
+      { key: 'roomLimit', label: 'Room Limit (per-day room rate)', type: 'money' },
+      { key: 'modeOfPayment', label: 'Mode of Payment', type: 'select', options: PAYMENT_MODE, required: true },
+    ],
+  },
+  {
+    key: 'eligibility',
+    title: 'Eligibility',
+    fields: [
+      { key: 'memberType', label: 'Member Type', type: 'select', options: MEMBER_TYPE, required: true },
+      { key: 'principalPosition', label: 'Principal Position', type: 'text' },
+      { key: 'civilStatus', label: 'Civil Status', type: 'select', options: CIVIL_STATUS },
+    ],
+  },
+  {
+    key: 'pricing',
+    title: 'Pricing',
+    fields: [
+      { key: 'beforeVat', label: 'Before VAT', type: 'money', required: true },
+      { key: 'vatInclusive', label: 'VAT Inclusive', type: 'checkbox' },
+      { key: 'vatAmount', label: 'VAT amount', type: 'money' },
+      { key: 'vatDesc', label: 'VAT Desc.', type: 'text', required: true },
+      { key: 'premium', label: 'Premium', type: 'money' },
+    ],
+  },
+  {
+    key: 'providers',
+    title: 'Providers',
+    fields: [
+      { key: 'hospitalCodes', label: 'Hospital Code', type: 'text', required: true, placeholder: 'Search hospitals by name or code…' },
+      { key: 'clinicCodes', label: 'Clinic Code', type: 'text', required: true, placeholder: 'Search clinics by name or code…' },
+    ],
+  },
+  {
+    key: 'remarks',
+    title: 'Remarks',
+    fields: [
+      { key: 'remarks', label: 'Remarks', type: 'text', required: true },
+      { key: 'dentalRemarks', label: 'Dental Remarks', type: 'text', required: true },
+    ],
+  },
+  {
+    key: 'dates',
+    title: 'Dates',
+    fields: [
+      { key: 'contractYear', label: 'Contract Year', type: 'int', required: true },
+      { key: 'effectiveFrom', label: 'Effective from', type: 'date', required: true },
+      { key: 'effectiveTo', label: 'Effective to', type: 'date' },
+    ],
+  },
+]
+
+/** Every editable (non-readonly) plan-code field key, in schema order. */
+export const PLAN_CODE_FIELD_KEYS: string[] = PLAN_CODE_SCHEMA.flatMap((s) =>
+  s.fields.filter((f) => f.type !== 'readonly').map((f) => f.key),
+)
+
+/** Sensible defaults for a new manual plan-code entry, carried from the case. */
+export function prefillPlanCodeForm(c: Case, setup: SetupState, sobVersion: number): Record<string, unknown> {
+  const effective = setup.legal.effectiveDate
+  return {
+    code: '',
+    accountRef: c.account.accountRef ?? '(pending)',
+    linkedSobVersion: `v${sobVersion}`,
+    businessSource: c.company.businessSource ?? 'Direct',
+    modeOfPayment: c.franchise.paymentFrequency ?? 'Annual',
+    contractYear: effective ? new Date(effective).getFullYear() : new Date().getFullYear(),
+    effectiveFrom: effective,
+    effectiveTo: setup.legal.expiryDate,
+  }
+}

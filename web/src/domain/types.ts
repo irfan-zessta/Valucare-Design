@@ -315,6 +315,20 @@ export interface PlanCode {
   effectiveTo?: string
   /** Reason recorded when a plan code is returned for correction. */
   returnReason?: string
+  // --- Full HMS3 plan-code capture schema -----------------------------------
+  mblDescription?: string
+  businessSource?: string // Direct | Agent | Broker
+  roomLimit?: number // per-day room rate
+  principalPosition?: string
+  civilStatus?: string
+  vatInclusive?: boolean
+  vatAmount?: number
+  vatDesc?: string
+  hospitalCodes?: string
+  clinicCodes?: string
+  remarks?: string
+  dentalRemarks?: string
+  contractYear?: number
 }
 
 export interface MemberDataSummary {
