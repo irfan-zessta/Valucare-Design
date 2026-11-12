@@ -284,7 +284,7 @@ body {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: stretch;
   margin-block-end: 16px;
 }
 .app-pageheader-cards > .app-pageheader-card {
@@ -297,7 +297,6 @@ body {
   flex: 1 1 calc(40% - 8px);
   display: flex;
   align-items: center;
-  padding-block: 12px;
 }
 .app-pageheader-card--stepper .app-stepper {
   inline-size: 100%;
