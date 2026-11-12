@@ -705,9 +705,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
                     </Button>
                   )}
                 </Space>
-              ) : (
-                <Tag>Not checked</Tag>
-              )}
+              ) : null}
               <Button icon={<RollbackOutlined />} onClick={() => setReturning(true)}>
                 Return to Actuarial
               </Button>
