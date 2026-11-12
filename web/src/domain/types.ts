@@ -291,6 +291,8 @@ export interface ProposalVersion {
   }
 }
 
+export type PlanCodeStatus = 'draft' | 'for-approval' | 'approved' | 'returned'
+
 export interface PlanCode {
   id: string
   code: string
@@ -301,6 +303,18 @@ export interface PlanCode {
   linkedSobVersion: number
   /** Row-level issues surfaced beside the affected plan code. */
   issues?: string[]
+  // --- Richer fields (ported from the wireframe plan-code schema) ------------
+  status?: PlanCodeStatus
+  planType?: string // CORP-STD | CORP-EXEC | CORP-DEP
+  memberType?: string // Principal | Dependent
+  roomType?: string
+  beforeVat?: number
+  premium?: number
+  modeOfPayment?: string
+  effectiveFrom?: string
+  effectiveTo?: string
+  /** Reason recorded when a plan code is returned for correction. */
+  returnReason?: string
 }
 
 export interface MemberDataSummary {
@@ -516,6 +530,175 @@ export interface AccountState {
   contractMilestones: { label: string; done: boolean; at?: string }[]
   planCodeSetStatus: PlanCodeSetStatus
   planCodes: PlanCode[]
+  /** The ordered Set Up Account task flow (alignment → plan codes). */
+  setup?: SetupState
+}
+
+// ===========================================================================
+// Set Up Account — the ordered task flow that runs after the client accepts the
+// proposal, SOB and commercial terms. Each task tracks its own status so the
+// compact task list can show pending / in-progress / completed and collapse
+// finished tasks to reopenable summaries. Honest simulation throughout:
+// Legal/notarization happen outside HMS and are only recorded here.
+// ===========================================================================
+
+export type SetupTaskId =
+  | 'internal-alignment'
+  | 'legal-request'
+  | 'upload-documents'
+  | 'send-to-client'
+  | 'notarization'
+  | 'kyc'
+  | 'onboarding-sob'
+  | 'coc'
+  | 'account-creation'
+  | 'benefit-upload'
+  | 'plan-codes'
+
+/** A single named/dated file reference (prototype — file name only). */
+export interface SetupAttachment {
+  slot: string
+  fileName: string
+  uploadedBy?: string
+  uploadedAt?: string
+}
+
+export type AlignmentOutcome = 'pending' | 'in-progress' | 'completed'
+
+/** Coordination record shared with one downstream department (Billing / MDA). */
+export interface DeptAlignment {
+  status: AlignmentOutcome
+  notes?: string
+  clarifications?: string
+  outcome?: string
+  updatedAt?: string
+}
+
+export type LegalRequestStatus = 'not-started' | 'preparing' | 'sent' | 'documents-received'
+
+/** The request Sales sends to Legal to review and prepare the contract. */
+export interface LegalRequest {
+  status: LegalRequestStatus
+  requestRef?: string
+  effectiveDate?: string
+  expiryDate?: string
+  paymentMode?: string
+  remarks?: string
+  requestedAt?: string
+  attachments?: SetupAttachment[]
+}
+
+/** The three distinct lifecycle versions a contract/DSA passes through. */
+export type SetupDocStage = 'legal-reviewed' | 'client-signed' | 'notarized'
+
+export interface SetupDocVersion {
+  stage: SetupDocStage
+  fileName: string
+  version: number
+  uploadedBy: string
+  uploadedAt: string
+}
+
+export interface SetupDocKind {
+  /** All uploaded versions, oldest first; the last is the latest. */
+  versions: SetupDocVersion[]
+}
+
+/** The contract and the DSA, each kept as its own versioned document. */
+export interface SetupContracts {
+  contract: SetupDocKind
+  dsa: SetupDocKind
+}
+
+export type ClientSendStatus = 'not-sent' | 'sent' | 'signed-received'
+
+/** Sending the Legal-reviewed contract + DSA to the client (simulated email). */
+export interface ClientSend {
+  status: ClientSendStatus
+  recipient?: string
+  recipientEmail?: string
+  subject?: string
+  message?: string
+  contractVersion?: number
+  dsaVersion?: number
+  sentAt?: string
+}
+
+export type NotarizationStatus =
+  | 'awaiting-signed'
+  | 'signed-received'
+  | 'sent-for-notarization'
+  | 'notarized'
+  | 'returned-to-client'
+
+/** Retrieve signed docs → notarize (outside HMS) → return the copy to client. */
+export interface Notarization {
+  status: NotarizationStatus
+  signedReceivedAt?: string
+  sentForNotarizationAt?: string
+  notarizedAt?: string
+  returnedAt?: string
+}
+
+export type KycStatus = 'pending' | 'in-review' | 'cleared' | 'flagged'
+
+/** KYC — recorded from an external check (SOLYTICS is not integrated). */
+export interface KycState {
+  status: KycStatus
+  externalRef?: string
+  checkDate?: string
+  checkerName?: string
+  flagDescription?: string
+  documents?: SetupAttachment[]
+  outstanding?: string[]
+}
+
+export type CocStatus = 'not-generated' | 'draft' | 'in-review' | 'approved' | 'released'
+
+/** Certificate of Coverage — generated from account + codified SOB + plan codes. */
+export interface CocState {
+  status: CocStatus
+  reference?: string
+  basis?: { accountVersion?: number; sobVersion?: number; planCodeCount?: number }
+  preparedAt?: string
+  approvedAt?: string
+  releasedAt?: string
+  remarks?: string
+}
+
+export type AccountFormStatus = 'pending-setup' | 'for-approval' | 'approved' | 'returned'
+
+export type BenefitUploadStatus = 'not-started' | 'uploaded' | 'verified'
+
+/** Transfer of the onboarding SOB benefits into the account. */
+export interface BenefitUploadState {
+  status: BenefitUploadStatus
+  sobVersion?: number
+  uploadedAt?: string
+  issues?: string[]
+}
+
+export interface SetupState {
+  /** Internal alignment with the two downstream departments. */
+  alignment: { billing: DeptAlignment; mda: DeptAlignment }
+  legal: LegalRequest
+  contracts: SetupContracts
+  clientSend: ClientSend
+  notarization: Notarization
+  kyc: KycState
+  /** The onboarding SOB (distinct from the accepted proposal SOB in offer.sob). */
+  onboardingSob?: SobDraft
+  coc: CocState
+  /** Account-number creation form (mirrors the wireframe account schema). */
+  accountForm?: Record<string, unknown>
+  accountFormStatus?: AccountFormStatus
+  benefitUpload: BenefitUploadState
+  /** Tasks the user has marked complete (drives the task-list state). */
+  completedTasks: SetupTaskId[]
+  /** The task currently open in the single content panel. */
+  activeTask?: SetupTaskId
+  /** True once the whole Set Up Account stage is finished. */
+  completed: boolean
 }
 
 export interface Case {
