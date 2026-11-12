@@ -96,13 +96,6 @@ export function ActivateHandover({ c }: { c: Case }) {
           </Space>
         }
         description="Attach the document pack, then send it to MDA before activating the account."
-        extra={
-          <Tooltip title={allAttached ? '' : 'Attach all four documents first.'}>
-            <Button type="primary" icon={<SendOutlined />} disabled={!allAttached || sentToMda} onClick={sendToMda}>
-              {sentToMda ? 'Sent to MDA' : 'Send to MDA'}
-            </Button>
-          </Tooltip>
-        }
         wide
       >
         <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
@@ -156,6 +149,23 @@ export function ActivateHandover({ c }: { c: Case }) {
           />
         )}
       </FormSection>
+
+      <div className="app-form-floatbar" style={{ marginTop: 16 }}>
+        <Typography.Text type="secondary">
+          {sentToMda
+            ? `Handed over to MDA${mda.sentAt ? ` on ${formatDateTime(mda.sentAt)}` : ''}.`
+            : allAttached
+              ? 'All documents attached — ready to send.'
+              : 'Attach all four documents to hand over to MDA.'}
+        </Typography.Text>
+        <div className="app-form-floatbar__actions">
+          <Tooltip title={sentToMda ? '' : allAttached ? '' : 'Attach all four documents first.'}>
+            <Button type="primary" icon={<SendOutlined />} disabled={!allAttached || sentToMda} onClick={sendToMda}>
+              {sentToMda ? 'Sent to MDA' : 'Send to MDA'}
+            </Button>
+          </Tooltip>
+        </div>
+      </div>
 
       {/* 2 · Activation ------------------------------------------------------ */}
       <FormSection
