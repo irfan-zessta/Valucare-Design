@@ -268,13 +268,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
     a.click()
     URL.revokeObjectURL(url)
   }
-  function advanceSob() {
-    if (!sob) return
-    const next: SobDraft['status'] = sob.status === 'draft' ? 'validated' : 'approved'
-    patchSob((s) => ({ ...s, status: next }))
-    message.success(next === 'validated' ? 'SOB sent for validation (validated).' : 'SOB approved.')
-  }
-
   // ---- Return the rate sheet to Actuarial (Sales raises a concern) ---------
   function returnToActuarial() {
     const concern = returnConcern.trim()
@@ -800,13 +793,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
               ))}
             </ul>
           </div>
-          {sob.status !== 'approved' && sob.status !== 'signed' && sob.status !== 'codified' && (
-            <div>
-              <Button type="primary" onClick={advanceSob}>
-                {sob.status === 'draft' ? 'Send for validation' : 'Approve SOB'}
-              </Button>
-            </div>
-          )}
         </Space>
       )}
     </section>
