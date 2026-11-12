@@ -691,9 +691,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
         {/* ---- Activity 1 · Rate sheet checking ----------------------------- */}
         <Card>
           {activityHead(1, 'Rate sheet checking')}
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-            Review the membership-fee rate sheet Actuarial released before using it in the proposal.
-          </Typography.Paragraph>
           <div
             className="app-decision-row"
             style={{ marginTop: 12, border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}
@@ -744,9 +741,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
               </Button>
             ) : undefined,
           )}
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-            Recommend the rates to present to {recipient}.
-          </Typography.Paragraph>
           {editable || editRates ? (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
@@ -809,9 +803,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
               </Button>
             ) : undefined,
           )}
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-            Prepare the explanation supporting the recommended rates.
-          </Typography.Paragraph>
           {editable || editJustification ? (
             <div style={{ marginTop: 12 }}>
               <Typography.Text>Rates justification *</Typography.Text>
@@ -864,11 +855,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
               </Upload>
             </Space>,
           )}
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-            Build the Summary of Benefits — company details, benefits, pricing and terms — into the client-facing proposal.
-            The full proposal template (eligibility, plan options, network, terms, exclusions and sign-offs) is prepared in
-            a later step.
-          </Typography.Paragraph>
           <div style={{ marginTop: 16 }}>{sobSection}</div>
           {proposal.templateAdditions.length > 0 && (
             <Alert
