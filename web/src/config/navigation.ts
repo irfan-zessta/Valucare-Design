@@ -64,6 +64,7 @@ export const NAV: NavDept[] = [
     status: 'available',
     match: (p) => p === '/',
   },
+  { id: 'accounts', label: 'Accounts', Icon: BankOutlined, to: '/accounts', status: 'available' },
   {
     id: 'sales',
     label: 'Sales',
@@ -88,7 +89,6 @@ export const NAV: NavDept[] = [
   { id: 'actuarial', label: 'Actuarial', Icon: BarChartOutlined, to: '/actuarial', status: 'available' },
   { id: 'mda', label: 'MDA', Icon: TeamOutlined, to: '/mda', status: 'available' },
   { id: 'billing', label: 'Billing & Collections', Icon: WalletOutlined, to: '/billing', status: 'available' },
-  { id: 'accounts', label: 'Accounts', Icon: BankOutlined, to: '/accounts', status: 'available' },
   { id: 'provider-networks', label: 'Provider Networks', Icon: DeploymentUnitOutlined, to: '/provider-networks', status: 'available' },
   { id: 'claims', label: 'Claims', Icon: FileTextOutlined, to: '/claims', status: 'available' },
   { id: 'ccd', label: 'CCD', Icon: CustomerServiceOutlined, to: '/ccd', status: 'available' },
