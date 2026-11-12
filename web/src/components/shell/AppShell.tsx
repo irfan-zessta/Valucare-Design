@@ -9,6 +9,7 @@
 // Routed screens render through <Outlet/> in the content region.
 // ===========================================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Grid, Button, Modal, Drawer } from 'antd'
 import { useAuth } from '../../auth/AuthProvider'
@@ -69,7 +70,17 @@ export function AppShell() {
 
   return (
     <ShellActionsContext.Provider value={shellActions}>
-      <Layout style={{ minHeight: '100vh' }} hasSider={!isMobile}>
+      <Layout
+        style={
+          {
+            minHeight: '100vh',
+            // Width of the sidebar, exposed so a fixed bottom action bar can
+            // offset itself and span only the content column.
+            '--app-sider-w': isMobile ? '0px' : collapsed ? '64px' : '256px',
+          } as CSSProperties
+        }
+        hasSider={!isMobile}
+      >
         {!isMobile && (
           <Sider
             className="app-sider"
