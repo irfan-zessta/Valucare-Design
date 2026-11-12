@@ -41,21 +41,24 @@ export default function CaseWorkspace() {
 
   return (
     <div className="app-page app-page--wide">
-      <div className="app-pageheader-card">
-        <PageHeader
-          breadcrumb={[{ title: 'Sales' }, { title: 'New Business', to: '/sales' }, { title: c.company.name }]}
-          title={c.company.name}
-          supporting={
-            <>
-              {c.id} · {c.company.shortName} · {c.company.productType} · {c.company.businessSource}
-              {c.account.accountRef ? ` · ${c.account.accountRef}` : ''}
-            </>
-          }
-          extra={<CaseStatusTag c={c} />}
-        />
-        <div className="app-pageheader-card__stepper">
+      <div className="app-pageheader-cards">
+        <div className="app-pageheader-card app-pageheader-card--name">
+          <PageHeader
+            breadcrumb={[{ title: 'Sales' }, { title: 'New Business', to: '/sales' }, { title: c.company.name }]}
+            title={c.company.name}
+            supporting={
+              <>
+                {c.id} · {c.company.shortName} · {c.company.productType} · {c.company.businessSource}
+                {c.account.accountRef ? ` · ${c.account.accountRef}` : ''}
+              </>
+            }
+            extra={<CaseStatusTag c={c} />}
+          />
+        </div>
+        <div className="app-pageheader-card app-pageheader-card--stepper">
           <JourneyStepper
             current={c.currentWorkArea}
+            minimal
             viewing={activeWorkArea}
             reachable={furthestWorkArea(c)}
             onSelect={(wa) => navigate(`/cases/${c.id}/${wa}`)}

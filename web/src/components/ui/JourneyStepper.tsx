@@ -30,12 +30,15 @@ function stateClass(i: number, currentIdx: number) {
 export function JourneyStepper({
   current,
   variant = 'full',
+  minimal = false,
   viewing,
   reachable,
   onSelect,
 }: {
   current: WorkAreaId
   variant?: 'full' | 'mini'
+  /** Compact the full stepper: smaller dots, labels only (no descriptions). */
+  minimal?: boolean
   /** The step currently being viewed (may be a past step), outlined for orientation. */
   viewing?: WorkAreaId
   /**
@@ -83,7 +86,7 @@ export function JourneyStepper({
   }
 
   return (
-    <div className="app-stepper">
+    <div className={`app-stepper${minimal ? ' app-stepper--minimal' : ''}`}>
       {WORK_AREA_ORDER.map((wa, i) => {
         // Reached steps (up to the furthest reached) are navigable when onSelect is given.
         const reached = i <= reachableIdx
@@ -96,7 +99,7 @@ export function JourneyStepper({
           <>
             <span className={`app-stepper__dot${stateClass(i, currentIdx)}`}>{STEP_ICONS[wa]}</span>
             <div className="app-stepper__label">{WORK_AREA_LABELS[wa]}</div>
-            <div className="app-stepper__desc">{STEP_DESC[wa]}</div>
+            {!minimal && <div className="app-stepper__desc">{STEP_DESC[wa]}</div>}
           </>
         )
         return clickable ? (
