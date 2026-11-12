@@ -34,6 +34,7 @@ import {
   EditOutlined,
   EyeOutlined,
   FileTextOutlined,
+  ImportOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -875,12 +876,19 @@ export function SetupAccount({ c }: { c: Case }) {
     const patchOnb = (recipe: (s: NonNullable<SetupState['onboardingSob']>) => NonNullable<SetupState['onboardingSob']>) =>
       patchSetup((s) => (s.onboardingSob ? { ...s, onboardingSob: recipe(s.onboardingSob) } : s))
 
-    function startFromAccepted() {
-      const base = c.offer.sob
-        ? { ...structuredClone(c.offer.sob), status: 'draft' as const, source: 'manual' as const }
-        : emptyRichSob(c, 'manual')
-      patchSetup((s) => ({ ...s, onboardingSob: base }))
-      message.success(c.offer.sob ? `Onboarding SOB started from accepted SOB v${c.offer.sob.version}.` : 'Onboarding SOB started (blank).')
+    function importFinalized() {
+      if (!c.offer.sob) {
+        message.warning('No finalized SOB found on the proposal.')
+        return
+      }
+      const imported = { ...structuredClone(c.offer.sob), status: 'approved' as const, savedAt: new Date().toISOString() }
+      patchSetup((s) => ({ ...s, onboardingSob: imported }))
+      message.success(`Finalized SOB v${c.offer.sob.version} imported as the onboarding SOB.`)
+    }
+
+    function startBlank() {
+      patchSetup((s) => ({ ...s, onboardingSob: emptyRichSob(c, 'manual') }))
+      message.success('Onboarding SOB started (blank).')
     }
 
     if (!onb) {
@@ -888,12 +896,19 @@ export function SetupAccount({ c }: { c: Case }) {
         <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
           <FormSection title="Onboarding SOB" wide>
             <Typography.Paragraph>
-              Prepare the onboarding Summary of Benefits from the client-accepted benefits and terms.
-              {c.offer.sob ? ` The accepted SOB (v${c.offer.sob.version}) will be carried forward.` : ' No accepted SOB found — you can build one from scratch.'}
+              Import the finalized Summary of Benefits from the accepted proposal to use as the onboarding SOB.
+              {c.offer.sob
+                ? ` The finalized SOB (v${c.offer.sob.version}) is ready to import.`
+                : ' No finalized SOB found on the proposal — you can build one from scratch.'}
             </Typography.Paragraph>
-            <Button type="primary" onClick={startFromAccepted}>
-              Start onboarding SOB
-            </Button>
+            <Space wrap>
+              {c.offer.sob && (
+                <Button type="primary" icon={<ImportOutlined />} onClick={importFinalized}>
+                  Import finalized SOB
+                </Button>
+              )}
+              <Button onClick={startBlank}>{c.offer.sob ? 'Build from scratch instead' : 'Build onboarding SOB'}</Button>
+            </Space>
           </FormSection>
         </Space>
       )
