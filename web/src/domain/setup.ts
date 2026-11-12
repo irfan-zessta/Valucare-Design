@@ -22,13 +22,7 @@ export const SETUP_TASKS: SetupTaskMeta[] = [
     id: 'internal-alignment',
     label: 'Internal alignment',
     blurb: 'Align Billing & Collections and MDA on the accepted company details and terms.',
-    whatNext: 'Request the contract from Legal.',
-  },
-  {
-    id: 'legal-request',
-    label: 'Request Legal review',
-    blurb: 'Send the accepted terms to Legal to review and prepare the contract.',
-    whatNext: 'Legal returns the contract and DSA by email; upload them next.',
+    whatNext: 'Upload the contract and DSA from Legal.',
   },
   {
     id: 'upload-documents',

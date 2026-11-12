@@ -44,7 +44,6 @@ import type {
 } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
 import { SETUP_TASK_ORDER, makeInitialSetup, setupTaskMeta } from '../../domain/setup'
-import { makeRequestRef } from '../../domain/ids'
 import { emptyRichSob } from '../../domain/sobModel'
 import { FormSection } from '../../components/ui/FormSection'
 import { SobBuilder } from './sob/SobBuilder'
@@ -72,7 +71,7 @@ const TAB_GROUPS: SetupTabGroup[] = [
   {
     key: 'contract',
     label: 'Contract & KYC',
-    tasks: ['legal-request', 'upload-documents', 'send-to-client', 'notarization', 'kyc'],
+    tasks: ['upload-documents', 'send-to-client', 'notarization', 'kyc'],
   },
   {
     key: 'onboarding',
@@ -108,7 +107,12 @@ export function SetupAccount({ c }: { c: Case }) {
     SETUP_TASK_ORDER.indexOf(setup.activeTask ?? 'internal-alignment'),
     ...setup.completedTasks.map((t) => SETUP_TASK_ORDER.indexOf(t)),
   )
-  const activeId = setup.activeTask ?? 'internal-alignment'
+  // Fall back if a persisted active task was removed from the flow (e.g. the old
+  // Legal-review step), so we never try to render a panel that no longer exists.
+  const rawActive = setup.activeTask ?? 'internal-alignment'
+  const activeId: SetupTaskId = SETUP_TASK_ORDER.includes(rawActive)
+    ? rawActive
+    : SETUP_TASK_ORDER.find((t) => !setup.completedTasks.includes(t)) ?? 'internal-alignment'
 
   function openTask(id: SetupTaskId) {
     patchSetup((s) => ({ ...s, activeTask: id }))
@@ -230,8 +234,6 @@ export function SetupAccount({ c }: { c: Case }) {
     switch (activeId) {
       case 'internal-alignment':
         return InternalAlignment()
-      case 'legal-request':
-        return LegalRequest()
       case 'upload-documents':
         return UploadDocuments()
       case 'send-to-client':
@@ -430,112 +432,6 @@ export function SetupAccount({ c }: { c: Case }) {
                 Complete alignment and continue
               </Button>
             </Tooltip>
-          </div>
-        </div>
-      </Space>
-    )
-  }
-
-  // ===== Request Legal review ===============================================
-  function LegalRequest() {
-    const l = setup!.legal
-    const sent = l.status === 'sent' || l.status === 'documents-received'
-    const setLegal = (patchFields: Partial<typeof l>) => patchSetup((s) => ({ ...s, legal: { ...s.legal, ...patchFields } }))
-
-    function sendRequest() {
-      patchSetup((s) => ({
-        ...s,
-        legal: {
-          ...s.legal,
-          status: 'sent',
-          requestRef: s.legal.requestRef ?? makeRequestRef(Number(c.id.replace(/\D/g, '').slice(-4)) || 1),
-          requestedAt: new Date().toISOString(),
-        },
-      }))
-      message.success('Legal review request recorded.')
-    }
-
-    return (
-      <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-        <FormSection title="Request to Legal (prefilled)" wide>
-          <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
-            <Descriptions.Item label="Company">{c.company.name}</Descriptions.Item>
-            <Descriptions.Item label="Accepted proposal">{accepted ? `v${accepted.version}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="SOB reference">{sobVersion ? `v${sobVersion}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="Request reference">{l.requestRef || '(assigned on send)'}</Descriptions.Item>
-          </Descriptions>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginTop: 12 }}>
-            <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Effective date</div>
-              <DatePicker
-                style={{ width: '100%' }}
-                value={l.effectiveDate ? dayjs(l.effectiveDate) : null}
-                onChange={(d) => setLegal({ effectiveDate: d ? d.format('YYYY-MM-DD') : undefined })}
-                disabled={sent}
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Expiry date</div>
-              <DatePicker
-                style={{ width: '100%' }}
-                value={l.expiryDate ? dayjs(l.expiryDate) : null}
-                onChange={(d) => setLegal({ expiryDate: d ? d.format('YYYY-MM-DD') : undefined })}
-                disabled={sent}
-              />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Remarks for Legal</div>
-              <Input.TextArea rows={2} value={l.remarks} onChange={(e) => setLegal({ remarks: e.target.value })} disabled={sent} />
-            </div>
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 13, marginBottom: 4 }}>Supporting attachments</div>
-            <Space wrap>
-              {(l.attachments ?? []).map((a) => (
-                <Tag key={a.slot} color="blue">
-                  {a.fileName}
-                </Tag>
-              ))}
-              {!sent && (
-                <Upload
-                  showUploadList={false}
-                  beforeUpload={(file) => {
-                    setLegal({ attachments: [...(l.attachments ?? []), { slot: `att-${Date.now()}`, fileName: file.name }] })
-                    return false
-                  }}
-                >
-                  <Button size="small" icon={<CloudUploadOutlined />}>
-                    Attach file
-                  </Button>
-                </Upload>
-              )}
-            </Space>
-          </div>
-        </FormSection>
-
-        {sent && (
-          <Alert
-            type="info"
-            showIcon
-            title={`Request sent ${l.requestedAt ? dayjs(l.requestedAt).format('YYYY-MM-DD HH:mm') : ''}`}
-            description="Awaiting Legal. Legal reviews and prepares the contract, then returns the contract and DSA to Sales by email. Upload them in the next task once received."
-          />
-        )}
-
-        <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Typography.Text type="secondary">
-            {sent ? 'Request recorded — continue to upload the returned documents.' : 'Review the request, then send it to Legal.'}
-          </Typography.Text>
-          <div className="app-form-floatbar__actions">
-            {!sent ? (
-              <Button type="primary" icon={<SendOutlined />} onClick={sendRequest}>
-                Send request to Legal
-              </Button>
-            ) : (
-              <Button type="primary" onClick={() => completeTask('legal-request')}>
-                Continue to document upload
-              </Button>
-            )}
           </div>
         </div>
       </Space>
