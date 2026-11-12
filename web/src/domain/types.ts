@@ -728,9 +728,11 @@ export interface Case {
   quotation: QuotationPackage
   offer: OfferState
   account: AccountState
-  coverage: { status: CoverageStatus; effectiveDate?: string }
+  coverage: { status: CoverageStatus; effectiveDate?: string; activatedAt?: string }
   memberData: MemberDataSummary
   handovers: Handover[]
+  /** Health benefit orientation — tracked separately from activation. */
+  orientation?: { status: 'not-scheduled' | 'scheduled' | 'completed'; date?: string }
   documents: CaseDocument[]
   /** Current position in the five-work-area spine. */
   currentWorkArea: WorkAreaId

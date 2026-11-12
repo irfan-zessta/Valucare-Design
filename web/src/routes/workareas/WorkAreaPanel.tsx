@@ -9,6 +9,7 @@ import { FranchiseReview } from './FranchiseReview'
 import { PrepareQuotation } from './PrepareQuotation'
 import { FinalizeOffer } from './FinalizeOffer'
 import { SetupAccount } from './SetupAccount'
+import { ActivateHandover } from './ActivateHandover'
 
 // Compact decision badge shown at the right corner of the Create Franchise card
 // header once the franchise has been approved or rejected.
@@ -76,30 +77,6 @@ function renderArea(c: Case, workArea: WorkAreaId) {
     case 'setup-account':
       return <SetupAccount c={c} />
     case 'activate-handover':
-      return (
-        <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-          <Descriptions column={1} size="small">
-            <Descriptions.Item label="Coverage">
-              {c.coverage.status}
-              {c.coverage.effectiveDate ? ` · ${formatDate(c.coverage.effectiveDate)}` : ''}
-            </Descriptions.Item>
-            <Descriptions.Item label="Member Data">
-              {c.memberData.importProcessed
-                ? `${formatCount(c.memberData.total)} total · ${formatCount(c.memberData.accepted)} accepted · ${formatCount(c.memberData.rejected)} rejected`
-                : 'Not yet imported'}
-            </Descriptions.Item>
-          </Descriptions>
-          <div>
-            <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)', marginBottom: 4 }}>Departmental handovers</div>
-            <Space wrap>
-              {c.handovers.map((h) => (
-                <Tag key={h.department} color={h.status === 'acknowledged' ? 'green' : h.status === 'failed' ? 'red' : 'default'}>
-                  {h.label}: {h.status}
-                </Tag>
-              ))}
-            </Space>
-          </div>
-        </Space>
-      )
+      return <ActivateHandover c={c} />
   }
 }
