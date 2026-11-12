@@ -521,7 +521,27 @@ export function SetupAccount({ c }: { c: Case }) {
           <Typography.Text type="secondary">{hasBoth ? 'Both documents uploaded.' : ''}</Typography.Text>
           <div className="app-form-floatbar__actions">
             <Tooltip title={hasBoth ? '' : 'Upload both documents first.'}>
-              <Button type="primary" disabled={!hasBoth} onClick={() => completeTask('upload-documents')}>
+              <Button
+                type="primary"
+                disabled={!hasBoth}
+                onClick={() => {
+                  const contractV = contract.versions[contract.versions.length - 1]
+                  const dsaV = dsa.versions[dsa.versions.length - 1]
+                  patchSetup((s) => ({
+                    ...s,
+                    clientSend: {
+                      ...s.clientSend,
+                      status: 'sent',
+                      sentAt: new Date().toISOString(),
+                      contractVersion: contractV?.version,
+                      dsaVersion: dsaV?.version,
+                      subject: s.clientSend.subject ?? `Contract and DSA for ${c.company.name}`,
+                    },
+                  }))
+                  message.success('Documents sent to the client (simulated).')
+                  completeTask('upload-documents')
+                }}
+              >
                 Send to client
               </Button>
             </Tooltip>
@@ -534,25 +554,7 @@ export function SetupAccount({ c }: { c: Case }) {
   // ===== Send to client + sign & notarize (one page) ========================
   function SendAndNotarize() {
     const send = setup!.clientSend
-    const contract = setup!.contracts.contract.versions[setup!.contracts.contract.versions.length - 1]
-    const dsa = setup!.contracts.dsa.versions[setup!.contracts.dsa.versions.length - 1]
     const sent = send.status === 'sent' || send.status === 'signed-received'
-    const setSend = (patchFields: Partial<typeof send>) => patchSetup((s) => ({ ...s, clientSend: { ...s.clientSend, ...patchFields } }))
-
-    function doSend() {
-      patchSetup((s) => ({
-        ...s,
-        clientSend: {
-          ...s.clientSend,
-          status: 'sent',
-          sentAt: new Date().toISOString(),
-          contractVersion: contract?.version,
-          dsaVersion: dsa?.version,
-          subject: s.clientSend.subject ?? `Contract and DSA for ${c.company.name}`,
-        },
-      }))
-      message.success('Documents recorded as sent to the client (simulated).')
-    }
 
     const n = setup!.notarization
     const order = ['awaiting-signed', 'signed-received', 'sent-for-notarization', 'notarized', 'returned-to-client'] as const
@@ -621,60 +623,6 @@ export function SetupAccount({ c }: { c: Case }) {
 
     return (
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-        {/* --- Send to client ------------------------------------------------ */}
-        <FormSection title="Send to client" wide>
-          <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
-            <Descriptions.Item label="Contract">{contract ? `${contract.fileName} · v${contract.version}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="DSA">{dsa ? `${dsa.fileName} · v${dsa.version}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="Recipient">{send.recipient || c.company.contact.name}</Descriptions.Item>
-            <Descriptions.Item label="Recipient email">{send.recipientEmail || c.company.contact.email}</Descriptions.Item>
-          </Descriptions>
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginTop: 12 }}
-            title="Email integration is not connected — sending is simulated/recorded, not actually delivered."
-          />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 12 }}>
-            <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Subject</div>
-              <Input
-                value={send.subject ?? `Contract and DSA for ${c.company.name}`}
-                onChange={(e) => setSend({ subject: e.target.value })}
-                disabled={sent}
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Message</div>
-              <Input.TextArea
-                rows={3}
-                value={send.message ?? `Dear ${c.company.contact.name},\n\nPlease find the attached contract and DSA for your review and signature.`}
-                onChange={(e) => setSend({ message: e.target.value })}
-                disabled={sent}
-              />
-            </div>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Attachments: {[contract?.fileName, dsa?.fileName].filter(Boolean).join(', ') || '—'}
-            </Typography.Text>
-          </div>
-          <div style={{ marginTop: 12 }}>
-            {!sent ? (
-              <Tooltip title={contract && dsa ? '' : 'Both documents must be uploaded first.'}>
-                <Button type="primary" icon={<SendOutlined />} disabled={!contract || !dsa} onClick={doSend}>
-                  Send to client
-                </Button>
-              </Tooltip>
-            ) : (
-              <Alert
-                type="success"
-                showIcon
-                title={`Sent ${send.sentAt ? dayjs(send.sentAt).format('YYYY-MM-DD HH:mm') : ''} · Contract v${send.contractVersion}, DSA v${send.dsaVersion}`}
-                description="Awaiting signed documents — record them below as the client returns them."
-              />
-            )}
-          </div>
-        </FormSection>
-
         {/* --- Signed & notarized documents (after sending) ------------------ */}
         <FormSection title="Document versions (stages kept distinct)" wide>
           {versionList('contract', 'Contract')}
