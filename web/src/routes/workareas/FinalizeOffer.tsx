@@ -28,10 +28,13 @@ import {
   Tag,
   Tooltip,
   Typography,
+  Upload,
 } from 'antd'
 import {
   CheckCircleOutlined,
+  CloudUploadOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   EyeOutlined,
   FileTextOutlined,
@@ -205,6 +208,31 @@ export function FinalizeOffer({ c }: { c: Case }) {
   }
 
   // ---- Full document builder ------------------------------------------------
+  function downloadSobTemplate() {
+    const headers = [
+      'Section',
+      'Group',
+      'Item (blank = auto-number)',
+      'Benefit description',
+      'Coverage (Covered/Not covered/Not specified)',
+      'Limits and conditions',
+      'Applicable plan/member',
+    ]
+    const sample = [
+      ['Outpatient Care', '', '', 'Consultations', 'Covered', 'Up to MBL, per illness/year', 'All plans'],
+      ['Dental Benefits', '', '', 'Oral prophylaxis', 'Covered', '2 sessions/year', 'All plans'],
+    ]
+    const csv = [headers, ...sample]
+      .map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sob-template-${c.id}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
   function advanceSob() {
     if (!sob) return
     const next: SobDraft['status'] = sob.status === 'draft' ? 'validated' : 'approved'
@@ -813,7 +841,29 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
         {/* ---- Activity 4 · Proposal preparation ---------------------------- */}
         <Card>
-          {activityHead(4, 'SOB creation')}
+          {activityHead(
+            4,
+            'SOB creation',
+            <Space>
+              <Button size="small" icon={<DownloadOutlined />} onClick={downloadSobTemplate}>
+                Download template
+              </Button>
+              <Upload
+                showUploadList={false}
+                accept=".xlsx,.csv,.pdf"
+                beforeUpload={(file) => {
+                  message.info(
+                    `Attached “${file.name}” as a reference. Structured parsing arrives next — build the SOB below for now.`,
+                  )
+                  return false
+                }}
+              >
+                <Button size="small" icon={<CloudUploadOutlined />}>
+                  Upload SOB template
+                </Button>
+              </Upload>
+            </Space>,
+          )}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
             Build the Summary of Benefits — company details, benefits, pricing and terms — into the client-facing proposal.
             The full proposal template (eligibility, plan options, network, terms, exclusions and sign-offs) is prepared in
