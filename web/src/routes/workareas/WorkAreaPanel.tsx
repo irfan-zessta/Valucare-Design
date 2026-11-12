@@ -1,4 +1,4 @@
-import { Card, Descriptions, Space, Tag, Typography } from 'antd'
+import { Card, Descriptions, Space, Tag } from 'antd'
 import type { Case, WorkAreaId } from '../../domain/types'
 import { WORK_AREA_LABELS } from '../../domain/types'
 import { formatDate, formatCount } from '../../lib/format'
@@ -12,17 +12,10 @@ import { FinalizeOffer } from './FinalizeOffer'
 // so the data stays consistent as the flows are added.
 
 export function WorkAreaPanel({ c, workArea }: { c: Case; workArea: WorkAreaId }) {
-  // Finalize Offer renders each step as its own card, so the shared panel
-  // background is dropped here to avoid a card-in-card look — just a heading.
+  // Finalize Offer renders each step as its own card (and its own header card),
+  // so the shared panel background is dropped here to avoid a card-in-card look.
   if (workArea === 'finalize-offer') {
-    return (
-      <div>
-        <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 16 }}>
-          {WORK_AREA_LABELS[workArea]}
-        </Typography.Title>
-        {renderArea(c, workArea)}
-      </div>
-    )
+    return renderArea(c, workArea)
   }
   return (
     <Card title={WORK_AREA_LABELS[workArea]}>{renderArea(c, workArea)}</Card>

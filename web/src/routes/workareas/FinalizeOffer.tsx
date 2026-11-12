@@ -622,6 +622,11 @@ export function FinalizeOffer({ c }: { c: Case }) {
   if (!proposal) {
     return (
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+        <Card>
+          <Typography.Title level={5} style={{ margin: 0 }}>
+            Finalize Offer
+          </Typography.Title>
+        </Card>
         {sobSection}
         <section>
           <Typography.Title level={5} style={{ marginTop: 0 }}>
@@ -678,7 +683,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
     <div>
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
         {/* ---- Header + workflow stepper ------------------------------------ */}
-        <section>
+        <Card>
+          <Typography.Title level={5} style={{ marginTop: 0 }}>
+            Finalize Offer
+          </Typography.Title>
           <Typography.Title level={5} style={{ marginTop: 0 }}>
             Proposal {proposal.code ?? proposalCode(c)} · version {proposal.version} {statusTag}
           </Typography.Title>
@@ -704,7 +712,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
               description={`${proposal.declineReason} Revise the offer (new version) or close the lead.`}
             />
           )}
-        </section>
+        </Card>
 
         {/* ---- Activity 1 · Rate sheet checking ----------------------------- */}
         <Card>
