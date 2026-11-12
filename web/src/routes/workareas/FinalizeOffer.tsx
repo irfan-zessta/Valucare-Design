@@ -1280,6 +1280,9 @@ export function FinalizeOffer({ c }: { c: Case }) {
           <Button icon={<FileTextOutlined />} onClick={generateProposalPdf}>
             Generate proposal PDF
           </Button>
+          {proposal.status !== 'draft' && proposal.status !== 'accepted' && (
+            <Button onClick={() => setRevising(true)}>Revise (new version)</Button>
+          )}
           {proposal.status === 'draft' && (
             <>
               <Button icon={<EditOutlined />} onClick={() => saveDraft(false)}>
@@ -1324,9 +1327,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
             <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => navigate(`/cases/${c.id}/setup-account`)}>
               Begin account setup
             </Button>
-          )}
-          {proposal.status !== 'draft' && proposal.status !== 'accepted' && (
-            <Button onClick={() => setRevising(true)}>Revise (new version)</Button>
           )}
         </div>
       </div>
