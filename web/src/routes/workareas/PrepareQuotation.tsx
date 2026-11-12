@@ -764,17 +764,14 @@ export function PrepareQuotation({ c }: { c: Case }) {
 
       {/* ---- Floating action bar (consistent with the other flows) ---------- */}
       <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-        <Typography.Text type="secondary">
-          {submitted && 'Submitted — waiting for Actuarial to issue a rate sheet.'}
-          {awaitingClarification && 'Actuarial raised a clarification — answer it on the Clarifications & rate sheets tab.'}
-          {responded && 'Rate sheet received — select one to finalize the offer.'}
-        </Typography.Text>
-        <div className="app-form-floatbar__actions">
+        <div>
           {tab === 'requirements' && (
             <Button size="small" onClick={attachSampleToMissing}>
               Attach sample documents
             </Button>
           )}
+        </div>
+        <div className="app-form-floatbar__actions">
           {tab === 'members' && (
             <>
               <Button size="small" onClick={validateMemberData}>
