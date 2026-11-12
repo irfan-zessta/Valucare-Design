@@ -8,6 +8,19 @@ export function formatDate(iso?: string): string {
   return d.toLocaleDateString('en-PH', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+export function formatDateTime(iso?: string): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('en-PH', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 export function formatRelative(iso?: string): string {
   if (!iso) return '—'
   const d = new Date(iso)

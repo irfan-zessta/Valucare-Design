@@ -1,143 +1,163 @@
 // ===========================================================================
-// Activate & Handover — ported from the wireframe branch's activation flow
-// (app/js/views/setup.js · activation). Four panels:
-//   1. Activation — status stepper (Pending → Ready → Scheduled → Active →
-//      Handover Complete), effective-date note, and the Activate / Schedule
-//      action (gated on readiness).
-//   2. Readiness — the gate checklist that must all be satisfied to activate.
-//   3. Operational handover — per-team acknowledgement (shown once active).
-//   4. Health benefit orientation — scheduled/completed, tracked separately.
-//   + a simulated notifications & integrations note.
-// Activation does not touch anything until every readiness gate is met.
+// Activate & Handover — ported & adapted from the wireframe activation flow.
+// Order:
+//   1. Handover to MDA — attach the document pack (internal announcement,
+//      Member Data masterlist, account & plan codes, SOB) and send to MDA.
+//   2. Activation — schedule the account (calendar + time) once handed over.
+//   3. Health benefit orientation — tracked separately.
 // ===========================================================================
 import { useState } from 'react'
-import { App, Alert, Button, DatePicker, Input, Modal, Space, Steps, Tag, Typography } from 'antd'
-import { CheckCircleFilled, CloseCircleFilled, ExclamationCircleFilled, RocketOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
-import type { Case, Handover } from '../../domain/types'
+import { App, Alert, Button, DatePicker, Modal, Space, Steps, Tag, Tooltip, Typography, Upload } from 'antd'
+import { CheckCircleFilled, CloudUploadOutlined, RocketOutlined, SendOutlined } from '@ant-design/icons'
+import dayjs, { type Dayjs } from 'dayjs'
+import type { Case } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
 import { FormSection } from '../../components/ui/FormSection'
-import { formatDate, formatCount } from '../../lib/format'
+import { formatDate, formatDateTime } from '../../lib/format'
 
-type ActStatus = 'Pending' | 'Ready' | 'Scheduled' | 'Active' | 'Handover Complete'
-const STEPS: ActStatus[] = ['Pending', 'Ready', 'Scheduled', 'Active', 'Handover Complete']
+type ActStatus = 'Pending' | 'Scheduled' | 'Active'
+const STEPS: ActStatus[] = ['Pending', 'Scheduled', 'Active']
 
-interface Gate {
-  label: string
-  ok: boolean
-  hint: string
-  /** Blocking gates must be met to activate; non-blocking ones are advisory. */
-  blocking?: boolean
-}
-
-function daysUntil(iso?: string): number {
-  if (!iso) return 0
-  return dayjs(iso).startOf('day').diff(dayjs().startOf('day'), 'day')
-}
+// The document pack handed to MDA before the account is activated.
+const MDA_SLOTS: { key: string; label: string; hint: string }[] = [
+  { key: 'announcement', label: 'Internal announcement / email blast', hint: 'Go-live announcement to circulate internally.' },
+  { key: 'masterlist', label: 'Member Data (masterlist)', hint: 'The enrollment masterlist.' },
+  { key: 'codes', label: 'Account code & plan codes', hint: 'Approved account reference and plan codes.' },
+  { key: 'sob', label: 'SOB', hint: 'The onboarding Summary of Benefits.' },
+]
 
 export function ActivateHandover({ c }: { c: Case }) {
   const { patchCase } = useCases()
   const { message } = App.useApp()
   const patch = (recipe: (prev: Case) => Case) => patchCase(c.id, recipe)
 
-  const [returning, setReturning] = useState<Handover | null>(null)
-  const [returnNote, setReturnNote] = useState('')
+  const [scheduling, setScheduling] = useState(false)
+  const [when, setWhen] = useState<Dayjs | null>(null)
 
   const setup = c.account.setup
-  const eff = c.coverage.effectiveDate ?? setup?.legal.effectiveDate
-  const future = daysUntil(eff) > 0
+  const mda = c.mdaHandover ?? { status: 'pending' as const, documents: [] }
+  const mdaDocs = mda.documents ?? []
+  const docFor = (slot: string) => mdaDocs.find((d) => d.slot === slot)
+  const allAttached = MDA_SLOTS.every((s) => docFor(s.key))
+  const sentToMda = mda.status === 'sent'
 
-  // ---- Readiness gates (derived from the case) ------------------------------
-  const sob = setup?.onboardingSob ?? c.offer.sob
-  const gates: Gate[] = [
-    { label: 'Account created & approved', ok: c.account.status === 'approved', hint: 'Approve the account record in Set Up Account.' },
-    { label: 'Onboarding SOB approved', ok: sob?.status === 'approved' || sob?.status === 'codified' || sob?.status === 'signed', hint: 'Prepare and approve the onboarding SOB.' },
-    {
-      label: 'COC released',
-      ok: setup?.coc.status === 'released' || setup?.coc.status === 'approved',
-      hint: 'Generate, approve and release the Certificate of Coverage.',
-    },
-    {
-      label: 'Plan codes approved',
-      ok:
-        c.account.planCodeSetStatus === 'approved' ||
-        (c.account.planCodes.length > 0 && c.account.planCodes.every((p) => p.status === 'approved')),
-      hint: 'Approve every plan code.',
-    },
-    { label: 'Effective date set', ok: Boolean(eff), hint: 'Set the coverage effective date.' },
-    {
-      label: 'Member data accepted',
-      ok: c.memberData.importProcessed,
-      hint: 'Enrollment member data (handled by MDA) — advisory, does not block activation.',
-      blocking: false,
-    },
-  ]
-  // Only the blocking gates must be met to activate.
-  const ready = gates.filter((g) => g.blocking !== false).every((g) => g.ok)
-
-  // ---- Current activation status --------------------------------------------
-  const allAcked = c.handovers.length > 0 && c.handovers.every((h) => h.status === 'acknowledged')
   const status: ActStatus =
-    c.coverage.status === 'active'
-      ? allAcked && c.isCompleted
-        ? 'Handover Complete'
-        : 'Active'
-      : c.coverage.status === 'scheduled'
-        ? 'Scheduled'
-        : ready
-          ? 'Ready'
-          : 'Pending'
+    c.coverage.status === 'active' ? 'Active' : c.coverage.status === 'scheduled' ? 'Scheduled' : 'Pending'
+  const statusColor: Record<ActStatus, string> = { Pending: 'default', Scheduled: 'gold', Active: 'green' }
+  const isActivated = c.coverage.status === 'active' || c.coverage.status === 'scheduled'
 
-  const statusColor: Record<ActStatus, string> = {
-    Pending: 'default',
-    Ready: 'blue',
-    Scheduled: 'gold',
-    Active: 'green',
-    'Handover Complete': 'green',
+  // ---- MDA handover ---------------------------------------------------------
+  function attach(slot: string, fileName: string) {
+    patch((prev) => {
+      const h = prev.mdaHandover ?? { status: 'pending' as const, documents: [] }
+      const docs = (h.documents ?? []).filter((d) => d.slot !== slot)
+      return { ...prev, mdaHandover: { ...h, documents: [...docs, { slot, fileName }] } }
+    })
+  }
+  function sendToMda() {
+    patch((prev) => ({
+      ...prev,
+      mdaHandover: { ...(prev.mdaHandover ?? { documents: [] }), status: 'sent', sentAt: new Date().toISOString() },
+      handovers: prev.handovers.map((h) => (h.department === 'MDA' ? { ...h, status: 'acknowledged' } : h)),
+    }))
+    message.success('Document pack sent to MDA (simulated).')
   }
 
-  const isActive = c.coverage.status === 'active' || c.coverage.status === 'scheduled'
-
-  // ---- Actions --------------------------------------------------------------
-  function activate() {
-    if (!ready) {
-      message.error('Activation is blocked — resolve every readiness item first.')
-      return
-    }
-    const now = new Date().toISOString()
+  // ---- Activation -----------------------------------------------------------
+  function confirmSchedule() {
+    if (!when) return
+    const future = when.isAfter(dayjs())
     patch((prev) => ({
       ...prev,
       coverage: {
         ...prev.coverage,
         status: future ? 'scheduled' : 'active',
-        effectiveDate: eff,
-        activatedAt: future ? undefined : now,
+        effectiveDate: when.format('YYYY-MM-DD'),
+        scheduledFor: future ? when.toISOString() : undefined,
+        activatedAt: future ? undefined : when.toISOString(),
       },
     }))
-    message.success(future ? `Activation scheduled for ${formatDate(eff)}.` : 'Account activated — downstream teams notified (simulated).')
-  }
-
-  function setHandover(dep: Handover['department'], next: Partial<Handover>) {
-    patch((prev) => ({
-      ...prev,
-      handovers: prev.handovers.map((h) => (h.department === dep ? { ...h, ...next } : h)),
-    }))
-  }
-
-  function completeHandover() {
-    patch((prev) => ({ ...prev, isCompleted: true }))
-    message.success('Handover complete — New Business closed out.')
+    setScheduling(false)
+    message.success(future ? `Activation scheduled for ${formatDateTime(when.toISOString())}.` : 'Account activated.')
   }
 
   function setOrientation(next: NonNullable<Case['orientation']>) {
     patch((prev) => ({ ...prev, orientation: next }))
   }
-
   const orientation = c.orientation ?? { status: 'not-scheduled' as const }
 
   return (
     <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-      {/* 1 · Activation ------------------------------------------------------ */}
+      {/* 1 · Handover to MDA ------------------------------------------------- */}
+      <FormSection
+        title={
+          <Space>
+            Handover to MDA {sentToMda && <Tag color="green">Sent</Tag>}
+          </Space>
+        }
+        description="Attach the document pack, then send it to MDA before activating the account."
+        extra={
+          <Tooltip title={allAttached ? '' : 'Attach all four documents first.'}>
+            <Button type="primary" icon={<SendOutlined />} disabled={!allAttached || sentToMda} onClick={sendToMda}>
+              {sentToMda ? 'Sent to MDA' : 'Send to MDA'}
+            </Button>
+          </Tooltip>
+        }
+        wide
+      >
+        <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
+          {MDA_SLOTS.map((s) => {
+            const doc = docFor(s.key)
+            return (
+              <div key={s.key} className="app-decision-row">
+                <Space>
+                  {doc ? (
+                    <CheckCircleFilled style={{ color: '#52c41a' }} />
+                  ) : (
+                    <span style={{ color: 'rgba(0,0,0,0.3)' }}>●</span>
+                  )}
+                  <div>
+                    <strong>{s.label}</strong>
+                    <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{doc ? doc.fileName : s.hint}</div>
+                  </div>
+                </Space>
+                {!sentToMda && (
+                  <Space>
+                    <Upload
+                      showUploadList={false}
+                      beforeUpload={(file) => {
+                        attach(s.key, file.name)
+                        return false
+                      }}
+                    >
+                      <Button size="small" icon={<CloudUploadOutlined />}>
+                        {doc ? 'Replace' : 'Attach'}
+                      </Button>
+                    </Upload>
+                    <Button
+                      size="small"
+                      onClick={() => attach(s.key, `${s.key}-${c.company.shortName || c.id}.pdf`)}
+                    >
+                      Attach sample
+                    </Button>
+                  </Space>
+                )}
+              </div>
+            )
+          })}
+        </Space>
+        {sentToMda && (
+          <Alert
+            type="success"
+            showIcon
+            style={{ marginTop: 12 }}
+            title={`Sent to MDA${mda.sentAt ? ` on ${formatDateTime(mda.sentAt)}` : ''}.`}
+            description="MDA has the document pack. You can now schedule activation."
+          />
+        )}
+      </FormSection>
+
+      {/* 2 · Activation ------------------------------------------------------ */}
       <FormSection
         title={
           <Space>
@@ -145,138 +165,48 @@ export function ActivateHandover({ c }: { c: Case }) {
           </Space>
         }
         description={
-          eff
-            ? `Effective date ${formatDate(eff)}${future ? ` · in ${daysUntil(eff)} day(s) — activation will be Scheduled, not Active` : ' · today or past'}`
-            : 'No effective date set yet.'
+          c.coverage.status === 'scheduled'
+            ? `Scheduled for ${formatDateTime(c.coverage.scheduledFor)}.`
+            : c.coverage.status === 'active'
+              ? `Active${c.coverage.activatedAt ? ` since ${formatDateTime(c.coverage.activatedAt)}` : ''}.`
+              : 'Pick a date and time to activate the account.'
         }
         extra={
-          !isActive &&
+          !isActivated &&
           c.account.status === 'approved' && (
-            <Button type="primary" icon={<RocketOutlined />} disabled={!ready} onClick={activate}>
-              {future ? 'Schedule activation' : 'Activate account'}
-            </Button>
+            <Tooltip title={sentToMda ? '' : 'Hand over to MDA first.'}>
+              <Button
+                type="primary"
+                icon={<RocketOutlined />}
+                disabled={!sentToMda}
+                onClick={() => {
+                  setWhen(setup?.legal.effectiveDate ? dayjs(setup.legal.effectiveDate).hour(9).minute(0) : dayjs().add(1, 'day').hour(9).minute(0))
+                  setScheduling(true)
+                }}
+              >
+                Schedule activation
+              </Button>
+            </Tooltip>
           )
         }
         wide
       >
-        <Steps
-          size="small"
-          current={STEPS.indexOf(status)}
-          items={STEPS.map((s) => ({ title: s }))}
-        />
+        <Steps size="small" current={STEPS.indexOf(status)} items={STEPS.map((s) => ({ title: s }))} />
         {c.coverage.status === 'scheduled' && (
           <Alert
             type="info"
             showIcon
             style={{ marginTop: 12 }}
-            title={`Scheduled to become Active on ${formatDate(eff)}.`}
-            description="The scheduler activates it on that date; it is not reported as active before then."
+            title={`Scheduled to become Active on ${formatDateTime(c.coverage.scheduledFor)}.`}
+            description="The scheduler activates it at that time; it is not reported as active before then."
           />
         )}
         {c.coverage.status === 'active' && (
-          <Alert
-            type="success"
-            showIcon
-            style={{ marginTop: 12 }}
-            title={`${c.company.name} is active${c.coverage.activatedAt ? ` since ${formatDate(c.coverage.activatedAt)}` : ''}.`}
-            description="Next: downstream teams acknowledge the handover to close out New Business."
-          />
+          <Alert type="success" showIcon style={{ marginTop: 12 }} title={`${c.company.name} is active.`} />
         )}
       </FormSection>
 
-      {/* 2 · Readiness ------------------------------------------------------- */}
-      <FormSection title="Readiness" description="Validated again when you activate." wide>
-        <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
-          {gates.map((g) => (
-            <div key={g.label} className="app-decision-row">
-              <Space>
-                {g.ok ? (
-                  <CheckCircleFilled style={{ color: '#52c41a' }} />
-                ) : g.blocking === false ? (
-                  <ExclamationCircleFilled style={{ color: '#faad14' }} />
-                ) : (
-                  <CloseCircleFilled style={{ color: '#cf1322' }} />
-                )}
-                <span>
-                  {g.label}
-                  {g.blocking === false && <Typography.Text type="secondary"> · advisory</Typography.Text>}
-                </span>
-              </Space>
-              {!g.ok && (
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  {g.hint}
-                </Typography.Text>
-              )}
-            </div>
-          ))}
-        </Space>
-      </FormSection>
-
-      {/* 3 · Operational handover (once active) ------------------------------ */}
-      {c.coverage.status === 'active' && (
-        <FormSection
-          title="Operational handover"
-          description="Each downstream team acknowledges it has what it needs."
-          extra={
-            allAcked &&
-            !c.isCompleted && (
-              <Button type="primary" onClick={completeHandover}>
-                Complete handover
-              </Button>
-            )
-          }
-          wide
-        >
-          <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
-            {c.handovers.map((h) => (
-              <div key={h.department} className="app-decision-row">
-                <Space>
-                  {h.status === 'acknowledged' ? (
-                    <CheckCircleFilled style={{ color: '#52c41a' }} />
-                  ) : h.status === 'failed' ? (
-                    <CloseCircleFilled style={{ color: '#cf1322' }} />
-                  ) : (
-                    <span style={{ color: 'rgba(0,0,0,0.3)' }}>●</span>
-                  )}
-                  <div>
-                    <strong>{h.label}</strong>
-                    <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>
-                      {h.status === 'acknowledged'
-                        ? 'Acknowledged'
-                        : h.status === 'failed'
-                          ? `Returned — ${h.note ?? 'issue raised'}`
-                          : 'Waiting for acknowledgement'}
-                      {' · '}Owner: {h.department}
-                    </div>
-                  </div>
-                </Space>
-                {h.status !== 'acknowledged' && !c.isCompleted && (
-                  <Space>
-                    <Button
-                      size="small"
-                      danger
-                      onClick={() => {
-                        setReturning(h)
-                        setReturnNote('')
-                      }}
-                    >
-                      Return
-                    </Button>
-                    <Button size="small" type="primary" onClick={() => setHandover(h.department, { status: 'acknowledged', note: undefined })}>
-                      Acknowledge
-                    </Button>
-                  </Space>
-                )}
-              </div>
-            ))}
-          </Space>
-          {c.isCompleted && (
-            <Alert type="success" showIcon style={{ marginTop: 12 }} title="Handover complete — every team acknowledged. New Business is closed out." />
-          )}
-        </FormSection>
-      )}
-
-      {/* 4 · Health benefit orientation ------------------------------------- */}
+      {/* 3 · Health benefit orientation ------------------------------------- */}
       <FormSection
         title={
           <Space>
@@ -286,61 +216,52 @@ export function ActivateHandover({ c }: { c: Case }) {
             </Tag>
           </Space>
         }
-        description="Tracked separately from billing completion and activation."
+        description="Tracked separately from activation."
         wide
       >
         <Space wrap align="center">
           <DatePicker
+            showTime
             value={orientation.date ? dayjs(orientation.date) : null}
             onChange={(d) =>
-              setOrientation({ status: d ? 'scheduled' : 'not-scheduled', date: d ? d.format('YYYY-MM-DD') : undefined })
+              setOrientation({ status: d ? 'scheduled' : 'not-scheduled', date: d ? d.toISOString() : undefined })
             }
-            placeholder="Schedule orientation date"
+            placeholder="Schedule orientation date & time"
           />
           {orientation.status === 'scheduled' && (
             <Button onClick={() => setOrientation({ ...orientation, status: 'completed' })}>Mark completed</Button>
           )}
-          {orientation.date && (
-            <Typography.Text type="secondary">Date {formatDate(orientation.date)}</Typography.Text>
-          )}
+          {orientation.date && <Typography.Text type="secondary">{formatDateTime(orientation.date)}</Typography.Text>}
         </Space>
       </FormSection>
 
-      {/* 5 · Notifications & integrations ----------------------------------- */}
-      <FormSection title="Notifications & integrations" wide>
-        <Alert
-          type="info"
-          showIcon
-          title="Simulated — nothing is delivered to external systems."
-          description="Announcements, MDA policy issuance, e-ID publishing, CCD live SOB access and renewal pipeline hand-off are recorded as simulated."
-        />
-        <div style={{ marginTop: 12, fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>
-          Member data: {c.memberData.importProcessed
-            ? `${formatCount(c.memberData.total)} total · ${formatCount(c.memberData.accepted)} accepted · ${formatCount(c.memberData.rejected)} rejected`
-            : 'not yet imported'}
-        </div>
-      </FormSection>
-
-      {/* Return-handover modal --------------------------------------------- */}
+      {/* Schedule-activation modal (calendar + time) ------------------------ */}
       <Modal
-        open={Boolean(returning)}
-        title={`Return handover — ${returning?.label ?? ''}`}
-        okText="Return with issue"
-        okButtonProps={{ danger: true, disabled: !returnNote.trim() }}
-        onCancel={() => setReturning(null)}
-        onOk={() => {
-          if (returning) setHandover(returning.department, { status: 'failed', note: returnNote.trim() })
-          setReturning(null)
-          setReturnNote('')
-          message.warning('Handover returned with an issue.')
-        }}
+        open={scheduling}
+        title="Schedule activation"
+        okText={when && !when.isAfter(dayjs()) ? 'Activate now' : 'Schedule'}
+        okButtonProps={{ disabled: !when }}
+        onCancel={() => setScheduling(false)}
+        onOk={confirmSchedule}
       >
-        <Input.TextArea
-          rows={3}
-          placeholder="Describe the issue so the owner can fix it."
-          value={returnNote}
-          onChange={(e) => setReturnNote(e.target.value)}
+        <Typography.Paragraph type="secondary">
+          Pick the date and time the account should become active. A future time schedules it; a past/now time
+          activates immediately.
+        </Typography.Paragraph>
+        <DatePicker
+          showTime
+          style={{ width: '100%' }}
+          value={when}
+          onChange={setWhen}
+          placeholder="Activation date & time"
         />
+        {when && (
+          <Typography.Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+            {when.isAfter(dayjs())
+              ? `Will be scheduled for ${formatDateTime(when.toISOString())}.`
+              : 'Will activate immediately.'}
+          </Typography.Text>
+        )}
       </Modal>
     </Space>
   )

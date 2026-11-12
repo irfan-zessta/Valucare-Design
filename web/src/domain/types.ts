@@ -728,9 +728,15 @@ export interface Case {
   quotation: QuotationPackage
   offer: OfferState
   account: AccountState
-  coverage: { status: CoverageStatus; effectiveDate?: string; activatedAt?: string }
+  coverage: { status: CoverageStatus; effectiveDate?: string; activatedAt?: string; scheduledFor?: string }
   memberData: MemberDataSummary
   handovers: Handover[]
+  /** Document handover pack sent to MDA before activation. */
+  mdaHandover?: {
+    documents?: { slot: string; fileName: string }[]
+    status: 'pending' | 'sent'
+    sentAt?: string
+  }
   /** Health benefit orientation — tracked separately from activation. */
   orientation?: { status: 'not-scheduled' | 'scheduled' | 'completed'; date?: string }
   documents: CaseDocument[]
