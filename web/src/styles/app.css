@@ -601,6 +601,38 @@ button.app-stepper__item {
   margin-inline-start: auto;
 }
 
+/* Activation success overlay — animated check with an expanding ring. */
+.activate-success {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  margin: 8px auto 12px;
+}
+.activate-success__check {
+  font-size: 72px;
+  color: #52c41a;
+  animation: activate-pop 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.activate-success__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid #52c41a;
+  animation: activate-ring 900ms ease-out 120ms 1 both;
+}
+@keyframes activate-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes activate-ring {
+  0% { transform: scale(0.5); opacity: 0.55; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
 /* Set Up Account — grouped tabs + single active content panel. */
 .app-setup {
   /* Keep content clear of the fixed floating action bar. */

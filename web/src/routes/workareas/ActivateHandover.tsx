@@ -6,7 +6,9 @@
 //   2. Activation — schedule the account (calendar + time) once handed over.
 //   3. Health benefit orientation — tracked separately.
 // ===========================================================================
-import { App, Alert, Button, DatePicker, Space, Tag, Tooltip, Typography, Upload } from 'antd'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { App, Alert, Button, DatePicker, Modal, Space, Tag, Tooltip, Typography, Upload } from 'antd'
 import { CheckCircleFilled, CloudUploadOutlined, SendOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import type { Case } from '../../domain/types'
@@ -27,7 +29,10 @@ const MDA_SLOTS: { key: string; label: string; hint: string }[] = [
 export function ActivateHandover({ c }: { c: Case }) {
   const { patchCase } = useCases()
   const { message } = App.useApp()
+  const navigate = useNavigate()
   const patch = (recipe: (prev: Case) => Case) => patchCase(c.id, recipe)
+
+  const [showSuccess, setShowSuccess] = useState(false)
 
   const mda = c.mdaHandover ?? { status: 'pending' as const, documents: [] }
   const mdaDocs = mda.documents ?? []
@@ -77,7 +82,11 @@ export function ActivateHandover({ c }: { c: Case }) {
         activatedAt: future ? undefined : d.toISOString(),
       },
     }))
-    message.success(future ? `Activation scheduled for ${formatDateTime(d.toISOString())}.` : 'Account activated.')
+    if (future) {
+      message.success(`Activation scheduled for ${formatDateTime(d.toISOString())}.`)
+    } else {
+      setShowSuccess(true)
+    }
   }
 
   function setOrientation(next: NonNullable<Case['orientation']>) {
@@ -232,6 +241,33 @@ export function ActivateHandover({ c }: { c: Case }) {
           {orientation.date && <Typography.Text type="secondary">{formatDateTime(orientation.date)}</Typography.Text>}
         </Space>
       </FormSection>
+
+      {/* Success overlay on immediate activation ---------------------------- */}
+      <Modal open={showSuccess} footer={null} centered width={440} onCancel={() => setShowSuccess(false)}>
+        <div style={{ textAlign: 'center', padding: '12px 8px 4px' }}>
+          <div className="activate-success">
+            <span className="activate-success__ring" />
+            <CheckCircleFilled className="activate-success__check" />
+          </div>
+          <Typography.Title level={4} style={{ marginBottom: 4 }}>
+            Account activated 🎉
+          </Typography.Title>
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 4 }}>
+            {c.company.name} is now active — New Business is complete.
+          </Typography.Paragraph>
+          {c.account.accountRef && (
+            <Typography.Text style={{ display: 'block', marginBottom: 16 }}>
+              Account number <strong>{c.account.accountRef}</strong>
+            </Typography.Text>
+          )}
+          <Space>
+            <Button onClick={() => setShowSuccess(false)}>Stay here</Button>
+            <Button type="primary" onClick={() => navigate('/')}>
+              Go to dashboard
+            </Button>
+          </Space>
+        </div>
+      </Modal>
     </Space>
   )
 }
