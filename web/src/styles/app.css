@@ -291,10 +291,10 @@ body {
   margin-block-end: 0;
 }
 .app-pageheader-card--name {
-  flex: 1 1 320px;
+  flex: 1 1 calc(60% - 8px);
 }
 .app-pageheader-card--stepper {
-  flex: 2 1 460px;
+  flex: 1 1 calc(40% - 8px);
   display: flex;
   align-items: center;
   padding-block: 12px;
@@ -381,6 +381,9 @@ body {
 }
 .app-stepper--minimal .app-stepper__label {
   font-size: 12px;
+  white-space: normal;
+  overflow: visible;
+  line-height: 1.25;
 }
 @media (max-width: 767px) {
   .app-stepper__desc {
