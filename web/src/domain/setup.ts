@@ -50,7 +50,7 @@ export const SETUP_TASKS: SetupTaskMeta[] = [
   },
   {
     id: 'coc',
-    label: 'Certificate of Coverage',
+    label: 'COC & Commission',
     blurb: 'Generate the COC from the account, codified SOB and approved plan codes.',
     whatNext: 'Create the account number.',
   },
