@@ -24,7 +24,6 @@ import {
 } from 'antd'
 import { CheckCircleOutlined, CloseCircleOutlined, EditOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import dayjs from 'dayjs'
 import type { Case } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
 import { CreateFranchise, FRANCHISE_DOCS, initialForm } from './CreateFranchise'
@@ -258,42 +257,21 @@ export function FranchiseReview({ c }: { c: Case }) {
         </section>
       )}
 
-      <Divider style={{ margin: '4px 0' }} />
-
-      {/* ---- Decision -------------------------------------------------------- */}
-      {accepted && (
-        <Alert
-          type="success"
-          showIcon
-          icon={<CheckCircleOutlined />}
-          title="Franchise approved"
-          description={
-            <>
-              {c.franchise.acceptedAt
-                ? `Approved on ${dayjs(c.franchise.acceptedAt).format('YYYY-MM-DD HH:mm')}.`
-                : 'This franchise has been approved.'}
-              {c.franchise.acceptedRemarks ? ` Remarks: ${c.franchise.acceptedRemarks}` : ''}
-            </>
-          }
-        />
+      {/* The approved/rejected decision summary now shows compactly in the
+          Create Franchise card header (right corner). Remarks/reason, when
+          present, stay inline here for the full record. */}
+      {accepted && c.franchise.acceptedRemarks && (
+        <Typography.Text type="secondary">Remarks: {c.franchise.acceptedRemarks}</Typography.Text>
       )}
-
       {rejected && (
-        <Alert
-          type="error"
-          showIcon
-          icon={<CloseCircleOutlined />}
-          title="Franchise rejected"
-          description={
-            <>
-              {c.franchise.rejectedAt && `Rejected on ${dayjs(c.franchise.rejectedAt).format('YYYY-MM-DD HH:mm')}. `}
-              {c.franchise.rejectedReason ? `Reason: ${c.franchise.rejectedReason}` : 'No reason recorded.'}
-            </>
-          }
-        />
+        <Typography.Text type="secondary">
+          Reason: {c.franchise.rejectedReason || 'No reason recorded.'}
+        </Typography.Text>
       )}
 
       {!accepted && !rejected && (
+        <>
+          <Divider style={{ margin: '4px 0' }} />
         <section>
           <Typography.Title level={5} style={{ marginTop: 0 }}>
             Quick checklist
@@ -315,6 +293,7 @@ export function FranchiseReview({ c }: { c: Case }) {
             ))}
           </Space>
         </section>
+        </>
       )}
       </Space>
 
