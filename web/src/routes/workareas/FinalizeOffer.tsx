@@ -828,7 +828,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
         <Tabs
           defaultActiveKey={defaultTab}
-          size="large"
+          size="small"
           items={[
             {
               key: 'prep',
