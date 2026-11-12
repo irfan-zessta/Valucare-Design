@@ -149,6 +149,32 @@ export function FinalizeOffer({ c }: { c: Case }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sob, c.id])
 
+  // Open the Proposal work area straight into the full tabbed view: if no
+  // proposal exists yet, create a draft one so the four activities show up.
+  useEffect(() => {
+    if (!proposal) {
+      patchCase(c.id, (prev) => {
+        if (prev.offer.proposals.length > 0) return prev
+        const newProp: ProposalVersion = {
+          id: uid('prop'),
+          version: 1,
+          sobVersion,
+          rateSheetId: selectedSheet?.id ?? '',
+          rateSheetVersion: selectedSheet?.version,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+          validUntil: dayjs().add(30, 'day').toISOString(),
+          code: proposalCode(c),
+          rateSchedule: sampleRateSchedule(),
+          commissionPct: inter ? 10 : undefined,
+          templateAdditions: ['Annual physical exam (template standard — not in requested TOR)'],
+        }
+        return { ...prev, offer: { ...prev.offer, proposals: [...prev.offer.proposals, newProp] } }
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal, c.id])
+
   // Local edit buffer for the draft form; reset whenever the active version changes.
   const [draft, setDraft] = useState<DraftForm>(() => initDraft(proposal))
   useEffect(() => {
