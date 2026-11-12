@@ -772,13 +772,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
         {/* ---- Activity 1 · Rate sheet checking ----------------------------- */}
         <Card>
-          {activityHead(
-            1,
-            'Rate sheet checking',
-            <Button size="small" icon={<RollbackOutlined />} onClick={() => setReturning(true)}>
-              Return to Actuarial
-            </Button>,
-          )}
+          {activityHead(1, 'Rate sheet checking')}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
             Review the membership-fee rate sheet Actuarial released before using it in the proposal.
           </Typography.Paragraph>
@@ -798,27 +792,32 @@ export function FinalizeOffer({ c }: { c: Case }) {
             </Button>
           </div>
           <div style={{ marginTop: 12 }}>
-            {proposal.rateSheetCheckedAt ? (
-              <Space>
-                <Tag color="green" icon={<CheckCircleOutlined />}>
-                  Checked
-                </Tag>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  Marked checked {dayjs(proposal.rateSheetCheckedAt).format('YYYY-MM-DD HH:mm')}
-                </Typography.Text>
-                {editable && (
-                  <Button size="small" type="link" onClick={toggleRateSheetChecked}>
-                    Undo
-                  </Button>
-                )}
-              </Space>
-            ) : editable ? (
-              <Button icon={<CheckCircleOutlined />} onClick={toggleRateSheetChecked}>
-                Mark rate sheet as checked
+            <Space wrap>
+              {proposal.rateSheetCheckedAt ? (
+                <Space>
+                  <Tag color="green" icon={<CheckCircleOutlined />}>
+                    Checked
+                  </Tag>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    Marked checked {dayjs(proposal.rateSheetCheckedAt).format('YYYY-MM-DD HH:mm')}
+                  </Typography.Text>
+                  {editable && (
+                    <Button size="small" type="link" onClick={toggleRateSheetChecked}>
+                      Undo
+                    </Button>
+                  )}
+                </Space>
+              ) : editable ? (
+                <Button icon={<CheckCircleOutlined />} onClick={toggleRateSheetChecked}>
+                  Mark rate sheet as checked
+                </Button>
+              ) : (
+                <Tag>Not checked</Tag>
+              )}
+              <Button size="small" icon={<RollbackOutlined />} onClick={() => setReturning(true)}>
+                Return to Actuarial
               </Button>
-            ) : (
-              <Tag>Not checked</Tag>
-            )}
+            </Space>
           </div>
         </Card>
 
