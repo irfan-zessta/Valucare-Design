@@ -88,7 +88,7 @@ const TAB_GROUPS: SetupTabGroup[] = [
   {
     key: 'contract',
     label: 'Contract & KYC',
-    tasks: ['upload-documents', 'send-to-client', 'notarization', 'kyc'],
+    tasks: ['upload-documents', 'send-to-client', 'kyc'],
   },
   {
     key: 'onboarding',
@@ -254,9 +254,7 @@ export function SetupAccount({ c }: { c: Case }) {
       case 'upload-documents':
         return UploadDocuments()
       case 'send-to-client':
-        return SendToClient()
-      case 'notarization':
-        return NotarizationPanel()
+        return SendAndNotarize()
       case 'kyc':
         return KycPanel()
       case 'onboarding-sob':
@@ -532,8 +530,8 @@ export function SetupAccount({ c }: { c: Case }) {
     )
   }
 
-  // ===== Send to client =====================================================
-  function SendToClient() {
+  // ===== Send to client + sign & notarize (one page) ========================
+  function SendAndNotarize() {
     const send = setup!.clientSend
     const contract = setup!.contracts.contract.versions[setup!.contracts.contract.versions.length - 1]
     const dsa = setup!.contracts.dsa.versions[setup!.contracts.dsa.versions.length - 1]
@@ -555,81 +553,6 @@ export function SetupAccount({ c }: { c: Case }) {
       message.success('Documents recorded as sent to the client (simulated).')
     }
 
-    return (
-      <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-        <FormSection title="Documents to send" wide>
-          <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
-            <Descriptions.Item label="Contract">{contract ? `${contract.fileName} · v${contract.version}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="DSA">{dsa ? `${dsa.fileName} · v${dsa.version}` : '—'}</Descriptions.Item>
-            <Descriptions.Item label="Recipient">{send.recipient || c.company.contact.name}</Descriptions.Item>
-            <Descriptions.Item label="Recipient email">{send.recipientEmail || c.company.contact.email}</Descriptions.Item>
-          </Descriptions>
-        </FormSection>
-
-        <FormSection title="Email preview (simulated)" wide>
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 12 }}
-            title="Email integration is not connected — sending is simulated/recorded, not actually delivered."
-          />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Subject</div>
-              <Input
-                value={send.subject ?? `Contract and DSA for ${c.company.name}`}
-                onChange={(e) => setSend({ subject: e.target.value })}
-                disabled={sent}
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Message</div>
-              <Input.TextArea
-                rows={3}
-                value={send.message ?? `Dear ${c.company.contact.name},\n\nPlease find the attached contract and DSA for your review and signature.`}
-                onChange={(e) => setSend({ message: e.target.value })}
-                disabled={sent}
-              />
-            </div>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Attachments: {[contract?.fileName, dsa?.fileName].filter(Boolean).join(', ') || '—'}
-            </Typography.Text>
-          </div>
-        </FormSection>
-
-        {sent && (
-          <Alert
-            type="info"
-            showIcon
-            title={`Awaiting signed documents — sent ${send.sentAt ? dayjs(send.sentAt).format('YYYY-MM-DD HH:mm') : ''} (Contract v${send.contractVersion}, DSA v${send.dsaVersion})`}
-            description="Record the signed documents when the client returns them in the next task."
-          />
-        )}
-
-        <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Typography.Text type="secondary">
-            {sent ? 'Documents sent — continue to record signed documents.' : 'Review the recipient and documents, then send.'}
-          </Typography.Text>
-          <div className="app-form-floatbar__actions">
-            {!sent ? (
-              <Tooltip title={contract && dsa ? '' : 'Both documents must be uploaded first.'}>
-                <Button type="primary" icon={<SendOutlined />} disabled={!contract || !dsa} onClick={doSend}>
-                  Send to client
-                </Button>
-              </Tooltip>
-            ) : (
-              <Button type="primary" onClick={() => completeTask('send-to-client')}>
-                Record signed documents received
-              </Button>
-            )}
-          </div>
-        </div>
-      </Space>
-    )
-  }
-
-  // ===== Signed → notarize → return =========================================
-  function NotarizationPanel() {
     const n = setup!.notarization
     const order = ['awaiting-signed', 'signed-received', 'sent-for-notarization', 'notarized', 'returned-to-client'] as const
     const idx = order.indexOf(n.status)
@@ -697,6 +620,61 @@ export function SetupAccount({ c }: { c: Case }) {
 
     return (
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+        {/* --- Send to client ------------------------------------------------ */}
+        <FormSection title="Send to client" wide>
+          <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
+            <Descriptions.Item label="Contract">{contract ? `${contract.fileName} · v${contract.version}` : '—'}</Descriptions.Item>
+            <Descriptions.Item label="DSA">{dsa ? `${dsa.fileName} · v${dsa.version}` : '—'}</Descriptions.Item>
+            <Descriptions.Item label="Recipient">{send.recipient || c.company.contact.name}</Descriptions.Item>
+            <Descriptions.Item label="Recipient email">{send.recipientEmail || c.company.contact.email}</Descriptions.Item>
+          </Descriptions>
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginTop: 12 }}
+            title="Email integration is not connected — sending is simulated/recorded, not actually delivered."
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 12 }}>
+            <div>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>Subject</div>
+              <Input
+                value={send.subject ?? `Contract and DSA for ${c.company.name}`}
+                onChange={(e) => setSend({ subject: e.target.value })}
+                disabled={sent}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>Message</div>
+              <Input.TextArea
+                rows={3}
+                value={send.message ?? `Dear ${c.company.contact.name},\n\nPlease find the attached contract and DSA for your review and signature.`}
+                onChange={(e) => setSend({ message: e.target.value })}
+                disabled={sent}
+              />
+            </div>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Attachments: {[contract?.fileName, dsa?.fileName].filter(Boolean).join(', ') || '—'}
+            </Typography.Text>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            {!sent ? (
+              <Tooltip title={contract && dsa ? '' : 'Both documents must be uploaded first.'}>
+                <Button type="primary" icon={<SendOutlined />} disabled={!contract || !dsa} onClick={doSend}>
+                  Send to client
+                </Button>
+              </Tooltip>
+            ) : (
+              <Alert
+                type="success"
+                showIcon
+                title={`Sent ${send.sentAt ? dayjs(send.sentAt).format('YYYY-MM-DD HH:mm') : ''} · Contract v${send.contractVersion}, DSA v${send.dsaVersion}`}
+                description="Awaiting signed documents — record them below as the client returns them."
+              />
+            )}
+          </div>
+        </FormSection>
+
+        {/* --- Signed & notarized documents (after sending) ------------------ */}
         <FormSection title="Document versions (stages kept distinct)" wide>
           {versionList('contract', 'Contract')}
           {versionList('dsa', 'DSA (Deed of Service Agreement)')}
@@ -705,7 +683,7 @@ export function SetupAccount({ c }: { c: Case }) {
           </Typography.Paragraph>
         </FormSection>
 
-        <FormSection title="Milestones" wide>
+        <FormSection title="Signed & notarized milestones" wide>
           <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
             {milestones.map((m, i) => {
               const done = idx > i // milestone[i] maps to order index i+1
@@ -751,7 +729,7 @@ export function SetupAccount({ c }: { c: Case }) {
                           </Button>
                         )
                       })()}
-                    {current && (
+                    {current && sent && (
                       <>
                         {m.status === 'signed-received' && (
                           <Upload
@@ -795,11 +773,15 @@ export function SetupAccount({ c }: { c: Case }) {
 
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
           <Typography.Text type="secondary">
-            {n.status === 'returned-to-client' ? 'Notarized copy returned — begin account onboarding.' : 'Record each milestone in order.'}
+            {n.status === 'returned-to-client'
+              ? 'Notarized copy returned — begin account onboarding.'
+              : !sent
+                ? 'Send the documents to the client first.'
+                : 'Record each milestone in order.'}
           </Typography.Text>
           <div className="app-form-floatbar__actions">
-            <Tooltip title={n.status === 'returned-to-client' ? '' : 'Complete all milestones first.'}>
-              <Button type="primary" disabled={n.status !== 'returned-to-client'} onClick={() => completeTask('notarization')}>
+            <Tooltip title={n.status === 'returned-to-client' ? '' : 'Send the documents and complete all milestones first.'}>
+              <Button type="primary" disabled={n.status !== 'returned-to-client'} onClick={() => completeTask('send-to-client')}>
                 Continue to onboarding (KYC)
               </Button>
             </Tooltip>

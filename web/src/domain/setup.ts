@@ -32,14 +32,8 @@ export const SETUP_TASKS: SetupTaskMeta[] = [
   },
   {
     id: 'send-to-client',
-    label: 'Send to client',
-    blurb: 'Send the Legal-reviewed contract and DSA to the client.',
-    whatNext: 'Await the client-signed documents.',
-  },
-  {
-    id: 'notarization',
-    label: 'Signed & notarized documents',
-    blurb: 'Record signed documents, notarization, and the notarized copy returned to the client.',
+    label: 'Send, sign & notarize',
+    blurb: 'Send the contract and DSA to the client, then record signed documents, notarization, and the notarized copy returned to the client.',
     whatNext: 'Begin account onboarding (KYC).',
   },
   {
