@@ -510,13 +510,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
             editable={sobEditable}
             showUpload={false}
           />
-          {sob.status !== 'approved' && sob.status !== 'signed' && sob.status !== 'codified' && (
-            <div>
-              <Button type="primary" onClick={advanceSob}>
-                {sob.status === 'draft' ? 'Send for validation' : 'Approve SOB'}
-              </Button>
-            </div>
-          )}
         </Space>
       ) : (
         <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
