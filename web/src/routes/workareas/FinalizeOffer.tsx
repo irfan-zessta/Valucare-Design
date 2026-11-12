@@ -875,16 +875,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
             </Space>,
           )}
           <div style={{ marginTop: 16 }}>{sobSection}</div>
-          {proposal.templateAdditions.length > 0 && (
-            <Alert
-              style={{ marginTop: 16 }}
-              type="info"
-              showIcon
-              icon={<FileTextOutlined />}
-              title="Template benefits added beyond the requested TOR"
-              description={proposal.templateAdditions.join('; ')}
-            />
-          )}
         </Card>
 
                 </Space>
