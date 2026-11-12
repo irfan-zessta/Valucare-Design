@@ -23,7 +23,6 @@ import {
   Modal,
   Select,
   Space,
-  Steps,
   Table,
   Tag,
   Tooltip,
@@ -96,16 +95,6 @@ const SOB_STATUS_LABEL: Record<string, string> = {
   approved: 'Approved',
   signed: 'Client signed',
   codified: 'Codified',
-}
-
-// Map a proposal status to the workflow stepper index.
-const STEP_INDEX: Record<string, number> = {
-  draft: 0,
-  'in-review': 1,
-  sent: 2,
-  feedback: 3,
-  revised: 3,
-  accepted: 4,
 }
 
 function proposalCode(c: Case): string {
@@ -661,7 +650,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
     )
   }
 
-  const stepIdx = STEP_INDEX[proposal.status] ?? 0
   const statusTag = (
     <Tag
       color={
@@ -698,18 +686,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
             Rate sheet v{proposal.rateSheetVersion ?? selectedSheet?.version ?? 1} · SOB v{sobVersion}
             {proposal.validUntil ? ` · valid until ${dayjs(proposal.validUntil).format('YYYY-MM-DD')}` : ''}
           </Typography.Text>
-          <Steps
-            size="small"
-            style={{ marginTop: 16 }}
-            current={stepIdx}
-            items={[
-              { title: 'Draft' },
-              { title: 'Internal review' },
-              { title: 'Sent' },
-              { title: 'Negotiation' },
-              { title: 'Accepted' },
-            ]}
-          />
           {proposal.returnReason && proposal.status === 'draft' && (
             <Alert
               style={{ marginTop: 12 }}
