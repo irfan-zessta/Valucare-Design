@@ -59,6 +59,23 @@ const STAGE_LABEL: Record<SetupDocStage, string> = {
 /** Display a date-ish value as a clean YYYY-MM-DD (handles ISO datetimes). */
 const fmtDate = (v?: string) => (v ? dayjs(v).format('YYYY-MM-DD') : '—')
 
+/**
+ * View/download an uploaded document. The prototype stores file names only, so we
+ * hand back a clearly-labelled placeholder file (opened in a new tab = "view",
+ * saved = "download") rather than pretending the real document is stored.
+ */
+function viewDownloadDoc(fileName: string, caption: string) {
+  const body = `${caption}\n\nFile: ${fileName}\n\n(Prototype placeholder — the actual document is not stored in this demo.)`
+  const blob = new Blob([body], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  a.rel = 'noopener'
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 interface SetupTabGroup {
   key: string
   label: string
@@ -636,20 +653,53 @@ export function SetupAccount({ c }: { c: Case }) {
       setNota(map[target])
     }
 
-    const contractVersions = setup!.contracts.contract.versions
-    const dsaVersions = setup!.contracts.dsa.versions
+    const stageColor = (stage: SetupDocStage) =>
+      stage === 'notarized' ? 'green' : stage === 'client-signed' ? 'blue' : 'default'
+    const latestOfStage = (kind: 'contract' | 'dsa', stage: SetupDocStage) =>
+      [...setup!.contracts[kind].versions].reverse().find((v) => v.stage === stage)
+
+    const versionList = (kind: 'contract' | 'dsa', title: string) => {
+      const versions = setup!.contracts[kind].versions
+      return (
+        <div style={{ marginBottom: 12 }}>
+          <Typography.Text strong>{title}</Typography.Text>
+          {versions.length ? (
+            <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 6 }}>
+              {versions.map((v) => (
+                <div key={`${kind}-${v.version}`} className="app-decision-row">
+                  <Space wrap>
+                    <FileTextOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />
+                    <span>{v.fileName}</span>
+                    <Tag>v{v.version}</Tag>
+                    <Tag color={stageColor(v.stage)}>{STAGE_LABEL[v.stage]}</Tag>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      {dayjs(v.uploadedAt).format('YYYY-MM-DD HH:mm')} · {v.uploadedBy}
+                    </Typography.Text>
+                  </Space>
+                  <Button
+                    size="small"
+                    icon={<EyeOutlined />}
+                    onClick={() => viewDownloadDoc(v.fileName, `${title} · v${v.version} · ${STAGE_LABEL[v.stage]}`)}
+                  >
+                    View / download
+                  </Button>
+                </div>
+              ))}
+            </Space>
+          ) : (
+            <div style={{ marginTop: 6 }}>
+              <Typography.Text type="secondary">No versions yet.</Typography.Text>
+            </div>
+          )}
+        </div>
+      )
+    }
 
     return (
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
         <FormSection title="Document versions (stages kept distinct)" wide>
-          <Descriptions column={1} size="small" bordered>
-            <Descriptions.Item label="Contract">
-              {contractVersions.map((v) => `v${v.version} ${STAGE_LABEL[v.stage]}`).join(' · ') || '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="DSA">
-              {dsaVersions.map((v) => `v${v.version} ${STAGE_LABEL[v.stage]}`).join(' · ') || '—'}
-            </Descriptions.Item>
-          </Descriptions>
+          {versionList('contract', 'Contract')}
+          {versionList('dsa', 'DSA (Deed of Service Agreement)')}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
             Notarization happens outside HMS — its status and the resulting document are recorded here.
           </Typography.Paragraph>
@@ -671,41 +721,72 @@ export function SetupAccount({ c }: { c: Case }) {
                       </Typography.Text>
                     )}
                   </Space>
-                  {current && (
-                    <Space>
-                      {m.status === 'signed-received' && (
-                        <Upload
-                          showUploadList={false}
-                          accept=".pdf,.docx,.doc"
-                          beforeUpload={(file) => {
-                            addDocVersion('contract', 'client-signed', file.name)
-                            return false
-                          }}
-                        >
-                          <Button size="small" icon={<CloudUploadOutlined />}>
-                            Upload signed
+                  <Space wrap>
+                    {/* View/download the document captured at this milestone. */}
+                    {m.status === 'signed-received' &&
+                      latestOfStage('contract', 'client-signed') &&
+                      (() => {
+                        const v = latestOfStage('contract', 'client-signed')!
+                        return (
+                          <Button
+                            size="small"
+                            icon={<EyeOutlined />}
+                            onClick={() => viewDownloadDoc(v.fileName, `Client-signed contract · v${v.version}`)}
+                          >
+                            View / download
                           </Button>
-                        </Upload>
-                      )}
-                      {m.status === 'notarized' && (
-                        <Upload
-                          showUploadList={false}
-                          accept=".pdf,.docx,.doc"
-                          beforeUpload={(file) => {
-                            addDocVersion('contract', 'notarized', file.name)
-                            return false
-                          }}
-                        >
-                          <Button size="small" icon={<CloudUploadOutlined />}>
-                            Upload notarized
+                        )
+                      })()}
+                    {m.status === 'notarized' &&
+                      latestOfStage('contract', 'notarized') &&
+                      (() => {
+                        const v = latestOfStage('contract', 'notarized')!
+                        return (
+                          <Button
+                            size="small"
+                            icon={<EyeOutlined />}
+                            onClick={() => viewDownloadDoc(v.fileName, `Notarized contract · v${v.version}`)}
+                          >
+                            View / download
                           </Button>
-                        </Upload>
-                      )}
-                      <Button size="small" type="primary" onClick={() => advanceTo(m.status)}>
-                        Record
-                      </Button>
-                    </Space>
-                  )}
+                        )
+                      })()}
+                    {current && (
+                      <>
+                        {m.status === 'signed-received' && (
+                          <Upload
+                            showUploadList={false}
+                            accept=".pdf,.docx,.doc"
+                            beforeUpload={(file) => {
+                              addDocVersion('contract', 'client-signed', file.name)
+                              return false
+                            }}
+                          >
+                            <Button size="small" icon={<CloudUploadOutlined />}>
+                              Upload signed
+                            </Button>
+                          </Upload>
+                        )}
+                        {m.status === 'notarized' && (
+                          <Upload
+                            showUploadList={false}
+                            accept=".pdf,.docx,.doc"
+                            beforeUpload={(file) => {
+                              addDocVersion('contract', 'notarized', file.name)
+                              return false
+                            }}
+                          >
+                            <Button size="small" icon={<CloudUploadOutlined />}>
+                              Upload notarized
+                            </Button>
+                          </Upload>
+                        )}
+                        <Button size="small" type="primary" onClick={() => advanceTo(m.status)}>
+                          Record
+                        </Button>
+                      </>
+                    )}
+                  </Space>
                 </div>
               )
             })}
