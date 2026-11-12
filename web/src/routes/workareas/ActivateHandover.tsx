@@ -173,7 +173,7 @@ export function ActivateHandover({ c }: { c: Case }) {
             Activation <Tag color={statusColor[status]}>{status}</Tag>
           </Space>
         }
-        description="Pick the date & time the account becomes active."
+        description="Schedule a date & time, or activate immediately."
         wide
       >
         <Space wrap align="center">
@@ -184,6 +184,11 @@ export function ActivateHandover({ c }: { c: Case }) {
             onChange={schedule}
             placeholder="Schedule activation date & time"
           />
+          {c.coverage.status !== 'active' && (
+            <Button type="primary" disabled={!sentToMda} onClick={() => schedule(dayjs())}>
+              Activate now
+            </Button>
+          )}
           {c.coverage.status === 'active' && (
             <Button onClick={() => patch((prev) => ({ ...prev, coverage: { ...prev.coverage, status: 'scheduled', activatedAt: undefined, scheduledFor: activationAt } }))}>
               Reschedule
