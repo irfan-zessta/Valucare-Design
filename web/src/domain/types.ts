@@ -58,7 +58,7 @@ export const WORK_AREA_ORDER: WorkAreaId[] = [
 export const WORK_AREA_LABELS: Record<WorkAreaId, string> = {
   'create-franchise': 'Create Franchise',
   'prepare-quotation': 'Prepare Quotation',
-  'finalize-offer': 'Finalize Offer',
+  'finalize-offer': 'Proposal',
   'setup-account': 'Set Up Account',
   'activate-handover': 'Activate & Handover',
 }
