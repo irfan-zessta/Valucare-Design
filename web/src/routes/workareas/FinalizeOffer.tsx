@@ -787,7 +787,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
                 rate sheet v{proposal.rateSheetVersion ?? selectedSheet?.version ?? 1} · view only
               </Typography.Text>
             </Space>
-            <Button size="small" icon={<EyeOutlined />} onClick={() => setViewRates(true)}>
+            <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => setViewRates(true)}>
               View
             </Button>
           </div>
