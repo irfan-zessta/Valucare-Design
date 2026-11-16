@@ -16,6 +16,7 @@ import SalesDashboard from './routes/dashboards/SalesDashboard'
 import DepartmentPlaceholderDashboard from './routes/dashboards/DepartmentPlaceholderDashboard'
 import CreateCase from './routes/CreateCase'
 import CaseWorkspace from './routes/CaseWorkspace'
+import AccountsDirectory from './routes/AccountsDirectory'
 import EnquiriesList from './routes/enquiries/EnquiriesList'
 import NewEnquiry from './routes/enquiries/NewEnquiry'
 import EnquiryDetail from './routes/enquiries/EnquiryDetail'
@@ -49,6 +50,8 @@ export default function App() {
                       <Route element={<AppShell />}>
                         <Route path="/" element={<Home />} />
                         <Route path="/sales" element={<SalesDashboard />} />
+                        {/* Accounts directory — the master register of created accounts. */}
+                        <Route path="/accounts" element={<AccountsDirectory />} />
                         {/* Old list route → the Sales dashboard (preserves saved links). */}
                         <Route path="/sales/corporate-new-business" element={<Navigate to="/sales" replace />} />
                         <Route path="/sales/corporate-new-business/new" element={<CreateCase />} />
