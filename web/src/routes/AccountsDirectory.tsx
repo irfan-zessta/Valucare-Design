@@ -9,7 +9,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Empty, Input, Select, Skeleton, Space, Statistic, Table, Tag, Typography } from 'antd'
-import { SearchOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../state/CaseProvider'
 import { useInitialLoad } from '../hooks/useInitialLoad'
@@ -175,12 +175,21 @@ export default function AccountsDirectory() {
                 <Skeleton active paragraph={false} title={{ width: '60%' }} />
               ) : (
                 <>
-                  <Text type="secondary" style={{ fontSize: 14 }}>
-                    By product
-                  </Text>
-                  <div style={{ display: 'flex', gap: 32, marginTop: 4 }}>
-                    <Statistic title="HMO" value={kpis.hmo} />
-                    <Statistic title="TPA" value={kpis.tpa} />
+                  <div className="kpi-product__head">
+                    <span className="kpi-product__chip">
+                      <AppstoreOutlined />
+                    </span>
+                    <span className="kpi-product__title">By product</span>
+                  </div>
+                  <div className="kpi-product__split">
+                    <div className="kpi-product__col">
+                      <span className="kpi-pill kpi-pill--hmo">HMO</span>
+                      <div className="kpi-product__value">{formatCount(kpis.hmo)}</div>
+                    </div>
+                    <div className="kpi-product__col">
+                      <span className="kpi-pill kpi-pill--tpa">TPA</span>
+                      <div className="kpi-product__value">{formatCount(kpis.tpa)}</div>
+                    </div>
                   </div>
                 </>
               )}
