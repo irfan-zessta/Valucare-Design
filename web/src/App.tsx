@@ -5,6 +5,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { CaseProvider, useCases } from './state/CaseProvider'
 import { EnquiryProvider } from './state/EnquiryProvider'
+import { RenewalProvider } from './state/RenewalProvider'
 import { UiPrefsProvider } from './state/UiPrefsProvider'
 import { UnsavedChangesProvider } from './state/UnsavedChangesProvider'
 import { BreadcrumbProvider } from './state/BreadcrumbProvider'
@@ -17,6 +18,8 @@ import DepartmentPlaceholderDashboard from './routes/dashboards/DepartmentPlaceh
 import CreateCase from './routes/CreateCase'
 import CaseWorkspace from './routes/CaseWorkspace'
 import AccountsDirectory from './routes/AccountsDirectory'
+import RenewalsDashboard from './routes/renewals/RenewalsDashboard'
+import RenewalWorkspace from './routes/renewals/RenewalWorkspace'
 import EnquiriesList from './routes/enquiries/EnquiriesList'
 import NewEnquiry from './routes/enquiries/NewEnquiry'
 import EnquiryDetail from './routes/enquiries/EnquiryDetail'
@@ -38,6 +41,7 @@ export default function App() {
           <AuthProvider>
             <UiPrefsProvider>
               <CaseProvider>
+                <RenewalProvider>
                 <EnquiryProvider>
                 <UnsavedChangesProvider>
                 <BreadcrumbProvider>
@@ -52,6 +56,10 @@ export default function App() {
                         <Route path="/sales" element={<SalesDashboard />} />
                         {/* Accounts directory — the master register of created accounts. */}
                         <Route path="/accounts" element={<AccountsDirectory />} />
+                        {/* Corporate Renewal — dashboard + per-renewal case workspace. */}
+                        <Route path="/sales/renewals" element={<RenewalsDashboard />} />
+                        <Route path="/sales/renewals/:id" element={<RenewalWorkspace />} />
+                        <Route path="/sales/renewals/:id/:phase" element={<RenewalWorkspace />} />
                         {/* Old list route → the Sales dashboard (preserves saved links). */}
                         <Route path="/sales/corporate-new-business" element={<Navigate to="/sales" replace />} />
                         <Route path="/sales/corporate-new-business/new" element={<CreateCase />} />
@@ -71,6 +79,7 @@ export default function App() {
                 </BreadcrumbProvider>
                 </UnsavedChangesProvider>
                 </EnquiryProvider>
+                </RenewalProvider>
               </CaseProvider>
             </UiPrefsProvider>
           </AuthProvider>

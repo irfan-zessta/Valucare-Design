@@ -972,3 +972,155 @@ button.app-stepper__item {
   margin-block-start: 10px;
   font-weight: 600;
 }
+
+/* ===========================================================================
+   Corporate Renewal — module-specific styles. Reuses brand tokens (brand red
+   #CB0A2F, pale red #fbe9ec) and the card/typography system from New Business.
+   =========================================================================== */
+
+/* One clear next action strip, under the case header. */
+.rnw-next {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-left: 3px solid #cb0a2f;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+.rnw-next__eyebrow {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.45);
+  margin-bottom: 4px;
+}
+.rnw-next__sentence {
+  font-size: 15px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+/* Compact figure cards (utilization, member-data counts). */
+.rnw-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.rnw-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #fafafa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.rnw-card-l {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+.rnw-card-v {
+  font-size: 20px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.88);
+}
+.rnw-card-sub {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* Utilization bars. */
+.rnw-util {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rnw-util-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.rnw-bar {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+.rnw-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #cb0a2f;
+}
+
+/* Indexed monthly mini bar chart. */
+.rnw-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 64px;
+  margin-top: 8px;
+}
+.rnw-chart-bar {
+  flex: 1;
+  min-height: 4px;
+  background: #fbe9ec;
+  border-top: 2px solid #cb0a2f;
+  border-radius: 2px 2px 0 0;
+}
+
+/* KYC step chips. */
+.rnw-kyc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rnw-kyc-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.55);
+}
+.rnw-kyc-step.on {
+  background: #fbe9ec;
+  color: #cb0a2f;
+  font-weight: 600;
+}
+
+/* Sample-document preview. */
+.rnw-doc {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.rnw-doc-ribbon {
+  background: #fbe9ec;
+  color: #cb0a2f;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  text-transform: uppercase;
+}
+.rnw-doc-body {
+  margin: 0;
+  padding: 16px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: rgba(0, 0, 0, 0.75);
+}

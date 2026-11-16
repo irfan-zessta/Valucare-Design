@@ -78,10 +78,18 @@ export const NAV: NavDept[] = [
         label: 'New Business',
         status: 'available',
         to: '/sales',
-        // The Sales dashboard, the creation journey, and open cases all live here.
-        match: (p) => startsWith('/sales')(p) || startsWith('/cases')(p),
+        // The Sales dashboard, the creation journey, and open cases all live here —
+        // but NOT the renewals subtree (which has its own child below).
+        match: (p) =>
+          (startsWith('/sales')(p) && !startsWith('/sales/renewals')(p)) || startsWith('/cases')(p),
       },
-      { id: 'sales-renewal-business', label: 'Renewal Business', status: 'coming-soon' },
+      {
+        id: 'sales-renewal-business',
+        label: 'Corporate Renewal',
+        status: 'available',
+        to: '/sales/renewals',
+        match: (p) => startsWith('/sales/renewals')(p),
+      },
       { id: 'sales-new-ifg', label: 'New IFG', status: 'coming-soon' },
       { id: 'sales-renewal-ifg', label: 'Renewal IFG', status: 'coming-soon' },
     ],
