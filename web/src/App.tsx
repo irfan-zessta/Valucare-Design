@@ -5,6 +5,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { CaseProvider, useCases } from './state/CaseProvider'
 import { EnquiryProvider } from './state/EnquiryProvider'
+import { LeadProvider } from './state/LeadProvider'
 import { RenewalProvider } from './state/RenewalProvider'
 import { UiPrefsProvider } from './state/UiPrefsProvider'
 import { UnsavedChangesProvider } from './state/UnsavedChangesProvider'
@@ -20,9 +21,9 @@ import CaseWorkspace from './routes/CaseWorkspace'
 import AccountsDirectory from './routes/AccountsDirectory'
 import RenewalsDashboard from './routes/renewals/RenewalsDashboard'
 import RenewalWorkspace from './routes/renewals/RenewalWorkspace'
-import EnquiriesList from './routes/enquiries/EnquiriesList'
 import NewEnquiry from './routes/enquiries/NewEnquiry'
 import EnquiryDetail from './routes/enquiries/EnquiryDetail'
+import LeadDetail from './routes/leads/LeadDetail'
 
 // /cases/:caseId with no work area → resume the case's latest saved work area.
 function ResumeCase() {
@@ -43,6 +44,7 @@ export default function App() {
               <CaseProvider>
                 <RenewalProvider>
                 <EnquiryProvider>
+                <LeadProvider>
                 <UnsavedChangesProvider>
                 <BreadcrumbProvider>
                   <Routes>
@@ -63,10 +65,13 @@ export default function App() {
                         {/* Old list route → the Sales dashboard (preserves saved links). */}
                         <Route path="/sales/corporate-new-business" element={<Navigate to="/sales" replace />} />
                         <Route path="/sales/corporate-new-business/new" element={<CreateCase />} />
-                        {/* Enquiries (leads) — capture → convert to franchise. */}
-                        <Route path="/sales/enquiries" element={<EnquiriesList />} />
+                        {/* Enquiries now live in the Sales dashboard's New Enquiries tab;
+                            the old standalone list redirects there (tab is preserved). */}
+                        <Route path="/sales/enquiries" element={<Navigate to="/sales" replace />} />
                         <Route path="/sales/enquiries/new" element={<NewEnquiry />} />
                         <Route path="/sales/enquiries/:enquiryId" element={<EnquiryDetail />} />
+                        {/* Leads — the qualified stage between an enquiry and a franchise. */}
+                        <Route path="/sales/leads/:leadId" element={<LeadDetail />} />
                         <Route path="/cases/:caseId" element={<ResumeCase />} />
                         <Route path="/cases/:caseId/:workArea" element={<CaseWorkspace />} />
                         <Route path="/coming-soon/:slug" element={<ComingSoon />} />
@@ -78,6 +83,7 @@ export default function App() {
                   </Routes>
                 </BreadcrumbProvider>
                 </UnsavedChangesProvider>
+                </LeadProvider>
                 </EnquiryProvider>
                 </RenewalProvider>
               </CaseProvider>

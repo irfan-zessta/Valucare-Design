@@ -6,7 +6,9 @@
 import type { Enquiry } from '../domain/types'
 import { seedEnquiries } from '../domain/sampleEnquiries'
 
-const STORE_KEY = 'hms4-enquiries:v1'
+// v2: enquiries now carry an activity timeline + follow-up fields, so the seed
+// shape changed — bump the key to re-seed the richer sample set.
+const STORE_KEY = 'hms4-enquiries:v2'
 
 export interface EnquiryStoreShape {
   enquiries: Enquiry[]

@@ -9,8 +9,10 @@ import { Button, Typography } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
+import { useEnquiries } from '../../state/EnquiryProvider'
 import { useInitialLoad } from '../../hooks/useInitialLoad'
 import { DepartmentDashboard, type DashboardConfig } from '../../components/dashboard/DepartmentDashboard'
+import { EnquiriesWorkspace } from '../enquiries/EnquiriesWorkspace'
 import { CaseStatusTag } from '../../components/CaseStatusTag'
 import { WORK_AREA_LABELS, WORK_AREA_ORDER, type Case } from '../../domain/types'
 import { nextAction, responsibleDepartment } from '../../domain/progress'
@@ -20,8 +22,12 @@ const { Link: TLink, Text } = Typography
 
 export default function SalesDashboard() {
   const { cases } = useCases()
+  const { enquiries } = useEnquiries()
   const { loading, error, retry } = useInitialLoad()
   const navigate = useNavigate()
+
+  // Enquiry count is kept separate from the case (lead/franchise) counts.
+  const openEnquiries = useMemo(() => enquiries.filter((e) => e.status === 'open').length, [enquiries])
 
   const config = useMemo<DashboardConfig<Case>>(() => {
     const openCase = (c: Case) => navigate(`/cases/${c.id}/${c.currentWorkArea}`)
@@ -88,6 +94,11 @@ export default function SalesDashboard() {
       deptId: 'sales',
       title: 'Sales',
       supportingText: 'Manage your corporate and IFG business.',
+      // New Enquiries sits before In progress / Completed; its badge counts open
+      // enquiries only, separate from the case (lead/franchise) counts.
+      leadingTabs: [
+        { key: 'enquiries', label: `New Enquiries (${openEnquiries})`, content: <EnquiriesWorkspace /> },
+      ],
       secondaryAction: {
         label: 'New enquiry',
         onClick: () => navigate('/sales/enquiries/new'),
@@ -141,7 +152,7 @@ export default function SalesDashboard() {
       inProgressColumns,
       completedColumns,
     }
-  }, [navigate])
+  }, [navigate, openEnquiries])
 
   return <DepartmentDashboard<Case> config={config} rows={cases} loading={loading} error={error} onRetry={retry} />
 }

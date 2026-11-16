@@ -1124,3 +1124,30 @@ button.app-stepper__item {
   white-space: pre-wrap;
   color: rgba(0, 0, 0, 0.75);
 }
+
+/* Enquiry detail — Activity (wide) beside Enquiry details; stacks when narrow. */
+.enq-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .enq-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.enq-followup {
+  background: #fbe9ec;
+  border: 1px solid rgba(203, 10, 47, 0.18);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.enq-followup__eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #cb0a2f;
+  font-weight: 600;
+}

@@ -750,13 +750,30 @@ export interface Case {
   isCompleted: boolean
 }
 
-// --- Enquiries (leads) ------------------------------------------------------
+// --- Enquiries ---------------------------------------------------------------
 //
-// A lightweight lead captured before any franchise exists: basic company
-// details only. An open enquiry can be converted into a full New Business case
-// (which opens the franchise form), or marked lost.
+// An enquiry is the first touchpoint: basic company details captured before any
+// lead or franchise exists. Sales tracks it, logs activity against it, and
+// converts a qualified enquiry into a LEAD (see domain/lead.ts). A converted
+// enquiry links to the lead it produced; a lost enquiry records a reason.
 
 export type EnquiryStatus = 'open' | 'converted' | 'lost'
+
+/** A manual or system-logged event on an enquiry's timeline. */
+export type EnquiryActivityType = 'Call' | 'Email' | 'Meeting' | 'Message' | 'Note' | 'System'
+
+export interface EnquiryActivity {
+  id: string
+  type: EnquiryActivityType
+  /** When the activity happened (editable for past activity). */
+  at: string // ISO datetime
+  /** What happened / outcome / notes. */
+  summary: string
+  /** Who logged it. */
+  by: string
+  /** Distinguishes manual activity from key system events for subtle styling. */
+  kind: 'activity' | 'created' | 'follow-up' | 'converted' | 'lost'
+}
 
 export interface Enquiry {
   id: string // e.g. ENQ-2026-0001
@@ -771,8 +788,15 @@ export interface Enquiry {
   status: EnquiryStatus
   createdAt: string
   updatedAt: string
-  /** The case created when this enquiry was converted to a franchise. */
-  convertedCaseId?: string
+  /** Activity timeline (newest-first when displayed). */
+  activities: EnquiryActivity[]
+  /** The next scheduled follow-up, if any. */
+  nextFollowUpDate?: string // ISO date
+  nextFollowUpAction?: string
+  /** The lead created when this enquiry was converted. */
+  convertedLeadId?: string
+  /** Reason recorded when the enquiry was marked lost. */
+  lostReason?: string
 }
 
 // --- Mock service contracts -------------------------------------------------

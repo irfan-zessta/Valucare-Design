@@ -76,12 +76,20 @@ export interface DashboardConfig<T> {
   completedColumns: ColumnsType<T>
 
   emptyText?: string // "No records yet" default
+
+  /**
+   * Optional self-contained tabs rendered BEFORE the built-in case tabs (e.g.
+   * Sales' "New Enquiries"). They own their content — the shared statistics and
+   * search/filter toolbar are hidden while a leading tab is active, because they
+   * describe the case list, not the leading tab's own dataset.
+   */
+  leadingTabs?: { key: string; label: ReactNode; content: ReactNode }[]
 }
 
 interface UiState {
   search: string
   filters: Record<string, string | undefined>
-  tab: 'all' | 'in-progress' | 'completed' | 'needs-action'
+  tab: string
 }
 
 function loadUiState(deptId: string): UiState {
@@ -92,10 +100,7 @@ function loadUiState(deptId: string): UiState {
       return {
         search: typeof p.search === 'string' ? p.search : '',
         filters: p.filters && typeof p.filters === 'object' ? p.filters : {},
-        tab:
-          p.tab === 'all' || p.tab === 'completed' || p.tab === 'needs-action'
-            ? p.tab
-            : 'in-progress',
+        tab: typeof p.tab === 'string' && p.tab ? p.tab : 'in-progress',
       }
     }
   } catch {
@@ -126,6 +131,11 @@ export function DepartmentDashboard<T>({
       // ignore
     }
   }, [config.deptId, ui])
+
+  const leadingTabs = config.leadingTabs ?? []
+  const knownKeys = [...leadingTabs.map((t) => t.key), 'all', 'in-progress', 'completed', 'needs-action']
+  const activeTab = knownKeys.includes(ui.tab) ? ui.tab : 'in-progress'
+  const isLeadingActive = leadingTabs.some((t) => t.key === activeTab)
 
   const activeFilterCount = Object.values(ui.filters).filter(Boolean).length
   const hasQueryOrFilters = ui.search.trim() !== '' || activeFilterCount > 0
@@ -264,25 +274,30 @@ export function DepartmentDashboard<T>({
         />
       ) : (
         <>
-          {/* 2. Four compact statistics */}
-          <div className="app-dashboard__stats">
-            {stats.map((s) => (
-              <Card key={s.key} size="small">
-                {loading ? (
-                  <Skeleton active paragraph={false} title={{ width: '60%' }} />
-                ) : (
-                  <Statistic title={s.title} value={s.value} />
-                )}
-              </Card>
-            ))}
-          </div>
+          {/* 2. Four compact statistics — case stats, hidden on a leading tab
+                 whose dataset (e.g. enquiries) is counted in its own tab badge. */}
+          {!isLeadingActive && (
+            <div className="app-dashboard__stats">
+              {stats.map((s) => (
+                <Card key={s.key} size="small">
+                  {loading ? (
+                    <Skeleton active paragraph={false} title={{ width: '60%' }} />
+                  ) : (
+                    <Statistic title={s.title} value={s.value} />
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
 
-          {/* 3. Work list — search + filters sit on the right of the tab bar */}
+          {/* 3. Work list — search + filters sit on the right of the tab bar
+                 (hidden on a leading tab, which owns its own toolbar). */}
           <Tabs
-            activeKey={ui.tab}
-            onChange={(k) => setUi((s) => ({ ...s, tab: k as UiState['tab'] }))}
-            tabBarExtraContent={{ right: toolbar }}
+            activeKey={activeTab}
+            onChange={(k) => setUi((s) => ({ ...s, tab: k }))}
+            tabBarExtraContent={isLeadingActive ? undefined : { right: toolbar }}
             items={[
+              ...leadingTabs.map((t) => ({ key: t.key, label: t.label, children: t.content })),
               {
                 key: 'all',
                 label: `All (${filtered.length})`,
