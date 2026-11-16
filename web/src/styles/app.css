@@ -528,13 +528,13 @@ button.app-stepper__item {
   }
 }
 
-/* "By product" KPI card — icon chip + title, then two labelled figures. */
-.kpi-product__head {
+/* KPI cards — icon chip + title on top, large figure(s) below. */
+.kpi-head {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.kpi-product__chip {
+.kpi-chip {
   width: 34px;
   height: 34px;
   border-radius: 9px;
@@ -546,11 +546,20 @@ button.app-stepper__item {
   font-size: 17px;
   flex: none;
 }
-.kpi-product__title {
+.kpi-title {
   font-weight: 600;
   font-size: 14px;
   color: rgba(0, 0, 0, 0.88);
 }
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: 14px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+/* "By product" KPI card — two labelled figures split by a divider. */
 .kpi-product__split {
   display: flex;
   margin-top: 14px;
@@ -561,6 +570,9 @@ button.app-stepper__item {
 .kpi-product__col + .kpi-product__col {
   border-left: 1px solid rgba(0, 0, 0, 0.06);
   padding-left: 16px;
+}
+.kpi-product__col .kpi-value {
+  margin-top: 8px;
 }
 .kpi-pill {
   display: inline-block;
@@ -578,13 +590,6 @@ button.app-stepper__item {
 .kpi-pill--tpa {
   background: rgba(0, 0, 0, 0.05);
   color: rgba(0, 0, 0, 0.65);
-}
-.kpi-product__value {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.1;
-  margin-top: 8px;
-  color: rgba(0, 0, 0, 0.88);
 }
 
 /* --- Login --------------------------------------------------------------- */

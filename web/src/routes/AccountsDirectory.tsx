@@ -8,8 +8,14 @@
 // ===========================================================================
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, Empty, Input, Select, Skeleton, Space, Statistic, Table, Tag, Typography } from 'antd'
-import { AppstoreOutlined, SearchOutlined } from '@ant-design/icons'
+import { Button, Card, Empty, Input, Select, Skeleton, Space, Table, Tag, Typography } from 'antd'
+import {
+  AppstoreOutlined,
+  BankOutlined,
+  SafetyCertificateOutlined,
+  SearchOutlined,
+  TeamOutlined,
+} from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../state/CaseProvider'
 import { useInitialLoad } from '../hooks/useInitialLoad'
@@ -153,21 +159,15 @@ export default function AccountsDirectory() {
               {loading ? (
                 <Skeleton active paragraph={false} title={{ width: '60%' }} />
               ) : (
-                <Statistic title="Overall accounts" value={kpis.overall} />
-              )}
-            </Card>
-            <Card size="small">
-              {loading ? (
-                <Skeleton active paragraph={false} title={{ width: '60%' }} />
-              ) : (
-                <Statistic title="Active" value={kpis.active} />
-              )}
-            </Card>
-            <Card size="small">
-              {loading ? (
-                <Skeleton active paragraph={false} title={{ width: '60%' }} />
-              ) : (
-                <Statistic title="Members covered" value={kpis.members} />
+                <>
+                  <div className="kpi-head">
+                    <span className="kpi-chip">
+                      <BankOutlined />
+                    </span>
+                    <span className="kpi-title">Overall accounts</span>
+                  </div>
+                  <div className="kpi-value">{formatCount(kpis.overall)}</div>
+                </>
               )}
             </Card>
             <Card size="small">
@@ -175,20 +175,50 @@ export default function AccountsDirectory() {
                 <Skeleton active paragraph={false} title={{ width: '60%' }} />
               ) : (
                 <>
-                  <div className="kpi-product__head">
-                    <span className="kpi-product__chip">
+                  <div className="kpi-head">
+                    <span className="kpi-chip">
+                      <SafetyCertificateOutlined />
+                    </span>
+                    <span className="kpi-title">Active</span>
+                  </div>
+                  <div className="kpi-value">{formatCount(kpis.active)}</div>
+                </>
+              )}
+            </Card>
+            <Card size="small">
+              {loading ? (
+                <Skeleton active paragraph={false} title={{ width: '60%' }} />
+              ) : (
+                <>
+                  <div className="kpi-head">
+                    <span className="kpi-chip">
+                      <TeamOutlined />
+                    </span>
+                    <span className="kpi-title">Members covered</span>
+                  </div>
+                  <div className="kpi-value">{formatCount(kpis.members)}</div>
+                </>
+              )}
+            </Card>
+            <Card size="small">
+              {loading ? (
+                <Skeleton active paragraph={false} title={{ width: '60%' }} />
+              ) : (
+                <>
+                  <div className="kpi-head">
+                    <span className="kpi-chip">
                       <AppstoreOutlined />
                     </span>
-                    <span className="kpi-product__title">By product</span>
+                    <span className="kpi-title">By product</span>
                   </div>
                   <div className="kpi-product__split">
                     <div className="kpi-product__col">
                       <span className="kpi-pill kpi-pill--hmo">HMO</span>
-                      <div className="kpi-product__value">{formatCount(kpis.hmo)}</div>
+                      <div className="kpi-value">{formatCount(kpis.hmo)}</div>
                     </div>
                     <div className="kpi-product__col">
                       <span className="kpi-pill kpi-pill--tpa">TPA</span>
-                      <div className="kpi-product__value">{formatCount(kpis.tpa)}</div>
+                      <div className="kpi-value">{formatCount(kpis.tpa)}</div>
                     </div>
                   </div>
                 </>
