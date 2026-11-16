@@ -63,15 +63,17 @@ export default function AccountsDirectory() {
     })
   }, [accounts, search, status, product])
 
-  const stats = useMemo(
-    () => [
-      { key: 'total', title: 'Accounts', value: accounts.length },
-      { key: 'approved', title: 'Approved', value: accounts.filter((c) => c.account.status === 'approved').length },
-      { key: 'active', title: 'Active coverage', value: accounts.filter((c) => c.coverage.status === 'active').length },
-      { key: 'members', title: 'Members covered', value: accounts.reduce((n, c) => n + membersCovered(c), 0) },
-    ],
-    [accounts],
-  )
+  const kpis = useMemo(() => {
+    const byProduct = (p: Case['company']['productType']) =>
+      accounts.filter((c) => c.company.productType === p).length
+    return {
+      overall: accounts.length,
+      active: accounts.filter((c) => c.coverage.status === 'active').length,
+      members: accounts.reduce((n, c) => n + membersCovered(c), 0),
+      hmo: byProduct('HMO'),
+      tpa: byProduct('TPA'),
+    }
+  }, [accounts])
 
   const openCase = (c: Case) => navigate(`/cases/${c.id}/${c.currentWorkArea}`)
 
@@ -147,15 +149,42 @@ export default function AccountsDirectory() {
       ) : (
         <>
           <div className="app-dashboard__stats">
-            {stats.map((s) => (
-              <Card key={s.key} size="small">
-                {loading ? (
-                  <Skeleton active paragraph={false} title={{ width: '60%' }} />
-                ) : (
-                  <Statistic title={s.title} value={s.value} />
-                )}
-              </Card>
-            ))}
+            <Card size="small">
+              {loading ? (
+                <Skeleton active paragraph={false} title={{ width: '60%' }} />
+              ) : (
+                <Statistic title="Overall accounts" value={kpis.overall} />
+              )}
+            </Card>
+            <Card size="small">
+              {loading ? (
+                <Skeleton active paragraph={false} title={{ width: '60%' }} />
+              ) : (
+                <Statistic title="Active" value={kpis.active} />
+              )}
+            </Card>
+            <Card size="small">
+              {loading ? (
+                <Skeleton active paragraph={false} title={{ width: '60%' }} />
+              ) : (
+                <Statistic title="Members covered" value={kpis.members} />
+              )}
+            </Card>
+            <Card size="small">
+              {loading ? (
+                <Skeleton active paragraph={false} title={{ width: '60%' }} />
+              ) : (
+                <>
+                  <Text type="secondary" style={{ fontSize: 14 }}>
+                    By product
+                  </Text>
+                  <div style={{ display: 'flex', gap: 32, marginTop: 4 }}>
+                    <Statistic title="HMO" value={kpis.hmo} />
+                    <Statistic title="TPA" value={kpis.tpa} />
+                  </div>
+                </>
+              )}
+            </Card>
           </div>
 
           <Space wrap style={{ marginBottom: 16 }}>
