@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  App, Button, Card, Collapse, Empty, Input, Popover, Select, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography,
+  App, Button, Card, Empty, Input, Popover, Select, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography,
 } from 'antd'
 import { FilterOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -338,24 +338,9 @@ export default function RenewalsDashboard() {
                 key: 'progress',
                 label: `In Progress (${inProgress.length})`,
                 children: (
-                  <>
-                    <Table<Row> rowKey={(r) => r.rn!.id} columns={progressColumns} dataSource={shownProgress}
-                      loading={loading} pagination={{ pageSize: 10, hideOnSinglePage: true }}
-                      locale={{ emptyText: emptyProgress }} />
-                    {history.length > 0 && (
-                      <Collapse
-                        style={{ marginTop: 16 }}
-                        items={[{
-                          key: 'history',
-                          label: `Recently completed and not renewed (${history.length})`,
-                          children: (
-                            <Table<Row> rowKey={(r) => r.rn!.id} columns={historyColumns} dataSource={history}
-                              pagination={false} size="small" />
-                          ),
-                        }]}
-                      />
-                    )}
-                  </>
+                  <Table<Row> rowKey={(r) => r.rn!.id} columns={progressColumns} dataSource={shownProgress}
+                    loading={loading} pagination={{ pageSize: 10, hideOnSinglePage: true }}
+                    locale={{ emptyText: emptyProgress }} />
                 ),
               },
               {

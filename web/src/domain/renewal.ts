@@ -16,7 +16,7 @@
 export type RenewalChannel = 'Direct' | 'Agent' | 'Broker'
 
 /** How far a sample account has been pre-advanced so the list reads like real work. */
-export type RenewalPreset = 'new' | 'rates' | 'sent' | 'accepted' | 'completed'
+export type RenewalPreset = 'new' | 'rates' | 'sent' | 'accepted' | 'completed' | 'not_renewed'
 
 export interface RenewalContact {
   name: string
@@ -347,6 +347,20 @@ export const RENEWAL_ACCOUNTS: RenewalAccount[] = [
     ],
     premiumPrincipal: 18500, premiumDependent: 14200,
   },
+  {
+    code: 'MA-2021-00144', name: 'Golden Harvest Foods Inc.', industry: 'Food and beverage',
+    expiry: '2026-10-15', owner: 'Joselito Reyes', ownerRole: 'Renewal Officer', channel: 'Broker',
+    intermediary: 'Vanguard Insurance Brokers', preset: 'not_renewed',
+    contacts: [{ name: 'Carmela Reyes', role: 'HR Manager', email: 'carmela.reyes@goldenharvest.example', phone: '+63 917 552 8810' }],
+    affiliates: ['Golden Harvest Logistics Inc.'],
+    principals: 420, dependents: 560,
+    sob: 'Corporate Silver 2026', mbl: 180000,
+    planCodes: [
+      { code: 'GH-PRIN-SLV', member: 'Principal', mbl: 180000, premium: 15200, room: 'Semi-private', mode: 'Annual' },
+      { code: 'GH-DEP-SLV', member: 'Dependent', mbl: 150000, premium: 11800, room: 'Ward', mode: 'Annual' },
+    ],
+    premiumPrincipal: 15200, premiumDependent: 11800,
+  },
 ]
 
 export const accountByCode = (code: string): RenewalAccount | null =>
@@ -436,12 +450,13 @@ export function seedRenewal(acct: RenewalAccount): RenewalCase {
 /** Advance a freshly-seeded renewal so the list can show accounts mid-journey. */
 export function applyPreset(rn: RenewalCase, preset: RenewalPreset) {
   if (preset === 'new') return
-  if (['rates', 'sent', 'accepted', 'completed'].includes(preset)) {
+  if (['rates', 'sent', 'accepted', 'completed', 'not_renewed'].includes(preset)) {
     doPrepareReports(rn, true)
     doRequestRates(rn, true)
     doUseRateResponse(rn, true)
   }
-  if (['sent', 'accepted', 'completed'].includes(preset)) doSendProposal(rn, true)
+  if (['sent', 'accepted', 'completed', 'not_renewed'].includes(preset)) doSendProposal(rn, true)
+  if (preset === 'not_renewed') doRecordDecision(rn, 'not_renewing', true)
   if (['accepted', 'completed'].includes(preset)) {
     doRecordDecision(rn, 'accepted', true)
     rn.setup.sobChoice = 'carry'

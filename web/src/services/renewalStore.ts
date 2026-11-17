@@ -12,7 +12,7 @@ import type { RenewalCase } from '../domain/renewal'
 import { RENEWAL_ACCOUNTS, renewalIdFor, seedRenewal } from '../domain/renewal'
 
 const STORE_KEY = 'hms4-renewal:v1'
-const BASELINE = 1
+const BASELINE = 2
 
 export interface RenewalStoreShape {
   cases: Record<string, RenewalCase>
