@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   App, Button, Card, Collapse, Empty, Input, Popover, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
 } from 'antd'
-import { FilterOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { FilterOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useRenewals } from '../../state/RenewalProvider'
 import { useInitialLoad } from '../../hooks/useInitialLoad'
@@ -58,7 +58,7 @@ interface Row {
 }
 
 export default function RenewalsDashboard() {
-  const { cases, getCase, startRenewal, resetDemo } = useRenewals()
+  const { cases, getCase, startRenewal } = useRenewals()
   const { loading, error, retry } = useInitialLoad()
   const navigate = useNavigate()
   const { modal, message } = App.useApp()
@@ -118,21 +118,6 @@ export default function RenewalsDashboard() {
         const rn = startRenewal(acct)
         message.success('Renewal started — opening Renewal Data & Pricing.')
         navigate(`/sales/renewals/${rn.id}/review`)
-      },
-    })
-  }
-
-  function handleReset() {
-    modal.confirm({
-      title: 'Reset renewal demo data?',
-      content:
-        'This clears every sample renewal and returns all accounts to their starting stages. Nothing outside this prototype is affected.',
-      okText: 'Reset demo',
-      okButtonProps: { danger: true },
-      onOk: () => {
-        resetDemo()
-        setUi((s) => ({ ...s, search: '', filters: {} }))
-        message.success('Renewal demo data reset.')
       },
     })
   }
@@ -308,7 +293,6 @@ export default function RenewalsDashboard() {
       <PageHeader
         title="Corporate Renewals"
         supporting="Find upcoming renewals and continue work already started. Everything here is clearly-labelled demo content."
-        extra={<Button icon={<ReloadOutlined />} onClick={handleReset}>Reset demo</Button>}
       />
 
       {/* Four compact statistics. Counts come from the records; "Upcoming" counts
