@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  App, Button, Card, Collapse, Empty, Input, Popover, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
+  App, Button, Card, Collapse, Empty, Input, Popover, Select, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography,
 } from 'antd'
 import { FilterOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -310,42 +310,46 @@ export default function RenewalsDashboard() {
         <Empty description={error}><Button type="primary" onClick={retry}>Retry</Button></Empty>
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
-            <Space>
-              <Button type={ui.tab === 'upcoming' ? 'primary' : 'default'} onClick={() => setUi((s) => ({ ...s, tab: 'upcoming', filters: {} }))}>
-                Upcoming Renewals ({upcoming.length})
-              </Button>
-              <Button type={ui.tab === 'progress' ? 'primary' : 'default'} onClick={() => setUi((s) => ({ ...s, tab: 'progress', filters: {} }))}>
-                In Progress ({inProgress.length})
-              </Button>
-            </Space>
-            {toolbar}
-          </div>
-
-          {ui.tab === 'upcoming' ? (
-            <Table<Row> rowKey={(r) => r.acct.code} columns={upcomingColumns} dataSource={shownUpcoming}
-              loading={loading} pagination={{ pageSize: 10, hideOnSinglePage: true }}
-              locale={{ emptyText: emptyUpcoming }} />
-          ) : (
-            <>
-              <Table<Row> rowKey={(r) => r.rn!.id} columns={progressColumns} dataSource={shownProgress}
-                loading={loading} pagination={{ pageSize: 10, hideOnSinglePage: true }}
-                locale={{ emptyText: emptyProgress }} />
-              {history.length > 0 && (
-                <Collapse
-                  style={{ marginTop: 16 }}
-                  items={[{
-                    key: 'history',
-                    label: `Recently completed and not renewed (${history.length})`,
-                    children: (
-                      <Table<Row> rowKey={(r) => r.rn!.id} columns={historyColumns} dataSource={history}
-                        pagination={false} size="small" />
-                    ),
-                  }]}
-                />
-              )}
-            </>
-          )}
+          <Tabs
+            activeKey={ui.tab}
+            onChange={(k) => setUi((s) => ({ ...s, tab: k, filters: {} }))}
+            tabBarExtraContent={{ right: toolbar }}
+            items={[
+              {
+                key: 'upcoming',
+                label: `Upcoming Renewals (${upcoming.length})`,
+                children: (
+                  <Table<Row> rowKey={(r) => r.acct.code} columns={upcomingColumns} dataSource={shownUpcoming}
+                    loading={loading} pagination={{ pageSize: 10, hideOnSinglePage: true }}
+                    locale={{ emptyText: emptyUpcoming }} />
+                ),
+              },
+              {
+                key: 'progress',
+                label: `In Progress (${inProgress.length})`,
+                children: (
+                  <>
+                    <Table<Row> rowKey={(r) => r.rn!.id} columns={progressColumns} dataSource={shownProgress}
+                      loading={loading} pagination={{ pageSize: 10, hideOnSinglePage: true }}
+                      locale={{ emptyText: emptyProgress }} />
+                    {history.length > 0 && (
+                      <Collapse
+                        style={{ marginTop: 16 }}
+                        items={[{
+                          key: 'history',
+                          label: `Recently completed and not renewed (${history.length})`,
+                          children: (
+                            <Table<Row> rowKey={(r) => r.rn!.id} columns={historyColumns} dataSource={history}
+                              pagination={false} size="small" />
+                          ),
+                        }]}
+                      />
+                    )}
+                  </>
+                ),
+              },
+            ]}
+          />
         </>
       )}
     </div>
