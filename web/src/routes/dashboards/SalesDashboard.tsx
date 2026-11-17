@@ -32,19 +32,20 @@ export default function SalesDashboard() {
   const config = useMemo<DashboardConfig<Case>>(() => {
     const openCase = (c: Case) => navigate(`/cases/${c.id}/${c.currentWorkArea}`)
 
-    const companyCell = (c: Case) => (
+    const nameCell = (c: Case) => (
       <div>
         <TLink onClick={() => openCase(c)} style={{ fontWeight: 500 }}>
           {c.company.name}
         </TLink>
-        <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>
-          {c.id} · {c.company.shortName}
-        </div>
+        <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{c.company.shortName}</div>
       </div>
     )
+    const mono = (v?: string) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v || '—'}</span>
 
     const inProgressColumns: ColumnsType<Case> = [
-      { title: 'Company', key: 'company', render: (_, c) => companyCell(c) },
+      { title: 'MA code', key: 'ma', render: (_, c) => mono(c.account.accountRef) },
+      { title: 'Franchise code', key: 'franchise', render: (_, c) => mono(c.id) },
+      { title: 'Name', key: 'name', render: (_, c) => nameCell(c) },
       { title: 'Business type', key: 'type', render: (_, c) => c.company.productType },
       { title: 'Current work area', key: 'wa', render: (_, c) => WORK_AREA_LABELS[c.currentWorkArea] },
       { title: 'Status', key: 'status', render: (_, c) => <CaseStatusTag c={c} /> },
