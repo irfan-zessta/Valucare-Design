@@ -84,6 +84,7 @@ export default function RenewalsDashboard() {
     [rows],
   )
   const inProgress = useMemo(() => rows.filter((r) => r.rn && !r.rn.completed && !r.rn.notRenewed), [rows])
+  const notRenewed = useMemo(() => rows.filter((r) => r.rn?.notRenewed), [rows])
   const history = useMemo(() => rows.filter((r) => r.rn && (r.rn.completed || r.rn.notRenewed)), [rows])
 
   const stats = [
@@ -150,6 +151,10 @@ export default function RenewalsDashboard() {
         return true
       }),
     [inProgress, ui.filters, q],
+  )
+  const shownNotRenewed = useMemo(
+    () => notRenewed.filter((r) => matchQ(r)),
+    [notRenewed, q],
   )
 
   const activeFilterCount = Object.values(ui.filters).filter(Boolean).length
@@ -287,6 +292,11 @@ export default function RenewalsDashboard() {
       {(ui.search || activeFilterCount) ? <Button onClick={clear}>Clear</Button> : null}
     </Empty>
   )
+  const emptyNotRenewed = (
+    <Empty description={ui.search ? 'No matching renewals' : 'No renewals have been marked not renewed.'}>
+      {ui.search ? <Button onClick={clear}>Clear</Button> : null}
+    </Empty>
+  )
 
   return (
     <div className="app-page app-page--wide">
@@ -346,6 +356,15 @@ export default function RenewalsDashboard() {
                       />
                     )}
                   </>
+                ),
+              },
+              {
+                key: 'not-renewed',
+                label: `Not renewed (${notRenewed.length})`,
+                children: (
+                  <Table<Row> rowKey={(r) => r.rn!.id} columns={historyColumns} dataSource={shownNotRenewed}
+                    loading={loading} pagination={{ pageSize: 10, hideOnSinglePage: true }}
+                    locale={{ emptyText: emptyNotRenewed }} />
                 ),
               },
             ]}
