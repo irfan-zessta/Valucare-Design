@@ -8,12 +8,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { App, Button, Drawer, Empty, Form, Input, Result, Select, Space, Tag, Timeline, Typography } from 'antd'
-import { ArrowRightOutlined, FileTextOutlined, HistoryOutlined, WarningOutlined } from '@ant-design/icons'
+import { FileTextOutlined, HistoryOutlined, WarningOutlined } from '@ant-design/icons'
 import { useRenewals } from '../../state/RenewalProvider'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDate, formatDateTime } from '../../lib/format'
 import {
-  RENEWAL_PHASE_IDS, accountById, nextStep, renewalPhase, statusInfo, toneColor,
+  RENEWAL_PHASE_IDS, accountById, nextStep, statusInfo, toneColor,
   type RenewalCase, type RenewalPhaseId,
 } from '../../domain/renewal'
 import { RenewalStepper, openDocPreview, type DocKind } from './shared'
@@ -63,8 +63,6 @@ export default function RenewalWorkspace() {
 
   const activePhase = (RENEWAL_PHASE_IDS.includes(phase as RenewalPhaseId) ? phase : 'review') as RenewalPhaseId
   const info = statusInfo(rn)
-  const ns = nextStep(rn)
-  const nsPhase = renewalPhase(ns.phase)
 
   const goPhase = (p: RenewalPhaseId) => navigate(`/sales/renewals/${rn.id}/${p}`)
   const patch = (recipe: (c: RenewalCase) => void) => patchCase(rn.id, recipe)
@@ -97,18 +95,6 @@ export default function RenewalWorkspace() {
         <div className="app-pageheader-card app-pageheader-card--stepper">
           <RenewalStepper rn={rn} viewing={activePhase} onSelect={goPhase} />
         </div>
-      </div>
-
-      {/* One clear next action. */}
-      <div className="rnw-next">
-        <div className="rnw-next__main">
-          <span className="rnw-next__eyebrow">
-            Next action · Phase {nsPhase.n} of {RENEWAL_PHASE_IDS.length}: {nsPhase.label}
-            {ns.waitingOn && <Tag color="gold" style={{ marginLeft: 8 }}>Waiting on {ns.waitingOn}</Tag>}
-          </span>
-          <b className="rnw-next__sentence">{ns.sentence}</b>
-        </div>
-        <Button type="primary" onClick={() => goPhase(ns.phase)}>{ns.label} <ArrowRightOutlined /></Button>
       </div>
 
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
