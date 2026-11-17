@@ -109,9 +109,9 @@ export default function RenewalsDashboard() {
       width: 520,
       content: (
         <div>
-          Start a sample renewal for <b>{acct.name}</b> ({acct.code}). Proposed renewal period{' '}
-          <b>{formatDate(rp.from)} – {formatDate(rp.to)}</b>. Existing contacts, affiliates, intermediary,
-          Schedule of Benefits and plan codes are carried forward — no new account is created.
+          <div><b>{acct.name}</b> ({acct.code})</div>
+          <div>{formatDate(rp.from)} – {formatDate(rp.to)}</div>
+          <div style={{ marginTop: 12 }}>Existing account details will carry forward.</div>
         </div>
       ),
       okText: 'Start renewal',
