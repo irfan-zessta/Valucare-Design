@@ -29,6 +29,7 @@ import {
   Statistic,
   Table,
   Tabs,
+  Tag,
   Tooltip,
   Typography,
 } from 'antd'
@@ -215,14 +216,14 @@ export function DepartmentDashboard<T>({
   )
 
   const toolbar = (
-    <Space wrap>
+    <Space wrap size={8}>
       <Input
         allowClear
         prefix={<SearchOutlined />}
         placeholder="Search company or reference"
         value={ui.search}
         onChange={(e) => setUi((s) => ({ ...s, search: e.target.value }))}
-        style={{ width: 320 }}
+        style={{ width: 240 }}
       />
       {config.filters.length > 0 && (
         <Popover content={filtersPopover} title="Filters" trigger="click" placement="bottomLeft">
@@ -231,20 +232,15 @@ export function DepartmentDashboard<T>({
           </Button>
         </Popover>
       )}
-      {hasQueryOrFilters && (
-        <Button type="text" onClick={clearFilters}>
-          Clear filters
-        </Button>
-      )}
     </Space>
   )
 
   const renderTable = (data: T[], columns: ColumnsType<T>) => (
     <Table<T>
+      className="app-dash-table"
       rowKey={config.rowId}
       columns={columns}
       dataSource={data}
-      size="small"
       onRow={config.onRowClick ? (record) => ({
         onClick: () => config.onRowClick!(record),
         style: { cursor: 'pointer' },
@@ -262,6 +258,22 @@ export function DepartmentDashboard<T>({
     />
   )
 
+  // Applied filters as removable chips (label + chosen option text).
+  const filterChips = config.filters.flatMap((f) => {
+    const v = ui.filters[f.key]
+    if (!v) return []
+    const opt = f.options.find((o) => o.value === v)
+    return [{ key: f.key, label: f.label, text: opt?.label ?? v }]
+  })
+
+  // Tab label with a small count badge beside the text.
+  const tabLabel = (text: string, n: number) => (
+    <span className="dash-tab">
+      {text}
+      <span className="dash-tab__count">{n}</span>
+    </span>
+  )
+
   return (
     <div className="app-page app-page--wide">
       {/* 1. Page header */}
@@ -270,16 +282,18 @@ export function DepartmentDashboard<T>({
       {config.note && <div style={{ marginTop: -8, marginBottom: 16 }}>{config.note}</div>}
 
       {error ? (
-        <Result
-          status="error"
-          title="Couldn’t load records"
-          subTitle={error}
-          extra={
-            <Button type="primary" onClick={onRetry}>
-              Retry
-            </Button>
-          }
-        />
+        <div className="app-table-panel app-table-panel--state">
+          <Result
+            status="error"
+            title="Couldn’t load records"
+            subTitle={error}
+            extra={
+              <Button type="primary" onClick={onRetry}>
+                Retry
+              </Button>
+            }
+          />
+        </div>
       ) : (
         <>
           {/* 2. Four compact statistics — case stats, hidden on a leading tab
@@ -298,36 +312,57 @@ export function DepartmentDashboard<T>({
             </div>
           )}
 
+          {/* Applied filters as removable chips. */}
+          {!isLeadingActive && filterChips.length > 0 && (
+            <div className="app-filterchips">
+              <span className="app-filterchips__label">Filters</span>
+              {filterChips.map((ch) => (
+                <Tag
+                  key={ch.key}
+                  closable
+                  onClose={() => setUi((s) => ({ ...s, filters: { ...s.filters, [ch.key]: undefined } }))}
+                >
+                  {ch.label}: {ch.text}
+                </Tag>
+              ))}
+              <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, filters: {} }))}>
+                Clear filters
+              </Button>
+            </div>
+          )}
+
           {/* 3. Work list — search + filters sit on the right of the tab bar
                  (hidden on a leading tab, which owns its own toolbar). */}
-          <Tabs
-            activeKey={activeTab}
-            onChange={(k) => setUi((s) => ({ ...s, tab: k }))}
-            tabBarExtraContent={isLeadingActive ? undefined : { right: toolbar }}
-            items={[
-              ...leadingTabs.map((t) => ({ key: t.key, label: t.label, children: t.content })),
-              {
-                key: 'all',
-                label: `All (${filtered.length})`,
-                children: loading ? <Skeleton active /> : renderTable(filtered, config.inProgressColumns),
-              },
-              {
-                key: 'in-progress',
-                label: `In progress (${inProgress.length})`,
-                children: loading ? <Skeleton active /> : renderTable(inProgress, config.inProgressColumns),
-              },
-              {
-                key: 'completed',
-                label: `Completed (${completed.length})`,
-                children: loading ? <Skeleton active /> : renderTable(completed, config.completedColumns),
-              },
-              {
-                key: 'needs-action',
-                label: `Needs my action (${needsAction})`,
-                children: loading ? <Skeleton active /> : renderTable(needsActionRows, config.inProgressColumns),
-              },
-            ]}
-          />
+          <div className="app-table-panel">
+            <Tabs
+              activeKey={activeTab}
+              onChange={(k) => setUi((s) => ({ ...s, tab: k }))}
+              tabBarExtraContent={isLeadingActive ? undefined : { right: toolbar }}
+              items={[
+                ...leadingTabs.map((t) => ({ key: t.key, label: t.label, children: t.content })),
+                {
+                  key: 'all',
+                  label: tabLabel('All', filtered.length),
+                  children: loading ? <Skeleton active /> : renderTable(filtered, config.inProgressColumns),
+                },
+                {
+                  key: 'in-progress',
+                  label: tabLabel('In progress', inProgress.length),
+                  children: loading ? <Skeleton active /> : renderTable(inProgress, config.inProgressColumns),
+                },
+                {
+                  key: 'completed',
+                  label: tabLabel('Completed', completed.length),
+                  children: loading ? <Skeleton active /> : renderTable(completed, config.completedColumns),
+                },
+                {
+                  key: 'needs-action',
+                  label: tabLabel('Needs my action', needsAction),
+                  children: loading ? <Skeleton active /> : renderTable(needsActionRows, config.inProgressColumns),
+                },
+              ]}
+            />
+          </div>
         </>
       )}
     </div>

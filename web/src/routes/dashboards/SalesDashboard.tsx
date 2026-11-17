@@ -4,9 +4,9 @@
 // from actual records — never hardcoded.
 // ===========================================================================
 import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { Typography } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, RightOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
@@ -18,7 +18,7 @@ import { WORK_AREA_LABELS, WORK_AREA_ORDER, type Case } from '../../domain/types
 import { nextAction, responsibleDepartment } from '../../domain/progress'
 import { formatDate } from '../../lib/format'
 
-const { Link: TLink, Text } = Typography
+const { Text } = Typography
 
 export default function SalesDashboard() {
   const { cases } = useCases()
@@ -30,42 +30,85 @@ export default function SalesDashboard() {
   const openEnquiries = useMemo(() => enquiries.filter((e) => e.status === 'open').length, [enquiries])
 
   const config = useMemo<DashboardConfig<Case>>(() => {
-    const openCase = (c: Case) => navigate(`/cases/${c.id}/${c.currentWorkArea}`)
+    const caseHref = (c: Case) => `/cases/${c.id}/${c.currentWorkArea}`
+    const openCase = (c: Case) => navigate(caseHref(c))
 
-    const nameCell = (c: Case) => (
-      <div>
-        <TLink onClick={() => openCase(c)} style={{ fontWeight: 500 }}>
-          {c.company.name}
-        </TLink>
-        <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{c.company.shortName}</div>
+    // Company: name as the open-case link, with the available references beneath
+    // it (each labelled; missing ones omitted). The case id doubles as the
+    // franchise reference in this app.
+    const companyCell = (c: Case) => {
+      const refs: { label: string; value: string }[] = [{ label: 'Franchise', value: c.id }]
+      if (c.account.accountRef) refs.push({ label: 'Account', value: c.account.accountRef })
+      return (
+        <div className="sales-co">
+          <RouterLink
+            className="sales-co__name"
+            to={caseHref(c)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {c.company.name}
+          </RouterLink>
+          <div className="sales-co__refs">
+            {refs.map((r, i) => (
+              <span key={r.label}>
+                {i > 0 && <span className="sales-co__sep">·</span>}
+                <span className="sales-co__reflabel">{r.label}</span> {r.value}
+              </span>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    // Progress: current work area on top, status tag beneath.
+    const progressCell = (c: Case) => (
+      <div className="sales-progress">
+        <div className="sales-progress__area">{WORK_AREA_LABELS[c.currentWorkArea]}</div>
+        <div className="sales-progress__status">
+          <CaseStatusTag c={c} />
+        </div>
       </div>
     )
-    const mono = (v?: string) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v || '—'}</span>
+
+    // Next action: the one instruction, with a waiting treatment when it sits
+    // with another team.
+    const nextCell = (c: Case) => {
+      const a = nextAction(c)
+      return (
+        <div className={`sales-next${a.waiting ? ' sales-next--waiting' : ''}`}>
+          {a.waiting && <ClockCircleOutlined className="sales-next__icon" />}
+          <span>{a.label}</span>
+        </div>
+      )
+    }
+
+    const chevronCol = {
+      title: '',
+      key: 'go',
+      width: 44,
+      align: 'right' as const,
+      render: () => <RightOutlined className="sales-chevron" />,
+    }
 
     const inProgressColumns: ColumnsType<Case> = [
-      { title: 'MA code', key: 'ma', render: (_, c) => mono(c.account.accountRef) },
-      { title: 'Franchise code', key: 'franchise', render: (_, c) => mono(c.id) },
-      { title: 'Name', key: 'name', render: (_, c) => nameCell(c) },
-      { title: 'Business type', key: 'type', render: (_, c) => c.company.productType },
-      { title: 'Current work area', key: 'wa', render: (_, c) => WORK_AREA_LABELS[c.currentWorkArea] },
-      { title: 'Status', key: 'status', render: (_, c) => <CaseStatusTag c={c} /> },
-      {
-        title: 'Next action',
-        key: 'next',
-        render: (_, c) => <Text type="secondary">{nextAction(c).label}</Text>,
-      },
+      { title: 'Company', key: 'company', render: (_, c) => companyCell(c) },
+      { title: 'Product', key: 'product', width: 96, render: (_, c) => c.company.productType },
+      { title: 'Progress', key: 'progress', width: 220, render: (_, c) => progressCell(c) },
+      { title: 'Next action', key: 'next', render: (_, c) => nextCell(c) },
+      chevronCol,
     ]
 
     const completedColumns: ColumnsType<Case> = [
-      { title: 'MA code', key: 'ma', render: (_, c) => mono(c.account.accountRef) },
-      { title: 'Franchise code', key: 'franchise', render: (_, c) => mono(c.id) },
-      { title: 'Name', key: 'name', render: (_, c) => nameCell(c) },
-      { title: 'Business type', key: 'type', render: (_, c) => c.company.productType },
+      { title: 'Company', key: 'company', render: (_, c) => companyCell(c) },
+      { title: 'Product', key: 'product', width: 96, render: (_, c) => c.company.productType },
+      { title: 'Status', key: 'status', width: 220, render: (_, c) => <CaseStatusTag c={c} /> },
       {
-        title: 'Completion date',
+        title: 'Completed',
         key: 'done',
-        render: (_, c) => formatDate(c.coverage.effectiveDate ?? c.updatedAt),
+        width: 160,
+        render: (_, c) => <Text type="secondary">{formatDate(c.coverage.effectiveDate ?? c.updatedAt)}</Text>,
       },
+      chevronCol,
     ]
 
     return {
@@ -75,7 +118,16 @@ export default function SalesDashboard() {
       // New Enquiries sits before In progress / Completed; its badge counts open
       // enquiries only, separate from the case (lead/franchise) counts.
       leadingTabs: [
-        { key: 'enquiries', label: `New Enquiries (${openEnquiries})`, content: <EnquiriesWorkspace /> },
+        {
+          key: 'enquiries',
+          label: (
+            <span className="dash-tab">
+              New Enquiries
+              <span className="dash-tab__count">{openEnquiries}</span>
+            </span>
+          ),
+          content: <EnquiriesWorkspace />,
+        },
       ],
       secondaryAction: {
         label: 'New enquiry',
