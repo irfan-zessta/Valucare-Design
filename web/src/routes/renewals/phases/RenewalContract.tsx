@@ -13,7 +13,7 @@ import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime } from '../../../lib/format'
 import { CONTRACT_STAGES, blockContractAdvance, toneColor, type RenewalCase, type Tone } from '../../../domain/renewal'
-import { SimNote, type RenewalPhaseProps } from '../shared'
+import { type RenewalPhaseProps } from '../shared'
 
 const { Text, Paragraph } = Typography
 const now = () => new Date().toISOString()

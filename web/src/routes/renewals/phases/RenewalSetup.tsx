@@ -17,7 +17,7 @@ import { FormActions } from '../../../components/ui/FormActions'
 import { formatPeso, formatDate, formatCount } from '../../../lib/format'
 import {
   kycReached, nextKyc, sampleMemberData,
-  type RenewalCase, type RenewalPlanCode,
+  type RenewalPlanCode,
 } from '../../../domain/renewal'
 import { SimNote, type RenewalPhaseProps } from '../shared'
 

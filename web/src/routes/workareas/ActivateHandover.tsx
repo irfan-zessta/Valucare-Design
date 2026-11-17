@@ -14,7 +14,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import type { Case } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
 import { FormSection } from '../../components/ui/FormSection'
-import { formatDate, formatDateTime } from '../../lib/format'
+import { formatDateTime } from '../../lib/format'
 
 type ActStatus = 'Pending' | 'Scheduled' | 'Active'
 

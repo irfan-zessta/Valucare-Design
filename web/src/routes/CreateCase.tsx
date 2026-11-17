@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert, AutoComplete, Button, Card, Col, Form, Input, Row, Select, Space, Typography } from 'antd'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
@@ -20,6 +20,15 @@ const KNOWN_COMPANIES: { name: string; productType: ProductType; businessSource:
   { name: 'Sampaguita Foods Inc.', productType: 'HMO', businessSource: 'Broker' },
   { name: 'Narra Shipping Lines Inc.', productType: 'TPA', businessSource: 'Agent' },
 ]
+
+// What a typeahead suggestion carries: either an existing case to open, or a
+// known company whose source/product should prefill the capture form.
+type CompanySuggestion =
+  | { kind: 'case'; to: string }
+  | { kind: 'known'; businessSource: BusinessSource; productType: ProductType }
+
+type SuggestOption = { value: string; label: ReactNode; data: CompanySuggestion }
+type SuggestGroup = { label: string; options: SuggestOption[] }
 
 export default function CreateCase() {
   const { cases, createCase } = useCases()
@@ -54,7 +63,7 @@ export default function CreateCase() {
   // Smart typeahead for the Company name field: as the user types, suggest
   // matching existing cases (open instead of duplicating) and known companies
   // (prefill their source/product). Filtering is done here, not by the widget.
-  const companyOptions = useMemo(() => {
+  const companyOptions = useMemo<SuggestGroup[]>(() => {
     const nameQ = name.trim().toLowerCase()
     if (nameQ.length < 1) return []
 
@@ -70,31 +79,27 @@ export default function CreateCase() {
       ),
     })
 
-    const caseOpts = cases
+    const caseOpts: SuggestOption[] = cases
       .filter((c) => c.company.name.toLowerCase().includes(nameQ))
       .map((c) => ({
         value: c.company.name,
-        data: { kind: 'case' as const, to: `/cases/${c.id}/${c.currentWorkArea}` },
+        data: { kind: 'case', to: `/cases/${c.id}/${c.currentWorkArea}` },
         ...row(c.company.name, `${c.id} · open case`),
       }))
 
-    const knownOpts = KNOWN_COMPANIES.filter(
+    const knownOpts: SuggestOption[] = KNOWN_COMPANIES.filter(
       (k) => k.name.toLowerCase().includes(nameQ) && !cases.some((c) => c.company.name.toLowerCase() === k.name.toLowerCase()),
     ).map((k) => ({
       value: k.name,
-      data: { kind: 'known' as const, businessSource: k.businessSource, productType: k.productType },
+      data: { kind: 'known', businessSource: k.businessSource, productType: k.productType },
       ...row(k.name, `${k.businessSource} · ${k.productType}`),
     }))
 
-    const groups: { label: string; options: typeof caseOpts }[] = []
+    const groups: SuggestGroup[] = []
     if (caseOpts.length) groups.push({ label: 'Existing cases — open instead of duplicating', options: caseOpts })
     if (knownOpts.length) groups.push({ label: 'Known companies', options: knownOpts })
     return groups
   }, [name, cases])
-
-  type CompanySuggestion =
-    | { kind: 'case'; to: string }
-    | { kind: 'known'; businessSource: BusinessSource; productType: ProductType }
 
   function handleSuggestionSelect(_value: string, option: { data?: CompanySuggestion }) {
     const data = option.data
@@ -198,7 +203,9 @@ export default function CreateCase() {
                   setName(val)
                   if (nameInvalid) setNameInvalid(false)
                 }}
-                onSelect={handleSuggestionSelect}
+                onSelect={(value, option) =>
+                  handleSuggestionSelect(value, option as { data?: CompanySuggestion })
+                }
                 placeholder="e.g. Northwind Logistics Corp."
               />
             </Form.Item>

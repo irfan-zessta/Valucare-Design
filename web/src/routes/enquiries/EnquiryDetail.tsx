@@ -9,7 +9,7 @@
 // Converting produces a LEAD (carrying everything forward) and links the two.
 // ===========================================================================
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   App, Alert, Button, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Modal,
   Result, Select, Space, Tag, Timeline, Typography,
@@ -53,7 +53,7 @@ export default function EnquiryDetail() {
   const { getEnquiry, logActivity, scheduleFollowUp, completeFollowUp, convertEnquiry, markLost } = useEnquiries()
   const { createLeadFromEnquiry, getLeadByEnquiry } = useLeads()
   const navigate = useNavigate()
-  const { modal, message } = App.useApp()
+  const { message } = App.useApp()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [lostOpen, setLostOpen] = useState(false)
