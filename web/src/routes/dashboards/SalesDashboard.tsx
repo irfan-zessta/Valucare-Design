@@ -5,7 +5,7 @@
 // ===========================================================================
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Typography } from 'antd'
+import { Typography } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
@@ -54,40 +54,17 @@ export default function SalesDashboard() {
         key: 'next',
         render: (_, c) => <Text type="secondary">{nextAction(c).label}</Text>,
       },
-      {
-        title: '',
-        key: 'continue',
-        align: 'right',
-        render: (_, c) => (
-          <Button type="link" style={{ paddingInline: 0 }} onClick={() => openCase(c)}>
-            Continue
-          </Button>
-        ),
-      },
     ]
 
     const completedColumns: ColumnsType<Case> = [
-      { title: 'Company', key: 'company', render: (_, c) => companyCell(c) },
+      { title: 'MA code', key: 'ma', render: (_, c) => mono(c.account.accountRef) },
+      { title: 'Franchise code', key: 'franchise', render: (_, c) => mono(c.id) },
+      { title: 'Name', key: 'name', render: (_, c) => nameCell(c) },
       { title: 'Business type', key: 'type', render: (_, c) => c.company.productType },
-      {
-        title: 'Account reference',
-        key: 'ref',
-        render: (_, c) => c.account.accountRef ?? '—',
-      },
       {
         title: 'Completion date',
         key: 'done',
         render: (_, c) => formatDate(c.coverage.effectiveDate ?? c.updatedAt),
-      },
-      {
-        title: '',
-        key: 'view',
-        align: 'right',
-        render: (_, c) => (
-          <Button type="link" style={{ paddingInline: 0 }} onClick={() => openCase(c)}>
-            View
-          </Button>
-        ),
       },
     ]
 
@@ -110,6 +87,7 @@ export default function SalesDashboard() {
         onClick: () => navigate('/sales/corporate-new-business/new'),
       },
       rowId: (c) => c.id,
+      onRowClick: openCase,
       isCompleted: (c) => c.isCompleted,
       // Only cases whose next action belongs to Sales — not every pending case.
       needsMyAction: (c) => {

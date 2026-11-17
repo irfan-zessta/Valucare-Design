@@ -77,6 +77,9 @@ export interface DashboardConfig<T> {
 
   emptyText?: string // "No records yet" default
 
+  /** When set, the whole row is clickable (cursor + onClick) to open the record. */
+  onRowClick?: (row: T) => void
+
   /**
    * Optional self-contained tabs rendered BEFORE the built-in case tabs (e.g.
    * Sales' "New Enquiries"). They own their content — the shared statistics and
@@ -242,6 +245,10 @@ export function DepartmentDashboard<T>({
       columns={columns}
       dataSource={data}
       size="small"
+      onRow={config.onRowClick ? (record) => ({
+        onClick: () => config.onRowClick!(record),
+        style: { cursor: 'pointer' },
+      }) : undefined}
       pagination={{ pageSize: 10, hideOnSinglePage: true }}
       locale={{
         emptyText: hasQueryOrFilters ? (
