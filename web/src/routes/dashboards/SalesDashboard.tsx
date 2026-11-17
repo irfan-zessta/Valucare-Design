@@ -6,7 +6,7 @@
 import { useMemo } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { Typography } from 'antd'
-import { PlusOutlined, RightOutlined, ClockCircleOutlined } from '@ant-design/icons'
+import { PlusOutlined, RightOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
@@ -70,18 +70,6 @@ export default function SalesDashboard() {
       </div>
     )
 
-    // Next action: the one instruction, with a waiting treatment when it sits
-    // with another team.
-    const nextCell = (c: Case) => {
-      const a = nextAction(c)
-      return (
-        <div className={`sales-next${a.waiting ? ' sales-next--waiting' : ''}`}>
-          {a.waiting && <ClockCircleOutlined className="sales-next__icon" />}
-          <span>{a.label}</span>
-        </div>
-      )
-    }
-
     const chevronCol = {
       title: '',
       key: 'go',
@@ -94,7 +82,6 @@ export default function SalesDashboard() {
       { title: 'Company', key: 'company', render: (_, c) => companyCell(c) },
       { title: 'Product', key: 'product', width: 96, render: (_, c) => c.company.productType },
       { title: 'Progress', key: 'progress', width: 220, render: (_, c) => progressCell(c) },
-      { title: 'Next action', key: 'next', render: (_, c) => nextCell(c) },
       chevronCol,
     ]
 
