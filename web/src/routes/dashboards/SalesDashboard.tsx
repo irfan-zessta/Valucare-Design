@@ -6,7 +6,7 @@
 import { useMemo } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { Typography } from 'antd'
-import { PlusOutlined, RightOutlined } from '@ant-design/icons'
+import { PlusOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
@@ -33,12 +33,16 @@ export default function SalesDashboard() {
     const caseHref = (c: Case) => `/cases/${c.id}/${c.currentWorkArea}`
     const openCase = (c: Case) => navigate(caseHref(c))
 
-    // Company: name as the open-case link, with the available references beneath
-    // it (each labelled; missing ones omitted). The case id doubles as the
-    // franchise reference in this app.
+    // Company: full name as the open-case link, with the available references
+    // beneath it. In this app the case reference (c.id, NB-…) is also the
+    // franchise application's identifier, so it is shown once as "Case"; the
+    // MA/account code (c.account.accountRef, ACC-…) only exists once the account
+    // is created. The short name (no label — it's a name, not a code) leads.
     const companyCell = (c: Case) => {
-      const refs: { label: string; value: string }[] = [{ label: 'Franchise', value: c.id }]
-      if (c.account.accountRef) refs.push({ label: 'Account', value: c.account.accountRef })
+      const parts: { key: string; label?: string; value: string }[] = []
+      if (c.company.shortName) parts.push({ key: 'short', value: c.company.shortName })
+      parts.push({ key: 'case', label: 'Case', value: c.id })
+      if (c.account.accountRef) parts.push({ key: 'account', label: 'Account', value: c.account.accountRef })
       return (
         <div className="sales-co">
           <RouterLink
@@ -49,10 +53,11 @@ export default function SalesDashboard() {
             {c.company.name}
           </RouterLink>
           <div className="sales-co__refs">
-            {refs.map((r, i) => (
-              <span key={r.label}>
+            {parts.map((p, i) => (
+              <span key={p.key}>
                 {i > 0 && <span className="sales-co__sep">·</span>}
-                <span className="sales-co__reflabel">{r.label}</span> {r.value}
+                {p.label && <span className="sales-co__reflabel">{p.label}</span>}
+                {p.label ? ` ${p.value}` : p.value}
               </span>
             ))}
           </div>
@@ -60,7 +65,7 @@ export default function SalesDashboard() {
       )
     }
 
-    // Progress: current work area on top, status tag beneath.
+    // Progress: current work area on top, exact workflow status beneath.
     const progressCell = (c: Case) => (
       <div className="sales-progress">
         <div className="sales-progress__area">{WORK_AREA_LABELS[c.currentWorkArea]}</div>
@@ -70,32 +75,41 @@ export default function SalesDashboard() {
       </div>
     )
 
-    const chevronCol = {
-      title: '',
-      key: 'go',
-      width: 44,
-      align: 'right' as const,
-      render: () => <RightOutlined className="sales-chevron" />,
+    // Next action: the step Sales takes next. When another team owns the step,
+    // the derived label already names who Sales is waiting on — shown muted with
+    // a clock so it reads as "not your move" at a glance.
+    const nextActionCell = (c: Case) => {
+      const a = nextAction(c)
+      return (
+        <span className={`sales-next${a.waiting ? ' sales-next--waiting' : ''}`}>
+          {a.waiting && <ClockCircleOutlined className="sales-next__icon" />}
+          <span>{a.label}</span>
+        </span>
+      )
     }
 
+    // Four scannable columns on desktop (~38 / 10 / 24 / 28). Long names and
+    // statuses wrap naturally; widths are proportional hints, not hard caps.
     const inProgressColumns: ColumnsType<Case> = [
-      { title: 'Company', key: 'company', render: (_, c) => companyCell(c) },
-      { title: 'Product', key: 'product', width: 96, render: (_, c) => c.company.productType },
-      { title: 'Progress', key: 'progress', width: 220, render: (_, c) => progressCell(c) },
-      chevronCol,
+      { title: 'Company', key: 'company', width: '38%', render: (_, c) => companyCell(c) },
+      { title: 'Product', key: 'product', width: '10%', render: (_, c) => c.company.productType },
+      { title: 'Progress', key: 'progress', width: '24%', render: (_, c) => progressCell(c) },
+      { title: 'Next action', key: 'next', width: '28%', render: (_, c) => nextActionCell(c) },
     ]
 
+    // Completed: coverage status (active / scheduled) is independent of case
+    // completion, so an account can be active with handover still pending; the
+    // completion date comes from the coverage effective date.
     const completedColumns: ColumnsType<Case> = [
-      { title: 'Company', key: 'company', render: (_, c) => companyCell(c) },
-      { title: 'Product', key: 'product', width: 96, render: (_, c) => c.company.productType },
-      { title: 'Status', key: 'status', width: 220, render: (_, c) => <CaseStatusTag c={c} /> },
+      { title: 'Company', key: 'company', width: '38%', render: (_, c) => companyCell(c) },
+      { title: 'Product', key: 'product', width: '10%', render: (_, c) => c.company.productType },
+      { title: 'Status', key: 'status', width: '24%', render: (_, c) => <CaseStatusTag c={c} /> },
       {
         title: 'Completed',
         key: 'done',
-        width: 160,
+        width: '28%',
         render: (_, c) => <Text type="secondary">{formatDate(c.coverage.effectiveDate ?? c.updatedAt)}</Text>,
       },
-      chevronCol,
     ]
 
     return {

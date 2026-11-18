@@ -1309,15 +1309,6 @@ button.app-stepper__item {
   align-self: center;
 }
 
-/* Subtle open-case cue. */
-.sales-chevron {
-  color: #c0c0c0;
-  font-size: 12px;
-}
-.app-dash-table .ant-table-tbody > tr:hover .sales-chevron {
-  color: #cb0a2f;
-}
-
 /* Applied-filter chips. */
 .app-filterchips {
   display: flex;
@@ -1371,9 +1362,6 @@ button.app-stepper__item {
     display: block;
     border: 0;
     padding: 4px 16px;
-  }
-  .app-dash-table .sales-chevron {
-    display: none;
   }
   .sales-co__name {
     max-inline-size: none;
