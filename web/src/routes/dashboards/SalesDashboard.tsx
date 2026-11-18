@@ -6,7 +6,7 @@
 import { useMemo } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { Typography } from 'antd'
-import { PlusOutlined, ClockCircleOutlined } from '@ant-design/icons'
+import { PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
@@ -74,26 +74,12 @@ export default function SalesDashboard() {
       </div>
     )
 
-    // Next action: the step Sales takes next. When another team owns the step,
-    // the derived label already names who Sales is waiting on — shown muted with
-    // a clock so it reads as "not your move" at a glance.
-    const nextActionCell = (c: Case) => {
-      const a = nextAction(c)
-      return (
-        <span className={`sales-next${a.waiting ? ' sales-next--waiting' : ''}`}>
-          {a.waiting && <ClockCircleOutlined className="sales-next__icon" />}
-          <span>{a.label}</span>
-        </span>
-      )
-    }
-
-    // Four scannable columns on desktop (~38 / 10 / 24 / 28). Long names and
+    // Three scannable columns on desktop (~52 / 13 / 35). Long names and
     // statuses wrap naturally; widths are proportional hints, not hard caps.
     const inProgressColumns: ColumnsType<Case> = [
-      { title: 'Company', key: 'company', width: '38%', render: (_, c) => companyCell(c) },
-      { title: 'Product', key: 'product', width: '10%', render: (_, c) => c.company.productType },
-      { title: 'Progress', key: 'progress', width: '24%', render: (_, c) => progressCell(c) },
-      { title: 'Next action', key: 'next', width: '28%', render: (_, c) => nextActionCell(c) },
+      { title: 'Company', key: 'company', width: '52%', render: (_, c) => companyCell(c) },
+      { title: 'Product', key: 'product', width: '13%', render: (_, c) => c.company.productType },
+      { title: 'Progress', key: 'progress', width: '35%', render: (_, c) => progressCell(c) },
     ]
 
     // Completed: coverage status (active / scheduled) is independent of case
