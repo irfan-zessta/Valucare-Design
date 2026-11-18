@@ -34,15 +34,15 @@ export default function SalesDashboard() {
     const openCase = (c: Case) => navigate(caseHref(c))
 
     // Company: full name as the open-case link, with the available references
-    // beneath it. In this app the case reference (c.id, NB-…) is also the
-    // franchise application's identifier, so it is shown once as "Case"; the
-    // MA/account code (c.account.accountRef, ACC-…) only exists once the account
-    // is created. The short name (no label — it's a name, not a code) leads.
+    // beneath it. c.id (NB-…) is the franchise code — the identifier the case
+    // carries from "Create New Franchise" onward; c.account.accountRef (ACC-…)
+    // is the MA/account code, which only exists once the account is created (see
+    // setup.ts "MA Code"). The short name (no label — it's a name) leads.
     const companyCell = (c: Case) => {
       const parts: { key: string; label?: string; value: string }[] = []
       if (c.company.shortName) parts.push({ key: 'short', value: c.company.shortName })
-      parts.push({ key: 'case', label: 'Case', value: c.id })
-      if (c.account.accountRef) parts.push({ key: 'account', label: 'Account', value: c.account.accountRef })
+      parts.push({ key: 'franchise', label: 'Franchise', value: c.id })
+      if (c.account.accountRef) parts.push({ key: 'ma', label: 'MA', value: c.account.accountRef })
       return (
         <div className="sales-co">
           <RouterLink
