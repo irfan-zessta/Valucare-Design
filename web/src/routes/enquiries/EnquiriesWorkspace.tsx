@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Empty, Input, Popover, Select, Space, Table, Tag, Typography } from 'antd'
-import { FilterOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { FilterOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useEnquiries } from '../../state/EnquiryProvider'
 import type { Enquiry } from '../../domain/types'
@@ -157,7 +157,6 @@ export function EnquiriesWorkspace() {
           </Popover>
           {(ui.search || activeFilterCount > 0) && <Button type="text" onClick={clear}>Clear</Button>}
         </Space>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/sales/enquiries/new')}>New enquiry</Button>
       </div>
 
       <Table<Enquiry>
