@@ -70,6 +70,8 @@ export function FranchiseReview({ c }: { c: Case }) {
   const [viewingDoc, setViewingDoc] = useState<{ slot: string; fileName: string } | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [returning, setReturning] = useState(false)
+  const [returnReason, setReturnReason] = useState('')
   const [approving, setApproving] = useState(false)
   const [approveRemarks, setApproveRemarks] = useState('')
   // The revision captured when the reviewer opened the approve dialog.
@@ -130,12 +132,24 @@ export function FranchiseReview({ c }: { c: Case }) {
     navigate(`/cases/${c.id}/prepare-quotation`)
   }
 
-  function returnForCorrections() {
+  function openReturn() {
+    setReturnReason('')
+    setReturning(true)
+  }
+
+  function confirmReturn() {
+    const reason = returnReason.trim()
     patchCase(c.id, (prev) => ({
       ...prev,
       currentWorkArea: 'create-franchise',
-      franchise: { ...prev.franchise, status: 'returned', acceptedAt: undefined },
+      franchise: {
+        ...prev.franchise,
+        status: 'returned',
+        acceptedAt: undefined,
+        returnReasons: [{ field: 'general', message: reason }],
+      },
     }))
+    setReturning(false)
     message.info('Franchise returned for corrections.')
   }
 
@@ -307,7 +321,7 @@ export function FranchiseReview({ c }: { c: Case }) {
             <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
               Edit franchise form
             </Button>
-            <Button onClick={returnForCorrections}>Return for corrections</Button>
+            <Button onClick={openReturn}>Return for corrections</Button>
             <Button danger icon={<CloseCircleOutlined />} onClick={() => setRejecting(true)}>
               Reject
             </Button>
@@ -396,6 +410,27 @@ export function FranchiseReview({ c }: { c: Case }) {
           value={approveRemarks}
           onChange={(e) => setApproveRemarks(e.target.value)}
           placeholder="Any notes for the AAT handler"
+        />
+      </Modal>
+
+      {/* ---- Return for corrections dialog ----------------------------------- */}
+      <Modal
+        open={returning}
+        title="Return for corrections"
+        okText="Return"
+        okButtonProps={{ disabled: !returnReason.trim() }}
+        onOk={confirmReturn}
+        onCancel={() => setReturning(false)}
+      >
+        <Typography.Paragraph type="secondary">
+          Returning sends the franchise back to the AAT handler to fix. Tell them what needs
+          correcting — they'll see this on the Create Franchise form.
+        </Typography.Paragraph>
+        <Input.TextArea
+          rows={3}
+          value={returnReason}
+          onChange={(e) => setReturnReason(e.target.value)}
+          placeholder="Reason for return (what needs correcting)"
         />
       </Modal>
 
