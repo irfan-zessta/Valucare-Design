@@ -26,8 +26,19 @@ export default function SalesDashboard() {
   const { loading, error, retry } = useInitialLoad()
   const navigate = useNavigate()
 
-  // Enquiry count is kept separate from the case (lead/franchise) counts.
+  // Enquiry counts are kept separate from the case (lead/franchise) counts.
   const openEnquiries = useMemo(() => enquiries.filter((e) => e.status === 'open').length, [enquiries])
+  // KPI cards for the New Enquiries tab — same layout as the case stats, but
+  // counting enquiries so the numbers match the list on that tab.
+  const enquiryStats = useMemo(
+    () => [
+      { key: 'total', title: 'Total enquiries', value: enquiries.length },
+      { key: 'open', title: 'Open', value: enquiries.filter((e) => e.status === 'open').length },
+      { key: 'converted', title: 'Converted', value: enquiries.filter((e) => e.status === 'converted').length },
+      { key: 'lost', title: 'Lost', value: enquiries.filter((e) => e.status === 'lost').length },
+    ],
+    [enquiries],
+  )
 
   const config = useMemo<DashboardConfig<Case>>(() => {
     const caseHref = (c: Case) => `/cases/${c.id}/${c.currentWorkArea}`
@@ -110,6 +121,7 @@ export default function SalesDashboard() {
             </span>
           ),
           content: <EnquiriesWorkspace />,
+          stats: enquiryStats,
         },
       ],
       secondaryAction: {
@@ -166,7 +178,7 @@ export default function SalesDashboard() {
       inProgressColumns,
       completedColumns,
     }
-  }, [navigate, openEnquiries])
+  }, [navigate, openEnquiries, enquiryStats])
 
   return <DepartmentDashboard<Case> config={config} rows={cases} loading={loading} error={error} onRetry={retry} />
 }

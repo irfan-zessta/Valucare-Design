@@ -83,11 +83,17 @@ export interface DashboardConfig<T> {
 
   /**
    * Optional self-contained tabs rendered AFTER the built-in case tabs (e.g.
-   * Sales' "New Enquiries"). They own their content — the shared statistics and
-   * search/filter toolbar are hidden while one of these tabs is active, because
-   * they describe the case list, not the extra tab's own dataset.
+   * Sales' "New Enquiries"). They own their content and search/filter toolbar.
+   * An extra tab may supply its OWN stat cards (e.g. enquiry counts); when it
+   * does, those render in the same KPI row in place of the case stats, so the
+   * numbers always describe the dataset actually on screen.
    */
-  extraTabs?: { key: string; label: ReactNode; content: ReactNode }[]
+  extraTabs?: {
+    key: string
+    label: ReactNode
+    content: ReactNode
+    stats?: { key: string; title: string; value: number }[]
+  }[]
 }
 
 interface UiState {
@@ -139,7 +145,8 @@ export function DepartmentDashboard<T>({
   const extraTabs = config.extraTabs ?? []
   const knownKeys = ['all', 'in-progress', 'completed', 'needs-action', ...extraTabs.map((t) => t.key)]
   const activeTab = knownKeys.includes(ui.tab) ? ui.tab : 'in-progress'
-  const isExtraActive = extraTabs.some((t) => t.key === activeTab)
+  const activeExtra = extraTabs.find((t) => t.key === activeTab)
+  const isExtraActive = !!activeExtra
 
   const activeFilterCount = Object.values(ui.filters).filter(Boolean).length
   const hasQueryOrFilters = ui.search.trim() !== '' || activeFilterCount > 0
@@ -161,12 +168,14 @@ export function DepartmentDashboard<T>({
     setUi((s) => ({ ...s, search: '', filters: {} }))
   }
 
-  const stats = [
+  const caseStats = [
     { key: 'total', title: 'Total cases', value: filtered.length },
     { key: 'in-progress', title: 'In progress', value: inProgress.length },
     { key: 'completed', title: 'Completed', value: completed.length },
     { key: 'needs-action', title: 'Needs my action', value: needsAction },
   ]
+  // On an extra tab, show its own stats (if provided) in the same KPI row.
+  const stats = activeExtra?.stats ?? caseStats
 
   function renderAction(a: DashboardPrimaryAction | undefined, type: 'primary' | 'default') {
     if (!a) return null
@@ -296,9 +305,9 @@ export function DepartmentDashboard<T>({
         </div>
       ) : (
         <>
-          {/* 2. Four compact statistics — case stats, hidden on a leading tab
-                 whose dataset (e.g. enquiries) is counted in its own tab badge. */}
-          {!isExtraActive && (
+          {/* 2. Four compact statistics — case stats, or an extra tab's own
+                 stats (e.g. enquiry counts) when it supplies them. */}
+          {(!isExtraActive || activeExtra?.stats) && (
             <div className="app-dashboard__stats">
               {stats.map((s) => (
                 <Card key={s.key} size="small">
