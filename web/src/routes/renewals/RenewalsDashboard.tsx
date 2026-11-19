@@ -322,7 +322,7 @@ export default function RenewalsDashboard() {
         <>
           <Tabs
             activeKey={ui.tab}
-            onChange={(k) => setUi((s) => ({ ...s, tab: k, filters: {} }))}
+            onChange={(k) => setUi((s) => ({ ...s, tab: k as UiState['tab'], filters: {} }))}
             tabBarExtraContent={{ right: toolbar }}
             items={[
               {
