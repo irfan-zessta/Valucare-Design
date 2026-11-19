@@ -331,38 +331,48 @@ export function DepartmentDashboard<T>({
             </div>
           )}
 
-          {/* 3. Work list — search + filters sit on the right of the tab bar
-                 (hidden on an extra tab, which owns its own toolbar). */}
-          <div className="app-table-panel">
-            <Tabs
-              activeKey={activeTab}
-              onChange={(k) => setUi((s) => ({ ...s, tab: k }))}
-              tabBarExtraContent={isExtraActive ? undefined : { right: toolbar }}
-              items={[
-                {
-                  key: 'all',
-                  label: tabLabel('All', filtered.length),
-                  children: loading ? <Skeleton active /> : renderTable(filtered, config.inProgressColumns),
-                },
-                {
-                  key: 'in-progress',
-                  label: tabLabel('In progress', inProgress.length),
-                  children: loading ? <Skeleton active /> : renderTable(inProgress, config.inProgressColumns),
-                },
-                {
-                  key: 'completed',
-                  label: tabLabel('Completed', completed.length),
-                  children: loading ? <Skeleton active /> : renderTable(completed, config.completedColumns),
-                },
-                {
-                  key: 'needs-action',
-                  label: tabLabel('Needs my action', needsAction),
-                  children: loading ? <Skeleton active /> : renderTable(needsActionRows, config.inProgressColumns),
-                },
-                ...extraTabs.map((t) => ({ key: t.key, label: t.label, children: t.content })),
-              ]}
-            />
-          </div>
+          {/* 3. Work list — the tab bar + search/filters live in their own
+                 panel, with the active table in a separate panel below (the
+                 toolbar is hidden on an extra tab, which owns its own). */}
+          {(() => {
+            const tabDefs = [
+              {
+                key: 'all',
+                label: tabLabel('All', filtered.length),
+                content: loading ? <Skeleton active /> : renderTable(filtered, config.inProgressColumns),
+              },
+              {
+                key: 'in-progress',
+                label: tabLabel('In progress', inProgress.length),
+                content: loading ? <Skeleton active /> : renderTable(inProgress, config.inProgressColumns),
+              },
+              {
+                key: 'completed',
+                label: tabLabel('Completed', completed.length),
+                content: loading ? <Skeleton active /> : renderTable(completed, config.completedColumns),
+              },
+              {
+                key: 'needs-action',
+                label: tabLabel('Needs my action', needsAction),
+                content: loading ? <Skeleton active /> : renderTable(needsActionRows, config.inProgressColumns),
+              },
+              ...extraTabs.map((t) => ({ key: t.key, label: t.label, content: t.content })),
+            ]
+            const activeContent = tabDefs.find((t) => t.key === activeTab)?.content
+            return (
+              <>
+                <div className="app-toolbar-panel">
+                  <Tabs
+                    activeKey={activeTab}
+                    onChange={(k) => setUi((s) => ({ ...s, tab: k }))}
+                    tabBarExtraContent={isExtraActive ? undefined : { right: toolbar }}
+                    items={tabDefs.map((t) => ({ key: t.key, label: t.label }))}
+                  />
+                </div>
+                <div className="app-table-panel">{activeContent}</div>
+              </>
+            )
+          })()}
         </>
       )}
     </div>
