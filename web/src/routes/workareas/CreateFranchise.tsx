@@ -288,8 +288,6 @@ export function CreateFranchise({ c }: { c: Case }) {
     need('mannerOfEnrollment', 'Choose the manner of enrollment.')
     need('mannerOfPayment', 'Choose the manner of payment.')
     need('businessSource', 'Choose the business source.')
-    need('accountManager', 'Enter the account handler (AAT).')
-    need('salesManager', 'Enter the secondary handler (AAT).')
     if (isIntermediary) {
       need('businessSourceName', 'Enter the agent/broker name for this intermediary case.')
       need('commissionType', 'Choose the commission type for this intermediary case.')
@@ -487,7 +485,7 @@ export function CreateFranchise({ c }: { c: Case }) {
     (f.sameAsCompany || (filled('billingAddress') && filled('billingProvince') && filled('billingCity')))
   const otherComplete =
     f.employeeCount > 0 &&
-    (['vatStatus', 'currentCoverage', 'mannerOfEnrollment', 'mannerOfPayment', 'businessSource', 'accountManager', 'salesManager'] as (keyof FormState)[]).every(filled) &&
+    (['vatStatus', 'currentCoverage', 'mannerOfEnrollment', 'mannerOfPayment', 'businessSource'] as (keyof FormState)[]).every(filled) &&
     (!isIntermediary || (filled('businessSourceName') && filled('commissionType')))
   const docsComplete = Object.keys(docs).length > 0
   const canSubmit = accountComplete && otherComplete && docsComplete
@@ -661,10 +659,10 @@ export function CreateFranchise({ c }: { c: Case }) {
           </div>
         )}
         <div style={two}>
-          <Form.Item label={reqLabel('Account handler (AAT)')} validateStatus={statusOf('accountManager')} help={helpOf('accountManager')}>
+          <Form.Item label="Account handler (AAT)">
             <Input id="accountManager" value={f.accountManager} onChange={(e) => set('accountManager', e.target.value)} />
           </Form.Item>
-          <Form.Item label={reqLabel('Secondary handler (AAT)')} validateStatus={statusOf('salesManager')} help={helpOf('salesManager')}>
+          <Form.Item label="Secondary handler (AAT)">
             <Input id="salesManager" value={f.salesManager} onChange={(e) => set('salesManager', e.target.value)} />
           </Form.Item>
         </div>
