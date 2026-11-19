@@ -160,7 +160,7 @@ export default function CreateCase() {
       />
 
       {mode === 'capture' && (
-        <FormSection wide title="Company details" description="Tell us which company this franchise is for.">
+        <FormSection title="Company details" description="Tell us which company this franchise is for.">
           <Form
             layout="vertical"
             requiredMark
