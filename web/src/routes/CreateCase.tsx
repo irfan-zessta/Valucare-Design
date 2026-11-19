@@ -10,12 +10,13 @@ import { FormSection } from '../components/ui/FormSection'
 import { FormActions } from '../components/ui/FormActions'
 import type { BusinessSource, Company, ProductType } from '../domain/types'
 
-const SOURCES: BusinessSource[] = ['Direct', 'Agent', 'Broker']
-const PRODUCTS: ProductType[] = ['HMO', 'TPA']
+export const SOURCES: BusinessSource[] = ['Direct', 'Agent', 'Broker']
+export const PRODUCTS: ProductType[] = ['HMO', 'TPA']
 
 // A small directory of previously-known companies (no active case yet), so the
 // "company already exists" path can be demonstrated alongside real case matches.
-const KNOWN_COMPANIES: { name: string; productType: ProductType; businessSource: BusinessSource }[] = [
+// Shared with the Create New Franchise modal so both surfaces dedupe the same way.
+export const KNOWN_COMPANIES: { name: string; productType: ProductType; businessSource: BusinessSource }[] = [
   { name: 'Northwind Logistics Corp.', productType: 'HMO', businessSource: 'Direct' },
   { name: 'Sampaguita Foods Inc.', productType: 'HMO', businessSource: 'Broker' },
   { name: 'Narra Shipping Lines Inc.', productType: 'TPA', businessSource: 'Agent' },

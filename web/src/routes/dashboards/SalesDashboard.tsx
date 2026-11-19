@@ -3,7 +3,7 @@
 // real Case records (Corporate New Business). Statistics and tab counts come
 // from actual records — never hardcoded.
 // ===========================================================================
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { Typography } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
@@ -12,6 +12,7 @@ import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
 import { useInitialLoad } from '../../hooks/useInitialLoad'
 import { DepartmentDashboard, type DashboardConfig } from '../../components/dashboard/DepartmentDashboard'
+import { CreateFranchiseModal } from '../../components/CreateFranchiseModal'
 import { useEnquiriesWorkspace } from '../enquiries/EnquiriesWorkspace'
 import { CaseStatusTag } from '../../components/CaseStatusTag'
 import { WORK_AREA_LABELS, WORK_AREA_ORDER, type Case } from '../../domain/types'
@@ -25,6 +26,7 @@ export default function SalesDashboard() {
   const { enquiries } = useEnquiries()
   const { loading, error, retry } = useInitialLoad()
   const navigate = useNavigate()
+  const [franchiseModalOpen, setFranchiseModalOpen] = useState(false)
 
   // Enquiry counts are kept separate from the case (lead/franchise) counts.
   const openEnquiries = useMemo(() => enquiries.filter((e) => e.status === 'open').length, [enquiries])
@@ -120,7 +122,7 @@ export default function SalesDashboard() {
       primaryAction: {
         label: 'Create New Franchise',
         icon: <PlusOutlined />,
-        onClick: () => navigate('/sales/corporate-new-business/new'),
+        onClick: () => setFranchiseModalOpen(true),
       },
       rowId: (c) => c.id,
       onRowClick: openCase,
@@ -190,5 +192,10 @@ export default function SalesDashboard() {
     ],
   }
 
-  return <DepartmentDashboard<Case> config={config} rows={cases} loading={loading} error={error} onRetry={retry} />
+  return (
+    <>
+      <DepartmentDashboard<Case> config={config} rows={cases} loading={loading} error={error} onRetry={retry} />
+      <CreateFranchiseModal open={franchiseModalOpen} onClose={() => setFranchiseModalOpen(false)} />
+    </>
+  )
 }
