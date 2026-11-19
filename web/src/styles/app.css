@@ -1294,17 +1294,11 @@ button.app-stepper__item {
   color: #d9d9d9;
 }
 
-/* Progress cell — work area over a status tag. */
+/* Progress cell — current work area label (status chip is its own column). */
 .sales-progress__area {
   color: #1a1a1a;
   font-size: 14px;
   line-height: 1.3;
-}
-.sales-progress__status {
-  margin-block-start: 6px;
-}
-.sales-progress__status .ant-tag {
-  margin: 0;
 }
 
 /* Next action — readable instruction; muted + clock when waiting. */

@@ -64,22 +64,19 @@ export default function SalesDashboard() {
       )
     }
 
-    // Progress: current work area on top, exact workflow status beneath.
+    // Progress = current work area; Status = the exact workflow status chip.
+    // Kept in separate columns so each reads cleanly under its own header.
     const progressCell = (c: Case) => (
-      <div className="sales-progress">
-        <div className="sales-progress__area">{WORK_AREA_LABELS[c.currentWorkArea]}</div>
-        <div className="sales-progress__status">
-          <CaseStatusTag c={c} />
-        </div>
-      </div>
+      <div className="sales-progress__area">{WORK_AREA_LABELS[c.currentWorkArea]}</div>
     )
 
-    // Three scannable columns on desktop (~52 / 13 / 35). Long names and
+    // Four scannable columns on desktop (~44 / 12 / 22 / 22). Long names and
     // statuses wrap naturally; widths are proportional hints, not hard caps.
     const inProgressColumns: ColumnsType<Case> = [
-      { title: 'Company', key: 'company', width: '52%', render: (_, c) => companyCell(c) },
-      { title: 'Product', key: 'product', width: '13%', render: (_, c) => c.company.productType },
-      { title: 'Progress', key: 'progress', width: '35%', render: (_, c) => progressCell(c) },
+      { title: 'Company', key: 'company', width: '44%', render: (_, c) => companyCell(c) },
+      { title: 'Product', key: 'product', width: '12%', render: (_, c) => c.company.productType },
+      { title: 'Progress', key: 'progress', width: '22%', render: (_, c) => progressCell(c) },
+      { title: 'Status', key: 'status', width: '22%', render: (_, c) => <CaseStatusTag c={c} /> },
     ]
 
     // Completed: coverage status (active / scheduled) is independent of case
