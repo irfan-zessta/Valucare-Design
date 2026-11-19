@@ -1,10 +1,14 @@
 // ===========================================================================
-// New Enquiries workspace — the content of the Sales dashboard's "New Enquiries"
-// tab. A compact, searchable, filterable list of enquiries that Sales works
+// New Enquiries workspace — powers the Sales dashboard's "New Enquiries" tab.
+// A compact, searchable, filterable list of enquiries that Sales works
 // day-to-day: it shows open enquiries by default (status filter reveals
 // converted / lost), puts overdue follow-ups first, and opens an enquiry on
 // click. Search + filters are remembered across visits (sessionStorage), kept
 // separate from the case list's own state.
+//
+// Exposed as a hook returning { toolbar, content } so the dashboard can place
+// the search/filter toolbar in the tab bar (identical to the case tabs) while
+// the table renders as the tab's content — both sharing the same state.
 // ===========================================================================
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -65,7 +69,7 @@ function followUpTag(e: Enquiry) {
   )
 }
 
-export function EnquiriesWorkspace() {
+export function useEnquiriesWorkspace() {
   const { enquiries } = useEnquiries()
   const navigate = useNavigate()
   const [ui, setUi] = useState<UiState>(() => loadUi())
@@ -146,30 +150,32 @@ export function EnquiriesWorkspace() {
     </div>
   )
 
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
-        <Space wrap>
-          <Input allowClear prefix={<SearchOutlined />} placeholder="Search company, contact, or reference"
-            value={ui.search} onChange={(e) => setUi((s) => ({ ...s, search: e.target.value }))} style={{ width: 320 }} />
-          <Popover content={filters} title="Filters" trigger="click" placement="bottomLeft">
-            <Button icon={<FilterOutlined />}>Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Button>
-          </Popover>
-          {(ui.search || activeFilterCount > 0) && <Button type="text" onClick={clear}>Clear</Button>}
-        </Space>
-      </div>
-
-      <Table<Enquiry>
-        rowKey={(e) => e.id}
-        columns={columns}
-        dataSource={rows}
-        pagination={{ pageSize: 10, hideOnSinglePage: true }}
-        locale={{
-          emptyText: (ui.search || activeFilterCount > 0)
-            ? <Empty description="No enquiries match"><Button onClick={clear}>Clear</Button></Empty>
-            : <Empty description="No open enquiries. Log one with “New enquiry”." />,
-        }}
-      />
-    </div>
+  // Search + Filters, styled and placed exactly like the case tabs' toolbar
+  // (the dashboard drops this into the right of the tab bar).
+  const toolbar = (
+    <Space wrap size={8}>
+      <Input allowClear prefix={<SearchOutlined />} placeholder="Search company or reference"
+        value={ui.search} onChange={(e) => setUi((s) => ({ ...s, search: e.target.value }))} style={{ width: 240 }} />
+      <Popover content={filters} title="Filters" trigger="click" placement="bottomLeft">
+        <Button icon={<FilterOutlined />}>Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Button>
+      </Popover>
+    </Space>
   )
+
+  const content = (
+    <Table<Enquiry>
+      className="app-dash-table"
+      rowKey={(e) => e.id}
+      columns={columns}
+      dataSource={rows}
+      pagination={{ pageSize: 10, hideOnSinglePage: true }}
+      locale={{
+        emptyText: (ui.search || activeFilterCount > 0)
+          ? <Empty description="No enquiries match"><Button onClick={clear}>Clear</Button></Empty>
+          : <Empty description="No open enquiries. Log one with “New enquiry”." />,
+      }}
+    />
+  )
+
+  return { toolbar, content }
 }

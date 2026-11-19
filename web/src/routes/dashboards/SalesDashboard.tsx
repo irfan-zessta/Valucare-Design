@@ -12,7 +12,7 @@ import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
 import { useInitialLoad } from '../../hooks/useInitialLoad'
 import { DepartmentDashboard, type DashboardConfig } from '../../components/dashboard/DepartmentDashboard'
-import { EnquiriesWorkspace } from '../enquiries/EnquiriesWorkspace'
+import { useEnquiriesWorkspace } from '../enquiries/EnquiriesWorkspace'
 import { CaseStatusTag } from '../../components/CaseStatusTag'
 import { WORK_AREA_LABELS, WORK_AREA_ORDER, type Case } from '../../domain/types'
 import { nextAction, responsibleDepartment } from '../../domain/progress'
@@ -40,7 +40,11 @@ export default function SalesDashboard() {
     [enquiries],
   )
 
-  const config = useMemo<DashboardConfig<Case>>(() => {
+  // Enquiry search/filter toolbar + table, sharing one state. The toolbar goes
+  // into the tab bar (like the case tabs); the table renders as tab content.
+  const enquiriesTab = useEnquiriesWorkspace()
+
+  const baseConfig = useMemo<DashboardConfig<Case>>(() => {
     const caseHref = (c: Case) => `/cases/${c.id}/${c.currentWorkArea}`
     const openCase = (c: Case) => navigate(caseHref(c))
 
@@ -109,21 +113,6 @@ export default function SalesDashboard() {
       deptId: 'sales',
       title: 'Sales',
       supportingText: 'Manage your corporate and IFG business.',
-      // New Enquiries sits after the case tabs; its badge counts open enquiries
-      // only, separate from the case (lead/franchise) counts.
-      extraTabs: [
-        {
-          key: 'enquiries',
-          label: (
-            <span className="dash-tab">
-              New Enquiries
-              <span className="dash-tab__count">{openEnquiries}</span>
-            </span>
-          ),
-          content: <EnquiriesWorkspace />,
-          stats: enquiryStats,
-        },
-      ],
       secondaryAction: {
         label: 'New enquiry',
         onClick: () => navigate('/sales/enquiries/new'),
@@ -178,7 +167,28 @@ export default function SalesDashboard() {
       inProgressColumns,
       completedColumns,
     }
-  }, [navigate, openEnquiries, enquiryStats])
+  }, [navigate])
+
+  // New Enquiries sits after the case tabs; its badge counts open enquiries
+  // only, separate from the case (lead/franchise) counts. Built outside the
+  // memo because its toolbar/content are fresh nodes tied to live state.
+  const config: DashboardConfig<Case> = {
+    ...baseConfig,
+    extraTabs: [
+      {
+        key: 'enquiries',
+        label: (
+          <span className="dash-tab">
+            New Enquiries
+            <span className="dash-tab__count">{openEnquiries}</span>
+          </span>
+        ),
+        toolbar: enquiriesTab.toolbar,
+        content: enquiriesTab.content,
+        stats: enquiryStats,
+      },
+    ],
+  }
 
   return <DepartmentDashboard<Case> config={config} rows={cases} loading={loading} error={error} onRetry={retry} />
 }

@@ -83,15 +83,17 @@ export interface DashboardConfig<T> {
 
   /**
    * Optional self-contained tabs rendered AFTER the built-in case tabs (e.g.
-   * Sales' "New Enquiries"). They own their content and search/filter toolbar.
-   * An extra tab may supply its OWN stat cards (e.g. enquiry counts); when it
-   * does, those render in the same KPI row in place of the case stats, so the
-   * numbers always describe the dataset actually on screen.
+   * Sales' "New Enquiries"). An extra tab may supply:
+   *  - `toolbar`: a search/filter node placed on the right of the tab bar, in
+   *    the same slot the case tabs use — so it looks identical across tabs.
+   *  - `stats`: its OWN KPI cards (e.g. enquiry counts) shown in the same row in
+   *    place of the case stats, so the numbers always describe what's on screen.
    */
   extraTabs?: {
     key: string
     label: ReactNode
     content: ReactNode
+    toolbar?: ReactNode
     stats?: { key: string; title: string; value: number }[]
   }[]
 }
@@ -374,7 +376,13 @@ export function DepartmentDashboard<T>({
                   <Tabs
                     activeKey={activeTab}
                     onChange={(k) => setUi((s) => ({ ...s, tab: k }))}
-                    tabBarExtraContent={isExtraActive ? undefined : { right: toolbar }}
+                    tabBarExtraContent={
+                      isExtraActive
+                        ? activeExtra?.toolbar
+                          ? { right: activeExtra.toolbar }
+                          : undefined
+                        : { right: toolbar }
+                    }
                     items={tabDefs.map((t) => ({ key: t.key, label: t.label }))}
                   />
                 </div>
