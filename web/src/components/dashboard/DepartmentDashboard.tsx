@@ -82,12 +82,12 @@ export interface DashboardConfig<T> {
   onRowClick?: (row: T) => void
 
   /**
-   * Optional self-contained tabs rendered BEFORE the built-in case tabs (e.g.
+   * Optional self-contained tabs rendered AFTER the built-in case tabs (e.g.
    * Sales' "New Enquiries"). They own their content — the shared statistics and
-   * search/filter toolbar are hidden while a leading tab is active, because they
-   * describe the case list, not the leading tab's own dataset.
+   * search/filter toolbar are hidden while one of these tabs is active, because
+   * they describe the case list, not the extra tab's own dataset.
    */
-  leadingTabs?: { key: string; label: ReactNode; content: ReactNode }[]
+  extraTabs?: { key: string; label: ReactNode; content: ReactNode }[]
 }
 
 interface UiState {
@@ -136,10 +136,10 @@ export function DepartmentDashboard<T>({
     }
   }, [config.deptId, ui])
 
-  const leadingTabs = config.leadingTabs ?? []
-  const knownKeys = [...leadingTabs.map((t) => t.key), 'all', 'in-progress', 'completed', 'needs-action']
+  const extraTabs = config.extraTabs ?? []
+  const knownKeys = ['all', 'in-progress', 'completed', 'needs-action', ...extraTabs.map((t) => t.key)]
   const activeTab = knownKeys.includes(ui.tab) ? ui.tab : 'in-progress'
-  const isLeadingActive = leadingTabs.some((t) => t.key === activeTab)
+  const isExtraActive = extraTabs.some((t) => t.key === activeTab)
 
   const activeFilterCount = Object.values(ui.filters).filter(Boolean).length
   const hasQueryOrFilters = ui.search.trim() !== '' || activeFilterCount > 0
@@ -298,7 +298,7 @@ export function DepartmentDashboard<T>({
         <>
           {/* 2. Four compact statistics — case stats, hidden on a leading tab
                  whose dataset (e.g. enquiries) is counted in its own tab badge. */}
-          {!isLeadingActive && (
+          {!isExtraActive && (
             <div className="app-dashboard__stats">
               {stats.map((s) => (
                 <Card key={s.key} size="small">
@@ -313,7 +313,7 @@ export function DepartmentDashboard<T>({
           )}
 
           {/* Applied filters as removable chips. */}
-          {!isLeadingActive && filterChips.length > 0 && (
+          {!isExtraActive && filterChips.length > 0 && (
             <div className="app-filterchips">
               <span className="app-filterchips__label">Filters</span>
               {filterChips.map((ch) => (
@@ -332,14 +332,13 @@ export function DepartmentDashboard<T>({
           )}
 
           {/* 3. Work list — search + filters sit on the right of the tab bar
-                 (hidden on a leading tab, which owns its own toolbar). */}
+                 (hidden on an extra tab, which owns its own toolbar). */}
           <div className="app-table-panel">
             <Tabs
               activeKey={activeTab}
               onChange={(k) => setUi((s) => ({ ...s, tab: k }))}
-              tabBarExtraContent={isLeadingActive ? undefined : { right: toolbar }}
+              tabBarExtraContent={isExtraActive ? undefined : { right: toolbar }}
               items={[
-                ...leadingTabs.map((t) => ({ key: t.key, label: t.label, children: t.content })),
                 {
                   key: 'all',
                   label: tabLabel('All', filtered.length),
@@ -360,6 +359,7 @@ export function DepartmentDashboard<T>({
                   label: tabLabel('Needs my action', needsAction),
                   children: loading ? <Skeleton active /> : renderTable(needsActionRows, config.inProgressColumns),
                 },
+                ...extraTabs.map((t) => ({ key: t.key, label: t.label, children: t.content })),
               ]}
             />
           </div>

@@ -101,9 +101,9 @@ export default function SalesDashboard() {
       deptId: 'sales',
       title: 'Sales',
       supportingText: 'Manage your corporate and IFG business.',
-      // New Enquiries sits before In progress / Completed; its badge counts open
-      // enquiries only, separate from the case (lead/franchise) counts.
-      leadingTabs: [
+      // New Enquiries sits after the case tabs; its badge counts open enquiries
+      // only, separate from the case (lead/franchise) counts.
+      extraTabs: [
         {
           key: 'enquiries',
           label: (

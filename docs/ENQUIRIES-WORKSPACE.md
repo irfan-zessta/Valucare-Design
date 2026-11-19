@@ -26,15 +26,15 @@ headers/tables/forms/status tags, white surfaces, IBM Plex Sans, brand red `#CB0
 | `services/leadStore.ts`, `state/LeadProvider.tsx` | Lead persistence + provider (idempotent create per enquiry, `linkCase`). |
 | `state/EnquiryProvider.tsx` | `logActivity`, `scheduleFollowUp`, `completeFollowUp`, `convertEnquiry(→lead)`, `markLost(reason)`; records system events on the timeline. |
 | `services/demoFailure.ts` | Demo "arm the next save to fail" switch (for the retry path). |
-| `components/dashboard/DepartmentDashboard.tsx` | Added `leadingTabs` (self-contained tabs before the case tabs; hides case stats/toolbar while active). |
+| `components/dashboard/DepartmentDashboard.tsx` | Added `extraTabs` (self-contained tabs after the case tabs; hides case stats/toolbar while active). |
 | `routes/enquiries/EnquiriesWorkspace.tsx` | The New Enquiries tab content. |
 | `routes/enquiries/EnquiryDetail.tsx` | Enquiry workspace (case layout). |
 | `routes/leads/LeadDetail.tsx` | Lead detail + Create franchise. |
-| `routes/dashboards/SalesDashboard.tsx` | Wires the New Enquiries leading tab (open-count badge). |
+| `routes/dashboards/SalesDashboard.tsx` | Wires the New Enquiries tab (last, open-count badge). |
 
 ## Dashboard — New Enquiries tab
 
-Added **before In progress / Completed**; badge counts **open** enquiries (separate from
+Added **after In progress / Completed / Needs my action** (last tab); badge counts **open** enquiries (separate from
 the case In-progress/Completed/Needs-my-action counts). Shows open by default; the status
 filter reveals Converted / Lost / All. Search by company, contact, or reference. Filters:
 status, business source, follow-up. Compact table — **Company / enquiry** (ref under the
