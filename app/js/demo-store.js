@@ -1,5 +1,6 @@
 // A durable, browser-local demo, scoped to the static host only. Every mutation
 // commits before success, is isolated by case, and records simulated evidence.
+import { authApi, signedInActor } from './preview-auth.js';
 const BASE = new URL('../preview/', import.meta.url);
 const KEY = 'hms3:corporate-demo:v2';
 const copy = x => structuredClone(x);
@@ -8,7 +9,7 @@ const stamp = () => new Date().toISOString();
 const today = () => new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Manila', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date());
 const days = (d,n) => new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
 const cached = new Map();
-let db, actor = 'u-ad1', queue = Promise.resolve();
+let db, actor = signedInActor(), queue = Promise.resolve();
 export class DemoError extends Error {
   constructor(message, status=409) { super(message); this.code='preview'; this.status=status; }
 }
@@ -325,7 +326,7 @@ async function mutate(p,b,q,raw) {
 }
 export async function demoApi(path,method='GET',body,raw) {
   const [p,qs='']=path.replace(/\/$/,'').split('?'),q=new URLSearchParams(qs);
-  if(p==='login'){actor=body?.userId||'u-ad1';return {ok:true};}if(p==='logout'){actor='u-ad1';return {ok:true};}if(p==='me')return fixture('me__'+actor);
+  const auth=await authApi(p,body,{fixture,getActor:()=>actor,setActor:a=>{actor=a;}});if(auth!==undefined)return auth;
   if(p==='companies/search'||p==='companies/duplicates'){
     await queue;db=null;storage();
     const term=(q.get('q')||body?.newCompany?.registeredName||'').toLowerCase().trim(),rows=await allCases();
