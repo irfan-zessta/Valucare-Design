@@ -27,6 +27,8 @@ ROLES = {
     "mda": "MDA (internal alignment)",
     "bc": "B&C (internal alignment)",
     "ccd": "CCD (downstream)",
+    "claims": "Claims",
+    "pn": "Provider Networks",
     # ---- Technical account, not a business-process participant ----
     "admin": "System Administrator (technical)",
 }
@@ -61,6 +63,8 @@ USERS = [
     {"id": "u-bc1", "name": "B&C Demo User (internal alignment)", "role": "bc", "team": None},
     {"id": "u-bc2", "name": "B&C Demo User 2 (internal alignment)", "role": "bc", "team": None},
     {"id": "u-cc1", "name": "CCD Demo User (downstream)", "role": "ccd", "team": None},
+    {"id": "u-cl1", "name": "Claims Demo User", "role": "claims", "team": None},
+    {"id": "u-pn1", "name": "Provider Networks Demo User", "role": "pn", "team": None},
     # Technical account only — not a documented business participant
     {"id": "u-ad1", "name": "System Admin (technical)", "role": "admin", "team": None},
 ]

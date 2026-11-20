@@ -94,6 +94,10 @@ export const isAdmin = () => state.me?.role === "admin";
 // internal New Business role; everyone else only acts in their own role.
 export const actsAs = (role) => state.me?.role === role || (isAdmin() && INTERNAL_NB_ROLES.includes(role));
 export const can = (...roles) => roles.some(actsAs);
+// Department login: the server tells us which workspaces this account may open
+// (["*"] for the administrator). No list = legacy/preview session, nothing restricted.
+export const isSuper = () => !!state.me?.super;
+export const canWs = (key) => { const w = state.me?.workspaces; return !w || w.includes("*") || w.includes(key); };
 // AAT owner gate: a plain AAT handler acts only on their own book; Admin owns the
 // whole desk, so the per-handler ownership check does not apply to them.
 export const ownsCase = (c) => actsAs("aat") && (isAdmin() || c?.ownerId === state.me?.id);
@@ -191,23 +195,12 @@ export async function messageDialog(title, body) {
 export class ApiErr extends Error {
   constructor(status, code, message, details) { super(message); this.status = status; this.code = code; this.details = details || {}; }
 }
-let reauthPromise = null;
+// A 401 session_expired means the server session is gone. There is no silent re-login any
+// more (credentials are required), so send the user back to the sign-in screen.
 async function reauth() {
-  if (reauthPromise) return reauthPromise;
-  const me = state.me;
-  reauthPromise = (async () => {
-    const r = await dialog({
-      title: "Your session expired",
-      body: html`<p>For security you were signed out. <b>Your unsaved changes are still on this page.</b> Sign in again to continue - the action you were doing will be retried.</p>
-        <p class="tiny mt">Demo sign-in: no password is used in this prototype.</p>`,
-      actions: [{ label: "Leave without saving", value: "leave" }, { label: `Sign in again as ${me?.name || "user"}`, kind: "primary", value: "ok" }],
-    });
-    if (!r || r.action !== "ok") { reauthPromise = null; throw new ApiErr(401, "session_expired", "Session expired - not saved."); }
-    await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: me.id }) });
-    reauthPromise = null;
-    return true;
-  })();
-  return reauthPromise;
+  state.me = null;
+  window.dispatchEvent(new CustomEvent("hms:signedout", { detail: "Your session expired. Sign in again." }));
+  throw new ApiErr(401, "session_expired", "Session expired - sign in again.");
 }
 export async function api(path, { method = "GET", body, raw: rawBody, headers = {}, retryAuth = true } = {}) {
   if (window.__HMS3_PREVIEW__) return previewApi(path, method, body, rawBody);
@@ -224,7 +217,7 @@ export async function api(path, { method = "GET", body, raw: rawBody, headers = 
   let data = null;
   const ct = res.headers.get("Content-Type") || "";
   if (ct.includes("json")) data = await res.json().catch(() => null);
-  if (res.status === 401 && data?.error?.code === "session_expired" && retryAuth) {
+  if (res.status === 401 && ["session_expired", "not_signed_in"].includes(data?.error?.code) && retryAuth) {
     await reauth();
     return api(path, { method, body, raw: rawBody, headers, retryAuth: false });
   }

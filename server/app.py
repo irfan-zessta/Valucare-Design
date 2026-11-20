@@ -15,6 +15,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import actions, meta, members, providers, tables
+from . import auth
 from .domain import (Bundle, Ctx, SYSTEM_USER, USERS, account_gates, add_workdays, can, compare_benefits, config, config_payload,
                      derive, iso, next_id, onboarding_status, parse_date, readiness, user_tasks, user_name, visible_case,
                      matches_validator)
@@ -23,6 +24,8 @@ from .store import ApiError, Store
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC = os.path.join(ROOT, "app")
 COOKIE = "hms_session"
+# Tests (and only tests) may sign in by bare user id: set HMS_AUTH=0. Default is credentials.
+LEGACY_LOGIN = os.environ.get("HMS_AUTH", "1") == "0"
 
 STATE = {"store": None, "last_sched": 0, "lock": threading.Lock()}
 
@@ -234,6 +237,11 @@ class Handler(BaseHTTPRequestHandler):
         user = USERS.get(sess["userId"])
         if not user:
             raise ApiError(401, "not_signed_in", "Unknown user.")
+        acct = auth.ACCOUNTS.get(sess.get("username") or "")
+        if acct is None and not LEGACY_LOGIN:
+            raise ApiError(401, "not_signed_in", "Please sign in.")
+        if acct is not None:
+            user = {**user, **auth.public({"username": sess["username"], **acct})}
         st.session_touch(tok, config(st)["sessionMinutes"])
         return Ctx(st, user)
 
@@ -290,11 +298,19 @@ class Handler(BaseHTTPRequestHandler):
                                     "intermediaries": st.list("intermediary"), "today": dt.date.today().isoformat()})
         if p == "login" and method == "POST":
             body = self._json()
-            uid = body.get("userId")
-            if uid not in USERS:
-                raise ApiError(400, "bad_user", "Choose a user.")
-            tok = st.session_create(uid, config(st)["sessionMinutes"])
-            return self._send(200, {"user": USERS[uid]}, headers={"Set-Cookie": f"{COOKIE}={tok}; Path=/; HttpOnly; SameSite=Lax"})
+            if LEGACY_LOGIN and body.get("userId"):
+                uid = body.get("userId")
+                if uid not in USERS:
+                    raise ApiError(400, "bad_user", "Choose a user.")
+                tok = st.session_create(uid, config(st)["sessionMinutes"])
+                return self._send(200, {"user": USERS[uid]}, headers={"Set-Cookie": f"{COOKIE}={tok}; Path=/; HttpOnly; SameSite=Lax"})
+            try:
+                acct = auth.check(body.get("username"), body.get("password"))
+            except ValueError as e:
+                raise ApiError(401, "bad_credentials", "Incorrect username or password.")
+            tok = st.session_create(acct["userId"], config(st)["sessionMinutes"], acct["username"])
+            return self._send(200, {"user": {**USERS[acct["userId"]], **auth.public(acct)}},
+                              headers={"Set-Cookie": f"{COOKIE}={tok}; Path=/; HttpOnly; SameSite=Strict"})
         if p == "logout" and method == "POST":
             st.session_delete(self._token())
             return self._send(200, {}, headers={"Set-Cookie": f"{COOKIE}=; Path=/; Max-Age=0"})
@@ -324,7 +340,18 @@ class Handler(BaseHTTPRequestHandler):
         if method == "POST" and p == "test/expire-session":
             st.session_expire(self._token())
             return self._send(200, {"expired": True})
+        if method == "POST" and p == "switch-user":
+            # Only the administrator login may act as another backend identity.
+            if not (ctx.user.get("super") or LEGACY_LOGIN):
+                raise ApiError(403, "forbidden", "Only the administrator can switch identity. Sign in with the other department's login.")
+            uid = self._json().get("userId")
+            if uid not in USERS:
+                raise ApiError(400, "bad_user", "Choose a user.")
+            st.session_set_user(self._token(), uid)
+            return self._send(200, {})
         if method == "POST" and p == "demo/reset":
+            if not (ctx.user.get("super") or LEGACY_LOGIN):
+                raise ApiError(403, "forbidden", "Only the administrator can reset demo data.")
             from . import seed
             seed.seed(st)
             return self._send(200, {"reset": True})

@@ -8,7 +8,7 @@
 // Everything else is honestly marked "Coming soon" and is not clickable — we never
 // lead a prospect into an empty or broken workspace.
 
-import { html, go } from "../core.js";
+import { html, go, canWs, api, state } from "../core.js";
 import { icon } from "../components.js";
 
 // Single source of truth for the chooser. `status: "live"` means a real workspace
@@ -125,7 +125,12 @@ export const DEPARTMENTS = [
   },
 ];
 
-const deptByKey = (k) => DEPARTMENTS.find((d) => d.key === k) || null;
+// Which workspaces each chooser card opens; a card shows only if the login covers one of them.
+const DEPT_WS = { admin: ["admin"], sales: ["corp-new", "corp-renewal", "ifg-new", "ifg-renewal"], actuarial: ["actuarial-desk"],
+  mda: ["mda-desk"], billing: ["bc-desk"], claims: ["claims-desk"], ccd: ["ccd-desk"], "provider-networks": ["pn-desk"] };
+const allowedDept = (d) => (DEPT_WS[d.key] || []).some(canWs);
+const visibleDepts = () => DEPARTMENTS.filter(allowedDept);
+const deptByKey = (k) => DEPARTMENTS.filter(allowedDept).find((d) => d.key === k) || null;
 const liveDemos = (dept) => (dept.demos || []).filter((x) => x.status === "live");
 
 // A department is reachable if it is live and has somewhere to go.
@@ -138,6 +143,14 @@ function openDepartment(dept) {
 export async function render(root, { parts }) {
   const subKey = parts[1];
   if (subKey) return renderDemos(root, subKey);
+  // A login that covers a single department has nothing to choose: go straight to it.
+  // (Admin, who covers several, still sees the chooser.)
+  const only = visibleDepts();
+  if (only.length === 1) {
+    const d = only[0];
+    if (d.demos && d.demos.length) { location.replace(`#/explore/${d.key}`); return; }
+    if (d.href) { location.replace(d.href); return; }
+  }
   return renderDepartments(root);
 }
 
@@ -148,17 +161,19 @@ function renderDepartments(root) {
   root.innerHTML = html`
     <div class="explore">
       <div class="explore-inner">
-        <div class="brand mb"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Demo workspace</small></span></div>
+        <div class="brand mb"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>${state.me?.dept || "Demo workspace"}</small></span>
+          <button type="button" class="btn ghost sm" id="signOut" style="margin-left:auto">Sign out${state.me?.username ? " (" + state.me.username + ")" : ""}</button></div>
         <header class="explore-head">
           <h1>Explore the HMS experience</h1>
           <p>Choose a department and explore a guided, interactive demo.</p>
         </header>
         <div class="explore-grid" role="list">
-          ${DEPARTMENTS.map((d) => deptCard(d))}
+          ${visibleDepts().map((d) => deptCard(d))}
         </div>
       </div>
     </div>`.s;
 
+  wireSignOut(root);
   root.querySelectorAll("[data-dept]").forEach((el) => {
     el.addEventListener("click", () => openDepartment(deptByKey(el.dataset.dept)));
   });
@@ -188,8 +203,9 @@ function renderDemos(root, deptKey) {
   root.innerHTML = html`
     <div class="explore">
       <div class="explore-inner">
-        <div class="brand mb"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Demo workspace</small></span></div>
-        <button type="button" class="btn ghost sm explore-back" id="backDepts">${icon("collapse", 14)} Back to departments</button>
+        <div class="brand mb"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>${state.me?.dept || "Demo workspace"}</small></span>
+          <button type="button" class="btn ghost sm" id="signOut" style="margin-left:auto">Sign out${state.me?.username ? " (" + state.me.username + ")" : ""}</button></div>
+        ${visibleDepts().length > 1 ? html`<button type="button" class="btn ghost sm explore-back" id="backDepts">${icon("collapse", 14)} Back to departments</button>` : ""}
         <header class="explore-head">
           <h1>${dept.name}</h1>
           <p>Choose a workflow to open its demo workspace.</p>
@@ -200,7 +216,8 @@ function renderDemos(root, deptKey) {
       </div>
     </div>`.s;
 
-  root.querySelector("#backDepts").addEventListener("click", () => go("#/explore"));
+  wireSignOut(root);
+  root.querySelector("#backDepts")?.addEventListener("click", () => go("#/explore"));
   root.querySelectorAll("[data-demo]").forEach((el) => {
     el.addEventListener("click", () => { if (el.dataset.href) go(el.dataset.href); });
   });
@@ -213,4 +230,15 @@ function demoCard(x) {
   if (!live) return html`<div class="dept-card soon" role="listitem" aria-disabled="true">${body}</div>`;
   return html`<button type="button" class="dept-card" role="listitem" data-demo="${x.key}" data-href="${x.href}"
       aria-label="Open ${x.name}">${body}${icon("arrowr", 18)}</button>`;
+}
+
+function wireSignOut(root) {
+  const b = root.querySelector("#signOut");
+  if (!b) return;
+  b.onclick = async () => {
+    try { await api("logout", { method: "POST" }); } catch (e) { /* already signed out */ }
+    state.me = null;
+    location.hash = "#/explore";
+    window.dispatchEvent(new CustomEvent("hms:signedout"));
+  };
 }

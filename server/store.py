@@ -117,6 +117,10 @@ class Store:
             CREATE TABLE IF NOT EXISTS config(key TEXT PRIMARY KEY, value TEXT);
             """
         )
+        try:  # older databases predate department logins
+            self.db.execute("ALTER TABLE sessions ADD COLUMN username TEXT")
+        except Exception:
+            pass
 
     # ------------------------------------------------------------ transactions
     @contextmanager
@@ -277,11 +281,11 @@ class Store:
                         (key, user_id, json.dumps(response, default=str), ctx.now_iso()))
 
     # ------------------------------------------------------------ sessions
-    def session_create(self, user_id, minutes):
+    def session_create(self, user_id, minutes, username=None):
         token = uuid.uuid4().hex + uuid.uuid4().hex
         with self.tx():
-            self.db.execute("INSERT INTO sessions(token,user_id,expires_at,created_at) VALUES(?,?,?,?)",
-                            (token, user_id, time.time() + minutes * 60, time.time()))
+            self.db.execute("INSERT INTO sessions(token,user_id,expires_at,created_at,username) VALUES(?,?,?,?,?)",
+                            (token, user_id, time.time() + minutes * 60, time.time(), username))
         return token
 
     def session_get(self, token):
@@ -290,13 +294,16 @@ class Store:
         r = self.db.execute("SELECT * FROM sessions WHERE token=?", (token,)).fetchone()
         if not r:
             return None
-        return {"token": r["token"], "userId": r["user_id"], "expiresAt": r["expires_at"]}
+        return {"token": r["token"], "userId": r["user_id"], "expiresAt": r["expires_at"], "username": r["username"]}
 
     def session_touch(self, token, minutes):
         self.db.execute("UPDATE sessions SET expires_at=? WHERE token=?", (time.time() + minutes * 60, token))
 
     def session_expire(self, token):
         self.db.execute("UPDATE sessions SET expires_at=? WHERE token=?", (time.time() - 1, token))
+
+    def session_set_user(self, token, user_id):
+        self.db.execute("UPDATE sessions SET user_id=? WHERE token=?", (user_id, token))
 
     def session_delete(self, token):
         self.db.execute("DELETE FROM sessions WHERE token=?", (token,))

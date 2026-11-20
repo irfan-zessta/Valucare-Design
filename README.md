@@ -165,3 +165,22 @@ with a horizontal case menu on narrow screens, and reduced-motion support.
 
 Member Data and Plan Code lists are built to scale (up to ~400 Plan Codes and ~10,000 members)
 with search, filtering and pagination so large accounts stay fast and legible.
+
+## Sign-in (department logins)
+
+Credentials are checked by the server. Usernames and passwords are defined in `server/auth.py` (edit that file to change them); passwords are intentionally not listed here.
+Each login opens only its own department; `admin` opens everything and is the only login
+that can switch identity or reset demo data.
+
+| Username | Opens |
+|----------|-------|
+| `salesadmin` | Sales (Corporate/IFG new business and renewals) |
+| `actuarialadmin` | Actuarial |
+| `mdaadmin` | MDA |
+| `billingadmin` | Billing & Collections |
+| `claimsadmin` | Claims |
+| `ccdadmin` | Customer Care |
+| `pnadmin` | Provider Networks |
+| `admin` | Everything, incl. Admin dashboard |
+
+Tests set `HMS_AUTH=0` to keep signing in by bare user id; the running app does not allow that.

@@ -1,66 +1,65 @@
-import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, confirmDialog, toast, announce, DEMO_BYPASS, actsAs } from "./core.js";
+import { html, esc, state, api, roleLabel, prefs, parseHash, go, flushForms, disposeForms, dialog, confirmDialog, toast, announce, DEMO_BYPASS, actsAs, canWs, isSuper } from "./core.js";
 import { icon, cleanLabel } from "./components.js";
 
 const root = document.getElementById("root");
 let lastHash = location.hash;
 let navigating = false;
 
-// The demo opens on the department chooser, not a workspace — so prospects never land
-// on "whoever was signed in last". There is no sign-in step: we quietly adopt one
-// internal desk identity behind the scenes so existing server actions keep working,
-// and the prospect only ever sees a neutral "Demo workspace". The identity can still
-// be switched automatically when a case genuinely needs another department's result
-// (the case screens drive switchUser), and manually from the account menu for the
-// person running the demo.
-const DEFAULT_USER = "u-ad1";
-
+// Sign-in is real: each department has its own username/password, checked by the
+// server (server/auth.py). The server returns which workspaces the account may open
+// and the guard in route() enforces it. Only the administrator can switch identity.
 async function boot() {
   state.meta = await api("meta");
   try { state.me = (await api("me", { retryAuth: false })).user; } catch (e) { state.me = null; }
-  if (!state.me) {
-    // No session yet — adopt the default desk identity silently. If even that fails
-    // (e.g. the backend is unreachable), fall back to the manual picker.
-    try {
-      await api("login", { method: "POST", body: { userId: DEFAULT_USER } });
-      state.me = (await api("me")).user;
-    } catch (e) { return renderLogin(); }
-  }
+  if (!state.me) return renderLogin();
   route();
 }
 
-// ---------------------------------------------------------------- sign in
-// A quiet centered card. Sales is the internal New Business desk — one person who
-// creates, reviews, approves and handles legal, so you never switch to walk a case
-// through. Actuarial, MDA and Billing are departments that sit outside that desk;
-// CCD is the downstream team that acknowledges the final handover. Switch into any of
-// them only when a case needs their result. (The internal role key stays `admin`.)
-const SIGNIN = [
-  { user: "u-ad1", key: "admin", role: "Sales", desc: "The whole New Business desk: create, review, approve and legal" },
-  { user: "u-ac1", key: "accusa", role: "Actuarial", desc: "Price quotations and release rates" },
-  { user: "u-md1", key: "mda", role: "MDA", desc: "Record member data alignment results" },
-  { user: "u-bc1", key: "bc", role: "Billing", desc: "Set up billing and collection" },
-  { user: "u-cc1", key: "ccd", role: "CCD", desc: "Acknowledge the downstream handover" },
-];
+window.addEventListener("hms:signedout", (e) => { shellWs = null; renderLogin(e.detail); });
 
+// ---------------------------------------------------------------- sign in
 function renderLogin(reason) {
-  document.title = "Sign in · HMS3 Corporate New Business";
+  document.title = "Sign in · HMS3";
   root.innerHTML = html`<div class="login"><div class="card" role="main" id="main">
-    <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Corporate New Business</small></span></div>
+    <div class="brand"><span class="mark" aria-hidden="true">VC</span><span class="nm">HMS3<small>Valucare</small></span></div>
     <h1>Sign in to HMS3</h1>
-    <p class="muted">Choose a role to start.</p>
-    ${reason ? html`<div class="note warn mt">${reason}</div>` : ""}
-    <div class="rolelist">${SIGNIN.map((r) => html`<button type="button" data-user="${r.user}">
-      <span class="avatar" aria-hidden="true">${r.role.split(" ").map((w) => w[0]).join("").slice(0, 2)}</span>
-      <span class="grow"><b>${r.role}</b><span>${r.desc}</span></span>${icon("arrowr")}</button>`)}</div>
+    <p class="muted">Use your department login.</p>
+    <div id="loginErr" role="alert">${reason ? html`<div class="note warn mt">${reason}</div>` : ""}</div>
+    <form id="loginForm" class="mt" autocomplete="on">
+      <div class="field"><label for="lu">Username</label><input id="lu" name="username" class="inp" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>
+      <div class="field mt"><label for="lp">Password</label><input id="lp" name="password" type="password" class="inp" autocomplete="current-password" required></div>
+      <button type="submit" class="btn primary mt" id="loginBtn">Sign in</button>
+    </form>
   </div></div>`.s;
-  root.querySelectorAll("[data-user]").forEach((b) => (b.onclick = async () => {
-    await api("login", { method: "POST", body: { userId: b.dataset.user } });
-    state.me = (await api("me")).user;
-    go("#/explore");
-    route(true);
-  }));
-  root.querySelector("[data-user]")?.focus();
+  const form = document.getElementById("loginForm");
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("loginBtn");
+    const err = document.getElementById("loginErr");
+    btn.disabled = true;
+    try {
+      const r = await api("login", { method: "POST", retryAuth: false, body: { username: form.username.value.trim(), password: form.password.value } });
+      state.me = r.user;
+      shellWs = null;
+      go("#/explore");
+      route(true);
+    } catch (ex) {
+      form.password.value = "";
+      err.innerHTML = html`<div class="note warn mt">${ex.message || "Could not sign in."}</div>`.s;
+      form.password.focus();
+    } finally { btn.disabled = false; }
+  };
+  document.getElementById("lu").focus();
 }
+
+// Identities the administrator may act as (admin-only "Act as" picker).
+const SIGNIN = [
+  { user: "u-ad1", key: "admin", role: "Sales" },
+  { user: "u-ac1", key: "accusa", role: "Actuarial" },
+  { user: "u-md1", key: "mda", role: "MDA" },
+  { user: "u-bc1", key: "bc", role: "Billing" },
+  { user: "u-cc1", key: "ccd", role: "CCD" },
+];
 
 // ---------------------------------------------------------------- workspaces
 // Navigation is contextual: instead of one menu listing every program area at once,
@@ -202,6 +201,12 @@ function setActiveNav(parts) {
   });
 }
 
+// More than one workspace reachable: worth showing the chooser shortcut.
+function multiWs() {
+  const w = state.me?.workspaces;
+  return !w || w.includes("*") || w.length > 1;
+}
+
 function renderShell(ws) {
   const collapsed = prefs.get("navCollapsed", false);
   root.innerHTML = html`<div class="app ${collapsed ? "collapsed" : ""}" id="app">
@@ -219,10 +224,10 @@ function renderShell(ws) {
         <nav class="crumbs" aria-label="Breadcrumb"><a href="#/explore">HMS</a><span aria-hidden="true">/</span><span>${ws.dept}</span><span aria-hidden="true">/</span><b aria-current="page">${ws.name}</b></nav>
         ${ws.search ? html`<form class="qsearch" role="search" id="qsearch"><label class="sr-only" for="qs">Search</label>${icon("search", 16)}
           <input id="qs" type="search" placeholder="${ws.searchPlaceholder || "Search"}" autocomplete="off"><kbd>⌘K</kbd></form>` : html`<div class="qsearch-spacer"></div>`}
-        <button type="button" class="btn ghost sm switch-demo" id="switchDemo" title="Return to the department chooser">${icon("expand", 15)}<span class="lbl">Switch demo</span></button>
+        ${multiWs() ? html`<button type="button" class="btn ghost sm switch-demo" id="switchDemo" title="Return to the department chooser">${icon("expand", 15)}<span class="lbl">Switch demo</span></button>` : ""}
         <button type="button" class="iconbtn" id="bellBtn" title="Notifications" aria-label="Notifications"><span class="dot" id="bellDot" hidden></span>${icon("bell", 18)}</button>
-        <button type="button" class="whoami" id="whoBtn" aria-haspopup="dialog" aria-label="Demo workspace. Open account menu"><span class="avatar" aria-hidden="true">${icon("user", 16)}</span>
-          <span class="w"><b>Demo workspace</b><span>Sample data</span></span>${icon("chevd", 14)}</button>
+        <button type="button" class="whoami" id="whoBtn" aria-haspopup="dialog" aria-label="${state.me?.dept || "Account"}. Open account menu"><span class="avatar" aria-hidden="true">${icon("user", 16)}</span>
+          <span class="w"><b>${state.me?.dept || "Account"}</b><span>${state.me?.username || ""}</span></span>${icon("chevd", 14)}</button>
       </header>
       <main id="main" tabindex="-1"></main>
     </div></div>`.s;
@@ -238,7 +243,8 @@ function renderShell(ws) {
   if (qform) qform.onsubmit = (e) => { e.preventDefault(); const q = document.getElementById("qs").value.trim(); go(ws.search(q)); };
   // "Switch demo" returns to the chooser. It only navigates — nothing is reset or
   // deleted, so renewal progress (held in localStorage) is preserved.
-  document.getElementById("switchDemo").onclick = () => go("#/explore");
+  const sd = document.getElementById("switchDemo");
+  if (sd) sd.onclick = () => go("#/explore");
   document.getElementById("whoBtn").onclick = (e) => userMenu(e.currentTarget);
   document.getElementById("bellBtn").onclick = () => go("#/tasks");
   refreshCounts();
@@ -260,8 +266,12 @@ async function resetDemoData() {
 // Exported so screens (e.g. the case overview "Switch to …" cue) can drive it.
 export async function switchUser(userId) {
   if (!userId || userId === state.me?.id) return false;
+  if (!isSuper()) {
+    toast("That step belongs to another department. Sign out and sign in with that department's login.", "err");
+    return false;
+  }
   if (!(await flushForms())) return false;
-  await api("login", { method: "POST", body: { userId } });
+  await api("switch-user", { method: "POST", body: { userId } });
   state.me = (await api("me")).user;
   state.suggestedUser = null; // the cue is resolved once we've switched
   toast(`Signed in as ${state.me.name} (${roleLabel(state.me.role)}).`, "ok");
@@ -278,22 +288,22 @@ async function userMenu(btn) {
   const me = state.me;
   const r = await dialog({
     title: "Account",
-    body: html`<p class="muted">Signed in as <b>${cleanLabel(me.name)}</b> (${cleanLabel(roleLabel(me.role))}). Switching keeps your place; unsaved changes are saved first.</p>
-      <p class="tiny mt">Admin covers the whole internal desk: create, review, approve and legal. Switch only for Actuarial, MDA, Billing or CCD (downstream handover).</p>
+    body: html`<p class="muted">Signed in as <b>${me.username || cleanLabel(me.name)}</b> (${cleanLabel(me.dept || roleLabel(me.role))}).${isSuper() ? " Switching keeps your place; unsaved changes are saved first." : ""}</p>
+      ${isSuper() ? html`<p class="tiny mt">Admin covers the whole internal desk: create, review, approve and legal. Switch only for Actuarial, MDA, Billing or CCD (downstream handover).</p>` : ""}
       ${sug && sug.id && sug.id !== me.id ? html`<p class="note info mt">The next step needs <b>${cleanLabel(roleLabel(sug.role))}</b>. They are selected below.</p>` : ""}
-      <div class="field mt"><label for="sw">Act as</label><select id="sw" name="user" class="inp">${SIGNIN.map((p) => {
+      ${isSuper() ? html`<div class="field mt"><label for="sw">Act as</label><select id="sw" name="user" class="inp">${SIGNIN.map((p) => {
         const pick = sug && sug.id ? p.user === sug.id || p.key === sug.role : p.key === me.role;
         return html`<option value="${p.user}" ${pick ? "selected" : ""}>${p.role}</option>`;
-      })}</select></div>
-      ${DEMO_BYPASS ? html`<div class="row tight mt"><button type="button" class="btn ghost sm" id="menuGuide">${icon("help", 15)} How this demo works</button><button type="button" class="btn ghost sm danger-ghost" id="menuReset">${icon("history", 15)} Reset demo data</button></div>` : ""}`,
-    actions: [{ label: "Sign out", value: "out" }, { label: "Cancel" }, { label: "Switch", kind: "primary", value: "ok" }],
+      })}</select></div>` : ""}
+      ${DEMO_BYPASS && isSuper() ? html`<div class="row tight mt"><button type="button" class="btn ghost sm" id="menuGuide">${icon("help", 15)} How this demo works</button><button type="button" class="btn ghost sm danger-ghost" id="menuReset">${icon("history", 15)} Reset demo data</button></div>` : ""}`,
+    actions: isSuper() ? [{ label: "Sign out", value: "out" }, { label: "Cancel" }, { label: "Switch", kind: "primary", value: "ok" }] : [{ label: "Cancel" }, { label: "Sign out", kind: "primary", value: "out" }],
     onOpen: (dlg, close) => {
       dlg.querySelector("#menuGuide")?.addEventListener("click", () => { close(null); guideDialog(); });
       dlg.querySelector("#menuReset")?.addEventListener("click", () => { close(null); resetDemoData(); });
     },
   });
   if (!r || (r.action !== "ok" && r.action !== "out")) return;
-  if (r.action === "out") { if (!(await flushForms())) return; await api("logout", { method: "POST" }); state.me = null; return renderLogin(); }
+  if (r.action === "out") { if (!(await flushForms())) return; await api("logout", { method: "POST" }); state.me = null; shellWs = null; go("#/explore"); return renderLogin(); }
   await switchUser(r.values.user);
 }
 
@@ -367,6 +377,15 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+function renderDenied() {
+  document.title = "Access denied · HMS3";
+  root.innerHTML = html`<div class="login"><div class="card" role="main" id="main">
+    <h1>Access denied</h1>
+    <p class="muted">Your login (${state.me?.dept || ""}) does not include this page.</p>
+    <p class="mt"><a class="btn primary" href="#/explore">Go to my workspace</a></p>
+  </div></div>`.s;
+}
+
 let renderSeq = 0;
 let shellWs = null; // key of the workspace whose shell is currently mounted (null on the chooser)
 async function route(force = false) {
@@ -375,6 +394,13 @@ async function route(force = false) {
   // Opening the bare root always lands on the department chooser, never the last
   // workspace that happened to be used.
   if (!parts.length) { location.replace("#/explore"); return; }
+
+  // Authorization: every route resolves to a workspace, and the signed-in account must
+  // be allowed into it. (The chooser itself is open to everyone; it lists only theirs.)
+  if (parts[0] !== "explore") {
+    const need = parts[0] === "admin" ? "admin" : workspaceForRoute(parts).key;
+    if (!canWs(need)) { shellWs = null; ++renderSeq; disposeForms(); return renderDenied(); }
+  }
 
   // The chooser lives outside the operational shell — render it straight into root.
   if (parts[0] === "explore") {

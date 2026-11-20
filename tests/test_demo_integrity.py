@@ -27,6 +27,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ["HMS_QUIET"] = "1"
+os.environ["HMS_AUTH"] = "0"  # tests sign in by bare user id
 os.environ["HMS_DEMO"] = "1"  # demo mode ON - the mode the audit ran in
 
 from server import app as server_app  # noqa: E402
