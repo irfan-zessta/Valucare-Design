@@ -60,7 +60,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
         }
     : !rn.rates.requested
     ? {
-        note: 'Reports prepared — send them to Actuarial for pricing.',
+        note: '',
         button: <Button type="primary" onClick={() => { patch((x) => doRequestRates(x)); message.success('Rate request sent to Actuarial (simulated).') }}>Request renewal rates</Button>,
       }
     : !rr
