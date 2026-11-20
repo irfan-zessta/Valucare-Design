@@ -161,4 +161,21 @@ export function openDocPreview(modal: HookAPI, kind: DocKind, rn: RenewalCase) {
   })
 }
 
+/** Download the sample document as a plain-text file (clearly labelled demo). */
+export function downloadDoc(kind: DocKind, rn: RenewalCase) {
+  const [title, body] = docContent(kind, rn)
+  const text = `SAMPLE — demo only, not a real document\n\n${title}\n${'='.repeat(title.length)}\n\n${body}\n`
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const fileName = `${rn.code}-${slug}.txt`
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export const phaseLabel = (id: RenewalPhaseId) => renewalPhase(id).label

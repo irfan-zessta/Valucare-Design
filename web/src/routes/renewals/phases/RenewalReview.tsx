@@ -6,8 +6,8 @@
 // returned rate sheet (selected version + principal/dependent rates). When rates
 // are in, the next action is Prepare renewal proposal.
 // ===========================================================================
-import { App, Button, Descriptions, Table, Tag, Tooltip, Typography } from 'antd'
-import { CheckCircleOutlined, FileTextOutlined } from '@ant-design/icons'
+import { App, Button, Descriptions, Space, Table, Tag, Tooltip, Typography } from 'antd'
+import { CheckCircleOutlined, DownloadOutlined, FileTextOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatPeso, formatCount } from '../../../lib/format'
@@ -16,7 +16,13 @@ import {
   doRequestExtract, doRequestRates, doUseRateResponse, extractsReceivedCount, extractsRequested,
   pctChange, reportsReady, type ExtractKey,
 } from '../../../domain/renewal'
-import { MiniChart, SimNote, StatCard, StatCards, UtilBar, type RenewalPhaseProps } from '../shared'
+import { MiniChart, SimNote, StatCard, StatCards, UtilBar, downloadDoc, type DocKind, type RenewalPhaseProps } from '../shared'
+
+const RENEWAL_REPORTS: { kind: DocKind; label: string }[] = [
+  { kind: 'utilization', label: 'Masked utilization' },
+  { kind: 'top', label: 'Top utilization (client)' },
+  { kind: 'preact', label: 'Pre-actuarial summary' },
+]
 
 const { Text, Title } = Typography
 
@@ -175,9 +181,15 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
               <b>Data cut-off:</b> {formatDate(r.cutoff)}. <b>Analyst comment:</b> {r.analyst}
             </Text>
             <FormActions note="Masked reports are client-safe for previews and exports; the pre-actuarial summary is internal pricing input only.">
-              <Button icon={<FileTextOutlined />} onClick={() => preview('utilization')}>Masked utilization</Button>
-              <Button icon={<FileTextOutlined />} onClick={() => preview('top')}>Top utilization (client)</Button>
-              <Button icon={<FileTextOutlined />} onClick={() => preview('preact')}>Pre-actuarial summary</Button>
+              {RENEWAL_REPORTS.map((rep) => (
+                <Space.Compact key={rep.kind}>
+                  <Button icon={<FileTextOutlined />} onClick={() => preview(rep.kind)}>{rep.label}</Button>
+                  <Tooltip title={`Download ${rep.label} (sample .txt)`}>
+                    <Button icon={<DownloadOutlined />} aria-label={`Download ${rep.label}`}
+                      onClick={() => { downloadDoc(rep.kind, rn); message.success(`Downloading ${rep.label}.`) }} />
+                  </Tooltip>
+                </Space.Compact>
+              ))}
             </FormActions>
           </>
         ) : null}
