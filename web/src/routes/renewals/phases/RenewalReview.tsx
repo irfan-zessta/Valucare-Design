@@ -27,6 +27,28 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
     { key: 'ccd', name: 'CCD availment extract', detail: r.prepared ? `${formatPeso(r.ccdEstimate!)} estimated` : 'Estimated availments (not settled)' },
   ]
 
+  // The phase's single forward action, surfaced in the floating bar (consistent
+  // with the New Business flows). Which one shows depends on how far the case is.
+  const floatAction = !r.prepared
+    ? {
+        note: 'Consolidate the renewal reports to begin pricing.',
+        button: <Button type="primary" onClick={() => { patch((x) => doPrepareReports(x)); message.success('Renewal reports prepared.') }}>Prepare renewal reports</Button>,
+      }
+    : !rn.rates.requested
+    ? {
+        note: 'Reports prepared — send them to Actuarial for pricing.',
+        button: <Button type="primary" onClick={() => { patch((x) => doRequestRates(x)); message.success('Rate request sent to Actuarial (simulated).') }}>Request renewal rates</Button>,
+      }
+    : !rr
+    ? {
+        note: 'Waiting on Actuarial — load a representative rate sheet to continue the demo.',
+        button: <Button type="primary" onClick={() => { patch((x) => doUseRateResponse(x)); message.success('Sample Actuarial rate sheet loaded.') }}>Load sample Actuarial rate sheet</Button>,
+      }
+    : {
+        note: 'Rates received — prepare the renewal proposal for the client.',
+        button: <Button type="primary" onClick={() => goPhase('proposal')}>Prepare renewal proposal ›</Button>,
+      }
+
   return (
     <>
       <FormSection wide title="Current account snapshot"
@@ -94,13 +116,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
               <Button icon={<FileTextOutlined />} onClick={() => preview('preact')}>Pre-actuarial summary</Button>
             </FormActions>
           </>
-        ) : (
-          <FormActions>
-            <Button type="primary" onClick={() => { patch((x) => doPrepareReports(x)); message.success('Renewal reports prepared.') }}>
-              Prepare renewal reports
-            </Button>
-          </FormActions>
-        )}
+        ) : null}
       </FormSection>
 
       {r.prepared && (
@@ -108,20 +124,9 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
           description="Actuarial pricing stays specialist work. Send the prepared reports to Actuarial and track the request in-system."
           extra={rr ? <Tag color="green">Received</Tag> : rn.rates.requested ? <Tag color="gold">Requested — simulated</Tag> : null}>
           {!rn.rates.requested ? (
-            <FormActions>
-              <Button type="primary" onClick={() => { patch((x) => doRequestRates(x)); message.success('Rate request sent to Actuarial (simulated).') }}>
-                Request renewal rates
-              </Button>
-            </FormActions>
+            <SimNote>Reports are prepared and ready to send to Actuarial for pricing.</SimNote>
           ) : !rr ? (
-            <>
-              <SimNote>Sent to Actuarial — no rating engine runs here. The case is waiting on Actuarial; load a representative rate sheet to continue the demo.</SimNote>
-              <FormActions>
-                <Button type="primary" onClick={() => { patch((x) => doUseRateResponse(x)); message.success('Sample Actuarial rate sheet loaded.') }}>
-                  Load sample Actuarial rate sheet
-                </Button>
-              </FormActions>
-            </>
+            <SimNote>Sent to Actuarial — no rating engine runs here. The case is waiting on Actuarial; load a representative rate sheet to continue the demo.</SimNote>
           ) : (
             <>
               <SimNote>Representative pricing loaded for the demo. No automatic pricing engine runs here — Actuarial remains specialist work.</SimNote>
@@ -147,13 +152,15 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
                   { key: 'pct', label: 'Overall change', children: `+${rr.pct}%` },
                 ]} />
               <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 8 }}><b>Pricing explanation:</b> {rr.note}</Text>
-              <FormActions>
-                <Button type="primary" onClick={() => goPhase('proposal')}>Prepare renewal proposal ›</Button>
-              </FormActions>
             </>
           )}
         </FormSection>
       )}
+
+      <div className="app-form-floatbar">
+        <Text type="secondary">{floatAction.note}</Text>
+        <div className="app-form-floatbar__actions">{floatAction.button}</div>
+      </div>
     </>
   )
 }
