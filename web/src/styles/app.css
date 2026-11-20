@@ -435,6 +435,11 @@ button.app-stepper__item {
 .app-form-panel--wide {
   max-inline-size: none;
 }
+/* Panels stacked within a single phase sit flush otherwise — keep them on the
+   same 24px rhythm as the rest of the page. */
+.app-form-panel + .app-form-panel {
+  margin-block-start: 24px;
+}
 .app-form-panel__head {
   display: flex;
   align-items: flex-start;
