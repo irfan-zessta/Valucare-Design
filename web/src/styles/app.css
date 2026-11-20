@@ -282,19 +282,19 @@ body {
 /* Case header laid out as two side-by-side cards: business name + stepper. */
 .app-pageheader-cards {
   display: flex;
-  gap: 16px;
+  gap: 24px;
   flex-wrap: wrap;
   align-items: stretch;
-  margin-block-end: 16px;
+  margin-block-end: 24px;
 }
 .app-pageheader-cards > .app-pageheader-card {
   margin-block-end: 0;
 }
 .app-pageheader-card--name {
-  flex: 1 1 calc(60% - 8px);
+  flex: 1 1 calc(60% - 12px);
 }
 .app-pageheader-card--stepper {
-  flex: 1 1 calc(40% - 8px);
+  flex: 1 1 calc(40% - 12px);
   display: flex;
   align-items: center;
 }
