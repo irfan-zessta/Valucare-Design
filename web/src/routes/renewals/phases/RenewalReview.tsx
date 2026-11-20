@@ -6,15 +6,17 @@
 // returned rate sheet (selected version + principal/dependent rates). When rates
 // are in, the next action is Prepare renewal proposal.
 // ===========================================================================
-import { App, Button, Descriptions, Space, Table, Tag, Tooltip, Typography } from 'antd'
-import { CheckCircleOutlined, DownloadOutlined, FileTextOutlined } from '@ant-design/icons'
+import { useState } from 'react'
+import { App, Button, Descriptions, Drawer, Empty, Space, Table, Tag, Timeline, Tooltip, Typography } from 'antd'
+import { CheckCircleOutlined, DownloadOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
-import { formatDate, formatPeso, formatCount } from '../../../lib/format'
+import { formatDate, formatDateTime, formatPeso, formatCount } from '../../../lib/format'
 import {
   EXTRACT_KEYS, EXTRACT_META, doReceiveAllExtracts, doReceiveExtract, doRequestAllExtracts,
-  doRequestExtract, doRequestRates, doUseRateResponse, extractsReceivedCount, extractsRequested,
-  pctChange, reportsReady, type ExtractKey,
+  doRequestExtract, doRequestRates, doReviseRates, doSelectRateVersion, doUseRateResponse,
+  extractsReceivedCount, extractsRequested, pctChange, reportsReady,
+  type ExtractKey, type RateResponse, type RenewalCase,
 } from '../../../domain/renewal'
 import { MiniChart, SimNote, StatCard, StatCards, UtilBar, downloadDoc, type DocKind, type RenewalPhaseProps } from '../shared'
 
@@ -28,6 +30,7 @@ const { Text, Title } = Typography
 
 export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps) {
   const { message } = App.useApp()
+  const [historyOpen, setHistoryOpen] = useState(false)
   const r = rn.reports
   const rr = rn.rates.response
 
@@ -40,8 +43,8 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
   const detailFor = (key: ExtractKey): string => {
     const received = r.extracts[key].status === 'received'
     if (key === 'members') {
-      return received
-        ? `${formatCount(r.memberSummary!.retained)} retained · +${formatCount(r.memberSummary!.added)} · −${formatCount(r.memberSummary!.removed)}`
+      return received && r.memberSummary
+        ? `${formatCount(r.memberSummary.retained)} retained · +${formatCount(r.memberSummary.added)} · −${formatCount(r.memberSummary.removed)}`
         : `${formatCount(rn.members.principal)} principals · ${formatCount(rn.members.dependent)} dependents (masked)`
     }
     if (key === 'claims') {
@@ -210,6 +213,10 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
                 <Title level={5} style={{ margin: 0 }}>Selected rate sheet</Title>
                 <Tag color="blue">v{rr.version}</Tag>
                 <Tag color="green" icon={<CheckCircleOutlined />}>Selected</Tag>
+                <Button type="link" size="small" icon={<HistoryOutlined />} style={{ marginInlineStart: 'auto' }}
+                  onClick={() => setHistoryOpen(true)}>
+                  Version history ({rn.rates.history.length})
+                </Button>
               </div>
               <Table size="small" pagination={false} rowKey="line"
                 dataSource={[
@@ -233,10 +240,64 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
         </FormSection>
       )}
 
+      <RateHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} rn={rn}
+        onRevise={() => { patch((x) => doReviseRates(x)); message.success('Loaded a revised Actuarial rate sheet.') }}
+        onSelect={(v) => { patch((x) => doSelectRateVersion(x, v)); message.success(`Selected rate sheet v${v}.`) }} />
+
       <div className="app-form-floatbar">
         <Text type="secondary">{floatAction.note}</Text>
         <div className="app-form-floatbar__actions">{floatAction.button}</div>
       </div>
     </>
+  )
+}
+
+// --- Rate-sheet version history --------------------------------------------
+// Shows every rate sheet Actuarial has returned, newest first. Each round can
+// be re-selected; a revised sheet can be loaded to simulate a new round.
+function RateHistoryDrawer({
+  open, onClose, rn, onRevise, onSelect,
+}: {
+  open: boolean
+  onClose: () => void
+  rn: RenewalCase
+  onRevise: () => void
+  onSelect: (version: number) => void
+}) {
+  const selected = rn.rates.response?.version
+  const ordered = [...rn.rates.history].reverse() // newest first
+  return (
+    <Drawer title="Rate sheet version history" open={open} onClose={onClose} size="large"
+      extra={<Button type="primary" icon={<HistoryOutlined />} onClick={onRevise}>Load revised sheet</Button>}>
+      <Text type="secondary" style={{ fontSize: 13 }}>
+        Every rate sheet Actuarial has returned for this renewal. Loading a revised sheet mimics a re-rate after a negotiation round — earlier versions stay on record and can be re-selected.
+      </Text>
+      {ordered.length ? (
+        <Timeline style={{ marginTop: 20 }}
+          items={ordered.map((s: RateResponse) => ({
+            color: s.version === selected ? 'green' : 'blue',
+            children: (
+              <div style={{ paddingBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Tag color="blue">v{s.version}</Tag>
+                  {s.version === selected
+                    ? <Tag color="green" icon={<CheckCircleOutlined />}>Selected</Tag>
+                    : <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => onSelect(s.version)}>Select this version</Button>}
+                  <Text type="secondary" style={{ fontSize: 12, marginInlineStart: 'auto' }}>{formatDateTime(s.at)}</Text>
+                </div>
+                <div style={{ fontSize: 13, marginTop: 6 }}>
+                  Principal <b>{formatPeso(s.principalRecommended)}</b> · Dependent <b>{formatPeso(s.dependentRecommended)}</b>
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)', marginTop: 2 }}>
+                  Overall +{s.pct}% · MBL {formatPeso(s.mbl)} · {s.plan}
+                </div>
+                <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>{s.note}</Text>
+              </div>
+            ),
+          }))} />
+      ) : (
+        <Empty style={{ marginTop: 32 }} description="No rate sheets loaded yet." />
+      )}
+    </Drawer>
   )
 }

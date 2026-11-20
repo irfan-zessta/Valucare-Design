@@ -26,6 +26,10 @@ function migrateCase(c: RenewalCase): RenewalCase {
     ) as RenewalCase['reports']['extracts']
     delete rep.prepared
   }
+  // Rate-sheet version history was added later; backfill from the single response.
+  if (!Array.isArray(c.rates.history)) {
+    c.rates.history = c.rates.response ? [c.rates.response] : []
+  }
   return c
 }
 

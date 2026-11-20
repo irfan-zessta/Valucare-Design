@@ -183,7 +183,10 @@ export interface RateResponse {
 export interface RenewalRates {
   requested: boolean
   requestedAt?: string
+  /** The currently-selected rate sheet. */
   response: RateResponse | null
+  /** Every rate sheet Actuarial has returned, oldest first (for version history). */
+  history: RateResponse[]
 }
 
 export interface ProposalVersion {
@@ -626,7 +629,7 @@ export function seedRenewal(acct: RenewalAccount): RenewalCase {
     currentPremium: { principal: acct.premiumPrincipal, dependent: acct.premiumDependent },
     planCodes: acct.planCodes.map((p) => ({ ...p, prevCode: p.code, source: 'Carried forward' })),
     reports: blankReports(),
-    rates: { requested: false, response: null },
+    rates: { requested: false, response: null, history: [] },
     proposal: { versions: [], decision: null, changeRequested: false, notRenewReason: '', edits: {}, rounds: [] },
     setup: {
       sobChoice: null, sobStatus: 'Not started', sobSigned: false, benefitsChecked: false,
@@ -757,7 +760,7 @@ export function doRequestRates(rn: RenewalCase, silent = false) {
 }
 export function doUseRateResponse(rn: RenewalCase, silent = false) {
   const cur = rn.currentPremium
-  rn.rates.response = {
+  const sheet: RateResponse = {
     at: stamp(),
     principalCurrent: cur.principal, principalRecommended: Math.round(cur.principal * 1.085),
     dependentCurrent: cur.dependent, dependentRecommended: Math.round(cur.dependent * 1.072),
@@ -765,7 +768,51 @@ export function doUseRateResponse(rn: RenewalCase, silent = false) {
     pct: 8.1, version: 1,
     note: 'Recommended uplift reflects loss ratio and medical inflation. MBL unchanged; room entitlements retained.',
   }
+  rn.rates.history = [sheet]
+  rn.rates.response = sheet
   if (!silent) log(rn, 'Loaded sample Actuarial rate sheet (v1): current vs recommended rates, MBL and plan, % change and pricing note.')
+}
+
+// Each revision steps the recommended uplift down a little, as if Actuarial
+// re-rated after a negotiation round. Progressive, clearly-labelled sample data.
+const REVISION_NOTES = [
+  'Revised after negotiation — modest softening on the dependent line; loss-ratio assumptions unchanged.',
+  'Second revision — principal uplift eased following the client’s utilization context. MBL still unchanged.',
+  'Further revision — best-and-final representative pricing for the demo.',
+]
+export function doReviseRates(rn: RenewalCase, silent = false) {
+  const prev = rn.rates.response
+  if (!prev) {
+    doUseRateResponse(rn, silent)
+    return
+  }
+  const version = rn.rates.history.length + 1
+  // Each round eases the uplift by ~0.6pt principal / ~0.5pt dependent.
+  const principalFactor = 1 + Math.max(0, (prev.principalRecommended / prev.principalCurrent - 1) - 0.006)
+  const dependentFactor = 1 + Math.max(0, (prev.dependentRecommended / prev.dependentCurrent - 1) - 0.005)
+  const principalRecommended = Math.round(prev.principalCurrent * principalFactor)
+  const dependentRecommended = Math.round(prev.dependentCurrent * dependentFactor)
+  const blended = ((principalRecommended / prev.principalCurrent) + (dependentRecommended / prev.dependentCurrent)) / 2 - 1
+  const sheet: RateResponse = {
+    at: stamp(),
+    principalCurrent: prev.principalCurrent, principalRecommended,
+    dependentCurrent: prev.dependentCurrent, dependentRecommended,
+    mbl: rn.mbl, plan: rn.currentSob,
+    pct: Math.round(blended * 1000) / 10,
+    note: REVISION_NOTES[Math.min(version - 2, REVISION_NOTES.length - 1)],
+    version,
+  }
+  rn.rates.history.push(sheet)
+  rn.rates.response = sheet
+  if (!silent) log(rn, `Loaded revised Actuarial rate sheet (v${version}): +${sheet.pct}% overall (was +${prev.pct}%).`)
+}
+
+/** Re-select an earlier rate-sheet version from the history. */
+export function doSelectRateVersion(rn: RenewalCase, version: number, silent = false) {
+  const sheet = rn.rates.history.find((s) => s.version === version)
+  if (!sheet || rn.rates.response?.version === version) return
+  rn.rates.response = sheet
+  if (!silent) log(rn, `Selected Actuarial rate sheet v${version} (+${sheet.pct}% overall).`)
 }
 export function doSendProposal(rn: RenewalCase, silent = false) {
   const v = rn.proposal.versions.length + 1
