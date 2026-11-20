@@ -282,7 +282,7 @@ function RateHistoryDrawer({
                   <Tag color="blue">v{s.version}</Tag>
                   {s.version === selected
                     ? <Tag color="green" icon={<CheckCircleOutlined />}>Selected</Tag>
-                    : <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => onSelect(s.version)}>Select this version</Button>}
+                    : <Button size="small" onClick={() => onSelect(s.version)}>Select this version</Button>}
                   <Text type="secondary" style={{ fontSize: 12, marginInlineStart: 'auto' }}>{formatDateTime(s.at)}</Text>
                 </div>
                 <div style={{ fontSize: 13, marginTop: 6 }}>
