@@ -97,19 +97,74 @@ export const GLOSS: Record<string, string> = {
 
 // --- Progress sub-state -----------------------------------------------------
 
+// A renewal's reporting data is pulled from three different teams. Each extract
+// is its own request with its own lifecycle (none → requested → received), so
+// the Renewal Officer can see exactly who they're waiting on. The data fields
+// are populated as each team's response is loaded.
+export type ExtractKey = 'members' | 'claims' | 'ccd'
+export type ExtractStatus = 'none' | 'requested' | 'received'
+
+export interface ExtractRequest {
+  status: ExtractStatus
+  ref?: string // data-request reference, e.g. DR-MDA-2020-00033
+  requestedAt?: string
+  requestedBy?: string // the Renewal Officer who raised the request
+  receivedAt?: string
+}
+
+/** Who owns each extract and how it's requested — drives the UI and the log. */
+export const EXTRACT_META: Record<ExtractKey, {
+  name: string
+  team: string // short label for tags
+  teamFull: string // full team name for the log / sub-lines
+  slaDays: number // typical turnaround, shown on the pending request
+  refPrefix: string
+}> = {
+  members: { name: 'Member Data extract', team: 'MDA', teamFull: 'Members Data Administration', slaDays: 2, refPrefix: 'DR-MDA' },
+  claims: { name: 'Billed claims extract', team: 'Claims', teamFull: 'Claims', slaDays: 3, refPrefix: 'DR-CLM' },
+  ccd: { name: 'CCD availment extract', team: 'CCD', teamFull: 'Customer Care Desk', slaDays: 2, refPrefix: 'DR-CCD' },
+}
+export const EXTRACT_KEYS: ExtractKey[] = ['members', 'claims', 'ccd']
+
 export interface RenewalReports {
-  prepared: boolean
+  extracts: Record<ExtractKey, ExtractRequest>
   cutoff?: string
+  // MDA
+  memberSummary?: { retained: number; added: number; removed: number; planChanges: number }
+  // Claims (settled/billed claims + the utilization analytics derived from them)
   claimsBilled?: number
-  ccdEstimate?: number
-  ccdUnbilled?: number
   premium?: number
   principalUtil?: number
   dependentUtil?: number
   monthly?: number[]
   topIllness?: [string, number][]
   analyst?: string
+  // CCD
+  ccdEstimate?: number
+  ccdUnbilled?: number
 }
+
+/** A fresh, nothing-requested reports block. */
+export function blankReports(): RenewalReports {
+  return {
+    extracts: {
+      members: { status: 'none' },
+      claims: { status: 'none' },
+      ccd: { status: 'none' },
+    },
+  }
+}
+
+export const extractReceived = (rn: RenewalCase, k: ExtractKey): boolean =>
+  rn.reports.extracts[k].status === 'received'
+/** All three extracts are in — the consolidated masked report set is ready. */
+export const reportsReady = (rn: RenewalCase): boolean =>
+  EXTRACT_KEYS.every((k) => extractReceived(rn, k))
+/** At least one extract has been requested (work on the data has started). */
+export const extractsRequested = (rn: RenewalCase): boolean =>
+  EXTRACT_KEYS.some((k) => rn.reports.extracts[k].status !== 'none')
+export const extractsReceivedCount = (rn: RenewalCase): number =>
+  EXTRACT_KEYS.filter((k) => extractReceived(rn, k)).length
 
 export interface RateResponse {
   at: string
@@ -570,7 +625,7 @@ export function seedRenewal(acct: RenewalAccount): RenewalCase {
     currentSob: acct.sob, mbl: acct.mbl,
     currentPremium: { principal: acct.premiumPrincipal, dependent: acct.premiumDependent },
     planCodes: acct.planCodes.map((p) => ({ ...p, prevCode: p.code, source: 'Carried forward' })),
-    reports: { prepared: false },
+    reports: blankReports(),
     rates: { requested: false, response: null },
     proposal: { versions: [], decision: null, changeRequested: false, notRenewReason: '', edits: {}, rounds: [] },
     setup: {
@@ -591,7 +646,7 @@ export function seedRenewal(acct: RenewalAccount): RenewalCase {
 export function applyPreset(rn: RenewalCase, preset: RenewalPreset) {
   if (preset === 'new') return
   if (['rates', 'sent', 'accepted', 'completed', 'not_renewed'].includes(preset)) {
-    doPrepareReports(rn, true)
+    doReceiveAllExtracts(rn, true)
     doRequestRates(rn, true)
     doUseRateResponse(rn, true)
   }
@@ -620,20 +675,79 @@ export function applyPreset(rn: RenewalCase, preset: RenewalPreset) {
 // ---------------------------------------------------------------- state actions
 // Each mutates the passed draft; the provider clones before applying and persists
 // afterwards. The `silent` flag lets applyPreset() seed without spamming the log.
-export function doPrepareReports(rn: RenewalCase, silent = false) {
-  rn.reports = {
-    prepared: true, cutoff: rn.currentContract.to,
-    claimsBilled: 48250000, ccdEstimate: 6120000, ccdUnbilled: 2140000, premium: 71880000,
-    principalUtil: 0.82, dependentUtil: 0.63,
-    monthly: [3.1, 3.4, 2.9, 3.8, 4.2, 3.6, 4.0, 4.5, 3.9, 4.1, 4.4, 4.8],
-    topIllness: [['Respiratory infections', 22], ['Cardiovascular', 18], ['Gastro-intestinal', 14], ['Musculoskeletal', 11], ['Dengue / viral', 9]],
-    analyst: 'Utilization tracking slightly above prior year; Q4 uptick driven by seasonal respiratory cases. No single catastrophic claim.',
+/** Raise a data request for one extract to its owning team. */
+export function doRequestExtract(rn: RenewalCase, key: ExtractKey, silent = false) {
+  const ex = rn.reports.extracts[key]
+  if (ex.status !== 'none') return // already requested or received
+  const meta = EXTRACT_META[key]
+  ex.status = 'requested'
+  ex.ref = `${meta.refPrefix}-${rn.code.replace(/^MA-/, '')}`
+  ex.requestedAt = stamp()
+  ex.requestedBy = rn.owner
+  if (!silent) log(rn, `Requested ${meta.name} from ${meta.teamFull} — ${ex.ref} (expected ~${meta.slaDays} working days).`)
+}
+
+/** Raise all three data requests in one go. */
+export function doRequestAllExtracts(rn: RenewalCase, silent = false) {
+  const pending = EXTRACT_KEYS.filter((k) => rn.reports.extracts[k].status === 'none')
+  pending.forEach((k) => doRequestExtract(rn, k, true))
+  if (!silent && pending.length) {
+    log(rn, `Requested renewal data extracts from ${pending.map((k) => EXTRACT_META[k].teamFull).join(', ')}.`)
+  }
+}
+
+/** Load a team's response for one extract, populating that team's data. */
+export function doReceiveExtract(rn: RenewalCase, key: ExtractKey, silent = false) {
+  const ex = rn.reports.extracts[key]
+  if (ex.status === 'received') return
+  if (ex.status === 'none') doRequestExtract(rn, key, true) // auto-raise if skipped
+  ex.status = 'received'
+  ex.receivedAt = stamp()
+  const r = rn.reports
+  r.cutoff = rn.currentContract.to
+  if (key === 'members') {
+    const total = rn.members.principal + rn.members.dependent
+    r.memberSummary = {
+      retained: Math.round(total * 0.94),
+      added: Math.round(total * 0.08),
+      removed: Math.round(total * 0.05),
+      planChanges: Math.round(rn.members.principal * 0.03),
+    }
+  } else if (key === 'claims') {
+    r.claimsBilled = 48250000
+    r.premium = 71880000
+    r.principalUtil = 0.82
+    r.dependentUtil = 0.63
+    r.monthly = [3.1, 3.4, 2.9, 3.8, 4.2, 3.6, 4.0, 4.5, 3.9, 4.1, 4.4, 4.8]
+    r.topIllness = [['Respiratory infections', 22], ['Cardiovascular', 18], ['Gastro-intestinal', 14], ['Musculoskeletal', 11], ['Dengue / viral', 9]]
+    r.analyst = 'Utilization tracking slightly above prior year; Q4 uptick driven by seasonal respiratory cases. No single catastrophic claim.'
+  } else if (key === 'ccd') {
+    r.ccdEstimate = 6120000
+    r.ccdUnbilled = 2140000
   }
   if (!silent) {
-    log(rn, 'Prepared renewal reports: masked detailed utilization, top utilization (client) report and pre-actuarial summary.')
+    const meta = EXTRACT_META[key]
+    log(rn, `${meta.teamFull} returned the ${meta.name}${ex.ref ? ` (${ex.ref})` : ''}.`)
+    // Once every team has responded, the consolidated masked report set is
+    // assembled — the same documents the old single-step flow produced.
+    if (reportsReady(rn)) {
+      log(rn, 'All extracts in — consolidated the masked utilization, top utilization (client) report and pre-actuarial summary.')
+      addDoc(rn, 'Masked utilization report', 'Report')
+      addDoc(rn, 'Top utilization (client) report', 'Report')
+      addDoc(rn, 'Pre-actuarial summary', 'Report')
+    }
+  }
+}
+
+/** Load every outstanding team response at once (demo convenience). */
+export function doReceiveAllExtracts(rn: RenewalCase, silent = false) {
+  const hadPending = EXTRACT_KEYS.some((k) => rn.reports.extracts[k].status !== 'received')
+  EXTRACT_KEYS.forEach((k) => doReceiveExtract(rn, k, true))
+  if (hadPending && !silent) {
     addDoc(rn, 'Masked utilization report', 'Report')
     addDoc(rn, 'Top utilization (client) report', 'Report')
     addDoc(rn, 'Pre-actuarial summary', 'Report')
+    log(rn, 'Loaded all team responses and consolidated the masked renewal report set.')
   }
 }
 export function doRequestRates(rn: RenewalCase, silent = false) {
@@ -705,7 +819,8 @@ export function statusInfo(rn: RenewalCase): { label: string; tone: Tone } {
   if (rn.proposal.versions.length) return { label: `Proposal sent (v${rn.proposal.versions.length})`, tone: 'info' }
   if (rn.rates.response) return { label: 'Rates received', tone: 'info' }
   if (rn.rates.requested) return { label: 'Rates requested — simulated', tone: 'warn' }
-  if (rn.reports.prepared) return { label: 'Reports prepared', tone: 'info' }
+  if (reportsReady(rn)) return { label: 'Reports prepared', tone: 'info' }
+  if (extractsRequested(rn)) return { label: `Extracts requested (${extractsReceivedCount(rn)}/${EXTRACT_KEYS.length} in)`, tone: 'warn' }
   return { label: 'Data under review', tone: 'neutral' }
 }
 
@@ -743,7 +858,7 @@ export interface NextStep {
 export function nextStep(rn: RenewalCase): NextStep {
   if (rn.notRenewed) return { phase: 'proposal', sentence: 'This renewal was declined. You can still review the summary and advisory.', label: 'View summary' }
   if (rn.completed) return { phase: 'contract', sentence: 'Renewal processing is complete. Review the summary and handoffs.', label: 'View renewal summary' }
-  if (!rn.reports.prepared) return { phase: 'review', sentence: "Start by preparing the renewal reports from the account's current data.", label: 'Go to Renewal Data & Pricing' }
+  if (!reportsReady(rn)) return { phase: 'review', sentence: extractsRequested(rn) ? 'Data extracts requested. Load each team’s response as it arrives.' : 'Start by requesting the renewal data extracts from MDA, Claims and CCD.', label: 'Go to Renewal Data & Pricing', waitingOn: extractsRequested(rn) ? 'the data teams' : undefined }
   if (!rn.rates.requested) return { phase: 'review', sentence: 'Reports are ready. Request renewal rates from Actuarial.', label: 'Go to Renewal Data & Pricing' }
   if (!rn.rates.response) return { phase: 'review', sentence: 'Rates were requested (simulated). Load the sample Actuarial rate sheet.', label: 'Go to Renewal Data & Pricing', waitingOn: 'Actuarial' }
   if (!rn.proposal.versions.length) return { phase: 'proposal', sentence: 'Rates are in. Prepare and send the renewal proposal.', label: 'Prepare renewal proposal' }
@@ -759,7 +874,7 @@ export function phaseStatus(rn: RenewalCase, id: RenewalPhaseId): { label: strin
   const active = nextStep(rn).phase
   if (id === 'review') {
     if (rn.rates.response) return { label: 'Done', state: 'done' }
-    if (rn.reports.prepared || rn.rates.requested) return { label: 'In progress', state: active === id ? 'current' : 'done' }
+    if (reportsReady(rn) || rn.rates.requested || extractsRequested(rn)) return { label: 'In progress', state: active === id ? 'current' : 'done' }
     return { label: 'Start here', state: 'current' }
   }
   if (id === 'proposal') {

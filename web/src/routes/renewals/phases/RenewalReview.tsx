@@ -6,12 +6,16 @@
 // returned rate sheet (selected version + principal/dependent rates). When rates
 // are in, the next action is Prepare renewal proposal.
 // ===========================================================================
-import { App, Button, Descriptions, Table, Tag, Typography } from 'antd'
+import { App, Button, Descriptions, Table, Tag, Tooltip, Typography } from 'antd'
 import { CheckCircleOutlined, FileTextOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatPeso, formatCount } from '../../../lib/format'
-import { doPrepareReports, doRequestRates, doUseRateResponse, pctChange } from '../../../domain/renewal'
+import {
+  EXTRACT_KEYS, EXTRACT_META, doReceiveAllExtracts, doReceiveExtract, doRequestAllExtracts,
+  doRequestExtract, doRequestRates, doUseRateResponse, extractsReceivedCount, extractsRequested,
+  pctChange, reportsReady, type ExtractKey,
+} from '../../../domain/renewal'
 import { MiniChart, SimNote, StatCard, StatCards, UtilBar, type RenewalPhaseProps } from '../shared'
 
 const { Text, Title } = Typography
@@ -21,19 +25,39 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
   const r = rn.reports
   const rr = rn.rates.response
 
-  const extractRows = [
-    { key: 'members', name: 'Member Data extract', detail: `${formatCount(rn.members.principal)} principals · ${formatCount(rn.members.dependent)} dependents` },
-    { key: 'claims', name: 'Billed claims extract', detail: r.prepared ? `${formatPeso(r.claimsBilled!)} settled` : 'Settled and billed claims' },
-    { key: 'ccd', name: 'CCD availment extract', detail: r.prepared ? `${formatPeso(r.ccdEstimate!)} estimated` : 'Estimated availments (not settled)' },
-  ]
+  const ready = reportsReady(rn)
+  const anyRequested = extractsRequested(rn)
+  const receivedCount = extractsReceivedCount(rn)
+
+  // Each extract is a request to a different team; the detail line shows the
+  // returned figure once that team has responded, otherwise what's being pulled.
+  const detailFor = (key: ExtractKey): string => {
+    const received = r.extracts[key].status === 'received'
+    if (key === 'members') {
+      return received
+        ? `${formatCount(r.memberSummary!.retained)} retained · +${formatCount(r.memberSummary!.added)} · −${formatCount(r.memberSummary!.removed)}`
+        : `${formatCount(rn.members.principal)} principals · ${formatCount(rn.members.dependent)} dependents (masked)`
+    }
+    if (key === 'claims') {
+      return received ? `${formatPeso(r.claimsBilled!)} settled & billed` : 'Settled and billed claims'
+    }
+    return received ? `${formatPeso(r.ccdEstimate!)} estimated availments` : 'Estimated availments (not settled)'
+  }
+
+  const extractRows = EXTRACT_KEYS.map((key) => ({ key, meta: EXTRACT_META[key], ex: r.extracts[key] }))
 
   // The phase's single forward action, surfaced in the floating bar (consistent
   // with the New Business flows). Which one shows depends on how far the case is.
-  const floatAction = !r.prepared
-    ? {
-        note: 'Consolidate the renewal reports to begin pricing.',
-        button: <Button type="primary" onClick={() => { patch((x) => doPrepareReports(x)); message.success('Renewal reports prepared.') }}>Prepare renewal reports</Button>,
-      }
+  const floatAction = !ready
+    ? !anyRequested
+      ? {
+          note: 'Request the Member Data, claims and CCD extracts from their teams to begin.',
+          button: <Button type="primary" onClick={() => { patch((x) => doRequestAllExtracts(x)); message.success('Data requests sent to MDA, Claims and CCD.') }}>Request all extracts</Button>,
+        }
+      : {
+          note: `Waiting on the data teams — ${receivedCount} of ${EXTRACT_KEYS.length} responses in. Load each as it arrives.`,
+          button: <Button type="primary" onClick={() => { patch((x) => doReceiveAllExtracts(x)); message.success('Loaded all outstanding team responses.') }}>Load all responses</Button>,
+        }
     : !rn.rates.requested
     ? {
         note: 'Reports prepared — send them to Actuarial for pricing.',
@@ -65,16 +89,56 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
       </FormSection>
 
       <FormSection wide title="Renewal data extracts"
-        description="Pull the account's Member Data, claims and CCD availment into a consolidated, masked report set — no manual ICT request, no spreadsheet assembly."
-        extra={r.prepared ? <Tag color="green">Prepared</Tag> : null}>
-        <Table size="small" pagination={false} rowKey="key" dataSource={extractRows}
+        description="Each extract is a data request to a different team — MDA, Claims and CCD. Request each one (or all at once), then load each team's response as it comes back. No manual ICT request, no spreadsheet assembly."
+        extra={
+          ready ? <Tag color="green" icon={<CheckCircleOutlined />}>All extracts received</Tag>
+            : anyRequested ? <Tag color="gold">{receivedCount}/{EXTRACT_KEYS.length} received</Tag>
+            : <Tag>Not requested</Tag>
+        }>
+        {!anyRequested && (
+          <SimNote>Nothing has been requested yet. In a live system each request is routed to the owning team's queue; here you control when each response arrives.</SimNote>
+        )}
+        <Table<typeof extractRows[number]> size="small" pagination={false} rowKey="key" dataSource={extractRows}
           columns={[
-            { title: 'Extract', dataIndex: 'name', key: 'name' },
-            { title: 'Detail', dataIndex: 'detail', key: 'detail', render: (v) => <Text type="secondary">{v}</Text> },
-            { title: 'Status', key: 'status', align: 'right', render: () => r.prepared ? <Tag color="green" icon={<CheckCircleOutlined />}>Loaded</Tag> : <Tag>Not requested</Tag> },
+            {
+              title: 'Extract', key: 'name',
+              render: (_, row) => (
+                <div>
+                  <div style={{ fontWeight: 500 }}>{row.meta.name}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>
+                    {row.ex.status === 'none'
+                      ? `From ${row.meta.teamFull}`
+                      : `${row.meta.teamFull} · ${row.ex.ref}`}
+                  </div>
+                </div>
+              ),
+            },
+            { title: 'Detail', key: 'detail', render: (_, row) => <Text type="secondary">{detailFor(row.key)}</Text> },
+            {
+              title: 'Status', key: 'status',
+              render: (_, row) =>
+                row.ex.status === 'received'
+                  ? <Tag color="green" icon={<CheckCircleOutlined />}>Received</Tag>
+                  : row.ex.status === 'requested'
+                  ? <Tooltip title={`Requested ${row.ex.requestedAt ? formatDate(row.ex.requestedAt) : ''} by ${row.ex.requestedBy ?? 'Renewal Officer'} · typical turnaround ${row.meta.slaDays} working days`}>
+                      <Tag color="gold">Requested — {row.meta.team}</Tag>
+                    </Tooltip>
+                  : <Tag>Not requested</Tag>,
+            },
+            {
+              title: '', key: 'action', align: 'right',
+              render: (_, row) =>
+                row.ex.status === 'none'
+                  ? <Button size="small" onClick={() => { patch((x) => doRequestExtract(x, row.key)); message.success(`Requested from ${row.meta.teamFull}.`) }}>Request</Button>
+                  : row.ex.status === 'requested'
+                  ? <Tooltip title={`Simulate ${row.meta.teamFull} returning the data.`}>
+                      <Button size="small" type="primary" onClick={() => { patch((x) => doReceiveExtract(x, row.key)); message.success(`${row.meta.team} response loaded.`) }}>Load {row.meta.team} response</Button>
+                    </Tooltip>
+                  : <Text type="secondary" style={{ fontSize: 12 }}>Received {row.ex.receivedAt ? formatDate(row.ex.receivedAt) : ''}</Text>,
+            },
           ]} />
 
-        {r.prepared ? (
+        {ready ? (
           <>
             <SimNote>Figures are fictional aggregates for the mock. Member identities are masked; no personal or medical information is shown.</SimNote>
             <StatCards>
@@ -119,7 +183,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
         ) : null}
       </FormSection>
 
-      {r.prepared && (
+      {ready && (
         <FormSection wide title="Renewal rates"
           description="Actuarial pricing stays specialist work. Send the prepared reports to Actuarial and track the request in-system."
           extra={rr ? <Tag color="green">Received</Tag> : rn.rates.requested ? <Tag color="gold">Requested — simulated</Tag> : null}>

@@ -8,11 +8,26 @@
 // from the first visit. "new" accounts stay unstarted — they populate Upcoming
 // Renewals until someone clicks Start renewal.
 // ===========================================================================
-import type { RenewalCase } from '../domain/renewal'
-import { RENEWAL_ACCOUNTS, renewalIdFor, seedRenewal } from '../domain/renewal'
+import type { RenewalCase, ExtractStatus } from '../domain/renewal'
+import { EXTRACT_KEYS, RENEWAL_ACCOUNTS, renewalIdFor, seedRenewal } from '../domain/renewal'
 
 const STORE_KEY = 'hms4-renewal:v1'
 const BASELINE = 2
+
+// Cases persisted before the per-team data-extract model have `reports.prepared`
+// but no `reports.extracts`. Backfill the new shape so they keep working: a
+// previously-prepared case becomes "all extracts received".
+function migrateCase(c: RenewalCase): RenewalCase {
+  const rep = c.reports as unknown as { prepared?: boolean; extracts?: unknown }
+  if (!rep.extracts) {
+    const status: ExtractStatus = rep.prepared ? 'received' : 'none'
+    c.reports.extracts = Object.fromEntries(
+      EXTRACT_KEYS.map((k) => [k, { status }]),
+    ) as RenewalCase['reports']['extracts']
+    delete rep.prepared
+  }
+  return c
+}
 
 export interface RenewalStoreShape {
   cases: Record<string, RenewalCase>
@@ -36,6 +51,7 @@ export function loadRenewalStore(): RenewalStoreShape {
     if (raw) {
       const parsed = JSON.parse(raw) as RenewalStoreShape
       if (parsed && parsed.cases && typeof parsed.cases === 'object') {
+        for (const id of Object.keys(parsed.cases)) migrateCase(parsed.cases[id])
         const seeded = ensureSeeded(parsed)
         saveRenewalStore(seeded)
         return seeded
