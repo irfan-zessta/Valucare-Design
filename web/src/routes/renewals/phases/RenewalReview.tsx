@@ -95,7 +95,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
             </FormActions>
           </>
         ) : (
-          <FormActions note="This is the improved experience; today this is assembled by hand from spreadsheets and ICT requests.">
+          <FormActions>
             <Button type="primary" onClick={() => { patch((x) => doPrepareReports(x)); message.success('Renewal reports prepared.') }}>
               Prepare renewal reports
             </Button>
