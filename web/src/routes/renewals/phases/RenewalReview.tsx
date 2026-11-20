@@ -29,7 +29,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
 
   return (
     <>
-      <FormSection title="Current account snapshot"
+      <FormSection wide title="Current account snapshot"
         description="Prefilled from the account's current contract — no spreadsheets to chase. SOB and plan codes are the signed current-year versions, carried forward.">
         <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered
           items={[
@@ -42,7 +42,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
           ]} />
       </FormSection>
 
-      <FormSection title="Renewal data extracts"
+      <FormSection wide title="Renewal data extracts"
         description="Pull the account's Member Data, claims and CCD availment into a consolidated, masked report set — no manual ICT request, no spreadsheet assembly."
         extra={r.prepared ? <Tag color="green">Prepared</Tag> : null}>
         <Table size="small" pagination={false} rowKey="key" dataSource={extractRows}
@@ -104,7 +104,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
       </FormSection>
 
       {r.prepared && (
-        <FormSection title="Renewal rates"
+        <FormSection wide title="Renewal rates"
           description="Actuarial pricing stays specialist work. Send the prepared reports to Actuarial and track the request in-system."
           extra={rr ? <Tag color="green">Received</Tag> : rn.rates.requested ? <Tag color="gold">Requested — simulated</Tag> : null}>
           {!rn.rates.requested ? (
