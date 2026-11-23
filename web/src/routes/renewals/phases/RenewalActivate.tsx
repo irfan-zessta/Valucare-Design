@@ -6,7 +6,8 @@
 // policy is issued, no coverage is switched on, and no external system is called.
 // ===========================================================================
 import { useState } from 'react'
-import { App, Button, DatePicker, Descriptions, Space, Tag, Typography, Upload } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import { App, Button, DatePicker, Descriptions, Modal, Space, Tag, Typography, Upload } from 'antd'
 import { CalendarOutlined, CheckCircleFilled, CheckCircleOutlined, CloudUploadOutlined, SendOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { FormSection } from '../../../components/ui/FormSection'
@@ -30,10 +31,35 @@ const MDA_SLOTS: { key: string; label: string; hint: string }[] = [
 export function RenewalActivate(props: RenewalPhaseProps) {
   const { rn, patch, goPhase } = props
   const { message } = App.useApp()
+  const navigate = useNavigate()
   // Default the scheduled go-live to the new contract's start date.
   const [scheduleDate, setScheduleDate] = useState<dayjs.Dayjs | null>(dayjs(rn.renewal.from))
+  const [showSuccess, setShowSuccess] = useState(false)
 
-  if (rn.completed) return <RenewalSummary {...props} />
+  // Success overlay shown after Complete renewal — mirrors New Business.
+  const successModal = (
+    <Modal open={showSuccess} footer={null} centered width={440} onCancel={() => setShowSuccess(false)}>
+      <div style={{ textAlign: 'center', padding: '12px 8px 4px' }}>
+        <div className="activate-success">
+          <span className="activate-success__ring" />
+          <CheckCircleFilled className="activate-success__check" />
+        </div>
+        <Typography.Title level={4} style={{ marginBottom: 4 }}>Renewal completed 🎉</Typography.Title>
+        <Paragraph type="secondary" style={{ marginBottom: 4 }}>
+          {rn.name} renewal is complete — the new contract term is set up in HMS (demo).
+        </Paragraph>
+        <Text style={{ display: 'block', marginBottom: 16 }}>
+          Account <strong>{rn.code}</strong>
+        </Text>
+        <Space>
+          <Button onClick={() => setShowSuccess(false)}>Stay here</Button>
+          <Button type="primary" onClick={() => navigate('/sales/renewals')}>Back to Corporate Renewals</Button>
+        </Space>
+      </div>
+    </Modal>
+  )
+
+  if (rn.completed) return <>{<RenewalSummary {...props} />}{successModal}</>
 
   if (!contractSent(rn)) {
     return (
@@ -83,7 +109,7 @@ export function RenewalActivate(props: RenewalPhaseProps) {
   }
   const complete = () => {
     patch((x) => { x.completed = true; x.activity.push({ at: now(), text: 'Renewal processing completed — demo.' }) })
-    message.success('Renewal processing completed — demo.')
+    setShowSuccess(true)
   }
 
   return (
