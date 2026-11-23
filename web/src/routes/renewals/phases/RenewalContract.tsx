@@ -144,6 +144,27 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
       x.activity.push({ at: now(), text: `Contract notarization: ${stage}.` })
     })
   }
+  function recordSignedReceived() {
+    patch((x) => {
+      const name = x.setup.contractRecord?.signedContract || `Signed-Contract-${x.code}.pdf`
+      x.setup.contractRecord = { ...(x.setup.contractRecord ?? {}), signedContract: name }
+      x.activity.push({ at: now(), text: 'Recorded signed documents received from the client.' })
+    })
+    message.success('Signed documents recorded as received.')
+  }
+  // Linear progress across the signed → notarized → returned milestones.
+  const notaProgress =
+    cr.notarization === 'returned' ? 4
+      : cr.notarization === 'notarized' ? 3
+        : cr.notarization === 'sent' ? 2
+          : cr.signedContract ? 1
+            : 0
+  const notaMilestones = [
+    'Signed documents received from the client',
+    'Contract sent for notarization (outside HMS)',
+    'Notarized contract received and uploaded',
+    'Notarized copy returned to the client',
+  ]
 
   return (
     <>
@@ -328,6 +349,59 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
               {cr.notarization === 'notarized' && <Button type="primary" onClick={() => setNotarization('returned')}>Mark returned to client</Button>}
             </FormActions>
           </>
+        )}
+      </FormSection>
+
+      {/* Signed & notarized milestones — recorded in order (legal/notarization
+          happen outside HMS; status and the resulting document are recorded here). */}
+      <FormSection wide title="4.4 · Signed &amp; notarized milestones"
+        description="Notarization happens outside HMS — its status and the resulting document are recorded here."
+        extra={<Tag color={cr.notarization === 'returned' ? 'green' : cr.sentToClient ? 'blue' : 'default'}>
+          {cr.notarization === 'returned' ? 'Returned to client' : cr.notarization === 'notarized' ? 'Notarized' : cr.notarization === 'sent' ? 'Sent for notarization' : cr.signedContract ? 'Signed received' : 'Awaiting signed'}
+        </Tag>}>
+        <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+          {notaMilestones.map((label, i) => {
+            const done = notaProgress > i
+            const current = notaProgress === i
+            return (
+              <div key={i} className="app-decision-row" style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+                <Space>
+                  {done ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : <span style={{ color: 'rgba(0,0,0,0.3)' }}>{i + 1}</span>}
+                  <span>{label}</span>
+                </Space>
+                <Space wrap>
+                  {current && cr.sentToClient && (
+                    <>
+                      {i === 0 && (
+                        <Upload showUploadList={false} accept=".pdf,.docx,.doc" beforeUpload={(file) => { uploadContract('signedContract', file.name, 'Signed renewal contract'); return false }}>
+                          <Button size="small" icon={<CloudUploadOutlined />}>Upload signed</Button>
+                        </Upload>
+                      )}
+                      {i === 2 && (
+                        <Upload showUploadList={false} accept=".pdf,.docx,.doc" beforeUpload={(file) => { uploadContract('notarizedFile', file.name, 'Notarized contract'); setNotarization('notarized'); return false }}>
+                          <Button size="small" icon={<CloudUploadOutlined />}>Upload notarized</Button>
+                        </Upload>
+                      )}
+                      <Button size="small" type="primary"
+                        onClick={() => {
+                          if (i === 0) recordSignedReceived()
+                          else if (i === 1) setNotarization('sent')
+                          else if (i === 2) setNotarization('notarized')
+                          else setNotarization('returned')
+                        }}>
+                        Record
+                      </Button>
+                    </>
+                  )}
+                </Space>
+              </div>
+            )
+          })}
+        </Space>
+        {!cr.sentToClient && (
+          <Text type="secondary" style={{ display: 'block', marginTop: 12, fontSize: 12 }}>
+            Send the contract and DSA to the client (section 4.3) before recording these milestones.
+          </Text>
         )}
       </FormSection>
     </>
