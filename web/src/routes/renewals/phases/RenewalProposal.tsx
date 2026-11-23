@@ -192,9 +192,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
               <Paragraph>Reason: {rn.proposal.notRenewReason || '—'}.</Paragraph>
               <Text type="secondary" style={{ fontSize: 12 }}>The existing cover is <b>not</b> cancelled by this demo — no termination is performed. A non-renewal advisory has been prepared.</Text>
             </>
-          ) : (
-            <SimNote>Proposal <b>v{latest.v}</b> sent to {recipientOf(rn)} on {formatDateTime(latest.at)} — recorded, not delivered. Waiting on the {rn.channel === 'Direct' ? 'client' : 'intermediary'} to record a decision below.</SimNote>
-          )}
+          ) : null}
           {rn.proposal.versions.length > 0 && <VersionHistory rn={rn} />}
         </FormSection>
       )}
