@@ -1,22 +1,21 @@
 // ===========================================================================
-// Phase 4 — Contract, KYC & Notarization. Tracks Legal's draft contract + DSA,
-// client review and correction rounds; KYC screening must clear before the print
-// copy is released; signed, notarized and delivered are separate milestones with
-// versions/dates. A handoff summary shows outstanding work and its owner. When
-// delivered, the renewal completes to a read-only summary. No policy is issued
-// and no coverage is activated — this is a presentation mock.
+// Phase 4 — Contract, KYC & Notarization. Sales records the compliance and
+// contract paperwork: the CoC + CRF, the KYC screening, and the contract flow —
+// upload the renewal contract and DSA, send them to the client through the app,
+// then optionally record the client-signed copies and the notarization outcome.
+// When the contract has been sent, the renewal can be completed to a read-only
+// summary. No policy is issued and no coverage is activated — presentation mock.
 // ===========================================================================
-import { useState } from 'react'
-import { App, Alert, Button, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Steps, Table, Tag, Typography, Upload } from 'antd'
-import { CheckCircleOutlined, CloudUploadOutlined, FileTextOutlined, WarningOutlined } from '@ant-design/icons'
+import { App, Alert, Button, DatePicker, Descriptions, Input, InputNumber, Select, Space, Table, Tag, Typography, Upload } from 'antd'
+import { CheckCircleOutlined, CloudUploadOutlined, FileTextOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso } from '../../../lib/format'
-import { CONTRACT_STAGES, blockContractAdvance, toneColor, type RenewalCase, type Tone } from '../../../domain/renewal'
+import { toneColor, type RenewalCase, type Tone } from '../../../domain/renewal'
 import { type RenewalPhaseProps } from '../shared'
 
-const { Text, Paragraph } = Typography
+const { Text } = Typography
 const now = () => new Date().toISOString()
 
 export function RenewalContract(props: RenewalPhaseProps) {
@@ -27,101 +26,20 @@ export function RenewalContract(props: RenewalPhaseProps) {
 
 function ContractInProgress({ rn, patch, preview }: RenewalPhaseProps) {
   const { message } = App.useApp()
-  const [corrOpen, setCorrOpen] = useState(false)
-  const [corrForm] = Form.useForm()
-  const c = rn.contract
-  const idx = CONTRACT_STAGES.indexOf(c.stage)
-  const blocked = blockContractAdvance(rn)
-  const next = CONTRACT_STAGES[idx + 1]
+  const sentToClient = !!rn.setup.contractRecord?.sentToClient
 
   return (
     <>
       <SetupHandoffCards rn={rn} patch={patch} preview={preview} />
 
-      <FormSection wide title="Contract progress">
-        {!c.started ? (
-          <>
-            <Paragraph>Legal drafts the renewal contract and Data Sharing Agreement (DSA), then it moves through to delivery. KYC clearance precedes the print-copy release.</Paragraph>
-            <FormActions>
-              <Button type="primary" onClick={() => { patch((x) => { x.contract.started = true; x.contract.stage = 'Draft'; x.documents.push({ name: 'Renewal contract (draft)', kind: 'Contract', at: now(), sample: true }); x.documents.push({ name: 'Data Sharing Agreement', kind: 'DSA', at: now(), sample: true }); x.activity.push({ at: now(), text: 'Legal started renewal contract draft and DSA.' }) }); message.success('Contract draft started.') }}>Start contract draft</Button>
-            </FormActions>
-          </>
-        ) : (
-          <>
-            <Steps size="small" responsive current={idx} style={{ marginBlock: 8 }}
-              items={CONTRACT_STAGES.map((st) => ({ title: st }))} />
-            <FormActions>
-              <Button icon={<FileTextOutlined />} onClick={() => preview('contract')}>Contract</Button>
-              <Button icon={<FileTextOutlined />} onClick={() => preview('dsa')}>DSA</Button>
-              {idx >= CONTRACT_STAGES.indexOf('Signed') && <Button icon={<FileTextOutlined />} onClick={() => preview('signed')}>Signed contract</Button>}
-              {idx >= CONTRACT_STAGES.indexOf('Notarized') && <Button icon={<FileTextOutlined />} onClick={() => preview('notarized')}>Notarized copy</Button>}
-            </FormActions>
-            {blocked && (
-              <Alert type="warning" showIcon icon={<WarningOutlined />} style={{ marginBlock: 12 }}
-                message={<span>Print copy is released only after KYC clearance. KYC is currently <b>{rn.setup.kyc}</b> — clear it in the KYC screening section above.</span>} />
-            )}
-            <FormActions note={c.stage === 'Delivered' ? 'Signed and notarized copies and the delivery record are kept with the case.' : undefined}>
-              {idx < CONTRACT_STAGES.length - 1 && (
-                <Button type="primary" disabled={blocked} onClick={() => {
-                  patch((x) => {
-                    const ni = CONTRACT_STAGES.indexOf(x.contract.stage) + 1
-                    x.contract.stage = CONTRACT_STAGES[ni]
-                    if (x.contract.stage === 'Signed') x.documents.push({ name: 'Signed renewal contract', kind: 'Contract', at: now(), sample: true })
-                    if (x.contract.stage === 'Notarized') x.documents.push({ name: 'Notarized contract copy', kind: 'Contract', at: now(), sample: true })
-                    x.activity.push({ at: now(), text: `Contract advanced to “${x.contract.stage}”.` })
-                  })
-                  message.success('Contract advanced.')
-                }}>Advance to “{next}”</Button>
-              )}
-              <Button onClick={() => { corrForm.setFieldsValue({ text: 'Client legal flagged a typo in the registered address; revised draft to be issued.' }); setCorrOpen(true) }}>Record correction request</Button>
-            </FormActions>
-            {c.corrections.length > 0 && (
-              <div style={{ marginTop: 8 }}>
-                <Text strong style={{ fontSize: 12 }}>{c.corrections.length} correction request{c.corrections.length === 1 ? '' : 's'}</Text>
-                {c.corrections.map((x, i) => (
-                  <div key={i} style={{ fontSize: 13, marginTop: 4 }}><Text type="secondary">{formatDateTime(x.at)}</Text> — {x.text}</div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </FormSection>
+      <HandoffSummary rn={rn} />
 
-      {c.started && (
-        <FormSection wide title="Delivery">
-          {c.delivery ? (
-            <Descriptions size="small" column={1} items={[
-              { key: 'courier', label: 'Courier', children: c.delivery.courier },
-              { key: 'tracking', label: 'Tracking', children: <span style={{ fontFamily: 'monospace' }}>{c.delivery.tracking}</span> },
-            ]} />
-          ) : (
-            <FormActions note={idx < CONTRACT_STAGES.indexOf('Signed') ? 'Delivery can be recorded once the contract is signed.' : undefined}>
-              <Button disabled={idx < CONTRACT_STAGES.indexOf('Signed')} onClick={() => { patch((x) => { x.contract.delivery = { courier: 'LBC Express', tracking: 'DEMO-' + x.code.slice(-4) + '-2210' }; x.activity.push({ at: now(), text: 'Recorded sample delivery (courier + tracking) to the client.' }) }); message.success('Sample delivery recorded.') }}>Record sample delivery</Button>
-            </FormActions>
-          )}
-        </FormSection>
-      )}
-
-      {c.started && <HandoffSummary rn={rn} />}
-
-      {c.stage === 'Delivered' && (
-        <FormActions>
-          <Button type="primary" onClick={() => { patch((x) => { x.completed = true; x.activity.push({ at: now(), text: 'Renewal processing completed — demo.' }) }); message.success('Renewal processing completed — demo.') }}>Complete renewal</Button>
-        </FormActions>
-      )}
-
-      <Modal title="Record correction request" open={corrOpen} okText="Record & revise draft" onCancel={() => setCorrOpen(false)}
-        onOk={() => corrForm.validateFields().then((v) => {
-          patch((x) => { x.contract.corrections.push({ at: now(), text: v.text }); x.contract.stage = 'Draft'; x.documents.push({ name: `Revised contract draft (rev ${x.contract.corrections.length + 1})`, kind: 'Contract', at: now(), sample: true }); x.activity.push({ at: now(), text: 'Recorded correction request and issued a revised draft.' }) })
-          message.success('Correction recorded; revised draft issued.')
-          setCorrOpen(false)
-        })}>
-        <Form form={corrForm} layout="vertical">
-          <Form.Item name="text" label="What needs correcting?" rules={[{ required: true, message: 'Describe the correction.' }]}>
-            <Input.TextArea rows={3} />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <FormActions note={sentToClient ? 'Completing does not issue a policy or activate coverage — demo only.' : 'Send the renewal contract and DSA to the client before completing.'}>
+        <Button type="primary" disabled={!sentToClient}
+          onClick={() => { patch((x) => { x.completed = true; x.activity.push({ at: now(), text: 'Renewal processing completed — demo.' }) }); message.success('Renewal processing completed — demo.') }}>
+          Complete renewal
+        </Button>
+      </FormActions>
     </>
   )
 }
@@ -203,14 +121,24 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
     message.success('Sample KYC data filled.')
   }
 
-  // ---- Record contract -----------------------------------------------------
+  // ---- Contract flow (prepare → send → signed → notarized) -----------------
+  type ContractField = 'contractFile' | 'dsaFile' | 'signedContract' | 'signedDsa' | 'notarizedFile'
   const cr = s.contractRecord ?? {}
-  function uploadContract(field: 'signedContract' | 'dsa' | 'notarizedFile', fileName: string, label: string) {
+  const kycCleared = rn.setup.kyc === 'Screening cleared'
+  const canSend = !!(cr.contractFile && cr.dsaFile && kycCleared)
+  function uploadContract(field: ContractField, fileName: string, label: string) {
     patch((x) => {
       x.setup.contractRecord = { ...(x.setup.contractRecord ?? {}), [field]: fileName }
-      x.documents.push({ name: label, kind: 'Contract', at: now(), sample: true })
+      x.documents.push({ name: label, kind: field === 'dsaFile' || field === 'signedDsa' ? 'DSA' : 'Contract', at: now(), sample: true })
       x.activity.push({ at: now(), text: `${label} uploaded: ${fileName}.` })
     })
+  }
+  function sendContractToClient() {
+    patch((x) => {
+      x.setup.contractRecord = { ...(x.setup.contractRecord ?? {}), sentToClient: true, sentAt: now() }
+      x.activity.push({ at: now(), text: 'Sent renewal contract and DSA to the client through the app (simulated).' })
+    })
+    message.success('Contract and DSA sent to client.')
   }
   function setNotarization(stage: 'sent' | 'notarized' | 'returned') {
     patch((x) => {
@@ -319,49 +247,90 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
         </FormActions>
       </FormSection>
 
-      {/* Record contract */}
-      <FormSection wide title="Record contract"
-        description="Record the client-signed renewal contract and DSA, then the notarization outcome. Notarization happens outside HMS."
-        extra={cr.notarization === 'returned' ? <Tag color="green" icon={<CheckCircleOutlined />}>Returned to client</Tag> : cr.signedContract ? <Tag color="blue">Signed recorded</Tag> : <Tag>Pending</Tag>}>
-        <Space orientation="vertical" size="small" style={{ display: 'flex', marginBottom: 16 }}>
+      {/* Contract & DSA — prepare → send → signed → notarized */}
+      <FormSection wide title="Contract &amp; DSA"
+        description="Upload the renewal contract and DSA, send them to the client through the app, then record the signed copies and notarization. Signed copies and notarization are optional."
+        extra={cr.notarization === 'returned' ? <Tag color="green" icon={<CheckCircleOutlined />}>Notarized &amp; returned</Tag> : cr.signedContract ? <Tag color="blue">Signed recorded</Tag> : cr.sentToClient ? <Tag color="blue">Sent to client</Tag> : <Tag>Pending</Tag>}>
+        {/* 1 — Prepare & send */}
+        <Text strong style={{ fontSize: 12 }}>1 · Prepare and send to client</Text>
+        <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8, marginBottom: 12 }}>
           {([
-            ['signedContract', 'Client-signed renewal contract', true],
-            ['dsa', 'Data Sharing Agreement (DSA)', false],
-          ] as const).map(([field, label, required]) => {
-            const val = cr[field as 'signedContract' | 'dsa']
+            ['contractFile', 'Renewal contract'],
+            ['dsaFile', 'Data Sharing Agreement (DSA)'],
+          ] as const).map(([field, label]) => {
+            const val = cr[field]
             return (
               <div key={field} className="app-decision-row" style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
                 <Space>
                   <span>{label}</span>
                   {val && <Tag color="blue">{val}</Tag>}
-                  {required && !val && <Tag>Required</Tag>}
+                  {!val && <Tag>Required</Tag>}
                 </Space>
-                <Upload showUploadList={false} beforeUpload={(file) => { uploadContract(field as 'signedContract' | 'dsa', file.name, label); return false }}>
-                  <Button size="small" icon={<CloudUploadOutlined />}>{val ? 'Replace' : 'Upload'}</Button>
-                </Upload>
+                <Space>
+                  <Button size="small" type="link" icon={<FileTextOutlined />} onClick={() => preview(field === 'dsaFile' ? 'dsa' : 'contract')}>Preview</Button>
+                  <Upload showUploadList={false} beforeUpload={(file) => { uploadContract(field, file.name, label); return false }}>
+                    <Button size="small" icon={<CloudUploadOutlined />} disabled={cr.sentToClient}>{val ? 'Replace' : 'Upload'}</Button>
+                  </Upload>
+                </Space>
               </div>
             )
           })}
         </Space>
-        <Text strong style={{ fontSize: 12 }}>Notarization</Text>
-        <div className="rnw-kyc" style={{ marginTop: 8 }}>
-          {(['sent', 'notarized', 'returned'] as const).map((stage) => {
-            const order = { none: 0, sent: 1, notarized: 2, returned: 3 }
-            const on = order[cr.notarization ?? 'none'] >= order[stage]
-            const label = stage === 'sent' ? 'Sent for notarization' : stage === 'notarized' ? 'Notarized' : 'Returned to client'
-            return <span key={stage} className={`rnw-kyc-step${on ? ' on' : ''}`}>{on ? <CheckCircleOutlined /> : null} {label}</span>
-          })}
-        </div>
-        <FormActions>
-          {(!cr.notarization || cr.notarization === 'none') && cr.signedContract && <Button onClick={() => setNotarization('sent')}>Mark sent for notarization</Button>}
-          {cr.notarization === 'sent' && (
-            <Upload showUploadList={false} beforeUpload={(file) => { uploadContract('notarizedFile', file.name, 'Notarized contract'); setNotarization('notarized'); return false }}>
-              <Button icon={<CloudUploadOutlined />}>Upload notarized contract</Button>
-            </Upload>
-          )}
-          {cr.notarization === 'notarized' && <Button type="primary" onClick={() => setNotarization('returned')}>Mark returned to client</Button>}
-          {!cr.signedContract && <Text type="secondary" style={{ fontSize: 12 }}>Upload the client-signed contract to record notarization.</Text>}
+        {!kycCleared && (
+          <Alert type="warning" showIcon style={{ marginBottom: 12 }}
+            message={<span>The contract is sent to the client only after KYC clearance. KYC is currently <b>{rn.setup.kyc}</b> — clear it in the KYC screening section above.</span>} />
+        )}
+        <FormActions note={cr.sentToClient ? `Sent to the client ${cr.sentAt ? formatDateTime(cr.sentAt) : ''} (through the app, simulated).` : undefined}>
+          {cr.sentToClient
+            ? <Tag color="green" icon={<CheckCircleOutlined />}>Sent to client</Tag>
+            : <Button type="primary" disabled={!canSend} onClick={sendContractToClient}>Send contract &amp; DSA to client</Button>}
         </FormActions>
+
+        {/* 2 — Signed copies (optional) */}
+        {cr.sentToClient && (
+          <>
+            <Text strong style={{ fontSize: 12, display: 'block', marginTop: 16 }}>2 · Client-signed copies (optional)</Text>
+            <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8 }}>
+              {([
+                ['signedContract', 'Signed renewal contract'],
+                ['signedDsa', 'Signed DSA'],
+              ] as const).map(([field, label]) => {
+                const val = cr[field]
+                return (
+                  <div key={field} className="app-decision-row" style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+                    <Space>
+                      <span>{label}</span>
+                      {val ? <Tag color="blue">{val}</Tag> : <Tag>Optional</Tag>}
+                    </Space>
+                    <Upload showUploadList={false} beforeUpload={(file) => { uploadContract(field, file.name, label); return false }}>
+                      <Button size="small" icon={<CloudUploadOutlined />}>{val ? 'Replace' : 'Upload'}</Button>
+                    </Upload>
+                  </div>
+                )
+              })}
+            </Space>
+
+            {/* 3 — Notarization (optional) */}
+            <Text strong style={{ fontSize: 12, display: 'block', marginTop: 16 }}>3 · Notarization (optional)</Text>
+            <div className="rnw-kyc" style={{ marginTop: 8 }}>
+              {(['sent', 'notarized', 'returned'] as const).map((stage) => {
+                const order = { none: 0, sent: 1, notarized: 2, returned: 3 }
+                const on = order[cr.notarization ?? 'none'] >= order[stage]
+                const label = stage === 'sent' ? 'Sent for notarization' : stage === 'notarized' ? 'Notarized' : 'Returned to client'
+                return <span key={stage} className={`rnw-kyc-step${on ? ' on' : ''}`}>{on ? <CheckCircleOutlined /> : null} {label}</span>
+              })}
+            </div>
+            <FormActions>
+              {(!cr.notarization || cr.notarization === 'none') && <Button onClick={() => setNotarization('sent')}>Mark sent for notarization</Button>}
+              {cr.notarization === 'sent' && (
+                <Upload showUploadList={false} beforeUpload={(file) => { uploadContract('notarizedFile', file.name, 'Notarized contract'); setNotarization('notarized'); return false }}>
+                  <Button icon={<CloudUploadOutlined />}>Upload notarized contract</Button>
+                </Upload>
+              )}
+              {cr.notarization === 'notarized' && <Button type="primary" onClick={() => setNotarization('returned')}>Mark returned to client</Button>}
+            </FormActions>
+          </>
+        )}
       </FormSection>
     </>
   )
@@ -369,11 +338,16 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
 
 function HandoffSummary({ rn }: { rn: RenewalCase }) {
   const s = rn.setup
+  const cr = s.contractRecord ?? {}
+  const contractStatus = cr.notarization === 'returned' ? 'Notarized & returned'
+    : cr.signedContract ? 'Signed recorded'
+    : cr.sentToClient ? 'Sent to client'
+    : 'Not sent'
   const rows: { k: string; v: string; tone: Tone; owner: string }[] = [
     { k: 'Renewal SOB & Plan Codes', v: s.sobSigned ? 'Signed and ready' : s.sobStatus, tone: s.sobSigned ? 'success' : 'warn', owner: 'Sales / Actuarial' },
     { k: 'MDA processing', v: s.mdaStatus === 'Acknowledged' ? 'Acknowledged' : s.mdaStatus, tone: s.mdaStatus === 'Acknowledged' ? 'success' : 'warn', owner: 'MDA' },
     { k: 'Accounting CRF', v: s.crf?.sent ? 'Sent (simulated)' : 'Not sent', tone: s.crf?.sent ? 'info' : 'neutral', owner: 'Accounting' },
-    { k: 'Contract delivery', v: rn.contract.delivery ? 'Dispatched' : rn.contract.stage, tone: rn.contract.delivery ? 'success' : 'warn', owner: 'Sales' },
+    { k: 'Contract & DSA', v: contractStatus, tone: cr.sentToClient ? 'success' : 'warn', owner: 'Sales' },
     { k: 'Billing handoff', v: 'Visibility only — not connected (simulated)', tone: 'info', owner: 'Billing' },
   ]
   return (

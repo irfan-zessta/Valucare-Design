@@ -283,10 +283,24 @@ export interface RenewalSetup {
     checkerName?: string
     flagNote?: string
   }
-  /** Recorded signed/notarized contract (mirrors New Business). */
+  /**
+   * Recorded contract flow (mirrors New Business): Sales prepares the contract
+   * and DSA, sends them to the client via the app, then optionally records the
+   * client-signed copies and the notarization outcome.
+   */
   contractRecord?: {
+    /** Prepared (unsigned) documents Sales uploads before sending. */
+    contractFile?: string
+    dsaFile?: string
+    /** Sent to the client through the app. */
+    sentToClient?: boolean
+    sentAt?: string
+    /** Client-signed copies (optional). */
     signedContract?: string
+    signedDsa?: string
+    /** Legacy field (kept for compatibility). */
     dsa?: string
+    /** Notarization outcome (optional). */
     notarization?: 'none' | 'sent' | 'notarized' | 'returned'
     notarizedFile?: string
   }
