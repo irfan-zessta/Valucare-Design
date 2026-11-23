@@ -38,10 +38,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
   // The phase's single forward action, surfaced in the floating bar (consistent
   // with the New Business flows). Which one shows depends on how far the case is.
   const floatAction = !ready
-    ? {
-        note: 'Pull the Member Data, claims and CCD extracts — all three teams, in one step.',
-        button: <Button type="primary" icon={<CloudDownloadOutlined />} onClick={() => { patch((x) => doPullAllExtracts(x)); message.success('Pulled renewal data extracts from MDA, Claims and CCD.') }}>Pull reports</Button>,
-      }
+    ? null // extracts are pulled from the card itself; no floating action yet
     : !rn.rates.requested
     ? {
         note: '',
@@ -74,15 +71,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
 
       <FormSection wide title="Renewal data extracts"
         description="One click pulls the Member Data, claims and CCD extracts straight from their teams — MDA, Claims and CCD. No manual ICT request, no spreadsheet assembly."
-        extra={
-          ready ? <Tag color="green" icon={<CheckCircleOutlined />}>All extracts received</Tag>
-            : (
-              <Button type="primary" size="small" icon={<CloudDownloadOutlined />}
-                onClick={() => { patch((x) => doPullAllExtracts(x)); message.success('Pulled renewal data extracts from MDA, Claims and CCD.') }}>
-                Pull reports
-              </Button>
-            )
-        }>
+        extra={ready ? <Tag color="green" icon={<CheckCircleOutlined />}>All extracts received</Tag> : undefined}>
         {!ready && (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
             description="No extracts pulled yet. Use Pull reports to bring in the Member Data, claims and CCD figures.">
@@ -190,10 +179,12 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
         onRevise={() => { patch((x) => doReviseRates(x)); message.success('Loaded a revised Actuarial rate sheet.') }}
         onSelect={(v) => { patch((x) => doSelectRateVersion(x, v)); message.success(`Selected rate sheet v${v}.`) }} />
 
-      <div className="app-form-floatbar">
-        <Text type="secondary">{floatAction.note}</Text>
-        <div className="app-form-floatbar__actions">{floatAction.button}</div>
-      </div>
+      {floatAction && (
+        <div className="app-form-floatbar">
+          <Text type="secondary">{floatAction.note}</Text>
+          <div className="app-form-floatbar__actions">{floatAction.button}</div>
+        </div>
+      )}
     </>
   )
 }
