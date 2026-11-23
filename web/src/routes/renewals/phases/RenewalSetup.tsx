@@ -10,16 +10,17 @@
 //   D · CRF & Accounting handoff — opens once the SOB is final and signed.
 // ===========================================================================
 import { useState } from 'react'
-import { App, Button, Descriptions, Form, Input, InputNumber, Modal, Select, Table, Tag, Typography } from 'antd'
-import { CheckCircleOutlined, FileTextOutlined, PlusOutlined } from '@ant-design/icons'
+import { App, Button, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, Upload } from 'antd'
+import { CheckCircleOutlined, CloudUploadOutlined, FileTextOutlined, PlusOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatPeso, formatDate, formatCount } from '../../../lib/format'
 import {
-  kycReached, nextKyc, sampleMemberData,
+  sampleMemberData,
   type RenewalPlanCode,
 } from '../../../domain/renewal'
-import { SimNote, type RenewalPhaseProps } from '../shared'
+import { type RenewalPhaseProps } from '../shared'
 
 const { Text, Paragraph } = Typography
 const now = () => new Date().toISOString()
@@ -47,6 +48,90 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
     planForm.setFieldsValue(p)
     setPlanModal({ index })
   }
+
+  // ---- Merged CoC + CRF (inline edit) --------------------------------------
+  const cc = s.cocCrf ?? {}
+  const cocGenerated = !!cc.generated
+  const cocEditable = !cocGenerated
+  const isInter = rn.channel !== 'Direct'
+  const setCocCrf = (p: Partial<NonNullable<typeof s.cocCrf>>) =>
+    patch((x) => { x.setup.cocCrf = { ...(x.setup.cocCrf ?? {}), ...p } })
+  function generateCocCrf() {
+    patch((x) => {
+      const eff = x.setup.cocCrf?.effective || x.renewal.from
+      const exp = x.setup.cocCrf?.expiry || new Date(new Date(x.renewal.from).getTime() + 30 * 86400000).toISOString().slice(0, 10)
+      x.setup.cocCrf = {
+        ...(x.setup.cocCrf ?? {}),
+        reference: x.setup.cocCrf?.reference || `COC-${x.code}`,
+        effective: eff, expiry: exp, generated: true, generatedAt: now(),
+      }
+      // Compatibility values read by the Contract phase and document checklists.
+      x.setup.coc = { previewed: true, from: eff, to: exp }
+      x.setup.crf = { sent: true, pct: x.setup.cocCrf.commissionPct ?? 0 }
+      x.documents.push({ name: 'Certificate of Coverage (CoC)', kind: 'CoC', at: now(), sample: true })
+      x.documents.push({ name: 'Commission Rate Form', kind: 'CRF', at: now(), sample: true })
+      x.activity.push({ at: now(), text: 'Generated CoC & CRF (inline, simulated).' })
+    })
+    message.success('CoC & CRF generated.')
+  }
+
+  // ---- KYC (record + upload) -----------------------------------------------
+  const kd = s.kycDocs ?? []
+  const kr = s.kycRecord ?? {}
+  const kycFormUploaded = kd.some((d) => d.slot === 'form')
+  const kycCanClear = !!(kycFormUploaded && kr.reference && kr.checkDate)
+  const setKycRecord = (p: Partial<NonNullable<typeof s.kycRecord>>) =>
+    patch((x) => { x.setup.kycRecord = { ...(x.setup.kycRecord ?? {}), ...p } })
+  function uploadKyc(slot: 'form' | 'evidence', fileName: string) {
+    patch((x) => {
+      x.setup.kycDocs = [...(x.setup.kycDocs ?? []).filter((d) => d.slot !== slot), { slot, fileName }]
+      if (x.setup.kyc === 'Not started') x.setup.kyc = 'Received'
+      if (slot === 'form') x.documents.push({ name: 'KYC screening form', kind: 'KYC', at: now(), sample: true })
+      x.activity.push({ at: now(), text: `KYC ${slot === 'form' ? 'form' : 'supporting evidence'} uploaded: ${fileName}.` })
+    })
+  }
+  function clearKyc() {
+    patch((x) => {
+      x.setup.kycRecord = { ...(x.setup.kycRecord ?? {}), result: 'Cleared' }
+      x.setup.kyc = 'Screening cleared'
+      x.activity.push({ at: now(), text: 'KYC screening cleared (recorded).' })
+    })
+    message.success('KYC screening cleared.')
+  }
+  function fillKycSample() {
+    patch((x) => {
+      x.setup.kycRecord = {
+        result: 'Cleared',
+        reference: x.setup.kycRecord?.reference || `SOL-${x.code}-${dayjs().format('YYYYMMDD')}`,
+        checkDate: x.setup.kycRecord?.checkDate || dayjs().format('YYYY-MM-DD'),
+        checkerName: x.setup.kycRecord?.checkerName || 'Demo Admin',
+      }
+      if (!(x.setup.kycDocs ?? []).some((d) => d.slot === 'form')) {
+        x.setup.kycDocs = [...(x.setup.kycDocs ?? []), { slot: 'form', fileName: `KYC-Form-${x.code}.pdf` }]
+        x.documents.push({ name: 'KYC screening form', kind: 'KYC', at: now(), sample: true })
+      }
+      if (x.setup.kyc === 'Not started') x.setup.kyc = 'Received'
+    })
+    message.success('Sample KYC data filled.')
+  }
+
+  // ---- Record contract -----------------------------------------------------
+  const cr = s.contractRecord ?? {}
+  function uploadContract(field: 'signedContract' | 'dsa' | 'notarizedFile', fileName: string, label: string) {
+    patch((x) => {
+      x.setup.contractRecord = { ...(x.setup.contractRecord ?? {}), [field]: fileName }
+      x.documents.push({ name: label, kind: 'Contract', at: now(), sample: true })
+      x.activity.push({ at: now(), text: `${label} uploaded: ${fileName}.` })
+    })
+  }
+  function setNotarization(stage: 'sent' | 'notarized' | 'returned') {
+    patch((x) => {
+      x.setup.contractRecord = { ...(x.setup.contractRecord ?? {}), notarization: stage }
+      x.activity.push({ at: now(), text: `Contract notarization: ${stage}.` })
+    })
+  }
+
+  const lbl = { fontSize: 13, marginBottom: 4 } as const
 
   return (
     <>
@@ -153,53 +238,147 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
         )}
       </FormSection>
 
-      {/* C — CoC & KYC */}
-      <FormSection wide title="C · Certificate of Coverage (CoC) and KYC"
-        description="A CoC is optional temporary-cover documentation — not an automatic requirement for every renewal, and not the same as completed renewal processing.">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
-          <div>
-            <Text strong style={{ fontSize: 12 }}>Certificate of Coverage (optional)</Text>
-            {s.coc ? (
-              <Paragraph style={{ marginTop: 8 }}>Sample CoC sent. <b>Sample validity:</b> {formatDate(s.coc.from)} – {formatDate(s.coc.to)} <Tag>Sample</Tag></Paragraph>
-            ) : (
-              <div style={{ marginTop: 8 }}>
-                <Button icon={<FileTextOutlined />} onClick={() => { patch((x) => { const to = new Date(new Date(x.renewal.from).getTime() + 30 * 86400000).toISOString().slice(0, 10); x.setup.coc = { previewed: true, from: x.renewal.from, to }; x.documents.push({ name: 'Certificate of Coverage (CoC)', kind: 'CoC', at: now(), sample: true }); x.activity.push({ at: now(), text: 'Sent sample CoC (temporary cover, sample validity).' }) }); preview('coc') }}>Send sample CoC</Button>
-              </div>
-            )}
+      {/* C — Certificate of Coverage & Commission Rate Form (merged, inline edit) */}
+      <FormSection wide title="C · Certificate of Coverage (CoC) and Commission Rate Form (CRF)"
+        description="Prepare the CoC (optional temporary cover) together with the commission rate form inline, then generate both."
+        extra={cocGenerated ? <Tag color="green" icon={<CheckCircleOutlined />}>Generated</Tag> : <Tag>Draft</Tag>}>
+        {cocEditable ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            <div style={{ gridColumn: '1 / -1' }}><div style={lbl}>Company</div><Input value={rn.name} readOnly /></div>
+            <div><div style={lbl}>CoC reference</div><Input value={cc.reference ?? ''} placeholder={`COC-${rn.code}`} onChange={(e) => setCocCrf({ reference: e.target.value })} /></div>
+            <div><div style={lbl}>SOB / plan</div><Input value={`${rn.currentSob} · ${formatPeso(rn.mbl)}`} readOnly /></div>
+            <div><div style={lbl}>Effective date</div><DatePicker style={{ width: '100%' }} value={cc.effective ? dayjs(cc.effective) : dayjs(rn.renewal.from)} onChange={(d) => setCocCrf({ effective: d ? d.format('YYYY-MM-DD') : undefined })} /></div>
+            <div><div style={lbl}>Expiry date</div><DatePicker style={{ width: '100%' }} value={cc.expiry ? dayjs(cc.expiry) : null} onChange={(d) => setCocCrf({ expiry: d ? d.format('YYYY-MM-DD') : undefined })} /></div>
+            <div style={{ gridColumn: '1 / -1' }}><div style={lbl}>CoC remarks</div><Input.TextArea rows={2} value={cc.remarks ?? ''} onChange={(e) => setCocCrf({ remarks: e.target.value })} /></div>
           </div>
-          <div>
-            <Text strong style={{ fontSize: 12 }}>KYC screening</Text>
-            <div className="rnw-kyc" style={{ marginTop: 8 }}>
-              {(['Sent', 'Received', 'Screening cleared'] as const).map((k) => (
-                <span key={k} className={`rnw-kyc-step${kycReached(s.kyc, k) ? ' on' : ''}`}>{kycReached(s.kyc, k) ? <CheckCircleOutlined /> : null} {k}</span>
-              ))}
+        ) : (
+          <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered
+            items={[
+              { key: 'co', label: 'Company', children: rn.name },
+              { key: 'ref', label: 'CoC reference', children: cc.reference || '—' },
+              { key: 'eff', label: 'Effective', children: cc.effective ? formatDate(cc.effective) : '—' },
+              { key: 'exp', label: 'Expiry', children: cc.expiry ? formatDate(cc.expiry) : '—' },
+              ...(cc.remarks ? [{ key: 'rm', label: 'Remarks', children: cc.remarks, span: 2 }] : []),
+            ]} />
+        )}
+
+        <div style={{ marginTop: 16 }}>
+          <Text strong>Commission Rate Form (CRF)</Text>
+          {!isInter && <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>Direct business — no intermediary commission; recorded for completeness.</Text>}
+          {cocEditable ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginTop: 8 }}>
+              <div><div style={lbl}>Commission type</div><Select style={{ width: '100%' }} value={cc.commissionType ?? (isInter ? 'Percentage of premium' : 'None')} onChange={(v) => setCocCrf({ commissionType: v })} options={['Percentage of premium', 'Percentage of net premium', 'Fixed amount', 'None'].map((o) => ({ value: o, label: o }))} /></div>
+              <div><div style={lbl}>Commission rate (%)</div><InputNumber style={{ width: '100%' }} min={0} value={cc.commissionPct ?? (isInter ? 7.5 : 0)} onChange={(v) => setCocCrf({ commissionPct: v ?? undefined })} /></div>
+              <div><div style={lbl}>Computation basis</div><Select style={{ width: '100%' }} value={cc.commissionBasis ?? 'Gross premium'} onChange={(v) => setCocCrf({ commissionBasis: v })} options={['Gross premium', 'Net premium', 'Per enrollee', 'N/A'].map((o) => ({ value: o, label: o }))} /></div>
+              <div><div style={lbl}>Payee</div><Input value={cc.payee ?? (isInter ? rn.intermediary ?? '' : 'In-house (Direct)')} onChange={(e) => setCocCrf({ payee: e.target.value })} /></div>
+              <div style={{ gridColumn: '1 / -1' }}><div style={lbl}>CRF note</div><Input.TextArea rows={2} value={cc.note ?? ''} onChange={(e) => setCocCrf({ note: e.target.value })} /></div>
             </div>
-            {s.kyc !== 'Screening cleared' ? (
-              <div style={{ marginTop: 8 }}>
-                <Button icon={<FileTextOutlined />} style={{ marginRight: 8 }} onClick={() => preview('kyc')}>KYC form</Button>
-                <Button onClick={() => { patch((x) => { const nx = nextKyc(x.setup.kyc); x.setup.kyc = nx; if (nx === 'Sent') x.documents.push({ name: 'KYC screening form', kind: 'KYC', at: now(), sample: true }); x.activity.push({ at: now(), text: `KYC screening: ${nx}${nx === 'Received' ? ' — returned documents recorded' : ''}.` }) }); message.success('KYC advanced.') }}>Advance KYC</Button>
-              </div>
-            ) : (
-              <Paragraph style={{ marginTop: 8 }}><Tag color="green" icon={<CheckCircleOutlined />}>Screening cleared</Tag></Paragraph>
-            )}
-          </div>
+          ) : (
+            <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered style={{ marginTop: 8 }}
+              items={[
+                { key: 't', label: 'Type', children: cc.commissionType || (isInter ? 'Percentage of premium' : 'None') },
+                { key: 'r', label: 'Rate', children: `${cc.commissionPct ?? 0}%` },
+                { key: 'b', label: 'Basis', children: cc.commissionBasis || 'Gross premium' },
+                { key: 'p', label: 'Payee', children: cc.payee || (isInter ? rn.intermediary ?? '—' : 'In-house (Direct)') },
+                ...(cc.note ? [{ key: 'n', label: 'Note', children: cc.note, span: 2 }] : []),
+              ]} />
+          )}
         </div>
+
+        <FormActions note={cocGenerated ? 'CoC and CRF generated and recorded against the case.' : 'Edit the details above, then generate both documents.'}>
+          <Button icon={<FileTextOutlined />} onClick={() => preview('coc')}>Preview CoC</Button>
+          <Button icon={<FileTextOutlined />} onClick={() => preview('crf')}>Preview CRF</Button>
+          {cocEditable ? (
+            <Button type="primary" onClick={generateCocCrf}>Generate CoC &amp; CRF</Button>
+          ) : (
+            <Button onClick={() => setCocCrf({ generated: false, generatedAt: undefined })}>Edit again</Button>
+          )}
+        </FormActions>
       </FormSection>
 
-      {/* D — CRF */}
-      <FormSection wide title="D · Commission Rate Form (CRF) & Accounting handoff"
-        extra={s.crf?.sent ? <Tag color="blue">Sent to Accounting — simulated</Tag> : null}>
-        {rn.channel === 'Direct' && <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 8 }}>This account is Direct business — no intermediary commission applies. The CRF step is shown for completeness.</Text>}
-        {!s.sobSigned ? (
-          <Text type="secondary" style={{ fontSize: 13 }}>The CRF opens once the renewal SOB is final and signed (section A).</Text>
-        ) : !s.crf ? (
-          <FormActions>
-            <Button icon={<FileTextOutlined />} onClick={() => preview('crf')}>Preview CRF</Button>
-            <Button type="primary" onClick={() => { patch((x) => { x.setup.crf = { sent: true, pct: 7.5 }; x.documents.push({ name: 'Commission Rate Form', kind: 'CRF', at: now(), sample: true }); x.activity.push({ at: now(), text: 'Sent CRF to Accounting (simulated).' }) }); message.success('CRF sent to Accounting (simulated).') }}>Send to Accounting — simulated</Button>
-          </FormActions>
-        ) : (
-          <SimNote>CRF sent to Accounting (simulated). Intermediary {rn.intermediary || 'N/A (Direct)'} · {s.crf.pct}% · basis: premium · {formatDate(rn.renewal.from)} – {formatDate(rn.renewal.to)}.</SimNote>
-        )}
+      {/* D — KYC screening (record + upload) */}
+      <FormSection wide title="D · KYC screening"
+        description="External KYC (SOLYTICS) is not connected — upload the signed form and supporting evidence, and record the screening result."
+        extra={<Tag color={rn.setup.kyc === 'Screening cleared' ? 'green' : rn.setup.kyc === 'Not started' ? 'default' : 'blue'}>{rn.setup.kyc}</Tag>}>
+        <Text strong style={{ fontSize: 12 }}>KYC documents</Text>
+        <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8, marginBottom: 16 }}>
+          {(['form', 'evidence'] as const).map((slot) => {
+            const label = slot === 'form' ? 'KYC form (signed)' : 'Supporting evidence'
+            const doc = kd.find((d) => d.slot === slot)
+            return (
+              <div key={slot} className="app-decision-row" style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+                <Space>
+                  <span>{label}</span>
+                  {doc && <Tag color="blue">{doc.fileName}</Tag>}
+                  {slot === 'form' && !doc && <Tag>Required</Tag>}
+                </Space>
+                <Upload showUploadList={false} beforeUpload={(file) => { uploadKyc(slot, file.name); return false }}>
+                  <Button size="small" icon={<CloudUploadOutlined />}>{doc ? 'Replace' : 'Upload'}</Button>
+                </Upload>
+              </div>
+            )
+          })}
+        </Space>
+        <Text strong style={{ fontSize: 12 }}>Record screening result</Text>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginTop: 8 }}>
+          <div><div style={lbl}>Result</div><Select style={{ width: '100%' }} value={kr.result ?? 'Pending'} onChange={(v) => setKycRecord({ result: v })} options={['Pending', 'In review', 'Cleared', 'Flagged'].map((o) => ({ value: o, label: o }))} /></div>
+          <div><div style={lbl}>SOLYTICS reference</div><Input value={kr.reference ?? ''} onChange={(e) => setKycRecord({ reference: e.target.value })} /></div>
+          <div><div style={lbl}>Check date</div><DatePicker style={{ width: '100%' }} value={kr.checkDate ? dayjs(kr.checkDate) : null} onChange={(d) => setKycRecord({ checkDate: d ? d.format('YYYY-MM-DD') : undefined })} /></div>
+          <div><div style={lbl}>Checker name</div><Input value={kr.checkerName ?? ''} onChange={(e) => setKycRecord({ checkerName: e.target.value })} /></div>
+          {kr.result === 'Flagged' && (
+            <div style={{ gridColumn: '1 / -1' }}><div style={lbl}>Flag description</div><Input.TextArea rows={2} value={kr.flagNote ?? ''} onChange={(e) => setKycRecord({ flagNote: e.target.value })} /></div>
+          )}
+        </div>
+        <FormActions note={kycCanClear ? undefined : 'Upload the signed KYC form and record the reference and check date to clear KYC.'}>
+          <Button icon={<FileTextOutlined />} onClick={() => preview('kyc')}>Preview KYC form</Button>
+          <Button onClick={fillKycSample}>Fill sample data</Button>
+          <Button type="primary" disabled={!kycCanClear || rn.setup.kyc === 'Screening cleared'} onClick={clearKyc}>Record KYC cleared</Button>
+        </FormActions>
+      </FormSection>
+
+      {/* E — Record contract */}
+      <FormSection wide title="E · Record contract"
+        description="Record the client-signed renewal contract and DSA, then the notarization outcome. Notarization happens outside HMS."
+        extra={cr.notarization === 'returned' ? <Tag color="green" icon={<CheckCircleOutlined />}>Returned to client</Tag> : cr.signedContract ? <Tag color="blue">Signed recorded</Tag> : <Tag>Pending</Tag>}>
+        <Space orientation="vertical" size="small" style={{ display: 'flex', marginBottom: 16 }}>
+          {([
+            ['signedContract', 'Client-signed renewal contract', true],
+            ['dsa', 'Data Sharing Agreement (DSA)', false],
+          ] as const).map(([field, label, required]) => {
+            const val = cr[field as 'signedContract' | 'dsa']
+            return (
+              <div key={field} className="app-decision-row" style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+                <Space>
+                  <span>{label}</span>
+                  {val && <Tag color="blue">{val}</Tag>}
+                  {required && !val && <Tag>Required</Tag>}
+                </Space>
+                <Upload showUploadList={false} beforeUpload={(file) => { uploadContract(field as 'signedContract' | 'dsa', file.name, label); return false }}>
+                  <Button size="small" icon={<CloudUploadOutlined />}>{val ? 'Replace' : 'Upload'}</Button>
+                </Upload>
+              </div>
+            )
+          })}
+        </Space>
+        <Text strong style={{ fontSize: 12 }}>Notarization</Text>
+        <div className="rnw-kyc" style={{ marginTop: 8 }}>
+          {(['sent', 'notarized', 'returned'] as const).map((stage) => {
+            const order = { none: 0, sent: 1, notarized: 2, returned: 3 }
+            const on = order[cr.notarization ?? 'none'] >= order[stage]
+            const label = stage === 'sent' ? 'Sent for notarization' : stage === 'notarized' ? 'Notarized' : 'Returned to client'
+            return <span key={stage} className={`rnw-kyc-step${on ? ' on' : ''}`}>{on ? <CheckCircleOutlined /> : null} {label}</span>
+          })}
+        </div>
+        <FormActions>
+          {(!cr.notarization || cr.notarization === 'none') && cr.signedContract && <Button onClick={() => setNotarization('sent')}>Mark sent for notarization</Button>}
+          {cr.notarization === 'sent' && (
+            <Upload showUploadList={false} beforeUpload={(file) => { uploadContract('notarizedFile', file.name, 'Notarized contract'); setNotarization('notarized'); return false }}>
+              <Button icon={<CloudUploadOutlined />}>Upload notarized contract</Button>
+            </Upload>
+          )}
+          {cr.notarization === 'notarized' && <Button type="primary" onClick={() => setNotarization('returned')}>Mark returned to client</Button>}
+          {!cr.signedContract && <Text type="secondary" style={{ fontSize: 12 }}>Upload the client-signed contract to record notarization.</Text>}
+        </FormActions>
       </FormSection>
 
       <FormActions>

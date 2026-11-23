@@ -260,6 +260,36 @@ export interface RenewalSetup {
   kyc: KycStatus
   crf: { sent: boolean; pct: number } | null
   planReview: boolean
+  /** Inline-editable merged Certificate of Coverage + Commission Rate Form. */
+  cocCrf?: {
+    reference?: string
+    effective?: string
+    expiry?: string
+    remarks?: string
+    commissionType?: string
+    commissionPct?: number
+    commissionBasis?: string
+    payee?: string
+    note?: string
+    generated?: boolean
+    generatedAt?: string
+  }
+  /** KYC uploaded documents + recorded screening result. */
+  kycDocs?: { slot: 'form' | 'evidence'; fileName: string }[]
+  kycRecord?: {
+    result?: 'Pending' | 'In review' | 'Cleared' | 'Flagged'
+    reference?: string
+    checkDate?: string
+    checkerName?: string
+    flagNote?: string
+  }
+  /** Recorded signed/notarized contract (mirrors New Business). */
+  contractRecord?: {
+    signedContract?: string
+    dsa?: string
+    notarization?: 'none' | 'sent' | 'notarized' | 'returned'
+    notarizedFile?: string
+  }
 }
 
 export type ContractStage =
