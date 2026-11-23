@@ -55,7 +55,7 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
       </Text>
 
       {/* A — Renewal SOB & Plan Codes */}
-      <FormSection wide title="A · Renewal SOB and Plan Codes"
+      <FormSection wide title="A · Renewal-year Plan Codes"
         description="Create a renewal-year version linked to the previous one — the historical SOB and plan codes are never overwritten."
         extra={s.sobStatus !== 'Not started' ? <Tag color={s.sobSigned ? 'green' : 'blue'}>{s.sobStatus}</Tag> : null}>
         {!s.sobChoice ? (
@@ -66,8 +66,7 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
         ) : (
           <>
             {/* Plan codes */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-              <Text strong>Renewal-year Plan Codes</Text>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 8 }}>
               <Button size="small" icon={<PlusOutlined />} onClick={() => openPlan(null)}>Add Plan Code</Button>
             </div>
             <Text type="secondary" style={{ fontSize: 12 }}>Carried forward from last year into renewal-year records. AM & SM review is shown as a simulated summary.</Text>
