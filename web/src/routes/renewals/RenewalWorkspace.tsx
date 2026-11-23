@@ -1,7 +1,7 @@
 // ===========================================================================
 // Corporate Renewal case workspace. Mirrors the New Business case layout: a
 // header card (company, account reference, current expiry) beside the
-// four-phase stepper, then ONE clear next action. The active phase gets a
+// five-phase stepper, then ONE clear next action. The active phase gets a
 // single focused panel; completed phases summarise via the stepper state.
 // ===========================================================================
 import { useEffect } from 'react'
@@ -19,6 +19,7 @@ import { RenewalReview } from './phases/RenewalReview'
 import { RenewalProposal } from './phases/RenewalProposal'
 import { RenewalSetup } from './phases/RenewalSetup'
 import { RenewalContract } from './phases/RenewalContract'
+import { RenewalActivate } from './phases/RenewalActivate'
 
 export default function RenewalWorkspace() {
   const { id = '', phase = 'review' } = useParams()
@@ -78,6 +79,7 @@ export default function RenewalWorkspace() {
         {activePhase === 'proposal' && <RenewalProposal {...phaseProps} />}
         {activePhase === 'setup' && <RenewalSetup {...phaseProps} />}
         {activePhase === 'contract' && <RenewalContract {...phaseProps} />}
+        {activePhase === 'activate' && <RenewalActivate {...phaseProps} />}
       </Space>
     </div>
   )

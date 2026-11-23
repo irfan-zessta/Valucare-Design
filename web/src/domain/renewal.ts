@@ -62,9 +62,9 @@ export interface RenewalAccount {
   premiumDependent: number
 }
 
-// --- The four renewal phases (navigation groups, not approval gates) --------
+// --- The five renewal phases (navigation groups, not approval gates) --------
 
-export type RenewalPhaseId = 'review' | 'proposal' | 'setup' | 'contract'
+export type RenewalPhaseId = 'review' | 'proposal' | 'setup' | 'contract' | 'activate'
 
 export interface RenewalPhaseDef {
   id: RenewalPhaseId
@@ -79,6 +79,7 @@ export const RENEWAL_PHASES: RenewalPhaseDef[] = [
   { id: 'proposal', n: 2, label: 'Proposal & Client Decision', desc: 'Send, negotiate, record decision' },
   { id: 'setup', n: 3, label: 'Renewal Setup, SOB & Plan Codes', desc: 'SOB, plan codes, member handoff' },
   { id: 'contract', n: 4, label: 'Contract, KYC & Notarization', desc: 'Contract through to delivery' },
+  { id: 'activate', n: 5, label: 'Activate & Handover', desc: 'Activate the account and hand over' },
 ]
 export const RENEWAL_PHASE_IDS: RenewalPhaseId[] = RENEWAL_PHASES.map((p) => p.id)
 export const renewalPhase = (id: RenewalPhaseId): RenewalPhaseDef =>
@@ -330,6 +331,14 @@ export interface RenewalContractState {
   delivery: { courier: string; tracking: string } | null
 }
 
+/** Phase 5 — activating the renewed account and handing it over. Simulated. */
+export interface RenewalActivation {
+  accountActivated?: boolean
+  billingHandoff?: boolean
+  opsHandoff?: boolean
+  activatedAt?: string
+}
+
 export interface RenewalDocument {
   name: string
   kind: string
@@ -373,6 +382,7 @@ export interface RenewalCase {
   proposal: RenewalProposal
   setup: RenewalSetup
   contract: RenewalContractState
+  activation?: RenewalActivation
   completed: boolean
   notRenewed: boolean
   documents: RenewalDocument[]
@@ -733,7 +743,14 @@ export function applyPreset(rn: RenewalCase, preset: RenewalPreset) {
     rn.setup.kyc = 'Screening cleared'
     rn.setup.crf = { sent: true, pct: 7.5 }
     rn.setup.planReview = true
+    rn.setup.contractRecord = {
+      contractFile: `Renewal-Contract-${rn.code}.pdf`, dsaFile: `DSA-${rn.code}.pdf`,
+      sentToClient: true, sentAt: stamp(),
+      signedContract: `Signed-Contract-${rn.code}.pdf`, signedDsa: `Signed-DSA-${rn.code}.pdf`,
+      notarization: 'returned', notarizedFile: `Notarized-Contract-${rn.code}.pdf`,
+    }
     rn.contract = { started: true, stage: 'Delivered', corrections: [], delivery: { courier: 'LBC Express', tracking: 'DEMO-7788-2210' } }
+    rn.activation = { accountActivated: true, billingHandoff: true, opsHandoff: true, activatedAt: stamp() }
     rn.completed = true
   }
 }
@@ -944,7 +961,8 @@ export type Tone = 'success' | 'danger' | 'info' | 'warn' | 'neutral'
 export function statusInfo(rn: RenewalCase): { label: string; tone: Tone } {
   if (rn.notRenewed) return { label: 'Not renewed', tone: 'danger' }
   if (rn.completed) return { label: 'Renewal completed — demo', tone: 'success' }
-  if (rn.contract.started) return { label: `Contract — ${rn.contract.stage}`, tone: 'info' }
+  if (activationDone(rn)) return { label: 'Ready to complete', tone: 'info' }
+  if (contractSent(rn)) return { label: 'Activation & handover', tone: 'info' }
   if (rn.proposal.decision === 'accepted') return { label: 'Accepted — in setup', tone: 'success' }
   if (rn.proposal.changeRequested) return { label: `Changes requested (drafting v${rn.proposal.versions.length + 1})`, tone: 'warn' }
   if (rn.proposal.versions.length) return { label: `Proposal sent (v${rn.proposal.versions.length})`, tone: 'info' }
@@ -959,7 +977,7 @@ export function statusInfo(rn: RenewalCase): { label: string; tone: Tone } {
 export function progressStatus(rn: RenewalCase): { label: string; tone: Tone } {
   if (rn.notRenewed) return { label: 'Not renewed', tone: 'danger' }
   if (rn.completed) return { label: 'Completed', tone: 'success' }
-  if (rn.contract.started) return { label: 'Contract in progress', tone: 'info' }
+  if (contractSent(rn)) return { label: 'Activation & handover', tone: 'info' }
   if (rn.proposal.decision === 'accepted') return { label: 'Preparing renewal documents', tone: 'info' }
   if (rn.proposal.changeRequested) return { label: 'Negotiating', tone: 'warn' }
   if (rn.proposal.versions.length) return { label: 'Proposal sent', tone: 'info' }
@@ -978,6 +996,17 @@ export function setupDone(rn: RenewalCase): boolean {
   return !!(rn.setup.sobChoice && rn.setup.memberData && rn.setup.sobStatus !== 'Not started')
 }
 
+/** The renewal contract and DSA have been sent to the client (phase 4). */
+export function contractSent(rn: RenewalCase): boolean {
+  return !!rn.setup.contractRecord?.sentToClient
+}
+
+/** Account activated and both handovers recorded (phase 5). */
+export function activationDone(rn: RenewalCase): boolean {
+  const a = rn.activation
+  return !!(a?.accountActivated && a?.billingHandoff && a?.opsHandoff)
+}
+
 export interface NextStep {
   phase: RenewalPhaseId
   sentence: string
@@ -988,7 +1017,7 @@ export interface NextStep {
 
 export function nextStep(rn: RenewalCase): NextStep {
   if (rn.notRenewed) return { phase: 'proposal', sentence: 'This renewal was declined. You can still review the summary and advisory.', label: 'View summary' }
-  if (rn.completed) return { phase: 'contract', sentence: 'Renewal processing is complete. Review the summary and handoffs.', label: 'View renewal summary' }
+  if (rn.completed) return { phase: 'activate', sentence: 'Renewal processing is complete. Review the summary and handoffs.', label: 'View renewal summary' }
   if (!reportsReady(rn)) return { phase: 'review', sentence: extractsRequested(rn) ? 'Data extracts requested. Load each team’s response as it arrives.' : 'Start by requesting the renewal data extracts from MDA, Claims and CCD.', label: 'Go to Renewal Data & Pricing', waitingOn: extractsRequested(rn) ? 'the data teams' : undefined }
   if (!rn.rates.requested) return { phase: 'review', sentence: 'Reports are ready. Request renewal rates from Actuarial.', label: 'Go to Renewal Data & Pricing' }
   if (!rn.rates.response) return { phase: 'review', sentence: 'Rates were requested (simulated). Load the sample Actuarial rate sheet.', label: 'Go to Renewal Data & Pricing', waitingOn: 'Actuarial' }
@@ -996,8 +1025,9 @@ export function nextStep(rn: RenewalCase): NextStep {
   if (rn.proposal.changeRequested) return { phase: 'proposal', sentence: 'Client asked for changes. Load revised rates and send a new version.', label: 'Go to Proposal & Client Decision' }
   if (!rn.proposal.decision) return { phase: 'proposal', sentence: "Proposal sent. Record the client's decision.", label: 'Go to Proposal & Client Decision', waitingOn: rn.channel === 'Direct' ? 'the client' : rn.intermediary ?? 'the intermediary' }
   if (rn.proposal.decision === 'accepted' && !setupDone(rn)) return { phase: 'setup', sentence: 'Accepted. Prepare the renewal-year SOB, plan codes and member handoff.', label: 'Go to Renewal Setup' }
-  if (!rn.contract.started || rn.contract.stage !== 'Delivered') return { phase: 'contract', sentence: 'Setup is progressing. Move the contract through to delivery.', label: 'Go to Contract & Completion' }
-  return { phase: 'contract', sentence: 'Everything is in place. Complete the renewal.', label: 'Go to Contract & Completion' }
+  if (!contractSent(rn)) return { phase: 'contract', sentence: 'Setup is done. Prepare the contract and DSA and send them to the client.', label: 'Go to Contract, KYC & Notarization' }
+  if (!activationDone(rn)) return { phase: 'activate', sentence: 'Contract sent. Activate the renewed account and complete the handovers.', label: 'Go to Activate & Handover' }
+  return { phase: 'activate', sentence: 'Everything is in place. Complete the renewal.', label: 'Go to Activate & Handover' }
 }
 
 /** Per-phase status for the stepper. */
@@ -1020,9 +1050,16 @@ export function phaseStatus(rn: RenewalCase, id: RenewalPhaseId): { label: strin
     if (rn.proposal.decision === 'accepted') return { label: 'Ready', state: active === id ? 'current' : 'todo' }
     return { label: 'Not started', state: 'todo' }
   }
-  // contract
+  if (id === 'contract') {
+    if (rn.completed) return { label: 'Done', state: 'done' }
+    if (contractSent(rn)) return { label: 'Sent to client', state: active === id ? 'current' : 'done' }
+    if (setupDone(rn)) return { label: 'Ready', state: active === id ? 'current' : 'todo' }
+    return { label: 'Not started', state: 'todo' }
+  }
+  // activate (final)
   if (rn.completed) return { label: 'Completed', state: 'done' }
-  if (rn.contract.started) return { label: rn.contract.stage, state: active === id ? 'current' : 'done' }
+  if (activationDone(rn)) return { label: 'Ready to complete', state: active === id ? 'current' : 'done' }
+  if (contractSent(rn)) return { label: 'Ready', state: active === id ? 'current' : 'todo' }
   return { label: 'Not started', state: active === id ? 'current' : 'todo' }
 }
 

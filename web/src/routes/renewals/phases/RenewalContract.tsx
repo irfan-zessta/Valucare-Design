@@ -3,8 +3,8 @@
 // contract paperwork: the CoC + CRF, the KYC screening, and the contract flow —
 // upload the renewal contract and DSA, send them to the client through the app,
 // then optionally record the client-signed copies and the notarization outcome.
-// When the contract has been sent, the renewal can be completed to a read-only
-// summary. No policy is issued and no coverage is activated — presentation mock.
+// Once the contract has been sent, the case continues to Phase 5 (Activate &
+// Handover). No policy is issued and no coverage is activated — presentation mock.
 // ===========================================================================
 import { App, Alert, Button, DatePicker, Descriptions, Input, InputNumber, Select, Space, Table, Tag, Typography, Upload } from 'antd'
 import { CheckCircleOutlined, CloudUploadOutlined, FileTextOutlined } from '@ant-design/icons'
@@ -24,8 +24,7 @@ export function RenewalContract(props: RenewalPhaseProps) {
   return <ContractInProgress {...props} />
 }
 
-function ContractInProgress({ rn, patch, preview }: RenewalPhaseProps) {
-  const { message } = App.useApp()
+function ContractInProgress({ rn, patch, goPhase, preview }: RenewalPhaseProps) {
   const sentToClient = !!rn.setup.contractRecord?.sentToClient
 
   return (
@@ -34,10 +33,9 @@ function ContractInProgress({ rn, patch, preview }: RenewalPhaseProps) {
 
       <HandoffSummary rn={rn} />
 
-      <FormActions note={sentToClient ? 'Completing does not issue a policy or activate coverage — demo only.' : 'Send the renewal contract and DSA to the client before completing.'}>
-        <Button type="primary" disabled={!sentToClient}
-          onClick={() => { patch((x) => { x.completed = true; x.activity.push({ at: now(), text: 'Renewal processing completed — demo.' }) }); message.success('Renewal processing completed — demo.') }}>
-          Complete renewal
+      <FormActions note={sentToClient ? undefined : 'Send the renewal contract and DSA to the client to continue to activation.'}>
+        <Button type="primary" disabled={!sentToClient} onClick={() => goPhase('activate')}>
+          Continue to Activate &amp; Handover ›
         </Button>
       </FormActions>
     </>
@@ -362,7 +360,7 @@ function HandoffSummary({ rn }: { rn: RenewalCase }) {
   )
 }
 
-function RenewalSummary({ rn, preview }: RenewalPhaseProps) {
+export function RenewalSummary({ rn, preview }: RenewalPhaseProps) {
   const docKindFor = (name: string) => {
     const n = name.toLowerCase()
     if (n.includes('utilization') && n.includes('top')) return 'top'

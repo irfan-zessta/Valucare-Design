@@ -12,7 +12,7 @@ import type { RenewalCase, ExtractStatus } from '../domain/renewal'
 import { EXTRACT_KEYS, RENEWAL_ACCOUNTS, renewalIdFor, seedRenewal } from '../domain/renewal'
 
 const STORE_KEY = 'hms4-renewal:v1'
-const BASELINE = 3
+const BASELINE = 4
 
 // Cases persisted before the per-team data-extract model have `reports.prepared`
 // but no `reports.extracts`. Backfill the new shape so they keep working: a

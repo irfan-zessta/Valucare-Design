@@ -1,7 +1,7 @@
 // ===========================================================================
 // Shared building blocks for the Corporate Renewal case screens:
 //   • RenewalPhaseProps — the context each phase panel receives;
-//   • RenewalStepper — the four-phase navigator (reuses the New Business
+//   • RenewalStepper — the five-phase navigator (reuses the New Business
 //     app-stepper CSS so it matches the journey stepper exactly);
 //   • StatCards / UtilBar / MiniChart — compact figures reused in Review/Setup;
 //   • SimNote — the "clearly-labelled simulated" callout;
