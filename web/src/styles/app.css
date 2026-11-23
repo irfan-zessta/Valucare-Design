@@ -482,22 +482,6 @@ button.app-stepper__item {
   font-size: 13px;
 }
 
-/* Floating CTA — a card that lifts the primary "Continue" action off the page
-   and keeps it pinned to the bottom of the view as the setup form scrolls. */
-.rnw-float-cta {
-  position: sticky;
-  bottom: 20px;
-  z-index: 5;
-  margin-block-start: 28px;
-  display: flex;
-  justify-content: flex-end;
-  padding: 14px 16px;
-  background: #ffffff;
-  border: 1px solid #f0f0f0;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-
 /* Required marker: hide Ant's leading asterisk in this form and place our own
    red "*" on the right of the label text instead. */
 .app-form-panel .ant-form-item-required::before {

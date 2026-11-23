@@ -153,8 +153,12 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
         )}
       </FormSection>
 
-      <div className="rnw-float-cta">
-        <Button type="primary" size="large" onClick={() => goPhase('contract')}>Continue to Contract, KYC & Notarization ›</Button>
+      {/* Floating action bar — consistent with the other renewal phases. */}
+      <div className="app-form-floatbar">
+        <div />
+        <div className="app-form-floatbar__actions">
+          <Button type="primary" onClick={() => goPhase('contract')}>Continue to Contract, KYC & Notarization ›</Button>
+        </div>
       </div>
 
       {/* Add / edit plan code */}
