@@ -7,7 +7,7 @@
 // are in, the next action is Prepare renewal proposal.
 // ===========================================================================
 import { useState } from 'react'
-import { App, Button, Descriptions, Drawer, Empty, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd'
+import { App, Button, Descriptions, Empty, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import { CheckCircleOutlined, CloudDownloadOutlined, DownloadOutlined, EyeOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
@@ -29,7 +29,6 @@ const { Text, Title } = Typography
 
 export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps) {
   const { message } = App.useApp()
-  const [historyOpen, setHistoryOpen] = useState(false)
   const r = rn.reports
   const rr = rn.rates.response
 
@@ -143,25 +142,14 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
             <SimNote>Sent to Actuarial — no rating engine runs here. The case is waiting on Actuarial; load a representative rate sheet to continue the demo.</SimNote>
           ) : (
             <>
-              <SimNote>Representative pricing loaded for the demo. No automatic pricing engine runs here — Actuarial remains specialist work.</SimNote>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 12px' }}>
-                <Title level={5} style={{ margin: 0 }}>Selected rate sheet</Title>
-                <Tag color="blue">v{rr.version}</Tag>
-                <Tag color="green" icon={<CheckCircleOutlined />}>Selected</Tag>
-                <Button type="link" size="small" icon={<HistoryOutlined />} style={{ marginInlineStart: 'auto' }}
-                  onClick={() => setHistoryOpen(true)}>
-                  Version history ({rn.rates.history.length})
-                </Button>
-              </div>
-              <RateSheetDetail sheet={rr} />
+              <SimNote>Representative pricing loaded for the demo. No automatic pricing engine runs here — Actuarial remains specialist work. Open any version with <b>View</b> to see its full breakdown.</SimNote>
+              <RateSheetVersions rn={rn}
+                onRevise={() => { patch((x) => doReviseRates(x)); message.success('Loaded a revised Actuarial rate sheet.') }}
+                onSelect={(v) => { patch((x) => doSelectRateVersion(x, v)); message.success(`Selected rate sheet v${v}.`) }} />
             </>
           )}
         </FormSection>
       )}
-
-      <RateHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} rn={rn}
-        onRevise={() => { patch((x) => doReviseRates(x)); message.success('Loaded a revised Actuarial rate sheet.') }}
-        onSelect={(v) => { patch((x) => doSelectRateVersion(x, v)); message.success(`Selected rate sheet v${v}.`) }} />
 
       {floatAction && (
         <div className="app-form-floatbar">
@@ -202,15 +190,15 @@ function RateSheetDetail({ sheet }: { sheet: RateResponse }) {
 }
 
 // --- Rate-sheet versions ----------------------------------------------------
-// Mirrors the New Business "Rate sheet versions" list: one row per version with
-// its status, who issued it and when, a View pop-up with the full sheet, and a
-// Select-this-version action. A revised sheet can be loaded to simulate a new
-// Actuarial round; earlier versions stay on record and can be re-selected.
-function RateHistoryDrawer({
-  open, onClose, rn, onRevise, onSelect,
+// Mirrors the New Business "Rate sheet versions" list, rendered inline in the
+// Renewal rates section: one row per version with its status, who issued it and
+// when, a View pop-up with the full sheet, and a Select-this-version action. No
+// sheet is previewed until View is clicked. A revised sheet can be loaded to
+// simulate a new Actuarial round; earlier versions stay on record and can be
+// re-selected.
+function RateSheetVersions({
+  rn, onRevise, onSelect,
 }: {
-  open: boolean
-  onClose: () => void
   rn: RenewalCase
   onRevise: () => void
   onSelect: (version: number) => void
@@ -220,12 +208,13 @@ function RateHistoryDrawer({
   const ordered = [...rn.rates.history].reverse() // newest first
   const viewed = ordered.find((s) => s.version === viewVersion)
   return (
-    <Drawer title="Rate sheet versions" open={open} onClose={onClose} size="large"
-      extra={<Button type="primary" icon={<HistoryOutlined />} onClick={onRevise}>Load revised sheet</Button>}>
-      <Text type="secondary" style={{ fontSize: 13 }}>
-        Every rate sheet Actuarial has returned for this renewal. Loading a revised sheet mimics a re-rate after a negotiation round — earlier versions stay on record and can be re-selected.
-      </Text>
-      <Title level={5} style={{ marginTop: 20 }}>Rate sheet versions ({ordered.length})</Title>
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 12px' }}>
+        <Title level={5} style={{ margin: 0 }}>Rate sheet versions ({ordered.length})</Title>
+        <Button type="link" size="small" icon={<HistoryOutlined />} style={{ marginInlineStart: 'auto' }} onClick={onRevise}>
+          Load revised sheet
+        </Button>
+      </div>
       {ordered.length ? (
         <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
           {ordered.map((s: RateResponse) => (
@@ -248,7 +237,7 @@ function RateHistoryDrawer({
           ))}
         </Space>
       ) : (
-        <Empty style={{ marginTop: 32 }} description="No rate sheets loaded yet." />
+        <Empty style={{ marginTop: 16 }} description="No rate sheets loaded yet." />
       )}
 
       <Modal open={viewVersion !== null} width={680}
@@ -262,6 +251,6 @@ function RateHistoryDrawer({
         ]}>
         {viewed && <RateSheetDetail sheet={viewed} />}
       </Modal>
-    </Drawer>
+    </>
   )
 }
