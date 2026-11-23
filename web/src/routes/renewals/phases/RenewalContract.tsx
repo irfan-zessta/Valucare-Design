@@ -31,11 +31,17 @@ function ContractInProgress({ rn, patch, goPhase, preview }: RenewalPhaseProps) 
     <>
       <SetupHandoffCards rn={rn} patch={patch} preview={preview} />
 
-      <FormActions note={sentToClient ? undefined : 'Send the renewal contract and DSA to the client to continue to activation.'}>
-        <Button type="primary" disabled={!sentToClient} onClick={() => goPhase('activate')}>
-          Continue to Activate &amp; Handover ›
-        </Button>
-      </FormActions>
+      {/* Floating action bar — consistent with the other renewal phases. */}
+      <div className="app-form-floatbar">
+        <Text type="secondary">
+          {sentToClient ? '' : 'Send the renewal contract and DSA to the client to continue to activation.'}
+        </Text>
+        <div className="app-form-floatbar__actions">
+          <Button type="primary" disabled={!sentToClient} onClick={() => goPhase('activate')}>
+            Continue to Activate &amp; Handover ›
+          </Button>
+        </div>
+      </div>
     </>
   )
 }
