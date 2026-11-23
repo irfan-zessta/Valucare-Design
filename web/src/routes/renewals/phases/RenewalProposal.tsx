@@ -25,6 +25,13 @@ import valucareLogo from '../../../assets/valucare-logo.png'
 
 const { Text, Paragraph } = Typography
 
+// A card title with the red numbered badge (matches the New Business activity heads).
+const numberedTitle = (n: number, text: string) => (
+  <span className="app-activity-head">
+    <span className="app-activity-badge">{n}</span> {text}
+  </span>
+)
+
 export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhaseProps) {
   const { message } = App.useApp()
   const [editOpen, setEditOpen] = useState(false)
@@ -82,7 +89,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
   return (
     <>
       {/* 1 — Recommended renewal rates (list view; View opens the rate sheet) */}
-      <FormSection wide title="Recommended renewal rates"
+      <FormSection wide title={numberedTitle(1, 'Recommended renewal rates')}
         description="The Actuarial-recommended renewal rates included in the proposal, taken from the selected rate sheet."
         extra={<Tag color="blue">rate sheet v{rr.version}</Tag>}>
         <Table size="small" pagination={false} rowKey="line"
@@ -107,7 +114,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
       </FormSection>
 
       {/* 2 — Current year vs renewal year */}
-      <FormSection wide title="Current year vs renewal year"
+      <FormSection wide title={numberedTitle(2, 'Current year vs renewal year')}
         description="Prepared by the Account Specialist from the selected rate sheet and the current SOB — renewal dates, plan, room entitlement, MBL, rates, payment mode, network access and benefit notes. Changes and enhancements are highlighted; unchanged benefits carry forward.">
         <SimNote>At this stage Sales works from the <b>current SOB</b> and the proposed changes. The final renewal SOB is prepared and reviewed in the next stage, Renewal Setup.</SimNote>
         <Table size="small" pagination={false} rowKey="k" dataSource={comparisonRows}
@@ -138,7 +145,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
       <RateJustificationCard rn={rn} patch={patch} />
 
       {/* 5 — Import current SOB */}
-      <FormSection wide title="Import current SOB"
+      <FormSection wide title={numberedTitle(5, 'Import current SOB')}
         description="Bring the signed current-year SOB into the proposal package so the proposal is built against the client's actual current benefits. The final renewal SOB is prepared in Renewal Setup."
         extra={rn.proposal.sobImported ? <Tag color="green" icon={<CheckCircleOutlined />}>Imported</Tag> : <Tag>Not imported</Tag>}>
         {rn.proposal.sobImported ? (
@@ -319,7 +326,7 @@ function RatesRecommendationCard({ rn, patch }: { rn: RenewalCase; patch: Renewa
   const label = { fontSize: 12, color: 'rgba(0,0,0,0.55)', marginBottom: 4 } as const
   return (
     <FormSection wide
-      title={<span className="app-activity-head"><span className="app-activity-badge">2</span> Rates recommendation</span>}
+      title={numberedTitle(3, 'Rates recommendation')}
       description="The commission and the Sales recommendation included with the renewal proposal.">
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div>
@@ -358,7 +365,7 @@ function RateJustificationCard({ rn, patch }: { rn: RenewalCase; patch: RenewalP
   const [text, setText] = useState(rn.proposal.edits.rateJustification ?? fallback)
   const saved = rn.proposal.edits.rateJustification ?? fallback
   return (
-    <FormSection wide title="Rate justification"
+    <FormSection wide title={numberedTitle(4, 'Rate justification')}
       description="Explain the recommended change for the client. Defaults to Actuarial's pricing note — edit as needed. Included in the proposal and the generated PDF.">
       <Input.TextArea rows={4} value={text} onChange={(e) => setText(e.target.value)}
         placeholder="Why the recommended rates are fair and justified for the client." />
