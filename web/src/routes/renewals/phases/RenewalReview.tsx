@@ -7,8 +7,8 @@
 // are in, the next action is Prepare renewal proposal.
 // ===========================================================================
 import { useState } from 'react'
-import { App, Button, Descriptions, Empty, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd'
-import { CheckCircleOutlined, CloudDownloadOutlined, DownloadOutlined, EyeOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons'
+import { App, Button, Descriptions, Empty, Input, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd'
+import { CheckCircleOutlined, CloudDownloadOutlined, DownloadOutlined, EyeOutlined, FileTextOutlined, SendOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso, formatCount } from '../../../lib/format'
@@ -145,7 +145,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
             <>
               <SimNote>Representative pricing loaded for the demo. No automatic pricing engine runs here — Actuarial remains specialist work. Open any version with <b>View</b> to see its full breakdown.</SimNote>
               <RateSheetVersions rn={rn}
-                onRevise={() => { patch((x) => doReviseRates(x)); message.success('Loaded a revised Actuarial rate sheet.') }}
+                onRequest={(reason) => { patch((x) => doReviseRates(x, false, reason)); message.success('Rate sheet request sent to Actuarial (simulated).') }}
                 onSelect={(v) => { patch((x) => doSelectRateVersion(x, v)); message.success(`Selected rate sheet v${v}.`) }} />
             </>
           )}
@@ -170,9 +170,14 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
 function RateSheetPreview({ sheet }: { sheet: RateResponse }) {
   return (
     <>
-      <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: 12 }}>
+      <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: sheet.requestReason ? 4 : 12 }}>
         <b>Overall change +{sheet.pct}%</b> · MBL {formatPeso(sheet.mbl)} · {sheet.plan}. {sheet.note}
       </Text>
+      {sheet.requestReason && (
+        <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: 12 }}>
+          <b>Requested from Actuarial because:</b> {sheet.requestReason}
+        </Text>
+      )}
       <ProposalRateSchedule value={sampleRateSchedule()} editable={false} />
     </>
   )
@@ -186,22 +191,31 @@ function RateSheetPreview({ sheet }: { sheet: RateResponse }) {
 // simulate a new Actuarial round; earlier versions stay on record and can be
 // re-selected.
 function RateSheetVersions({
-  rn, onRevise, onSelect,
+  rn, onRequest, onSelect,
 }: {
   rn: RenewalCase
-  onRevise: () => void
+  onRequest: (reason: string) => void
   onSelect: (version: number) => void
 }) {
   const [viewVersion, setViewVersion] = useState<number | null>(null)
+  const [requestOpen, setRequestOpen] = useState(false)
+  const [reason, setReason] = useState('')
   const selected = rn.rates.response?.version
   const ordered = [...rn.rates.history].reverse() // newest first
   const viewed = ordered.find((s) => s.version === viewVersion)
+
+  function sendRequest() {
+    onRequest(reason)
+    setRequestOpen(false)
+    setReason('')
+  }
+
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 12px' }}>
         <Title level={5} style={{ margin: 0 }}>Rate sheet versions ({ordered.length})</Title>
-        <Button type="link" size="small" icon={<HistoryOutlined />} style={{ marginInlineStart: 'auto' }} onClick={onRevise}>
-          Load revised sheet
+        <Button type="link" size="small" icon={<SendOutlined />} style={{ marginInlineStart: 'auto' }} onClick={() => setRequestOpen(true)}>
+          Request new rate sheet from Actuarial
         </Button>
       </div>
       {ordered.length ? (
@@ -239,6 +253,16 @@ function RateSheetVersions({
           <Button key="close" onClick={() => setViewVersion(null)}>Close</Button>,
         ]}>
         {viewed && <RateSheetPreview sheet={viewed} />}
+      </Modal>
+
+      <Modal open={requestOpen} title="Request new rate sheet from Actuarial"
+        okText="Send request" okButtonProps={{ icon: <SendOutlined />, disabled: !reason.trim() }}
+        onOk={sendRequest} onCancel={() => { setRequestOpen(false); setReason('') }}>
+        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+          Ask Actuarial to re-rate this renewal. Give the reason for the request — it's sent with the request and recorded on the returned sheet. No rating engine runs here; a representative revised sheet is returned for the demo.
+        </Text>
+        <Input.TextArea rows={3} autoFocus value={reason} onChange={(e) => setReason(e.target.value)}
+          placeholder="e.g. Client pushed back on the dependent uplift — requesting a softened re-rate." />
       </Modal>
     </>
   )

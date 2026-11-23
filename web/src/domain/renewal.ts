@@ -178,6 +178,8 @@ export interface RateResponse {
   note: string
   /** The rate-sheet version this response represents (bumps on a revision). */
   version: number
+  /** Reason the Renewal Officer gave when requesting this (re-)rate from Actuarial. */
+  requestReason?: string
 }
 
 export interface RenewalRates {
@@ -787,7 +789,7 @@ const REVISION_NOTES = [
   'Second revision — principal uplift eased following the client’s utilization context. MBL still unchanged.',
   'Further revision — best-and-final representative pricing for the demo.',
 ]
-export function doReviseRates(rn: RenewalCase, silent = false) {
+export function doReviseRates(rn: RenewalCase, silent = false, reason?: string) {
   const prev = rn.rates.response
   if (!prev) {
     doUseRateResponse(rn, silent)
@@ -808,10 +810,14 @@ export function doReviseRates(rn: RenewalCase, silent = false) {
     pct: Math.round(blended * 1000) / 10,
     note: REVISION_NOTES[Math.min(version - 2, REVISION_NOTES.length - 1)],
     version,
+    requestReason: reason?.trim() || undefined,
   }
   rn.rates.history.push(sheet)
   rn.rates.response = sheet
-  if (!silent) log(rn, `Loaded revised Actuarial rate sheet (v${version}): +${sheet.pct}% overall (was +${prev.pct}%).`)
+  if (!silent) {
+    const why = sheet.requestReason ? ` Reason: “${sheet.requestReason}”.` : ''
+    log(rn, `Requested a new rate sheet from Actuarial (simulated).${why} Received revised sheet v${version}: +${sheet.pct}% overall (was +${prev.pct}%).`)
+  }
 }
 
 /** Re-select an earlier rate-sheet version from the history. */
