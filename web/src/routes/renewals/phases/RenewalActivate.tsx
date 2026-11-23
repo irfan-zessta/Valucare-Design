@@ -5,8 +5,10 @@
 // can be completed to a read-only summary. Everything here is simulated — no real
 // policy is issued, no coverage is switched on, and no external system is called.
 // ===========================================================================
-import { App, Button, Descriptions, Tag, Typography } from 'antd'
-import { CheckCircleOutlined } from '@ant-design/icons'
+import { useState } from 'react'
+import { App, Button, DatePicker, Descriptions, Space, Tag, Typography } from 'antd'
+import { CalendarOutlined, CheckCircleOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime } from '../../../lib/format'
@@ -20,6 +22,8 @@ const now = () => new Date().toISOString()
 export function RenewalActivate(props: RenewalPhaseProps) {
   const { rn, patch, goPhase } = props
   const { message } = App.useApp()
+  // Default the scheduled go-live to the new contract's start date.
+  const [scheduleDate, setScheduleDate] = useState<dayjs.Dayjs | null>(dayjs(rn.renewal.from))
 
   if (rn.completed) return <RenewalSummary {...props} />
 
@@ -39,12 +43,14 @@ export function RenewalActivate(props: RenewalPhaseProps) {
   const activated = !!a.accountActivated
   const canComplete = activationDone(rn)
 
-  const activateAccount = () => {
+  const activateAccount = (scheduledAt?: string) => {
     patch((x) => {
-      x.activation = { ...(x.activation ?? {}), accountActivated: true, activatedAt: now() }
-      x.activity.push({ at: now(), text: 'Activated the renewed account for the new contract term (simulated).' })
+      x.activation = { ...(x.activation ?? {}), accountActivated: true, activatedAt: now(), scheduledAt }
+      x.activity.push({ at: now(), text: scheduledAt
+        ? `Scheduled renewed account activation for ${formatDate(scheduledAt)} (simulated).`
+        : 'Activated the renewed account for the new contract term (simulated).' })
     })
-    message.success('Renewed account activated.')
+    message.success(scheduledAt ? `Activation scheduled for ${formatDate(scheduledAt)}.` : 'Renewed account activated.')
   }
   const recordHandoff = (which: 'billing' | 'ops', label: string) => {
     patch((x) => {
@@ -63,19 +69,40 @@ export function RenewalActivate(props: RenewalPhaseProps) {
       {/* 5.1 — Activate renewed account */}
       <FormSection wide title="5.1 · Activate renewed account"
         description="Switch the account to the renewed contract term in HMS so the new SOB, plan codes and member records take effect."
-        extra={activated ? <Tag color="green" icon={<CheckCircleOutlined />}>Activated</Tag> : <Tag>Pending</Tag>}>
+        extra={activated ? <Tag color="green" icon={<CheckCircleOutlined />}>{a.scheduledAt ? 'Scheduled' : 'Activated'}</Tag> : <Tag>Pending</Tag>}>
         <Descriptions size="small" column={{ xs: 1, sm: 2 }} bordered style={{ marginBottom: 12 }}
           items={[
             { key: 'code', label: 'Account code', children: <span style={{ fontFamily: 'monospace' }}>{rn.code}</span> },
             { key: 'term', label: 'New contract term', children: `${formatDate(rn.renewal.from)} – ${formatDate(rn.renewal.to)}` },
             { key: 'plan', label: 'Plan / MBL', children: rn.currentSob },
-            { key: 'status', label: 'Status', children: activated ? <Tag color="green">Activated{a.activatedAt ? ` · ${formatDateTime(a.activatedAt)}` : ''}</Tag> : <Tag>Not activated</Tag> },
+            { key: 'status', label: 'Status', children: activated
+              ? <Tag color="green">{a.scheduledAt ? `Scheduled for ${formatDate(a.scheduledAt)}` : `Activated${a.activatedAt ? ` · ${formatDateTime(a.activatedAt)}` : ''}`}</Tag>
+              : <Tag>Not activated</Tag> },
           ]} />
-        <FormActions note={activated ? 'The renewed term is active in HMS (simulated — no real coverage change).' : undefined}>
-          {activated
-            ? <Tag color="green" icon={<CheckCircleOutlined />}>Account activated</Tag>
-            : <Button type="primary" onClick={activateAccount}>Activate renewed account</Button>}
-        </FormActions>
+        {activated ? (
+          <FormActions note={a.scheduledAt
+            ? `Activation is scheduled for ${formatDate(a.scheduledAt)} (simulated — no real coverage change).`
+            : 'The renewed term is active in HMS (simulated — no real coverage change).'}>
+            <Tag color="green" icon={<CheckCircleOutlined />}>{a.scheduledAt ? `Scheduled for ${formatDate(a.scheduledAt)}` : 'Account activated'}</Tag>
+          </FormActions>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            {/* Option 1 — schedule a go-live date */}
+            <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 16 }}>
+              <Space align="center" style={{ marginBottom: 4 }}><CalendarOutlined /><Text strong>Schedule &amp; activate</Text></Space>
+              <Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 12 }}>Pick a go-live date — the renewed term switches on automatically on that date.</Paragraph>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>Go-live date</div>
+              <DatePicker style={{ width: '100%', marginBottom: 12 }} value={scheduleDate} onChange={setScheduleDate} />
+              <Button block icon={<CalendarOutlined />} disabled={!scheduleDate} onClick={() => activateAccount(scheduleDate!.format('YYYY-MM-DD'))}>Schedule activation</Button>
+            </div>
+            {/* Option 2 — activate immediately */}
+            <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 16 }}>
+              <Space align="center" style={{ marginBottom: 4 }}><ThunderboltOutlined /><Text strong>Activate now</Text></Space>
+              <Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 12 }}>Switch the renewed term on immediately, effective today.</Paragraph>
+              <Button type="primary" block icon={<ThunderboltOutlined />} onClick={() => activateAccount()}>Activate now</Button>
+            </div>
+          </div>
+        )}
       </FormSection>
 
       {/* 5.2 — Billing handover */}

@@ -337,6 +337,8 @@ export interface RenewalActivation {
   billingHandoff?: boolean
   opsHandoff?: boolean
   activatedAt?: string
+  /** Go-live date when activation was scheduled rather than done immediately. */
+  scheduledAt?: string
 }
 
 export interface RenewalDocument {
