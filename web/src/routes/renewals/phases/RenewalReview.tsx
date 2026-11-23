@@ -7,8 +7,8 @@
 // are in, the next action is Prepare renewal proposal.
 // ===========================================================================
 import { useState } from 'react'
-import { App, Button, Descriptions, Drawer, Empty, Space, Table, Tag, Timeline, Tooltip, Typography } from 'antd'
-import { CheckCircleOutlined, CloudDownloadOutlined, DownloadOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons'
+import { App, Button, Descriptions, Drawer, Empty, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd'
+import { CheckCircleOutlined, CloudDownloadOutlined, DownloadOutlined, EyeOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso, formatCount } from '../../../lib/format'
@@ -153,23 +153,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
                   Version history ({rn.rates.history.length})
                 </Button>
               </div>
-              <Table size="small" pagination={false} rowKey="line"
-                dataSource={[
-                  { line: 'Principal rate', current: rr.principalCurrent, rec: rr.principalRecommended },
-                  { line: 'Dependent rate', current: rr.dependentCurrent, rec: rr.dependentRecommended },
-                ]}
-                columns={[
-                  { title: 'Line', dataIndex: 'line', key: 'line' },
-                  { title: 'Current', dataIndex: 'current', key: 'current', align: 'right', render: (v) => formatPeso(v) },
-                  { title: 'Recommended', dataIndex: 'rec', key: 'rec', align: 'right', render: (v) => <b>{formatPeso(v)}</b> },
-                  { title: 'Change', key: 'chg', align: 'right', render: (_, row) => <Tag color="gold">+{pctChange(row.current, row.rec)}%</Tag> },
-                ]} />
-              <Descriptions column={{ xs: 1, sm: 2 }} size="small" style={{ marginTop: 12 }}
-                items={[
-                  { key: 'mbl', label: 'MBL / plan', children: `${formatPeso(rr.mbl)} · ${rr.plan}` },
-                  { key: 'pct', label: 'Overall change', children: `+${rr.pct}%` },
-                ]} />
-              <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 8 }}><b>Pricing explanation:</b> {rr.note}</Text>
+              <RateSheetDetail sheet={rr} />
             </>
           )}
         </FormSection>
@@ -189,9 +173,39 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
   )
 }
 
-// --- Rate-sheet version history --------------------------------------------
-// Shows every rate sheet Actuarial has returned, newest first. Each round can
-// be re-selected; a revised sheet can be loaded to simulate a new round.
+// --- Rate-sheet detail -----------------------------------------------------
+// The Principal/Dependent current→recommended breakdown plus MBL/plan, overall
+// change and the pricing explanation. Shared by the selected-sheet view in the
+// section and the per-version "View" pop-up in the drawer.
+function RateSheetDetail({ sheet }: { sheet: RateResponse }) {
+  return (
+    <>
+      <Table size="small" pagination={false} rowKey="line"
+        dataSource={[
+          { line: 'Principal rate', current: sheet.principalCurrent, rec: sheet.principalRecommended },
+          { line: 'Dependent rate', current: sheet.dependentCurrent, rec: sheet.dependentRecommended },
+        ]}
+        columns={[
+          { title: 'Line', dataIndex: 'line', key: 'line' },
+          { title: 'Current', dataIndex: 'current', key: 'current', align: 'right', render: (v) => formatPeso(v) },
+          { title: 'Recommended', dataIndex: 'rec', key: 'rec', align: 'right', render: (v) => <b>{formatPeso(v)}</b> },
+          { title: 'Change', key: 'chg', align: 'right', render: (_, row) => <Tag color="gold">+{pctChange(row.current, row.rec)}%</Tag> },
+        ]} />
+      <Descriptions column={{ xs: 1, sm: 2 }} size="small" style={{ marginTop: 12 }}
+        items={[
+          { key: 'mbl', label: 'MBL / plan', children: `${formatPeso(sheet.mbl)} · ${sheet.plan}` },
+          { key: 'pct', label: 'Overall change', children: `+${sheet.pct}%` },
+        ]} />
+      <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 8 }}><b>Pricing explanation:</b> {sheet.note}</Text>
+    </>
+  )
+}
+
+// --- Rate-sheet versions ----------------------------------------------------
+// Mirrors the New Business "Rate sheet versions" list: one row per version with
+// its status, who issued it and when, a View pop-up with the full sheet, and a
+// Select-this-version action. A revised sheet can be loaded to simulate a new
+// Actuarial round; earlier versions stay on record and can be re-selected.
 function RateHistoryDrawer({
   open, onClose, rn, onRevise, onSelect,
 }: {
@@ -201,40 +215,53 @@ function RateHistoryDrawer({
   onRevise: () => void
   onSelect: (version: number) => void
 }) {
+  const [viewVersion, setViewVersion] = useState<number | null>(null)
   const selected = rn.rates.response?.version
   const ordered = [...rn.rates.history].reverse() // newest first
+  const viewed = ordered.find((s) => s.version === viewVersion)
   return (
-    <Drawer title="Rate sheet version history" open={open} onClose={onClose} size="large"
+    <Drawer title="Rate sheet versions" open={open} onClose={onClose} size="large"
       extra={<Button type="primary" icon={<HistoryOutlined />} onClick={onRevise}>Load revised sheet</Button>}>
       <Text type="secondary" style={{ fontSize: 13 }}>
         Every rate sheet Actuarial has returned for this renewal. Loading a revised sheet mimics a re-rate after a negotiation round — earlier versions stay on record and can be re-selected.
       </Text>
+      <Title level={5} style={{ marginTop: 20 }}>Rate sheet versions ({ordered.length})</Title>
       {ordered.length ? (
-        <Timeline style={{ marginTop: 20 }}
-          items={ordered.map((s: RateResponse) => ({
-            color: s.version === selected ? 'green' : 'blue',
-            children: (
-              <div style={{ paddingBottom: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Tag color="blue">v{s.version}</Tag>
-                  {s.version === selected
-                    ? <Tag color="green" icon={<CheckCircleOutlined />}>Selected</Tag>
-                    : <Button size="small" onClick={() => onSelect(s.version)}>Select this version</Button>}
-                  <Text type="secondary" style={{ fontSize: 12, marginInlineStart: 'auto' }}>{formatDateTime(s.at)}</Text>
-                </div>
-                <div style={{ fontSize: 13, marginTop: 6 }}>
-                  Principal <b>{formatPeso(s.principalRecommended)}</b> · Dependent <b>{formatPeso(s.dependentRecommended)}</b>
-                </div>
-                <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)', marginTop: 2 }}>
-                  Overall +{s.pct}% · MBL {formatPeso(s.mbl)} · {s.plan}
-                </div>
-                <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>{s.note}</Text>
-              </div>
-            ),
-          }))} />
+        <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
+          {ordered.map((s: RateResponse) => (
+            <div key={s.version} className="app-decision-row"
+              style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+              <Space wrap>
+                <strong>Rate sheet v{s.version}</strong>
+                {s.version === selected
+                  ? <Tag color="green" icon={<CheckCircleOutlined />}>selected</Tag>
+                  : <Tag>superseded</Tag>}
+                <Text type="secondary" style={{ fontSize: 12 }}>issued {formatDateTime(s.at)} by Actuarial</Text>
+              </Space>
+              <Space>
+                <Button size="small" icon={<EyeOutlined />} onClick={() => setViewVersion(s.version)}>View</Button>
+                {s.version !== selected && (
+                  <Button size="small" type="primary" onClick={() => onSelect(s.version)}>Select this version</Button>
+                )}
+              </Space>
+            </div>
+          ))}
+        </Space>
       ) : (
         <Empty style={{ marginTop: 32 }} description="No rate sheets loaded yet." />
       )}
+
+      <Modal open={viewVersion !== null} width={680}
+        title={viewed ? `Rate sheet v${viewed.version} · issued ${formatDateTime(viewed.at)} by Actuarial` : 'Rate sheet'}
+        onCancel={() => setViewVersion(null)}
+        footer={[
+          viewed && viewed.version !== selected ? (
+            <Button key="select" type="primary" onClick={() => { onSelect(viewed.version); setViewVersion(null) }}>Select this version</Button>
+          ) : null,
+          <Button key="close" onClick={() => setViewVersion(null)}>Close</Button>,
+        ]}>
+        {viewed && <RateSheetDetail sheet={viewed} />}
+      </Modal>
     </Drawer>
   )
 }
