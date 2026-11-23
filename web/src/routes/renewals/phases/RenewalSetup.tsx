@@ -80,14 +80,6 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
                 { title: 'Previous', dataIndex: 'prev', key: 'prev' },
                 { title: 'Renewal', key: 'ren', render: (_, row) => <span>{row.ren}{row.tag ? <Tag style={{ marginLeft: 8 }} color={row.tag === 'No change' ? 'default' : row.tag === 'Pending' ? 'gold' : 'blue'}>{row.tag}</Tag> : null}</span> },
               ]} />
-            <FormActions note="The renewal SOB is checked against the account's configured benefits before it is signed.">
-              <Button icon={<FileTextOutlined />} onClick={() => preview('sob')}>Preview renewal SOB</Button>
-              {s.sobStatus === 'Prepared' && <Button onClick={() => { patch((x) => { x.setup.sobStatus = 'For review'; x.setup.planReview = true; x.setup.benefitsChecked = true; x.activity.push({ at: now(), text: 'Sent renewal SOB for Actuarial review (simulated); checked against configured benefits.' }) }); message.success('Sent for Actuarial review (simulated).') }}>Send for Actuarial review</Button>}
-              {s.sobStatus === 'For review' && <Button onClick={() => { patch((x) => { x.setup.sobStatus = 'Reviewed'; x.activity.push({ at: now(), text: 'Loaded sample Actuarial review response — SOB reviewed.' }) }); message.success('Sample review response applied.') }}>Use sample review response</Button>}
-              {s.sobStatus === 'Reviewed' && !s.sobSigned && <Button type="primary" onClick={() => { patch((x) => { x.setup.sobStatus = 'Signed'; x.setup.sobSigned = true; x.documents.push({ name: 'Signed renewal SOB', kind: 'SOB', at: now(), sample: true }); x.activity.push({ at: now(), text: 'Added sample signed SOB — linked to the case.' }) }); message.success('Signed SOB added.') }}>Add sample signed SOB</Button>}
-              {s.sobSigned && <Tag color="green" icon={<CheckCircleOutlined />}>Signed</Tag>}
-            </FormActions>
-
             {/* Plan codes */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
               <Text strong>Renewal-year Plan Codes</Text>
@@ -108,6 +100,14 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
             <div style={{ marginTop: 8 }}>
               <Tag color={s.planReview ? 'green' : 'gold'}>{s.planReview ? 'AM & SM review — looks good (simulated)' : 'Pending AM & SM review'}</Tag>
             </div>
+
+            <FormActions note="The renewal SOB is checked against the account's configured benefits before it is signed.">
+              <Button icon={<FileTextOutlined />} onClick={() => preview('sob')}>Preview renewal SOB</Button>
+              {s.sobStatus === 'Prepared' && <Button onClick={() => { patch((x) => { x.setup.sobStatus = 'For review'; x.setup.planReview = true; x.setup.benefitsChecked = true; x.activity.push({ at: now(), text: 'Sent renewal SOB for Actuarial review (simulated); checked against configured benefits.' }) }); message.success('Sent for Actuarial review (simulated).') }}>Send for Actuarial review</Button>}
+              {s.sobStatus === 'For review' && <Button onClick={() => { patch((x) => { x.setup.sobStatus = 'Reviewed'; x.activity.push({ at: now(), text: 'Loaded sample Actuarial review response — SOB reviewed.' }) }); message.success('Sample review response applied.') }}>Use sample review response</Button>}
+              {s.sobStatus === 'Reviewed' && !s.sobSigned && <Button type="primary" onClick={() => { patch((x) => { x.setup.sobStatus = 'Signed'; x.setup.sobSigned = true; x.documents.push({ name: 'Signed renewal SOB', kind: 'SOB', at: now(), sample: true }); x.activity.push({ at: now(), text: 'Added sample signed SOB — linked to the case.' }) }); message.success('Signed SOB added.') }}>Add sample signed SOB</Button>}
+              {s.sobSigned && <Tag color="green" icon={<CheckCircleOutlined />}>Signed</Tag>}
+            </FormActions>
           </>
         )}
       </FormSection>
