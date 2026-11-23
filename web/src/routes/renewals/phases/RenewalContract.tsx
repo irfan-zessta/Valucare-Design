@@ -276,12 +276,10 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
         </FormActions>
       </FormSection>
 
-      {/* Contract & DSA — prepare → send → signed → notarized */}
+      {/* Contract & DSA — prepare & send (signed copies and notarization are in 4.4) */}
       <FormSection wide title="4.3 · Contract &amp; DSA"
-        description="Upload the renewal contract and DSA, send them to the client through the app, then record the signed copies and notarization. Signed copies and notarization are optional."
-        extra={cr.notarization === 'returned' ? <Tag color="green" icon={<CheckCircleOutlined />}>Notarized &amp; returned</Tag> : cr.signedContract ? <Tag color="blue">Signed recorded</Tag> : cr.sentToClient ? <Tag color="blue">Sent to client</Tag> : <Tag>Pending</Tag>}>
-        {/* 1 — Prepare & send */}
-        <Text strong style={{ fontSize: 12 }}>1 · Prepare and send to client</Text>
+        description="Upload the renewal contract and DSA, then send them to the client through the app."
+        extra={cr.sentToClient ? <Tag color="blue">Sent to client</Tag> : <Tag>Pending</Tag>}>
         <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8, marginBottom: 12 }}>
           {([
             ['contractFile', 'Renewal contract'],
@@ -317,52 +315,6 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
                 <Button type="primary" disabled={!canSend} onClick={sendContractToClient}>Send contract &amp; DSA to client</Button>
               </>}
         </FormActions>
-
-        {/* 2 — Signed copies (optional) */}
-        {cr.sentToClient && (
-          <>
-            <Text strong style={{ fontSize: 12, display: 'block', marginTop: 16 }}>2 · Client-signed copies (optional)</Text>
-            <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8 }}>
-              {([
-                ['signedContract', 'Signed renewal contract'],
-                ['signedDsa', 'Signed DSA'],
-              ] as const).map(([field, label]) => {
-                const val = cr[field]
-                return (
-                  <div key={field} className="app-decision-row" style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
-                    <Space>
-                      <span>{label}</span>
-                      {val ? <Tag color="blue">{val}</Tag> : <Tag>Optional</Tag>}
-                    </Space>
-                    <Upload showUploadList={false} beforeUpload={(file) => { uploadContract(field, file.name, label); return false }}>
-                      <Button size="small" icon={<CloudUploadOutlined />}>{val ? 'Replace' : 'Upload'}</Button>
-                    </Upload>
-                  </div>
-                )
-              })}
-            </Space>
-
-            {/* 3 — Notarization (optional) */}
-            <Text strong style={{ fontSize: 12, display: 'block', marginTop: 16 }}>3 · Notarization (optional)</Text>
-            <div className="rnw-kyc" style={{ marginTop: 8 }}>
-              {(['sent', 'notarized', 'returned'] as const).map((stage) => {
-                const order = { none: 0, sent: 1, notarized: 2, returned: 3 }
-                const on = order[cr.notarization ?? 'none'] >= order[stage]
-                const label = stage === 'sent' ? 'Sent for notarization' : stage === 'notarized' ? 'Notarized' : 'Returned to client'
-                return <span key={stage} className={`rnw-kyc-step${on ? ' on' : ''}`}>{on ? <CheckCircleOutlined /> : null} {label}</span>
-              })}
-            </div>
-            <FormActions>
-              {(!cr.notarization || cr.notarization === 'none') && <Button onClick={() => setNotarization('sent')}>Mark sent for notarization</Button>}
-              {cr.notarization === 'sent' && (
-                <Upload showUploadList={false} beforeUpload={(file) => { uploadContract('notarizedFile', file.name, 'Notarized contract'); setNotarization('notarized'); return false }}>
-                  <Button icon={<CloudUploadOutlined />}>Upload notarized contract</Button>
-                </Upload>
-              )}
-              {cr.notarization === 'notarized' && <Button type="primary" onClick={() => setNotarization('returned')}>Mark returned to client</Button>}
-            </FormActions>
-          </>
-        )}
       </FormSection>
 
       {/* Signed & notarized milestones — recorded in order (legal/notarization
