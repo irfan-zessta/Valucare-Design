@@ -150,7 +150,7 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
   return (
     <>
       {/* Certificate of Coverage & Commission Rate Form (merged, inline edit) */}
-      <FormSection wide title="Certificate of Coverage (CoC) and Commission Rate Form (CRF)"
+      <FormSection wide title="4.1 · Certificate of Coverage (CoC) and Commission Rate Form (CRF)"
         description="Prepare the CoC (optional temporary cover) together with the commission rate form inline, then generate both."
         extra={cocGenerated ? <Tag color="green" icon={<CheckCircleOutlined />}>Generated</Tag> : <Tag>Draft</Tag>}>
         {cocEditable ? (
@@ -208,7 +208,7 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
       </FormSection>
 
       {/* KYC screening (record + upload) */}
-      <FormSection wide title="KYC screening"
+      <FormSection wide title="4.2 · KYC screening"
         description="External KYC (SOLYTICS) is not connected — upload the signed form and supporting evidence, and record the screening result."
         extra={<Tag color={rn.setup.kyc === 'Screening cleared' ? 'green' : rn.setup.kyc === 'Not started' ? 'default' : 'blue'}>{rn.setup.kyc}</Tag>}>
         <Text strong style={{ fontSize: 12 }}>KYC documents</Text>
@@ -248,7 +248,7 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
       </FormSection>
 
       {/* Contract & DSA — prepare → send → signed → notarized */}
-      <FormSection wide title="Contract &amp; DSA"
+      <FormSection wide title="4.3 · Contract &amp; DSA"
         description="Upload the renewal contract and DSA, send them to the client through the app, then record the signed copies and notarization. Signed copies and notarization are optional."
         extra={cr.notarization === 'returned' ? <Tag color="green" icon={<CheckCircleOutlined />}>Notarized &amp; returned</Tag> : cr.signedContract ? <Tag color="blue">Signed recorded</Tag> : cr.sentToClient ? <Tag color="blue">Sent to client</Tag> : <Tag>Pending</Tag>}>
         {/* 1 — Prepare & send */}
