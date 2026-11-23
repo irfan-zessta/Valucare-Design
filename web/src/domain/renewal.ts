@@ -208,6 +208,12 @@ export interface ProposalEdits {
   message?: string
   /** Justification narrative for the recommended rate change (defaults to the rate sheet's note). */
   rateJustification?: string
+  /** Commission % included in the proposal (intermediary-managed accounts). */
+  commissionPct?: number
+  /** Note explaining any commission adjustment. */
+  commissionNote?: string
+  /** The Sales recommendation presented with the proposal. */
+  salesRecommendation?: string
 }
 
 export type RenewalDecision = 'accepted' | 'not_renewing' | null

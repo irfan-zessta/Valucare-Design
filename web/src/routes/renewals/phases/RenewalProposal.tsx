@@ -126,7 +126,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         </FormActions>
       </FormSection>
 
-      <FormSection wide title="Rate recommendation"
+      <FormSection wide title="Recommended renewal rates"
         description="The Actuarial-recommended renewal rates included in the proposal, taken from the selected rate sheet."
         extra={<Tag color="blue">rate sheet v{rr.version}</Tag>}>
         <Table size="small" pagination={false} rowKey="line"
@@ -149,6 +149,8 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
           <Button onClick={() => goPhase('review')}>View full rate sheet ›</Button>
         </FormActions>
       </FormSection>
+
+      <RatesRecommendationCard rn={rn} patch={patch} />
 
       <RateJustificationCard rn={rn} patch={patch} />
 
@@ -273,6 +275,50 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
           style={{ width: '100%', height: '70vh', border: 0, background: '#f0f0f0' }} />
       </Modal>
     </>
+  )
+}
+
+// Rates recommendation — the commission and Sales recommendation included with
+// the proposal (mirrors the New Business Finalize Offer card). Commission is
+// labelled "(intermediary)" for broker/agent-managed accounts.
+function RatesRecommendationCard({ rn, patch }: { rn: RenewalCase; patch: RenewalPhaseProps['patch'] }) {
+  const { message } = App.useApp()
+  const inter = rn.channel !== 'Direct'
+  const e = rn.proposal.edits
+  const [pct, setPct] = useState(e.commissionPct != null ? String(e.commissionPct) : inter ? '10' : '')
+  const [note, setNote] = useState(e.commissionNote ?? '')
+  const [rec, setRec] = useState(e.salesRecommendation ?? '')
+  const label = { fontSize: 12, color: 'rgba(0,0,0,0.55)', marginBottom: 4 } as const
+  return (
+    <FormSection wide
+      title={<span className="app-activity-head"><span className="app-activity-badge">2</span> Rates recommendation</span>}
+      description="The commission and the Sales recommendation included with the renewal proposal.">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div>
+          <div style={label}>Commission %{inter ? ' (intermediary)' : ''}</div>
+          <Input value={pct} onChange={(ev) => setPct(ev.target.value)} />
+        </div>
+        <div>
+          <div style={label}>Commission adjustment note</div>
+          <Input value={note} onChange={(ev) => setNote(ev.target.value)} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <div style={label}>Sales recommendation</div>
+          <Input.TextArea rows={2} value={rec} onChange={(ev) => setRec(ev.target.value)} />
+        </div>
+      </div>
+      <FormActions>
+        <Button type="primary" onClick={() => {
+          patch((x) => {
+            x.proposal.edits.commissionPct = pct.trim() === '' ? undefined : Number(pct)
+            x.proposal.edits.commissionNote = note.trim() || undefined
+            x.proposal.edits.salesRecommendation = rec.trim() || undefined
+            x.activity.push({ at: new Date().toISOString(), text: 'Updated the rates recommendation (commission / Sales recommendation).' })
+          })
+          message.success('Rates recommendation saved.')
+        }}>Save recommendation</Button>
+      </FormActions>
+    </FormSection>
   )
 }
 
