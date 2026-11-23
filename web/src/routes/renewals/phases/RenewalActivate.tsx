@@ -155,18 +155,31 @@ export function RenewalActivate(props: RenewalPhaseProps) {
             )
           })}
         </Space>
-        <FormActions note={sentToMda
-          ? `Handed over to MDA${mda.sentAt ? ` on ${formatDateTime(mda.sentAt)}` : ''}.`
-          : allAttached ? 'All documents attached — ready to send.' : 'Attach all four documents to hand over to MDA.'}>
-          {sentToMda
-            ? <Tag color="green" icon={<CheckCircleOutlined />}>Sent to MDA</Tag>
-            : <Button type="primary" icon={<SendOutlined />} disabled={!allAttached} onClick={sendToMda}>Send to MDA</Button>}
-        </FormActions>
+        {sentToMda && (
+          <Text type="secondary" style={{ display: 'block', marginTop: 12, fontSize: 12 }}>
+            Handed over to MDA{mda.sentAt ? ` on ${formatDateTime(mda.sentAt)}` : ''}.
+          </Text>
+        )}
       </FormSection>
 
-      <FormActions note={canComplete ? 'Completing does not issue a policy or activate real coverage — demo only.' : 'Activate the account and hand the document pack over to MDA to complete the renewal.'}>
-        <Button type="primary" disabled={!canComplete} onClick={complete}>Complete renewal</Button>
-      </FormActions>
+      {/* Floating action bar — Send to MDA + Complete renewal. */}
+      <div className="app-form-floatbar">
+        <Text type="secondary">
+          {canComplete
+            ? 'Completing does not issue a policy or activate real coverage — demo only.'
+            : !activated
+              ? 'Activate the renewed account, then hand the document pack over to MDA.'
+              : !sentToMda
+                ? (allAttached ? 'All documents attached — send the pack to MDA.' : 'Attach all four documents to hand over to MDA.')
+                : 'Ready to complete.'}
+        </Text>
+        <div className="app-form-floatbar__actions">
+          {sentToMda
+            ? <Tag color="green" icon={<CheckCircleOutlined />}>Sent to MDA</Tag>
+            : <Button icon={<SendOutlined />} disabled={!allAttached} onClick={sendToMda}>Send to MDA</Button>}
+          <Button type="primary" disabled={!canComplete} onClick={complete}>Complete renewal</Button>
+        </div>
+      </div>
     </>
   )
 }
