@@ -206,6 +206,8 @@ export interface ProposalEdits {
   principal?: number
   benefitNote?: string
   message?: string
+  /** Justification narrative for the recommended rate change (defaults to the rate sheet's note). */
+  rateJustification?: string
 }
 
 export type RenewalDecision = 'accepted' | 'not_renewing' | null
@@ -220,6 +222,9 @@ export interface RenewalProposal {
   rounds: { at: string; text: string }[]
   acceptedVersion?: number
   acceptedAt?: string
+  /** The signed current-year SOB has been imported into the proposal package. */
+  sobImported?: boolean
+  sobImportedAt?: string
 }
 
 export interface MemberData {
@@ -826,6 +831,16 @@ export function doSelectRateVersion(rn: RenewalCase, version: number, silent = f
   if (!sheet || rn.rates.response?.version === version) return
   rn.rates.response = sheet
   if (!silent) log(rn, `Selected Actuarial rate sheet v${version} (+${sheet.pct}% overall).`)
+}
+/** Import the signed current-year SOB into the proposal package (simulated). */
+export function doImportCurrentSob(rn: RenewalCase, silent = false) {
+  if (rn.proposal.sobImported) return
+  rn.proposal.sobImported = true
+  rn.proposal.sobImportedAt = stamp()
+  if (!silent) {
+    addDoc(rn, `Current SOB — ${rn.currentSob}`, 'Proposal')
+    log(rn, `Imported the signed current-year SOB (${rn.currentSob}) into the renewal proposal package.`)
+  }
 }
 export function doSendProposal(rn: RenewalCase, silent = false) {
   const v = rn.proposal.versions.length + 1

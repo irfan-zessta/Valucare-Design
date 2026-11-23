@@ -8,17 +8,17 @@
 // (reason + advisory, path closed — no cancellation performed).
 // ===========================================================================
 import { useState } from 'react'
-import { App, Button, Collapse, DatePicker, Form, Input, InputNumber, Modal, Table, Tag, Timeline, Typography } from 'antd'
-import { CheckOutlined, EditOutlined, FileTextOutlined } from '@ant-design/icons'
+import { App, Button, Collapse, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Table, Tag, Timeline, Typography } from 'antd'
+import { CheckCircleOutlined, CheckOutlined, DownloadOutlined, EditOutlined, FileTextOutlined, ImportOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso } from '../../../lib/format'
 import {
-  doRecordDecision, doReviseRates, doSendProposal, pctChange, recipientOf,
+  doImportCurrentSob, doRecordDecision, doReviseRates, doSendProposal, pctChange, recipientOf,
   type RenewalCase,
 } from '../../../domain/renewal'
-import { SimNote, type RenewalPhaseProps } from '../shared'
+import { SimNote, downloadDoc, type RenewalPhaseProps } from '../shared'
 
 const { Text, Paragraph } = Typography
 
@@ -87,16 +87,63 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         />
         <FormActions note={`Recipient: ${recipientOf(rn)} — ${rn.channel === 'Direct' ? 'sent to the client contact' : 'sent to the recorded intermediary'}.`}>
           <Button icon={<EditOutlined />} onClick={() => { editForm.setFieldsValue({ from: dayjs(rn.renewal.from), to: dayjs(rn.renewal.to), principal: proposed, benefitNote: rn.proposal.edits.benefitNote || '', message: rn.proposal.edits.message || "We're pleased to present your corporate renewal terms for the coming year." }); setEditOpen(true) }}>Quick edits</Button>
-          <Button icon={<FileTextOutlined />} onClick={() => preview('proposal')}>Preview proposal</Button>
         </FormActions>
       </FormSection>
+
+      <FormSection wide title="Import current SOB"
+        description="Bring the signed current-year SOB into the proposal package so the proposal is built against the client's actual current benefits. The final renewal SOB is prepared in Renewal Setup."
+        extra={rn.proposal.sobImported ? <Tag color="green" icon={<CheckCircleOutlined />}>Imported</Tag> : <Tag>Not imported</Tag>}>
+        {rn.proposal.sobImported ? (
+          <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered
+            items={[
+              { key: 'sob', label: 'Current SOB', children: rn.currentSob },
+              { key: 'mbl', label: 'MBL', children: formatPeso(rn.mbl) },
+              { key: 'at', label: 'Imported', children: rn.proposal.sobImportedAt ? formatDateTime(rn.proposal.sobImportedAt) : '—' },
+            ]} />
+        ) : (
+          <>
+            <SimNote>The signed current-year SOB ({rn.currentSob}) is on file for this account. Import it to attach it to the proposal package (simulated).</SimNote>
+            <FormActions>
+              <Button type="primary" icon={<ImportOutlined />} onClick={() => { patch((x) => doImportCurrentSob(x)); message.success('Current SOB imported into the proposal package.') }}>Import current SOB</Button>
+            </FormActions>
+          </>
+        )}
+      </FormSection>
+
+      <FormSection wide title="Rate recommendation"
+        description="The Actuarial-recommended renewal rates included in the proposal, taken from the selected rate sheet."
+        extra={<Tag color="blue">rate sheet v{rr.version}</Tag>}>
+        <Table size="small" pagination={false} rowKey="line"
+          dataSource={[
+            { line: 'Principal rate', current: rn.currentPremium.principal, rec: proposed },
+            { line: 'Dependent rate', current: rn.currentPremium.dependent, rec: rr.dependentRecommended },
+          ]}
+          columns={[
+            { title: 'Line', dataIndex: 'line', key: 'line' },
+            { title: 'Current', dataIndex: 'current', key: 'current', align: 'right', render: (v) => formatPeso(v) },
+            { title: 'Recommended', dataIndex: 'rec', key: 'rec', align: 'right', render: (v) => <b>{formatPeso(v)}</b> },
+            { title: 'Change', key: 'chg', align: 'right', render: (_, row) => <Tag color="gold">+{pctChange(row.current, row.rec)}%</Tag> },
+          ]} />
+        <Descriptions column={{ xs: 1, sm: 2 }} size="small" style={{ marginTop: 12 }}
+          items={[
+            { key: 'mbl', label: 'MBL / plan', children: `${formatPeso(rr.mbl)} · ${rr.plan}` },
+            { key: 'pct', label: 'Overall change', children: `+${rr.pct}%` },
+          ]} />
+        <FormActions note="The full rate sheet (room & board tiers, before/with VAT) lives in Renewal Data & Pricing.">
+          <Button onClick={() => goPhase('review')}>View full rate sheet ›</Button>
+        </FormActions>
+      </FormSection>
+
+      <RateJustificationCard rn={rn} patch={patch} />
 
       <FormSection wide title="Send & record decision" extra={latest ? <Tag color="blue">Sent v{latest.v}</Tag> : null}>
         {!latest ? (
           <>
-            <Paragraph>The Account Manager sends the proposal to {recipientOf(rn)} — {rn.channel === 'Direct' ? 'the client contact' : 'through the broker for this broker-managed account'}. A version and timestamp are recorded so negotiation history is never lost.</Paragraph>
+            <Paragraph>With the proposal prepared, the Account Manager can send it directly to {recipientOf(rn)} — {rn.channel === 'Direct' ? 'the client contact' : 'through the broker for this broker-managed account'} — or generate it as a PDF to share manually. A version and timestamp are recorded on send so negotiation history is never lost.</Paragraph>
             <FormActions>
-              <Button type="primary" onClick={() => { patch((x) => doSendProposal(x)); message.success('Proposal sent (simulated).') }}>Send proposal</Button>
+              <Button icon={<FileTextOutlined />} onClick={() => preview('proposal')}>Preview proposal</Button>
+              <Button icon={<DownloadOutlined />} onClick={() => { downloadDoc('proposal', rn); message.success('Proposal PDF generated (sample).') }}>Generate proposal PDF</Button>
+              <Button type="primary" onClick={() => { patch((x) => doSendProposal(x)); message.success('Proposal sent to the client (simulated).') }}>Send to client</Button>
             </FormActions>
           </>
         ) : rn.proposal.decision === 'accepted' ? (
@@ -198,6 +245,32 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         <Text type="secondary" style={{ fontSize: 12 }}>This marks the renewal “Not renewed”. It does <b>not</b> cancel the existing cover or perform any termination.</Text>
       </Modal>
     </>
+  )
+}
+
+// Rate justification — the narrative Sales includes in the proposal explaining
+// the recommended change. Defaults to Actuarial's pricing note; editable.
+function RateJustificationCard({ rn, patch }: { rn: RenewalCase; patch: RenewalPhaseProps['patch'] }) {
+  const { message } = App.useApp()
+  const fallback = rn.rates.response?.note ?? ''
+  const [text, setText] = useState(rn.proposal.edits.rateJustification ?? fallback)
+  const saved = rn.proposal.edits.rateJustification ?? fallback
+  return (
+    <FormSection wide title="Rate justification"
+      description="Explain the recommended change for the client. Defaults to Actuarial's pricing note — edit as needed. Included in the proposal and the generated PDF.">
+      <Input.TextArea rows={4} value={text} onChange={(e) => setText(e.target.value)}
+        placeholder="Why the recommended rates are fair and justified for the client." />
+      <FormActions>
+        <Button type="primary" disabled={!text.trim() || text.trim() === saved.trim()}
+          onClick={() => {
+            patch((x) => {
+              x.proposal.edits.rateJustification = text.trim()
+              x.activity.push({ at: new Date().toISOString(), text: 'Updated the rate justification for the proposal.' })
+            })
+            message.success('Rate justification saved.')
+          }}>Save justification</Button>
+      </FormActions>
+    </FormSection>
   )
 }
 
