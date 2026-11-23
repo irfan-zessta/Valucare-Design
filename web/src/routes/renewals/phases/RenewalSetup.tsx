@@ -153,9 +153,9 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
         )}
       </FormSection>
 
-      <FormActions>
-        <Button type="primary" onClick={() => goPhase('contract')}>Continue to Contract, KYC & Notarization ›</Button>
-      </FormActions>
+      <div className="rnw-float-cta">
+        <Button type="primary" size="large" onClick={() => goPhase('contract')}>Continue to Contract, KYC & Notarization ›</Button>
+      </div>
 
       {/* Add / edit plan code */}
       <Modal title={planModal?.index === null ? 'Add Plan Code' : 'Edit Plan Code'} open={!!planModal}
