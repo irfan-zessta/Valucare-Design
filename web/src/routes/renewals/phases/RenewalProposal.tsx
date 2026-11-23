@@ -7,7 +7,7 @@
 // (→ revised Actuarial rate sheet + new version, v1 retained), or Not renewing
 // (reason + advisory, path closed — no cancellation performed).
 // ===========================================================================
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { App, Button, Collapse, DatePicker, Form, Input, InputNumber, Modal, Space, Table, Tag, Timeline, Typography } from 'antd'
 import { CheckCircleOutlined, CheckOutlined, DownloadOutlined, EditOutlined, EyeOutlined, FileTextOutlined, ImportOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -19,8 +19,11 @@ import {
   type RenewalCase,
 } from '../../../domain/renewal'
 import { SimNote, downloadDoc, type RenewalPhaseProps } from '../shared'
-import { buildRenewalSobHtml } from '../renewalSobDocument'
+import { renewalSobDraft } from '../renewalSobDocument'
+import { buildSobDocumentHtml } from '../../workareas/sob/sobDocument'
+import { SobBuilder } from '../../workareas/sob/SobBuilder'
 import { ProposalRateSchedule, sampleRateSchedule } from '../../workareas/ProposalRateSchedule'
+import type { Case, SobDraft } from '../../../domain/types'
 import valucareLogo from '../../../assets/valucare-logo.png'
 
 const { Text, Paragraph } = Typography
@@ -40,21 +43,31 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
   const [sobPreview, setSobPreview] = useState(false)
   const [rateSheetOpen, setRateSheetOpen] = useState(false)
   const previewFrameRef = useRef<HTMLIFrameElement>(null)
-  const inlineFrameRef = useRef<HTMLIFrameElement>(null)
   const [editForm] = Form.useForm()
   const [changeForm] = Form.useForm()
   const [nrForm] = Form.useForm()
 
-  // The current SOB rendered as the formal, client-facing YaluCare document.
-  const sobDocHtml = useMemo(() => buildRenewalSobHtml(rn, valucareLogo), [rn])
+  // The editable imported SOB (rich document model). Lazily initialised from the
+  // renewal case the first time the SOB is imported (and for cases imported
+  // before this field existed).
+  const sobDraft = rn.proposal.importedSob
+  useEffect(() => {
+    if (rn.proposal.sobImported && !rn.proposal.importedSob) {
+      patch((x) => { x.proposal.importedSob = renewalSobDraft(x) })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rn.proposal.sobImported, rn.proposal.importedSob])
+  // Bridge SobBuilder's immutable patchSob onto the renewal case's mutate-a-clone patch.
+  const patchSob = (recipe: (s: SobDraft) => SobDraft) =>
+    patch((x) => { x.proposal.importedSob = recipe(x.proposal.importedSob ?? renewalSobDraft(x)) })
+
+  // The imported SOB rendered as the formal client-facing YaluCare document (for preview/print).
+  const sobDocHtml = useMemo(
+    () => buildSobDocumentHtml(sobDraft ?? renewalSobDraft(rn), valucareLogo, rn.name),
+    [sobDraft, rn],
+  )
   function printSobDocument() {
     const win = previewFrameRef.current?.contentWindow
-    if (!win) return
-    win.focus()
-    win.print()
-  }
-  function printInline() {
-    const win = inlineFrameRef.current?.contentWindow
     if (!win) return
     win.focus()
     win.print()
@@ -147,21 +160,19 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                Imported{rn.proposal.sobImportedAt ? ` ${formatDateTime(rn.proposal.sobImportedAt)}` : ''} · {rn.currentSob} · MBL {formatPeso(rn.mbl)}
+                Imported{rn.proposal.sobImportedAt ? ` ${formatDateTime(rn.proposal.sobImportedAt)}` : ''} · {rn.currentSob} · MBL {formatPeso(rn.mbl)} · edit the benefits inline below
               </Text>
-              <Space>
-                <Button size="small" icon={<DownloadOutlined />} onClick={printInline}>Print / Save as PDF</Button>
-                <Button size="small" icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>Open full screen</Button>
-              </Space>
+              <Button size="small" icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>Preview / print document</Button>
             </div>
-            <iframe ref={inlineFrameRef} title="Imported SOB document" srcDoc={sobDocHtml}
-              style={{ width: '100%', height: 640, border: '1px solid #f0f0f0', borderRadius: 8, background: '#f0f0f0' }} />
+            {sobDraft && (
+              <SobBuilder c={{ id: rn.code } as Case} sob={sobDraft} patchSob={patchSob} editable showUpload={false} />
+            )}
           </>
         ) : (
           <>
-            <SimNote>The signed current-year SOB ({rn.currentSob}) is on file for this account. Import it to attach it to the proposal package and view it as the formal client-facing document (simulated).</SimNote>
+            <SimNote>The signed current-year SOB ({rn.currentSob}) is on file for this account. Import it to attach it to the proposal package and edit the benefits inline (simulated).</SimNote>
             <FormActions>
-              <Button type="primary" icon={<ImportOutlined />} onClick={() => { patch((x) => doImportCurrentSob(x)); message.success('Current SOB imported into the proposal package.') }}>Import current SOB</Button>
+              <Button type="primary" icon={<ImportOutlined />} onClick={() => { patch((x) => { doImportCurrentSob(x); x.proposal.importedSob = x.proposal.importedSob ?? renewalSobDraft(x) }); message.success('Current SOB imported into the proposal package.') }}>Import current SOB</Button>
               <Button icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>Preview SOB document</Button>
             </FormActions>
           </>

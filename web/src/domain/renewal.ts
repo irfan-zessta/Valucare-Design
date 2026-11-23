@@ -13,6 +13,8 @@
 // Corporate Renewal only (no IFG renewal, no individual SOA/age/grace rules).
 // ===========================================================================
 
+import type { SobDraft } from './types'
+
 export type RenewalChannel = 'Direct' | 'Agent' | 'Broker'
 
 /** How far a sample account has been pre-advanced so the list reads like real work. */
@@ -231,6 +233,8 @@ export interface RenewalProposal {
   /** The signed current-year SOB has been imported into the proposal package. */
   sobImported?: boolean
   sobImportedAt?: string
+  /** The imported current-year SOB, editable inline (rich document model). */
+  importedSob?: SobDraft
 }
 
 export interface MemberData {
