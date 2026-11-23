@@ -35,7 +35,7 @@ function ContractInProgress({ rn, patch, preview }: RenewalPhaseProps) {
 
   return (
     <>
-      <FormSection title="Contract progress">
+      <FormSection wide title="Contract progress">
         {!c.started ? (
           <>
             <Paragraph>Legal drafts the renewal contract and Data Sharing Agreement (DSA), then it moves through to delivery. KYC clearance precedes the print-copy release.</Paragraph>
@@ -85,7 +85,7 @@ function ContractInProgress({ rn, patch, preview }: RenewalPhaseProps) {
       </FormSection>
 
       {c.started && (
-        <FormSection title="Delivery">
+        <FormSection wide title="Delivery">
           {c.delivery ? (
             <Descriptions size="small" column={1} items={[
               { key: 'courier', label: 'Courier', children: c.delivery.courier },
@@ -133,7 +133,7 @@ function HandoffSummary({ rn }: { rn: RenewalCase }) {
     { k: 'Billing handoff', v: 'Visibility only — not connected (simulated)', tone: 'info', owner: 'Billing' },
   ]
   return (
-    <FormSection title="Handoff summary" description="A shared view of departmental progress. Outstanding items show their owner so Sales can see what still needs action.">
+    <FormSection wide title="Handoff summary" description="A shared view of departmental progress. Outstanding items show their owner so Sales can see what still needs action.">
       <Table size="small" pagination={false} rowKey="k" dataSource={rows}
         columns={[
           { title: 'Area', dataIndex: 'k', key: 'k' },
@@ -164,7 +164,7 @@ function RenewalSummary({ rn, preview }: RenewalPhaseProps) {
   }
   return (
     <>
-      <FormSection title="Renewal summary" extra={<Tag color="green" icon={<CheckCircleOutlined />}>Completed — demo</Tag>}>
+      <FormSection wide title="Renewal summary" extra={<Tag color="green" icon={<CheckCircleOutlined />}>Completed — demo</Tag>}>
         <Alert type="success" showIcon style={{ marginBottom: 12 }}
           message="Renewal processing completed — demo."
           description="Closing this tracker did not issue policies, activate member coverage, or complete any external integration." />

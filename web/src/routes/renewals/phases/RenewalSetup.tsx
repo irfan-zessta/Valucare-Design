@@ -32,7 +32,7 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
 
   if (rn.proposal.decision !== 'accepted') {
     return (
-      <FormSection>
+      <FormSection wide>
         <Paragraph>
           Renewal Setup opens once the client accepts the proposal.{' '}
           <Button type="link" style={{ paddingInline: 0 }} onClick={() => goPhase('proposal')}>Go to Proposal & Client Decision</Button>.
@@ -55,7 +55,7 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
       </Text>
 
       {/* A — Renewal SOB & Plan Codes */}
-      <FormSection title="A · Renewal SOB and Plan Codes"
+      <FormSection wide title="A · Renewal SOB and Plan Codes"
         description="Create a renewal-year version linked to the previous one — the historical SOB and plan codes are never overwritten."
         extra={s.sobStatus !== 'Not started' ? <Tag color={s.sobSigned ? 'green' : 'blue'}>{s.sobStatus}</Tag> : null}>
         {!s.sobChoice ? (
@@ -113,7 +113,7 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
       </FormSection>
 
       {/* B — Member Data & MDA handoff */}
-      <FormSection title="B · Member Data and MDA handoff"
+      <FormSection wide title="B · Member Data and MDA handoff"
         description="Load a masked comparison of the renewal-year roster against the current one. No real file parsing or sensitive data."
         extra={s.mdaStatus !== 'Not started' ? <Tag color={s.mdaStatus === 'Acknowledged' ? 'green' : 'blue'}>{s.mdaStatus}</Tag> : null}>
         {/* The three distinct milestones, kept separate on purpose. */}
@@ -154,7 +154,7 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
       </FormSection>
 
       {/* C — CoC & KYC */}
-      <FormSection title="C · Certificate of Coverage (CoC) and KYC"
+      <FormSection wide title="C · Certificate of Coverage (CoC) and KYC"
         description="A CoC is optional temporary-cover documentation — not an automatic requirement for every renewal, and not the same as completed renewal processing.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
           <div>
@@ -187,7 +187,7 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
       </FormSection>
 
       {/* D — CRF */}
-      <FormSection title="D · Commission Rate Form (CRF) & Accounting handoff"
+      <FormSection wide title="D · Commission Rate Form (CRF) & Accounting handoff"
         extra={s.crf?.sent ? <Tag color="blue">Sent to Accounting — simulated</Tag> : null}>
         {rn.channel === 'Direct' && <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 8 }}>This account is Direct business — no intermediary commission applies. The CRF step is shown for completeness.</Text>}
         {!s.sobSigned ? (

@@ -33,7 +33,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
 
   if (!rn.rates.response) {
     return (
-      <FormSection>
+      <FormSection wide>
         <Paragraph>
           Prepare renewal reports and obtain the sample rate sheet first.{' '}
           <Button type="link" style={{ paddingInline: 0 }} onClick={() => goPhase('review')}>Go to Renewal Data & Pricing</Button>.
@@ -66,7 +66,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
 
   return (
     <>
-      <FormSection title="Current year vs renewal year"
+      <FormSection wide title="Current year vs renewal year"
         description="Prefilled from the selected rate sheet, account details and current SOB. Unchanged items are labelled “No change”.">
         <Table size="small" pagination={false} rowKey="k" dataSource={comparisonRows}
           columns={[
@@ -90,7 +90,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         </FormActions>
       </FormSection>
 
-      <FormSection title="Send & record decision" extra={latest ? <Tag color="blue">Sent v{latest.v}</Tag> : null}>
+      <FormSection wide title="Send & record decision" extra={latest ? <Tag color="blue">Sent v{latest.v}</Tag> : null}>
         {!latest ? (
           <>
             <Paragraph>Send the proposal as a simulated email. A version and timestamp are recorded so negotiation history is never lost.</Paragraph>
