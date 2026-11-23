@@ -258,8 +258,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
   // The formal SOB document HTML, rebuilt whenever the SOB changes.
   const sobDocHtml = useMemo(
-    () => (sob && isRichSob(sob) ? buildSobDocumentHtml(c, sob, valucareLogo) : ''),
-    [c, sob],
+    () => (sob && isRichSob(sob) ? buildSobDocumentHtml(sob, valucareLogo, c.company?.name) : ''),
+    [c.company?.name, sob],
   )
   function printSobDocument() {
     const win = previewFrameRef.current?.contentWindow

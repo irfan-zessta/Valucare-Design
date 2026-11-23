@@ -7,9 +7,9 @@
 // (→ revised Actuarial rate sheet + new version, v1 retained), or Not renewing
 // (reason + advisory, path closed — no cancellation performed).
 // ===========================================================================
-import { useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { App, Button, Collapse, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Table, Tag, Timeline, Typography } from 'antd'
-import { CheckCircleOutlined, CheckOutlined, DownloadOutlined, EditOutlined, FileTextOutlined, ImportOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, CheckOutlined, DownloadOutlined, EditOutlined, EyeOutlined, FileTextOutlined, ImportOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
@@ -19,6 +19,8 @@ import {
   type RenewalCase,
 } from '../../../domain/renewal'
 import { SimNote, downloadDoc, type RenewalPhaseProps } from '../shared'
+import { buildRenewalSobHtml } from '../renewalSobDocument'
+import valucareLogo from '../../../assets/valucare-logo.png'
 
 const { Text, Paragraph } = Typography
 
@@ -27,9 +29,20 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
   const [editOpen, setEditOpen] = useState(false)
   const [changesOpen, setChangesOpen] = useState(false)
   const [notRenewOpen, setNotRenewOpen] = useState(false)
+  const [sobPreview, setSobPreview] = useState(false)
+  const previewFrameRef = useRef<HTMLIFrameElement>(null)
   const [editForm] = Form.useForm()
   const [changeForm] = Form.useForm()
   const [nrForm] = Form.useForm()
+
+  // The current SOB rendered as the formal, client-facing YaluCare document.
+  const sobDocHtml = useMemo(() => buildRenewalSobHtml(rn, valucareLogo), [rn])
+  function printSobDocument() {
+    const win = previewFrameRef.current?.contentWindow
+    if (!win) return
+    win.focus()
+    win.print()
+  }
 
   if (!rn.rates.response) {
     return (
@@ -108,6 +121,9 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
             </FormActions>
           </>
         )}
+        <FormActions note="Renders the current SOB as the formal client-facing YaluCare document — preview and save as PDF.">
+          <Button icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>Preview SOB document</Button>
+        </FormActions>
       </FormSection>
 
       <FormSection wide title="Rate recommendation"
@@ -243,6 +259,18 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
           </Form.Item>
         </Form>
         <Text type="secondary" style={{ fontSize: 12 }}>This marks the renewal “Not renewed”. It does <b>not</b> cancel the existing cover or perform any termination.</Text>
+      </Modal>
+
+      {/* SOB document preview (formal client-facing YaluCare layout) */}
+      <Modal title="Schedule of Benefits — document preview" open={sobPreview} width={860}
+        mask={{ closable: false }} styles={{ body: { padding: 0 } }}
+        onCancel={() => setSobPreview(false)}
+        footer={[
+          <Button key="print" icon={<DownloadOutlined />} onClick={printSobDocument}>Print / Save as PDF</Button>,
+          <Button key="close" type="primary" onClick={() => setSobPreview(false)}>Close</Button>,
+        ]}>
+        <iframe ref={previewFrameRef} title="SOB document preview" srcDoc={sobDocHtml}
+          style={{ width: '100%', height: '70vh', border: 0, background: '#f0f0f0' }} />
       </Modal>
     </>
   )

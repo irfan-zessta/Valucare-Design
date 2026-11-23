@@ -13,7 +13,7 @@
 //   · a branded footer (program · coverage year · company)
 // ===========================================================================
 import dayjs from 'dayjs'
-import type { Case, SobBenefitLine, SobDraft, SobSection } from '../../../domain/types'
+import type { SobBenefitLine, SobDraft, SobSection } from '../../../domain/types'
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch] as string)
@@ -94,9 +94,9 @@ function sectionBlock(sec: SobSection): string {
   )
 }
 
-export function buildSobDocumentHtml(c: Case, sob: SobDraft, logoUrl: string): string {
+export function buildSobDocumentHtml(sob: SobDraft, logoUrl: string, fallbackCompany?: string): string {
   const h = sob.header ?? ({} as NonNullable<SobDraft['header']>)
-  const company = h.companyName || c.company?.name || 'Company'
+  const company = h.companyName || fallbackCompany || 'Company'
   const applicability = h.applicability || 'Principal & Dependent'
   const titleCompany = `${company}${applicability ? ` (${applicability})` : ''}`
   const year = h.currentEffectiveDate ? dayjs(h.currentEffectiveDate).year() : dayjs().year()
