@@ -13,10 +13,9 @@ import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso, formatCount } from '../../../lib/format'
 import {
-  EXTRACT_KEYS, EXTRACT_META, doPullAllExtracts, doReceiveExtract,
-  doRequestExtract, doRequestRates, doReviseRates, doSelectRateVersion, doUseRateResponse,
-  extractsReceivedCount, extractsRequested, pctChange, reportsReady,
-  type ExtractKey, type RateResponse, type RenewalCase,
+  doPullAllExtracts, doRequestRates, doReviseRates, doSelectRateVersion, doUseRateResponse,
+  pctChange, reportsReady,
+  type RateResponse, type RenewalCase,
 } from '../../../domain/renewal'
 import { MiniChart, SimNote, StatCard, StatCards, UtilBar, downloadDoc, type DocKind, type RenewalPhaseProps } from '../shared'
 
@@ -35,25 +34,6 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
   const rr = rn.rates.response
 
   const ready = reportsReady(rn)
-  const anyRequested = extractsRequested(rn)
-  const receivedCount = extractsReceivedCount(rn)
-
-  // Each extract is a request to a different team; the detail line shows the
-  // returned figure once that team has responded, otherwise what's being pulled.
-  const detailFor = (key: ExtractKey): string => {
-    const received = r.extracts[key].status === 'received'
-    if (key === 'members') {
-      return received && r.memberSummary
-        ? `${formatCount(r.memberSummary.retained)} retained · +${formatCount(r.memberSummary.added)} · −${formatCount(r.memberSummary.removed)}`
-        : `${formatCount(rn.members.principal)} principals · ${formatCount(rn.members.dependent)} dependents (masked)`
-    }
-    if (key === 'claims') {
-      return received ? `${formatPeso(r.claimsBilled!)} settled & billed` : 'Settled and billed claims'
-    }
-    return received ? `${formatPeso(r.ccdEstimate!)} estimated availments` : 'Estimated availments (not settled)'
-  }
-
-  const extractRows = EXTRACT_KEYS.map((key) => ({ key, meta: EXTRACT_META[key], ex: r.extracts[key] }))
 
   // The phase's single forward action, surfaced in the floating bar (consistent
   // with the New Business flows). Which one shows depends on how far the case is.
@@ -93,61 +73,25 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
       </FormSection>
 
       <FormSection wide title="Renewal data extracts"
-        description="Each extract is a data request to a different team — MDA, Claims and CCD. Request each one (or all at once), then load each team's response as it comes back. No manual ICT request, no spreadsheet assembly."
+        description="One click pulls the Member Data, claims and CCD extracts straight from their teams — MDA, Claims and CCD. No manual ICT request, no spreadsheet assembly."
         extra={
           ready ? <Tag color="green" icon={<CheckCircleOutlined />}>All extracts received</Tag>
             : (
-              <Space>
-                {anyRequested && <Tag color="gold">{receivedCount}/{EXTRACT_KEYS.length} received</Tag>}
-                <Button type="primary" size="small" icon={<CloudDownloadOutlined />}
-                  onClick={() => { patch((x) => doPullAllExtracts(x)); message.success('Pulled renewal data extracts from MDA, Claims and CCD.') }}>
-                  Pull reports
-                </Button>
-              </Space>
+              <Button type="primary" size="small" icon={<CloudDownloadOutlined />}
+                onClick={() => { patch((x) => doPullAllExtracts(x)); message.success('Pulled renewal data extracts from MDA, Claims and CCD.') }}>
+                Pull reports
+              </Button>
             )
         }>
-        {!anyRequested && (
-          <SimNote>One click pulls all three extracts — Member Data, claims and CCD — from their teams. You can still request and load each one individually in the table below if you prefer.</SimNote>
+        {!ready && (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="No extracts pulled yet. Use Pull reports to bring in the Member Data, claims and CCD figures.">
+            <Button type="primary" icon={<CloudDownloadOutlined />}
+              onClick={() => { patch((x) => doPullAllExtracts(x)); message.success('Pulled renewal data extracts from MDA, Claims and CCD.') }}>
+              Pull reports
+            </Button>
+          </Empty>
         )}
-        <Table<typeof extractRows[number]> size="small" pagination={false} rowKey="key" dataSource={extractRows}
-          columns={[
-            {
-              title: 'Extract', key: 'name',
-              render: (_, row) => (
-                <div>
-                  <div style={{ fontWeight: 500 }}>{row.meta.name}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>
-                    {row.ex.status === 'none'
-                      ? `From ${row.meta.teamFull}`
-                      : `${row.meta.teamFull} · ${row.ex.ref}`}
-                  </div>
-                </div>
-              ),
-            },
-            { title: 'Detail', key: 'detail', render: (_, row) => <Text type="secondary">{detailFor(row.key)}</Text> },
-            {
-              title: 'Status', key: 'status',
-              render: (_, row) =>
-                row.ex.status === 'received'
-                  ? <Tag color="green" icon={<CheckCircleOutlined />}>Received</Tag>
-                  : row.ex.status === 'requested'
-                  ? <Tooltip title={`Requested ${row.ex.requestedAt ? formatDate(row.ex.requestedAt) : ''} by ${row.ex.requestedBy ?? 'Renewal Officer'} · typical turnaround ${row.meta.slaDays} working days`}>
-                      <Tag color="gold">Requested — {row.meta.team}</Tag>
-                    </Tooltip>
-                  : <Tag>Not requested</Tag>,
-            },
-            {
-              title: '', key: 'action', align: 'right',
-              render: (_, row) =>
-                row.ex.status === 'none'
-                  ? <Button size="small" onClick={() => { patch((x) => doRequestExtract(x, row.key)); message.success(`Requested from ${row.meta.teamFull}.`) }}>Request</Button>
-                  : row.ex.status === 'requested'
-                  ? <Tooltip title={`Simulate ${row.meta.teamFull} returning the data.`}>
-                      <Button size="small" type="primary" onClick={() => { patch((x) => doReceiveExtract(x, row.key)); message.success(`${row.meta.team} response loaded.`) }}>Load {row.meta.team} response</Button>
-                    </Tooltip>
-                  : <Text type="secondary" style={{ fontSize: 12 }}>Received {row.ex.receivedAt ? formatDate(row.ex.receivedAt) : ''}</Text>,
-            },
-          ]} />
 
         {ready ? (
           <>
