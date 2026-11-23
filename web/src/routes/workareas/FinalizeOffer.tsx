@@ -10,7 +10,7 @@
 //   5. Accept    — record acceptance and move on to Set Up Account.
 // Revise creates a fresh draft version; earlier approvals stay in history.
 // ===========================================================================
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   Alert,
@@ -61,6 +61,9 @@ import { uid } from '../../domain/ids'
 import { ProposalRateSchedule, emptyRateSchedule, sampleRateSchedule } from './ProposalRateSchedule'
 import { SobBuilder } from './sob/SobBuilder'
 import { emptyRichSob, isRichSob } from '../../domain/sobModel'
+import { buildSobDocumentHtml } from './sob/sobDocument'
+import { wesupportReferenceSob } from './sob/wesupportSample'
+import valucareLogo from '../../assets/valucare-logo.png'
 
 const CHANNELS = ['Email', 'Call', 'Meeting', 'Through intermediary']
 
@@ -219,6 +222,9 @@ export function FinalizeOffer({ c }: { c: Case }) {
   // Inline customization of the rates recommendation / justification outside the draft stage.
   const [editRates, setEditRates] = useState(false)
   const [editJustification, setEditJustification] = useState(false)
+  // SOB document preview (formal, client-facing layout) + print.
+  const [sobPreview, setSobPreview] = useState(false)
+  const previewFrameRef = useRef<HTMLIFrameElement>(null)
 
   function patchProposal(recipe: (p: ProposalVersion) => ProposalVersion, extra?: (c: Case) => Case) {
     patchCase(c.id, (prev) => {
@@ -240,6 +246,26 @@ export function FinalizeOffer({ c }: { c: Case }) {
   }
   function setSobLines(lines: SobLine[]) {
     patchSob((s) => ({ ...s, lines }))
+  }
+
+  // Fill the builder with the reference WESUPPORT (Dependent) content so the
+  // document preview matches the supplied reference. Only on a fresh draft.
+  function loadReferenceSob() {
+    const ref = wesupportReferenceSob()
+    patchSob((s) => ({ ...s, ...ref }))
+    message.success('Reference SOB content loaded (WESUPPORT · Dependent).')
+  }
+
+  // The formal SOB document HTML, rebuilt whenever the SOB changes.
+  const sobDocHtml = useMemo(
+    () => (sob && isRichSob(sob) ? buildSobDocumentHtml(c, sob, valucareLogo) : ''),
+    [c, sob],
+  )
+  function printSobDocument() {
+    const win = previewFrameRef.current?.contentWindow
+    if (!win) return
+    win.focus()
+    win.print()
   }
 
   // ---- Full document builder ------------------------------------------------
@@ -1034,6 +1060,14 @@ export function FinalizeOffer({ c }: { c: Case }) {
             4,
             'SOB creation',
             <Space>
+              <Button size="small" type="primary" icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>
+                Preview document
+              </Button>
+              {sobEditable && (
+                <Button size="small" onClick={loadReferenceSob}>
+                  Load reference content
+                </Button>
+              )}
               <Button size="small" icon={<DownloadOutlined />} onClick={downloadSobTemplate}>
                 Download template
               </Button>
@@ -1610,6 +1644,39 @@ export function FinalizeOffer({ c }: { c: Case }) {
           value={reviseReason}
           onChange={(e) => setReviseReason(e.target.value)}
         />
+      </Modal>
+
+      {/* ---- SOB document preview (formal client-facing layout) ------------ */}
+      <Modal
+        open={sobPreview}
+        width={860}
+        title="Summary of Benefits — document preview"
+        onCancel={() => setSobPreview(false)}
+        mask={{ closable: false }}
+        styles={{ body: { padding: 0 } }}
+        footer={[
+          <Button key="print" icon={<DownloadOutlined />} onClick={printSobDocument}>
+            Print / Save as PDF
+          </Button>,
+          <Button key="close" type="primary" onClick={() => setSobPreview(false)}>
+            Close
+          </Button>,
+        ]}
+      >
+        {sobDocHtml ? (
+          <iframe
+            ref={previewFrameRef}
+            title="SOB document preview"
+            srcDoc={sobDocHtml}
+            style={{ width: '100%', height: '70vh', border: 0, background: '#f0f0f0' }}
+          />
+        ) : (
+          <div style={{ padding: 24 }}>
+            <Typography.Text type="secondary">
+              Build the Summary of Benefits above (or load the reference content) to preview the document.
+            </Typography.Text>
+          </div>
+        )}
       </Modal>
     </div>
   )
