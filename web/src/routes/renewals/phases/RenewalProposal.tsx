@@ -20,6 +20,7 @@ import {
 } from '../../../domain/renewal'
 import { SimNote, downloadDoc, type RenewalPhaseProps } from '../shared'
 import { buildRenewalSobHtml } from '../renewalSobDocument'
+import { ProposalRateSchedule, sampleRateSchedule } from '../../workareas/ProposalRateSchedule'
 import valucareLogo from '../../../assets/valucare-logo.png'
 
 const { Text, Paragraph } = Typography
@@ -30,6 +31,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
   const [changesOpen, setChangesOpen] = useState(false)
   const [notRenewOpen, setNotRenewOpen] = useState(false)
   const [sobPreview, setSobPreview] = useState(false)
+  const [rateSheetOpen, setRateSheetOpen] = useState(false)
   const previewFrameRef = useRef<HTMLIFrameElement>(null)
   const [editForm] = Form.useForm()
   const [changeForm] = Form.useForm()
@@ -79,6 +81,32 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
 
   return (
     <>
+      {/* 1 — Recommended renewal rates (list view; View opens the rate sheet) */}
+      <FormSection wide title="Recommended renewal rates"
+        description="The Actuarial-recommended renewal rates included in the proposal, taken from the selected rate sheet."
+        extra={<Tag color="blue">rate sheet v{rr.version}</Tag>}>
+        <Table size="small" pagination={false} rowKey="line"
+          dataSource={[
+            { line: 'Principal rate', current: rn.currentPremium.principal, rec: proposed },
+            { line: 'Dependent rate', current: rn.currentPremium.dependent, rec: rr.dependentRecommended },
+          ]}
+          columns={[
+            { title: 'Line', dataIndex: 'line', key: 'line' },
+            { title: 'Current', dataIndex: 'current', key: 'current', align: 'right', render: (v) => formatPeso(v) },
+            { title: 'Recommended', dataIndex: 'rec', key: 'rec', align: 'right', render: (v) => <b>{formatPeso(v)}</b> },
+            { title: 'Change', key: 'chg', align: 'right', render: (_, row) => <Tag color="gold">+{pctChange(row.current, row.rec)}%</Tag> },
+          ]} />
+        <Descriptions column={{ xs: 1, sm: 2 }} size="small" style={{ marginTop: 12 }}
+          items={[
+            { key: 'mbl', label: 'MBL / plan', children: `${formatPeso(rr.mbl)} · ${rr.plan}` },
+            { key: 'pct', label: 'Overall change', children: `+${rr.pct}%` },
+          ]} />
+        <FormActions note="Opens the full membership-fee rate sheet (room & board tiers, before/with VAT) from Actuarial.">
+          <Button icon={<EyeOutlined />} onClick={() => setRateSheetOpen(true)}>View rate sheet</Button>
+        </FormActions>
+      </FormSection>
+
+      {/* 2 — Current year vs renewal year */}
       <FormSection wide title="Current year vs renewal year"
         description="Prepared by the Account Specialist from the selected rate sheet and the current SOB — renewal dates, plan, room entitlement, MBL, rates, payment mode, network access and benefit notes. Changes and enhancements are highlighted; unchanged benefits carry forward.">
         <SimNote>At this stage Sales works from the <b>current SOB</b> and the proposed changes. The final renewal SOB is prepared and reviewed in the next stage, Renewal Setup.</SimNote>
@@ -103,6 +131,13 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         </FormActions>
       </FormSection>
 
+      {/* 3 — Rates recommendation */}
+      <RatesRecommendationCard rn={rn} patch={patch} />
+
+      {/* 4 — Rate justification */}
+      <RateJustificationCard rn={rn} patch={patch} />
+
+      {/* 5 — Import current SOB */}
       <FormSection wide title="Import current SOB"
         description="Bring the signed current-year SOB into the proposal package so the proposal is built against the client's actual current benefits. The final renewal SOB is prepared in Renewal Setup."
         extra={rn.proposal.sobImported ? <Tag color="green" icon={<CheckCircleOutlined />}>Imported</Tag> : <Tag>Not imported</Tag>}>
@@ -126,76 +161,29 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         </FormActions>
       </FormSection>
 
-      <FormSection wide title="Recommended renewal rates"
-        description="The Actuarial-recommended renewal rates included in the proposal, taken from the selected rate sheet."
-        extra={<Tag color="blue">rate sheet v{rr.version}</Tag>}>
-        <Table size="small" pagination={false} rowKey="line"
-          dataSource={[
-            { line: 'Principal rate', current: rn.currentPremium.principal, rec: proposed },
-            { line: 'Dependent rate', current: rn.currentPremium.dependent, rec: rr.dependentRecommended },
-          ]}
-          columns={[
-            { title: 'Line', dataIndex: 'line', key: 'line' },
-            { title: 'Current', dataIndex: 'current', key: 'current', align: 'right', render: (v) => formatPeso(v) },
-            { title: 'Recommended', dataIndex: 'rec', key: 'rec', align: 'right', render: (v) => <b>{formatPeso(v)}</b> },
-            { title: 'Change', key: 'chg', align: 'right', render: (_, row) => <Tag color="gold">+{pctChange(row.current, row.rec)}%</Tag> },
-          ]} />
-        <Descriptions column={{ xs: 1, sm: 2 }} size="small" style={{ marginTop: 12 }}
-          items={[
-            { key: 'mbl', label: 'MBL / plan', children: `${formatPeso(rr.mbl)} · ${rr.plan}` },
-            { key: 'pct', label: 'Overall change', children: `+${rr.pct}%` },
-          ]} />
-        <FormActions note="The full rate sheet (room & board tiers, before/with VAT) lives in Renewal Data & Pricing.">
-          <Button onClick={() => goPhase('review')}>View full rate sheet ›</Button>
-        </FormActions>
-      </FormSection>
+      {/* Negotiation & decision — status + history (once the proposal is sent) */}
+      {latest && (
+        <FormSection wide title="Negotiation & decision" extra={<Tag color="blue">Sent v{latest.v}</Tag>}>
+          {rn.proposal.decision === 'accepted' ? (
+            <>
+              <SimNote>Accepted proposal <b>v{rn.proposal.acceptedVersion}</b> recorded. Renewal-confirmation sent to the relevant departments — simulated. Renewal Setup covers the applicable COC/KYC, plan codes and the final renewal SOB review.</SimNote>
+              <Paragraph>A sample signed-acceptance attachment is on file. Continue to prepare the renewal year.</Paragraph>
+            </>
+          ) : rn.notRenewed ? (
+            <>
+              <div style={{ marginBottom: 8 }}><Tag color="red">Marked “Not renewed”</Tag></div>
+              <Paragraph>Reason: {rn.proposal.notRenewReason || '—'}.</Paragraph>
+              <Text type="secondary" style={{ fontSize: 12 }}>The existing cover is <b>not</b> cancelled by this demo — no termination is performed. A non-renewal advisory has been prepared.</Text>
+            </>
+          ) : (
+            <SimNote>Proposal <b>v{latest.v}</b> sent to {recipientOf(rn)} on {formatDateTime(latest.at)} — recorded, not delivered. Waiting on the {rn.channel === 'Direct' ? 'client' : 'intermediary'} to record a decision below.</SimNote>
+          )}
+          {rn.proposal.versions.length > 0 && <VersionHistory rn={rn} />}
+        </FormSection>
+      )}
 
-      <RatesRecommendationCard rn={rn} patch={patch} />
-
-      <RateJustificationCard rn={rn} patch={patch} />
-
-      <FormSection wide title="Send & record decision" extra={latest ? <Tag color="blue">Sent v{latest.v}</Tag> : null}>
-        {!latest ? (
-          <>
-            <Paragraph>With the proposal prepared, the Account Manager can send it directly to {recipientOf(rn)} — {rn.channel === 'Direct' ? 'the client contact' : 'through the broker for this broker-managed account'} — or generate it as a PDF to share manually. A version and timestamp are recorded on send so negotiation history is never lost.</Paragraph>
-            <FormActions>
-              <Button icon={<FileTextOutlined />} onClick={() => preview('proposal')}>Preview proposal</Button>
-              <Button icon={<DownloadOutlined />} onClick={() => { downloadDoc('proposal', rn); message.success('Proposal PDF generated (sample).') }}>Generate proposal PDF</Button>
-              <Button type="primary" onClick={() => { patch((x) => doSendProposal(x)); message.success('Proposal sent to the client (simulated).') }}>Send to client</Button>
-            </FormActions>
-          </>
-        ) : rn.proposal.decision === 'accepted' ? (
-          <>
-            <SimNote>Accepted proposal <b>v{rn.proposal.acceptedVersion}</b> recorded. Renewal-confirmation sent to the relevant departments — simulated. Renewal Setup covers the applicable COC/KYC, plan codes and the final renewal SOB review.</SimNote>
-            <Paragraph>A sample signed-acceptance attachment is on file. Continue to prepare the renewal year.</Paragraph>
-            <FormActions>
-              <Button icon={<FileTextOutlined />} onClick={() => preview('acceptance')}>View signed acceptance</Button>
-              <Button type="primary" onClick={() => goPhase('setup')}>Continue to Renewal Setup ›</Button>
-            </FormActions>
-          </>
-        ) : rn.notRenewed ? (
-          <>
-            <div style={{ marginBottom: 8 }}><Tag color="red">Marked “Not renewed”</Tag></div>
-            <Paragraph>Reason: {rn.proposal.notRenewReason || '—'}.</Paragraph>
-            <Text type="secondary" style={{ fontSize: 12 }}>The existing cover is <b>not</b> cancelled by this demo — no termination is performed. A non-renewal advisory has been prepared.</Text>
-            <FormActions>
-              <Button icon={<FileTextOutlined />} onClick={() => preview('advisory')}>Preview non-renewal advisory</Button>
-            </FormActions>
-          </>
-        ) : (
-          <>
-            <SimNote>Proposal <b>v{latest.v}</b> sent to {recipientOf(rn)} on {formatDateTime(latest.at)} — recorded, not delivered. Waiting on the {rn.channel === 'Direct' ? 'client' : 'intermediary'}.</SimNote>
-            <Paragraph style={{ marginTop: 8 }}>Sales handles negotiation and records the client's decision:</Paragraph>
-            <FormActions>
-              <Button type="primary" icon={<CheckOutlined />} onClick={doAccept}>Accepted</Button>
-              <Button onClick={() => { changeForm.setFieldsValue({ comment: 'Requesting a lower principal rate and clarification on dependent room entitlement.' }); setChangesOpen(true) }}>Request pricing changes</Button>
-              <Button danger onClick={() => { nrForm.setFieldsValue({ reason: 'Client consolidating cover with a group-wide provider.' }); setNotRenewOpen(true) }}>Declined (not renewing)</Button>
-            </FormActions>
-          </>
-        )}
-
-        {rn.proposal.versions.length > 0 && <VersionHistory rn={rn} />}
-      </FormSection>
+      {/* Spacer so the fixed action bar never covers the last card. */}
+      <div style={{ height: 64 }} />
 
       {/* Quick edits */}
       <Modal title="Quick edits" open={editOpen} okText="Save edits" onCancel={() => setEditOpen(false)}
@@ -274,6 +262,46 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         <iframe ref={previewFrameRef} title="SOB document preview" srcDoc={sobDocHtml}
           style={{ width: '100%', height: '70vh', border: 0, background: '#f0f0f0' }} />
       </Modal>
+
+      {/* Full membership-fee rate sheet (from Actuarial · view only) */}
+      <Modal open={rateSheetOpen} width={1100}
+        title={`Rate sheet v${rr.version} · issued ${formatDateTime(rr.at)} by Actuarial`}
+        onCancel={() => setRateSheetOpen(false)}
+        footer={[<Button key="close" type="primary" onClick={() => setRateSheetOpen(false)}>Close</Button>]}>
+        <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: 12 }}>
+          <b>Overall change +{rr.pct}%</b> · MBL {formatPeso(rr.mbl)} · {rr.plan}.{rr.note ? ` ${rr.note}` : ''}
+        </Text>
+        <ProposalRateSchedule value={sampleRateSchedule()} editable={false} />
+      </Modal>
+
+      {/* Floating action bar — proposal / decision actions, by state. */}
+      <div className="app-form-floatbar">
+        <div />
+        <div className="app-form-floatbar__actions">
+          {!latest ? (
+            <>
+              <Button icon={<FileTextOutlined />} onClick={() => preview('proposal')}>Preview proposal</Button>
+              <Button icon={<DownloadOutlined />} onClick={() => { downloadDoc('proposal', rn); message.success('Proposal PDF generated (sample).') }}>Generate proposal PDF</Button>
+              <Button type="primary" onClick={() => { patch((x) => doSendProposal(x)); message.success('Proposal sent to the client (simulated).') }}>Send to client</Button>
+            </>
+          ) : rn.proposal.decision === 'accepted' ? (
+            <>
+              <Button icon={<FileTextOutlined />} onClick={() => preview('acceptance')}>View signed acceptance</Button>
+              <Button type="primary" onClick={() => goPhase('setup')}>Continue to Renewal Setup ›</Button>
+            </>
+          ) : rn.notRenewed ? (
+            <Button icon={<FileTextOutlined />} onClick={() => preview('advisory')}>Preview non-renewal advisory</Button>
+          ) : (
+            <>
+              <Button icon={<FileTextOutlined />} onClick={() => preview('proposal')}>Preview proposal</Button>
+              <Button icon={<DownloadOutlined />} onClick={() => { downloadDoc('proposal', rn); message.success('Proposal PDF generated (sample).') }}>Generate proposal PDF</Button>
+              <Button type="primary" icon={<CheckOutlined />} onClick={doAccept}>Accepted</Button>
+              <Button onClick={() => { changeForm.setFieldsValue({ comment: 'Requesting a lower principal rate and clarification on dependent room entitlement.' }); setChangesOpen(true) }}>Request pricing changes</Button>
+              <Button danger onClick={() => { nrForm.setFieldsValue({ reason: 'Client consolidating cover with a group-wide provider.' }); setNotRenewOpen(true) }}>Declined (not renewing)</Button>
+            </>
+          )}
+        </div>
+      </div>
     </>
   )
 }
