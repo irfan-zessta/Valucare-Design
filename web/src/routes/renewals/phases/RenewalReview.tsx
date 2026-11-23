@@ -143,7 +143,6 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
             <SimNote>Sent to Actuarial — no rating engine runs here. The case is waiting on Actuarial; load a representative rate sheet to continue the demo.</SimNote>
           ) : (
             <>
-              <SimNote>Representative pricing loaded for the demo. No automatic pricing engine runs here — Actuarial remains specialist work. Open any version with <b>View</b> to see its full breakdown.</SimNote>
               <RateSheetVersions rn={rn}
                 onRequest={(reason) => { patch((x) => doReviseRates(x, false, reason)); message.success('Rate sheet request sent to Actuarial (simulated).') }}
                 onSelect={(v) => { patch((x) => doSelectRateVersion(x, v)); message.success(`Selected rate sheet v${v}.`) }} />
@@ -215,7 +214,7 @@ function RateSheetVersions({
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 12px' }}>
         <Title level={5} style={{ margin: 0 }}>Rate sheet versions ({ordered.length})</Title>
         <Button type="link" size="small" icon={<SendOutlined />} style={{ marginInlineStart: 'auto' }} onClick={() => setRequestOpen(true)}>
-          Request new rate sheet from Actuarial
+          Request new rate sheet
         </Button>
       </div>
       {ordered.length ? (
