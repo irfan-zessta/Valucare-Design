@@ -10,8 +10,8 @@
 // next step (Phase 4 — Contract, KYC & Notarization).
 // ===========================================================================
 import { useState } from 'react'
-import { App, Button, Descriptions, Form, Input, InputNumber, Modal, Select, Table, Tag, Typography } from 'antd'
-import { CheckCircleOutlined, FileTextOutlined, PlusOutlined } from '@ant-design/icons'
+import { App, Button, Descriptions, Form, Input, InputNumber, Modal, Select, Table, Tag, Typography, Upload } from 'antd'
+import { CheckCircleOutlined, FileTextOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatPeso, formatCount } from '../../../lib/format'
@@ -105,8 +105,19 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
           ]} />
 
         {!s.memberData ? (
-          <FormActions>
-            <Button type="primary" onClick={() => { patch((x) => { x.setup.memberData = sampleMemberData(); x.setup.mdaStatus = 'Loaded'; x.activity.push({ at: now(), text: 'Loaded sample Member Data comparison (masked).' }) }); message.success('Member data comparison loaded.') }}>Load renewal Member Data</Button>
+          <FormActions note="Upload a renewal-year roster or load the sample. For this demo the file is not parsed — a masked comparison is generated either way.">
+            <Upload
+              accept=".csv,.xlsx,.xls"
+              showUploadList={false}
+              beforeUpload={(file) => {
+                patch((x) => { x.setup.memberData = sampleMemberData(); x.setup.mdaStatus = 'Loaded'; x.activity.push({ at: now(), text: `Uploaded Member Data file "${file.name}" — masked comparison generated (demo; file not parsed).` }) })
+                message.success(`"${file.name}" uploaded — masked comparison generated.`)
+                return false // prevent the browser from actually uploading
+              }}
+            >
+              <Button type="primary" icon={<UploadOutlined />}>Upload Member Data</Button>
+            </Upload>
+            <Button onClick={() => { patch((x) => { x.setup.memberData = sampleMemberData(); x.setup.mdaStatus = 'Loaded'; x.activity.push({ at: now(), text: 'Loaded sample Member Data comparison (masked).' }) }); message.success('Member data comparison loaded.') }}>Load sample Member Data</Button>
           </FormActions>
         ) : (
           <>
