@@ -65,21 +65,6 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
           </FormActions>
         ) : (
           <>
-            <div style={{ marginBottom: 8 }}>
-              <Tag color={s.sobChoice === 'carry' ? 'default' : 'blue'}>{s.sobChoice === 'carry' ? 'Carried forward' : 'Updated benefits and rates'}</Tag>
-              <Text type="secondary" style={{ fontSize: 12 }}>A new renewal-year SOB version was created, linked to {rn.currentSob} (previous year retained).</Text>
-            </div>
-            <Table size="small" pagination={false} rowKey="k"
-              dataSource={[
-                { k: 'Plan / MBL', prev: `${rn.currentSob} · ${formatPeso(rn.mbl)}`, ren: `${rn.currentSob} · ${formatPeso(rn.mbl)}`, tag: s.sobChoice === 'carry' ? 'No change' : 'Updated' },
-                { k: 'Benefits check', prev: 'Configured benefits (current year)', ren: s.benefitsChecked ? 'Checked against configured benefits' : 'Not yet checked', tag: s.benefitsChecked ? 'Passed' : 'Pending' },
-                { k: 'Status', prev: 'Signed (current year)', ren: s.sobStatus, tag: '' },
-              ]}
-              columns={[
-                { title: 'Item', dataIndex: 'k', key: 'k', width: 150 },
-                { title: 'Previous', dataIndex: 'prev', key: 'prev' },
-                { title: 'Renewal', key: 'ren', render: (_, row) => <span>{row.ren}{row.tag ? <Tag style={{ marginLeft: 8 }} color={row.tag === 'No change' ? 'default' : row.tag === 'Pending' ? 'gold' : 'blue'}>{row.tag}</Tag> : null}</span> },
-              ]} />
             {/* Plan codes */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
               <Text strong>Renewal-year Plan Codes</Text>
