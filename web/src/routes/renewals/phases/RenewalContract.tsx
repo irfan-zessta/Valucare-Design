@@ -138,6 +138,16 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
     })
     message.success('Contract and DSA sent to client.')
   }
+  function fillContractSample() {
+    patch((x) => {
+      const r = { ...(x.setup.contractRecord ?? {}) }
+      if (!r.contractFile) { r.contractFile = `Renewal-Contract-${x.code}.pdf`; x.documents.push({ name: 'Renewal contract', kind: 'Contract', at: now(), sample: true }) }
+      if (!r.dsaFile) { r.dsaFile = `DSA-${x.code}.pdf`; x.documents.push({ name: 'Data Sharing Agreement (DSA)', kind: 'DSA', at: now(), sample: true }) }
+      x.setup.contractRecord = r
+      x.activity.push({ at: now(), text: 'Filled sample renewal contract and DSA (simulated).' })
+    })
+    message.success('Sample contract and DSA filled.')
+  }
   function setNotarization(stage: 'sent' | 'notarized' | 'returned') {
     patch((x) => {
       x.setup.contractRecord = { ...(x.setup.contractRecord ?? {}), notarization: stage }
@@ -302,7 +312,10 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
         <FormActions note={cr.sentToClient ? `Sent to the client ${cr.sentAt ? formatDateTime(cr.sentAt) : ''} (through the app, simulated).` : undefined}>
           {cr.sentToClient
             ? <Tag color="green" icon={<CheckCircleOutlined />}>Sent to client</Tag>
-            : <Button type="primary" disabled={!canSend} onClick={sendContractToClient}>Send contract &amp; DSA to client</Button>}
+            : <>
+                <Button onClick={fillContractSample} disabled={!!(cr.contractFile && cr.dsaFile)}>Fill sample data</Button>
+                <Button type="primary" disabled={!canSend} onClick={sendContractToClient}>Send contract &amp; DSA to client</Button>
+              </>}
         </FormActions>
 
         {/* 2 — Signed copies (optional) */}
