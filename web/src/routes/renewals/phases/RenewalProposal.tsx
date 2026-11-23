@@ -15,7 +15,7 @@ import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso } from '../../../lib/format'
 import {
-  doImportCurrentSob, doRecordDecision, doReviseRates, doSendProposal, pctChange, recipientOf,
+  doImportCurrentSob, doRecordDecision, doReviseRates, doSendProposal, pctChange,
   type RenewalCase,
 } from '../../../domain/renewal'
 import { SimNote, downloadDoc, type RenewalPhaseProps } from '../shared'
@@ -140,7 +140,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
             },
           ]}
         />
-        <FormActions note={`Recipient: ${recipientOf(rn)} — ${rn.channel === 'Direct' ? 'sent to the client contact' : 'sent to the recorded intermediary'}.`}>
+        <FormActions>
           <Button icon={<EditOutlined />} onClick={() => { editForm.setFieldsValue({ from: dayjs(rn.renewal.from), to: dayjs(rn.renewal.to), principal: proposed, benefitNote: rn.proposal.edits.benefitNote || '', message: rn.proposal.edits.message || "We're pleased to present your corporate renewal terms for the coming year." }); setEditOpen(true) }}>Quick edits</Button>
         </FormActions>
       </FormSection>
