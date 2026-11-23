@@ -14,10 +14,11 @@ import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso, formatCount } from '../../../lib/format'
 import {
   doPullAllExtracts, doRequestRates, doReviseRates, doSelectRateVersion, doUseRateResponse,
-  pctChange, reportsReady,
+  reportsReady,
   type RateResponse, type RenewalCase,
 } from '../../../domain/renewal'
 import { MiniChart, SimNote, StatCard, StatCards, UtilBar, downloadDoc, type DocKind, type RenewalPhaseProps } from '../shared'
+import { ProposalRateSchedule, sampleRateSchedule } from '../../workareas/ProposalRateSchedule'
 
 const RENEWAL_REPORTS: { kind: DocKind; label: string }[] = [
   { kind: 'utilization', label: 'Masked utilization' },
@@ -161,30 +162,18 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
   )
 }
 
-// --- Rate-sheet detail -----------------------------------------------------
-// The Principal/Dependent current→recommended breakdown plus MBL/plan, overall
-// change and the pricing explanation. Shared by the selected-sheet view in the
-// section and the per-version "View" pop-up in the drawer.
-function RateSheetDetail({ sheet }: { sheet: RateResponse }) {
+// --- Rate-sheet preview -----------------------------------------------------
+// The full Actuarial rate sheet shown in the "View" pop-up — the same detailed
+// membership-fee schedule layout used in New Business (Principal/Dependents,
+// network WITHOUT/WITH, room & board tiers, before/with VAT, payment-mode
+// toggle), prefaced by this renewal's headline change and pricing note.
+function RateSheetPreview({ sheet }: { sheet: RateResponse }) {
   return (
     <>
-      <Table size="small" pagination={false} rowKey="line"
-        dataSource={[
-          { line: 'Principal rate', current: sheet.principalCurrent, rec: sheet.principalRecommended },
-          { line: 'Dependent rate', current: sheet.dependentCurrent, rec: sheet.dependentRecommended },
-        ]}
-        columns={[
-          { title: 'Line', dataIndex: 'line', key: 'line' },
-          { title: 'Current', dataIndex: 'current', key: 'current', align: 'right', render: (v) => formatPeso(v) },
-          { title: 'Recommended', dataIndex: 'rec', key: 'rec', align: 'right', render: (v) => <b>{formatPeso(v)}</b> },
-          { title: 'Change', key: 'chg', align: 'right', render: (_, row) => <Tag color="gold">+{pctChange(row.current, row.rec)}%</Tag> },
-        ]} />
-      <Descriptions column={{ xs: 1, sm: 2 }} size="small" style={{ marginTop: 12 }}
-        items={[
-          { key: 'mbl', label: 'MBL / plan', children: `${formatPeso(sheet.mbl)} · ${sheet.plan}` },
-          { key: 'pct', label: 'Overall change', children: `+${sheet.pct}%` },
-        ]} />
-      <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 8 }}><b>Pricing explanation:</b> {sheet.note}</Text>
+      <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: 12 }}>
+        <b>Overall change +{sheet.pct}%</b> · MBL {formatPeso(sheet.mbl)} · {sheet.plan}. {sheet.note}
+      </Text>
+      <ProposalRateSchedule value={sampleRateSchedule()} editable={false} />
     </>
   )
 }
@@ -240,8 +229,8 @@ function RateSheetVersions({
         <Empty style={{ marginTop: 16 }} description="No rate sheets loaded yet." />
       )}
 
-      <Modal open={viewVersion !== null} width={680}
-        title={viewed ? `Rate sheet v${viewed.version} · issued ${formatDateTime(viewed.at)} by Actuarial` : 'Rate sheet'}
+      <Modal open={viewVersion !== null} width={1100}
+        title={viewed ? `Rate sheet v${viewed.version} · ${viewed.version === selected ? 'selected' : 'superseded'} · issued ${formatDateTime(viewed.at)} by Actuarial` : 'Rate sheet'}
         onCancel={() => setViewVersion(null)}
         footer={[
           viewed && viewed.version !== selected ? (
@@ -249,7 +238,7 @@ function RateSheetVersions({
           ) : null,
           <Button key="close" onClick={() => setViewVersion(null)}>Close</Button>,
         ]}>
-        {viewed && <RateSheetDetail sheet={viewed} />}
+        {viewed && <RateSheetPreview sheet={viewed} />}
       </Modal>
     </>
   )
