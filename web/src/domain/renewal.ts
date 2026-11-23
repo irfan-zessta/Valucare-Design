@@ -718,15 +718,17 @@ export function applyPreset(rn: RenewalCase, preset: RenewalPreset) {
   if (preset === 'not_renewed') doRecordDecision(rn, 'not_renewing', true)
   if (['accepted', 'completed'].includes(preset)) {
     doRecordDecision(rn, 'accepted', true)
+    // Setup (step 3 — SOB, plan codes and member handoff) is complete, so the
+    // case sits on step 4 (Contract, KYC & Notarization) as the active phase.
     rn.setup.sobChoice = 'carry'
-    rn.setup.sobStatus = 'Prepared'
-  }
-  if (preset === 'completed') {
     rn.setup.sobStatus = 'Signed'
     rn.setup.sobSigned = true
     rn.setup.benefitsChecked = true
+    rn.setup.planReview = true
     rn.setup.memberData = sampleMemberData()
     rn.setup.mdaStatus = 'Acknowledged'
+  }
+  if (preset === 'completed') {
     rn.setup.coc = { previewed: true, from: rn.renewal.from, to: rn.renewal.from }
     rn.setup.kyc = 'Screening cleared'
     rn.setup.crf = { sent: true, pct: 7.5 }

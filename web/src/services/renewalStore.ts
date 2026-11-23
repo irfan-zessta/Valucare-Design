@@ -12,7 +12,7 @@ import type { RenewalCase, ExtractStatus } from '../domain/renewal'
 import { EXTRACT_KEYS, RENEWAL_ACCOUNTS, renewalIdFor, seedRenewal } from '../domain/renewal'
 
 const STORE_KEY = 'hms4-renewal:v1'
-const BASELINE = 2
+const BASELINE = 3
 
 // Cases persisted before the per-team data-extract model have `reports.prepared`
 // but no `reports.extracts`. Backfill the new shape so they keep working: a
@@ -43,7 +43,9 @@ function ensureSeeded(store: RenewalStoreShape): RenewalStoreShape {
   for (const a of RENEWAL_ACCOUNTS) {
     if (a.preset === 'new') continue // belongs in Upcoming until explicitly started
     const id = renewalIdFor(a.code)
-    if (!store.cases[id]) store.cases[id] = seedRenewal(a)
+    // On a baseline bump, refresh the scripted preset cases so the demo book of
+    // work reflects the latest seed. (User-started "new" cases are never touched.)
+    store.cases[id] = seedRenewal(a)
   }
   store.seeded = BASELINE
   return store
