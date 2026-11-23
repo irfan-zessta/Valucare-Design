@@ -8,7 +8,7 @@
 // (reason + advisory, path closed — no cancellation performed).
 // ===========================================================================
 import { useMemo, useRef, useState } from 'react'
-import { App, Button, Collapse, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Space, Table, Tag, Timeline, Typography } from 'antd'
+import { App, Button, Collapse, DatePicker, Form, Input, InputNumber, Modal, Space, Table, Tag, Timeline, Typography } from 'antd'
 import { CheckCircleOutlined, CheckOutlined, DownloadOutlined, EditOutlined, EyeOutlined, FileTextOutlined, ImportOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { FormSection } from '../../../components/ui/FormSection'
@@ -40,6 +40,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
   const [sobPreview, setSobPreview] = useState(false)
   const [rateSheetOpen, setRateSheetOpen] = useState(false)
   const previewFrameRef = useRef<HTMLIFrameElement>(null)
+  const inlineFrameRef = useRef<HTMLIFrameElement>(null)
   const [editForm] = Form.useForm()
   const [changeForm] = Form.useForm()
   const [nrForm] = Form.useForm()
@@ -48,6 +49,12 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
   const sobDocHtml = useMemo(() => buildRenewalSobHtml(rn, valucareLogo), [rn])
   function printSobDocument() {
     const win = previewFrameRef.current?.contentWindow
+    if (!win) return
+    win.focus()
+    win.print()
+  }
+  function printInline() {
+    const win = inlineFrameRef.current?.contentWindow
     if (!win) return
     win.focus()
     win.print()
@@ -137,23 +144,28 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         description="Bring the signed current-year SOB into the proposal package so the proposal is built against the client's actual current benefits. The final renewal SOB is prepared in Renewal Setup."
         extra={rn.proposal.sobImported ? <Tag color="green" icon={<CheckCircleOutlined />}>Imported</Tag> : <Tag>Not imported</Tag>}>
         {rn.proposal.sobImported ? (
-          <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered
-            items={[
-              { key: 'sob', label: 'Current SOB', children: rn.currentSob },
-              { key: 'mbl', label: 'MBL', children: formatPeso(rn.mbl) },
-              { key: 'at', label: 'Imported', children: rn.proposal.sobImportedAt ? formatDateTime(rn.proposal.sobImportedAt) : '—' },
-            ]} />
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Imported{rn.proposal.sobImportedAt ? ` ${formatDateTime(rn.proposal.sobImportedAt)}` : ''} · {rn.currentSob} · MBL {formatPeso(rn.mbl)}
+              </Text>
+              <Space>
+                <Button size="small" icon={<DownloadOutlined />} onClick={printInline}>Print / Save as PDF</Button>
+                <Button size="small" icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>Open full screen</Button>
+              </Space>
+            </div>
+            <iframe ref={inlineFrameRef} title="Imported SOB document" srcDoc={sobDocHtml}
+              style={{ width: '100%', height: 640, border: '1px solid #f0f0f0', borderRadius: 8, background: '#f0f0f0' }} />
+          </>
         ) : (
           <>
-            <SimNote>The signed current-year SOB ({rn.currentSob}) is on file for this account. Import it to attach it to the proposal package (simulated).</SimNote>
+            <SimNote>The signed current-year SOB ({rn.currentSob}) is on file for this account. Import it to attach it to the proposal package and view it as the formal client-facing document (simulated).</SimNote>
             <FormActions>
               <Button type="primary" icon={<ImportOutlined />} onClick={() => { patch((x) => doImportCurrentSob(x)); message.success('Current SOB imported into the proposal package.') }}>Import current SOB</Button>
+              <Button icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>Preview SOB document</Button>
             </FormActions>
           </>
         )}
-        <FormActions note="Renders the current SOB as the formal client-facing YaluCare document — preview and save as PDF.">
-          <Button icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>Preview SOB document</Button>
-        </FormActions>
       </FormSection>
 
       {/* Negotiation & decision — status + history (once the proposal is sent) */}
