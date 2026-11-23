@@ -8,12 +8,12 @@
 // ===========================================================================
 import { useState } from 'react'
 import { App, Button, Descriptions, Drawer, Empty, Space, Table, Tag, Timeline, Tooltip, Typography } from 'antd'
-import { CheckCircleOutlined, DownloadOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, CloudDownloadOutlined, DownloadOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso, formatCount } from '../../../lib/format'
 import {
-  EXTRACT_KEYS, EXTRACT_META, doReceiveAllExtracts, doReceiveExtract, doRequestAllExtracts,
+  EXTRACT_KEYS, EXTRACT_META, doPullAllExtracts, doReceiveExtract,
   doRequestExtract, doRequestRates, doReviseRates, doSelectRateVersion, doUseRateResponse,
   extractsReceivedCount, extractsRequested, pctChange, reportsReady,
   type ExtractKey, type RateResponse, type RenewalCase,
@@ -58,15 +58,10 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
   // The phase's single forward action, surfaced in the floating bar (consistent
   // with the New Business flows). Which one shows depends on how far the case is.
   const floatAction = !ready
-    ? !anyRequested
-      ? {
-          note: 'Request the Member Data, claims and CCD extracts from their teams to begin.',
-          button: <Button type="primary" onClick={() => { patch((x) => doRequestAllExtracts(x)); message.success('Data requests sent to MDA, Claims and CCD.') }}>Request all extracts</Button>,
-        }
-      : {
-          note: `Waiting on the data teams — ${receivedCount} of ${EXTRACT_KEYS.length} responses in. Load each as it arrives.`,
-          button: <Button type="primary" onClick={() => { patch((x) => doReceiveAllExtracts(x)); message.success('Loaded all outstanding team responses.') }}>Load all responses</Button>,
-        }
+    ? {
+        note: 'Pull the Member Data, claims and CCD extracts — all three teams, in one step.',
+        button: <Button type="primary" icon={<CloudDownloadOutlined />} onClick={() => { patch((x) => doPullAllExtracts(x)); message.success('Pulled renewal data extracts from MDA, Claims and CCD.') }}>Pull reports</Button>,
+      }
     : !rn.rates.requested
     ? {
         note: '',
@@ -101,11 +96,18 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
         description="Each extract is a data request to a different team — MDA, Claims and CCD. Request each one (or all at once), then load each team's response as it comes back. No manual ICT request, no spreadsheet assembly."
         extra={
           ready ? <Tag color="green" icon={<CheckCircleOutlined />}>All extracts received</Tag>
-            : anyRequested ? <Tag color="gold">{receivedCount}/{EXTRACT_KEYS.length} received</Tag>
-            : <Tag>Not requested</Tag>
+            : (
+              <Space>
+                {anyRequested && <Tag color="gold">{receivedCount}/{EXTRACT_KEYS.length} received</Tag>}
+                <Button type="primary" size="small" icon={<CloudDownloadOutlined />}
+                  onClick={() => { patch((x) => doPullAllExtracts(x)); message.success('Pulled renewal data extracts from MDA, Claims and CCD.') }}>
+                  Pull reports
+                </Button>
+              </Space>
+            )
         }>
         {!anyRequested && (
-          <SimNote>Nothing has been requested yet. In a live system each request is routed to the owning team's queue; here you control when each response arrives.</SimNote>
+          <SimNote>One click pulls all three extracts — Member Data, claims and CCD — from their teams. You can still request and load each one individually in the table below if you prefer.</SimNote>
         )}
         <Table<typeof extractRows[number]> size="small" pagination={false} rowKey="key" dataSource={extractRows}
           columns={[

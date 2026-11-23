@@ -753,6 +753,13 @@ export function doReceiveAllExtracts(rn: RenewalCase, silent = false) {
     log(rn, 'Loaded all team responses and consolidated the masked renewal report set.')
   }
 }
+
+/** One click: raise all three data requests and load every team's response in a
+ * single step, consolidating the masked report set. */
+export function doPullAllExtracts(rn: RenewalCase, silent = false) {
+  doRequestAllExtracts(rn, true)
+  doReceiveAllExtracts(rn, silent)
+}
 export function doRequestRates(rn: RenewalCase, silent = false) {
   rn.rates.requested = true
   rn.rates.requestedAt = stamp()
