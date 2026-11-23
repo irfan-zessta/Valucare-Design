@@ -15,7 +15,7 @@ import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso } from '../../../lib/format'
 import {
-  doRecordDecision, doSendProposal, pctChange, recipientOf,
+  doRecordDecision, doReviseRates, doSendProposal, pctChange, recipientOf,
   type RenewalCase,
 } from '../../../domain/renewal'
 import { SimNote, type RenewalPhaseProps } from '../shared'
@@ -67,7 +67,8 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
   return (
     <>
       <FormSection wide title="Current year vs renewal year"
-        description="Prefilled from the selected rate sheet, account details and current SOB. Unchanged items are labelled “No change”.">
+        description="Prepared by the Account Specialist from the selected rate sheet and the current SOB — renewal dates, plan, room entitlement, MBL, rates, payment mode, network access and benefit notes. Changes and enhancements are highlighted; unchanged benefits carry forward.">
+        <SimNote>At this stage Sales works from the <b>current SOB</b> and the proposed changes. The final renewal SOB is prepared and reviewed in the next stage, Renewal Setup.</SimNote>
         <Table size="small" pagination={false} rowKey="k" dataSource={comparisonRows}
           columns={[
             { title: 'Item', dataIndex: 'k', key: 'k', width: 170 },
@@ -93,14 +94,14 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
       <FormSection wide title="Send & record decision" extra={latest ? <Tag color="blue">Sent v{latest.v}</Tag> : null}>
         {!latest ? (
           <>
-            <Paragraph>Send the proposal as a simulated email. A version and timestamp are recorded so negotiation history is never lost.</Paragraph>
+            <Paragraph>The Account Manager sends the proposal to {recipientOf(rn)} — {rn.channel === 'Direct' ? 'the client contact' : 'through the broker for this broker-managed account'}. A version and timestamp are recorded so negotiation history is never lost.</Paragraph>
             <FormActions>
               <Button type="primary" onClick={() => { patch((x) => doSendProposal(x)); message.success('Proposal sent (simulated).') }}>Send proposal</Button>
             </FormActions>
           </>
         ) : rn.proposal.decision === 'accepted' ? (
           <>
-            <SimNote>Accepted proposal <b>v{rn.proposal.acceptedVersion}</b> recorded. Renewal-confirmation notice sent to relevant departments — simulated.</SimNote>
+            <SimNote>Accepted proposal <b>v{rn.proposal.acceptedVersion}</b> recorded. Renewal-confirmation sent to the relevant departments — simulated. Renewal Setup covers the applicable COC/KYC, plan codes and the final renewal SOB review.</SimNote>
             <Paragraph>A sample signed-acceptance attachment is on file. Continue to prepare the renewal year.</Paragraph>
             <FormActions>
               <Button icon={<FileTextOutlined />} onClick={() => preview('acceptance')}>View signed acceptance</Button>
@@ -119,11 +120,11 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         ) : (
           <>
             <SimNote>Proposal <b>v{latest.v}</b> sent to {recipientOf(rn)} on {formatDateTime(latest.at)} — recorded, not delivered. Waiting on the {rn.channel === 'Direct' ? 'client' : 'intermediary'}.</SimNote>
-            <Paragraph style={{ marginTop: 8 }}>Record the client's response:</Paragraph>
+            <Paragraph style={{ marginTop: 8 }}>Sales handles negotiation and records the client's decision:</Paragraph>
             <FormActions>
               <Button type="primary" icon={<CheckOutlined />} onClick={doAccept}>Accepted</Button>
-              <Button onClick={() => { changeForm.setFieldsValue({ comment: 'Requesting a lower principal rate and clarification on dependent room entitlement.' }); setChangesOpen(true) }}>Request changes</Button>
-              <Button danger onClick={() => { nrForm.setFieldsValue({ reason: 'Client consolidating cover with a group-wide provider.' }); setNotRenewOpen(true) }}>Not renewing</Button>
+              <Button onClick={() => { changeForm.setFieldsValue({ comment: 'Requesting a lower principal rate and clarification on dependent room entitlement.' }); setChangesOpen(true) }}>Request pricing changes</Button>
+              <Button danger onClick={() => { nrForm.setFieldsValue({ reason: 'Client consolidating cover with a group-wide provider.' }); setNotRenewOpen(true) }}>Declined (not renewing)</Button>
             </FormActions>
           </>
         )}
@@ -156,25 +157,21 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         </Form>
       </Modal>
 
-      {/* Request changes → revised rate sheet + new version */}
-      <Modal title="Client requests changes" open={changesOpen} okText="Load revised rate sheet & send new version"
+      {/* Request changes → request revised rates from Actuarial + new version */}
+      <Modal title="Client requested pricing changes" open={changesOpen} okText="Send request to Actuarial & re-send proposal"
         onCancel={() => setChangesOpen(false)}
         onOk={() => changeForm.validateFields().then((v) => {
           patch((x) => {
             x.proposal.changeRequested = true
             x.proposal.rounds.push({ at: new Date().toISOString(), text: v.comment })
             x.activity.push({ at: new Date().toISOString(), text: `Client requested changes: ${v.comment}` })
-            // Simulated revised Actuarial rate sheet — a modest principal-rate concession.
-            if (x.rates.response) {
-              x.rates.response.principalRecommended = Math.round(x.rates.response.principalRecommended * 0.97)
-              x.rates.response.version += 1
-              x.rates.response.pct = Math.round(x.rates.response.pct * 0.9 * 10) / 10
-            }
+            // Sales sends the request back to Actuarial; a revised rate sheet is
+            // returned as a new version (the previous one stays on record).
+            doReviseRates(x, false, v.comment)
             x.proposal.edits.principal = x.rates.response?.principalRecommended
-            x.activity.push({ at: new Date().toISOString(), text: `Loaded revised Actuarial rate sheet (v${x.rates.response?.version}) — principal rate reduced.` })
             doSendProposal(x)
           })
-          message.success('Revised rate sheet loaded and new proposal version sent (simulated).')
+          message.success('Request sent to Actuarial; revised rates received and a new proposal version sent (simulated).')
           setChangesOpen(false)
         })}>
         <Form form={changeForm} layout="vertical">
@@ -182,7 +179,7 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
-        <Text type="secondary" style={{ fontSize: 12 }}>A revised Actuarial rate sheet is simulated and linked to a new proposal version. The previous version stays in the negotiation history.</Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>The request is sent to Actuarial with this reason; a revised rate sheet is returned and linked to a new proposal version. The previous version stays in the negotiation history.</Text>
       </Modal>
 
       {/* Not renewing */}
