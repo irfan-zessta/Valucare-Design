@@ -334,11 +334,11 @@ export interface RenewalContractState {
 /** Phase 5 — activating the renewed account and handing it over. Simulated. */
 export interface RenewalActivation {
   accountActivated?: boolean
-  billingHandoff?: boolean
-  opsHandoff?: boolean
   activatedAt?: string
   /** Go-live date when activation was scheduled rather than done immediately. */
   scheduledAt?: string
+  /** Document pack handed to MDA (internal announcement, masterlist, codes, SOB). */
+  mdaHandover?: { sent?: boolean; sentAt?: string; docs?: { slot: string; fileName: string }[] }
 }
 
 export interface RenewalDocument {
@@ -752,7 +752,15 @@ export function applyPreset(rn: RenewalCase, preset: RenewalPreset) {
       notarization: 'returned', notarizedFile: `Notarized-Contract-${rn.code}.pdf`,
     }
     rn.contract = { started: true, stage: 'Delivered', corrections: [], delivery: { courier: 'LBC Express', tracking: 'DEMO-7788-2210' } }
-    rn.activation = { accountActivated: true, billingHandoff: true, opsHandoff: true, activatedAt: stamp() }
+    rn.activation = {
+      accountActivated: true, activatedAt: stamp(),
+      mdaHandover: { sent: true, sentAt: stamp(), docs: [
+        { slot: 'announcement', fileName: `announcement-${rn.code}.pdf` },
+        { slot: 'masterlist', fileName: `masterlist-${rn.code}.xlsx` },
+        { slot: 'codes', fileName: `codes-${rn.code}.pdf` },
+        { slot: 'sob', fileName: `sob-${rn.code}.pdf` },
+      ] },
+    }
     rn.completed = true
   }
 }
@@ -1003,10 +1011,10 @@ export function contractSent(rn: RenewalCase): boolean {
   return !!rn.setup.contractRecord?.sentToClient
 }
 
-/** Account activated and both handovers recorded (phase 5). */
+/** Account activated and the document pack handed over to MDA (phase 5). */
 export function activationDone(rn: RenewalCase): boolean {
   const a = rn.activation
-  return !!(a?.accountActivated && a?.billingHandoff && a?.opsHandoff)
+  return !!(a?.accountActivated && a?.mdaHandover?.sent)
 }
 
 export interface NextStep {

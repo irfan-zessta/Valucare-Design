@@ -6,8 +6,8 @@
 // policy is issued, no coverage is switched on, and no external system is called.
 // ===========================================================================
 import { useState } from 'react'
-import { App, Button, DatePicker, Descriptions, Space, Tag, Typography } from 'antd'
-import { CalendarOutlined, CheckCircleOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { App, Button, DatePicker, Descriptions, Space, Tag, Typography, Upload } from 'antd'
+import { CalendarOutlined, CheckCircleFilled, CheckCircleOutlined, CloudUploadOutlined, SendOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
@@ -18,6 +18,14 @@ import { RenewalSummary } from './RenewalContract'
 
 const { Text, Paragraph } = Typography
 const now = () => new Date().toISOString()
+
+// The document pack handed to MDA before the renewed account goes live.
+const MDA_SLOTS: { key: string; label: string; hint: string }[] = [
+  { key: 'announcement', label: 'Internal announcement / email blast', hint: 'Go-live announcement to circulate internally.' },
+  { key: 'masterlist', label: 'Member Data (masterlist)', hint: 'The enrollment masterlist.' },
+  { key: 'codes', label: 'Account code & plan codes', hint: 'Approved account reference and plan codes.' },
+  { key: 'sob', label: 'SOB', hint: 'The onboarding Summary of Benefits.' },
+]
 
 export function RenewalActivate(props: RenewalPhaseProps) {
   const { rn, patch, goPhase } = props
@@ -52,12 +60,26 @@ export function RenewalActivate(props: RenewalPhaseProps) {
     })
     message.success(scheduledAt ? `Activation scheduled for ${formatDate(scheduledAt)}.` : 'Renewed account activated.')
   }
-  const recordHandoff = (which: 'billing' | 'ops', label: string) => {
+  // ---- Handover to MDA (document pack) -------------------------------------
+  const mda = a.mdaHandover ?? { docs: [] }
+  const mdaDocs = mda.docs ?? []
+  const docFor = (slot: string) => mdaDocs.find((d) => d.slot === slot)
+  const allAttached = MDA_SLOTS.every((s) => docFor(s.key))
+  const sentToMda = !!mda.sent
+  const attachMda = (slot: string, fileName: string) => {
     patch((x) => {
-      x.activation = { ...(x.activation ?? {}), [which === 'billing' ? 'billingHandoff' : 'opsHandoff']: true }
-      x.activity.push({ at: now(), text: `${label} handover recorded (simulated).` })
+      const h = x.activation?.mdaHandover ?? { docs: [] }
+      const docs = (h.docs ?? []).filter((d) => d.slot !== slot)
+      x.activation = { ...(x.activation ?? {}), mdaHandover: { ...h, docs: [...docs, { slot, fileName }] } }
+      x.activity.push({ at: now(), text: `Attached ${slot} to the MDA document pack.` })
     })
-    message.success(`${label} handover recorded.`)
+  }
+  const sendToMda = () => {
+    patch((x) => {
+      x.activation = { ...(x.activation ?? {}), mdaHandover: { ...(x.activation?.mdaHandover ?? { docs: [] }), sent: true, sentAt: now() } }
+      x.activity.push({ at: now(), text: 'Sent the document pack to MDA (simulated).' })
+    })
+    message.success('Document pack sent to MDA (simulated).')
   }
   const complete = () => {
     patch((x) => { x.completed = true; x.activity.push({ at: now(), text: 'Renewal processing completed — demo.' }) })
@@ -105,29 +127,44 @@ export function RenewalActivate(props: RenewalPhaseProps) {
         )}
       </FormSection>
 
-      {/* 5.2 — Billing handover */}
-      <FormSection wide title="5.2 · Handover to Billing &amp; Collections"
-        description="Hand the renewed account over to Billing & Collections so invoicing starts on the new term. Visibility only — Billing is not connected in this demo."
-        extra={a.billingHandoff ? <Tag color="green" icon={<CheckCircleOutlined />}>Handed over</Tag> : <Tag>Pending</Tag>}>
-        <FormActions note={!activated ? 'Activate the renewed account first.' : undefined}>
-          {a.billingHandoff
-            ? <Tag color="green" icon={<CheckCircleOutlined />}>Billing handover recorded</Tag>
-            : <Button type="primary" disabled={!activated} onClick={() => recordHandoff('billing', 'Billing & Collections')}>Hand over to Billing</Button>}
+      {/* 5.2 — Handover to MDA (document pack) */}
+      <FormSection wide title="5.2 · Handover to MDA"
+        description="Attach the document pack, then send it to MDA."
+        extra={sentToMda ? <Tag color="green" icon={<CheckCircleOutlined />}>Sent</Tag> : <Tag>Pending</Tag>}>
+        <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
+          {MDA_SLOTS.map((sdoc) => {
+            const doc = docFor(sdoc.key)
+            return (
+              <div key={sdoc.key} className="app-decision-row" style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+                <Space>
+                  {doc ? <CheckCircleFilled style={{ color: '#52c41a' }} /> : <span style={{ color: 'rgba(0,0,0,0.3)' }}>●</span>}
+                  <div>
+                    <strong>{sdoc.label}</strong>
+                    <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{doc ? doc.fileName : sdoc.hint}</div>
+                  </div>
+                </Space>
+                {!sentToMda && (
+                  <Space>
+                    <Upload showUploadList={false} beforeUpload={(file) => { attachMda(sdoc.key, file.name); return false }}>
+                      <Button size="small" icon={<CloudUploadOutlined />}>{doc ? 'Replace' : 'Attach'}</Button>
+                    </Upload>
+                    <Button size="small" onClick={() => attachMda(sdoc.key, `${sdoc.key}-${rn.code}.pdf`)}>Attach sample</Button>
+                  </Space>
+                )}
+              </div>
+            )
+          })}
+        </Space>
+        <FormActions note={sentToMda
+          ? `Handed over to MDA${mda.sentAt ? ` on ${formatDateTime(mda.sentAt)}` : ''}.`
+          : allAttached ? 'All documents attached — ready to send.' : 'Attach all four documents to hand over to MDA.'}>
+          {sentToMda
+            ? <Tag color="green" icon={<CheckCircleOutlined />}>Sent to MDA</Tag>
+            : <Button type="primary" icon={<SendOutlined />} disabled={!allAttached} onClick={sendToMda}>Send to MDA</Button>}
         </FormActions>
       </FormSection>
 
-      {/* 5.3 — Operations / Account Management handover */}
-      <FormSection wide title="5.3 · Handover to Account Management"
-        description="Hand over to Account Management / Operations for ongoing servicing of the renewed account."
-        extra={a.opsHandoff ? <Tag color="green" icon={<CheckCircleOutlined />}>Handed over</Tag> : <Tag>Pending</Tag>}>
-        <FormActions note={!activated ? 'Activate the renewed account first.' : undefined}>
-          {a.opsHandoff
-            ? <Tag color="green" icon={<CheckCircleOutlined />}>Account Management handover recorded</Tag>
-            : <Button type="primary" disabled={!activated} onClick={() => recordHandoff('ops', 'Account Management')}>Hand over to Account Management</Button>}
-        </FormActions>
-      </FormSection>
-
-      <FormActions note={canComplete ? 'Completing does not issue a policy or activate real coverage — demo only.' : 'Activate the account and record both handovers to complete the renewal.'}>
+      <FormActions note={canComplete ? 'Completing does not issue a policy or activate real coverage — demo only.' : 'Activate the account and hand the document pack over to MDA to complete the renewal.'}>
         <Button type="primary" disabled={!canComplete} onClick={complete}>Complete renewal</Button>
       </FormActions>
     </>
