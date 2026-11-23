@@ -31,8 +31,6 @@ function ContractInProgress({ rn, patch, goPhase, preview }: RenewalPhaseProps) 
     <>
       <SetupHandoffCards rn={rn} patch={patch} preview={preview} />
 
-      <HandoffSummary rn={rn} />
-
       <FormActions note={sentToClient ? undefined : 'Send the renewal contract and DSA to the client to continue to activation.'}>
         <Button type="primary" disabled={!sentToClient} onClick={() => goPhase('activate')}>
           Continue to Activate &amp; Handover ›
