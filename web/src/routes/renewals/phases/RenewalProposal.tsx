@@ -124,7 +124,6 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
       {/* 2 — Current year vs renewal year */}
       <FormSection wide title={numberedTitle(2, 'Current year vs renewal year')}
         description="Prepared by the Account Specialist from the selected rate sheet and the current SOB — renewal dates, plan, room entitlement, MBL, rates, payment mode, network access and benefit notes. Changes and enhancements are highlighted; unchanged benefits carry forward.">
-        <SimNote>At this stage Sales works from the <b>current SOB</b> and the proposed changes. The final renewal SOB is prepared and reviewed in the next stage, Renewal Setup.</SimNote>
         <Table size="small" pagination={false} rowKey="k" dataSource={comparisonRows}
           columns={[
             { title: 'Item', dataIndex: 'k', key: 'k', width: 170 },
