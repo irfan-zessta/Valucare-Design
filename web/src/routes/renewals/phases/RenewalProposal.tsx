@@ -8,7 +8,7 @@
 // (reason + advisory, path closed — no cancellation performed).
 // ===========================================================================
 import { useMemo, useRef, useState } from 'react'
-import { App, Button, Collapse, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Table, Tag, Timeline, Typography } from 'antd'
+import { App, Button, Collapse, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Space, Table, Tag, Timeline, Typography } from 'antd'
 import { CheckCircleOutlined, CheckOutlined, DownloadOutlined, EditOutlined, EyeOutlined, FileTextOutlined, ImportOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { FormSection } from '../../../components/ui/FormSection'
@@ -88,29 +88,17 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
 
   return (
     <>
-      {/* 1 — Recommended renewal rates (list view; View opens the rate sheet) */}
-      <FormSection wide title={numberedTitle(1, 'Recommended renewal rates')}
-        description="The Actuarial-recommended renewal rates included in the proposal, taken from the selected rate sheet."
-        extra={<Tag color="blue">rate sheet v{rr.version}</Tag>}>
-        <Table size="small" pagination={false} rowKey="line"
-          dataSource={[
-            { line: 'Principal rate', current: rn.currentPremium.principal, rec: proposed },
-            { line: 'Dependent rate', current: rn.currentPremium.dependent, rec: rr.dependentRecommended },
-          ]}
-          columns={[
-            { title: 'Line', dataIndex: 'line', key: 'line' },
-            { title: 'Current', dataIndex: 'current', key: 'current', align: 'right', render: (v) => formatPeso(v) },
-            { title: 'Recommended', dataIndex: 'rec', key: 'rec', align: 'right', render: (v) => <b>{formatPeso(v)}</b> },
-            { title: 'Change', key: 'chg', align: 'right', render: (_, row) => <Tag color="gold">+{pctChange(row.current, row.rec)}%</Tag> },
-          ]} />
-        <Descriptions column={{ xs: 1, sm: 2 }} size="small" style={{ marginTop: 12 }}
-          items={[
-            { key: 'mbl', label: 'MBL / plan', children: `${formatPeso(rr.mbl)} · ${rr.plan}` },
-            { key: 'pct', label: 'Overall change', children: `+${rr.pct}%` },
-          ]} />
-        <FormActions note="Opens the full membership-fee rate sheet (room & board tiers, before/with VAT) from Actuarial.">
-          <Button icon={<EyeOutlined />} onClick={() => setRateSheetOpen(true)}>View rate sheet</Button>
-        </FormActions>
+      {/* 1 — Rate sheet checking (view-only membership-fee rate sheet from Actuarial) */}
+      <FormSection wide title={numberedTitle(1, 'Rate sheet checking')}
+        description="The membership-fee rate sheet released by Actuarial. Sales reviews it (view only) and includes it in the proposal.">
+        <div className="app-decision-row" style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+          <Space>
+            <strong>Membership-fee rate sheet</strong>
+            <Tag color="green">from Actuarial</Tag>
+            <Text type="secondary" style={{ fontSize: 12 }}>rate sheet v{rr.version} · view only</Text>
+          </Space>
+          <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => setRateSheetOpen(true)}>View</Button>
+        </div>
       </FormSection>
 
       {/* 2 — Current year vs renewal year */}
