@@ -526,6 +526,20 @@ export function CreateFranchise({ c }: { c: Case }) {
     !docsComplete && 'a document',
   ].filter(Boolean) as string[]
 
+  // Step through the tabs with "Next"; once the Documents step is reached and a
+  // document is present, the primary action becomes "Submit for approval".
+  const TAB_ORDER = ['account', 'other', 'documents', 'affiliates', 'decisions']
+  const tabIndex = TAB_ORDER.indexOf(activeTab)
+  const isLastTab = tabIndex >= TAB_ORDER.length - 1
+  const reachedDocuments = tabIndex >= TAB_ORDER.indexOf('documents')
+  const showSubmit = reachedDocuments && docsComplete
+  const goNextTab = () => {
+    if (tabIndex > -1 && tabIndex < TAB_ORDER.length - 1) {
+      setActiveTab(TAB_ORDER[tabIndex + 1])
+      topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   const errorList = Object.entries(errors).filter(([, v]) => v)
   const isInvalid = (key: string) => Boolean(submitted && errors[key])
   const isWarn = (key: string) => !isInvalid(key) && Boolean(returnByField[key])
@@ -1023,11 +1037,17 @@ export function CreateFranchise({ c }: { c: Case }) {
           </Button>
           <div className="app-form-floatbar__actions">
             <Button onClick={saveDraft}>Save draft</Button>
-            <Tooltip title={canSubmit ? '' : `Complete ${submitBlockers.join(', ')} to submit.`}>
-              <Button type="primary" htmlType="submit" disabled={!canSubmit}>
-                {c.franchise.status === 'returned' ? 'Resubmit to AMT' : 'Submit to AMT'}
+            {showSubmit ? (
+              <Tooltip title={canSubmit ? '' : `Complete ${submitBlockers.join(', ')} to submit.`}>
+                <Button type="primary" htmlType="submit" disabled={!canSubmit}>
+                  {c.franchise.status === 'returned' ? 'Resubmit for approval' : 'Submit for approval'}
+                </Button>
+              </Tooltip>
+            ) : (
+              <Button type="primary" onClick={goNextTab} disabled={isLastTab}>
+                Next
               </Button>
-            </Tooltip>
+            )}
           </div>
         </div>
       </Form>
