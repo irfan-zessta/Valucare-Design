@@ -8,7 +8,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Mentions,
   Select,
   Space,
   Spin,
@@ -29,7 +28,6 @@ import {
 import dayjs from 'dayjs'
 import { useCases } from '../../state/CaseProvider'
 import { useActiveUser } from '../../state/ActiveUserProvider'
-import { useMentions } from '../../state/MentionsProvider'
 import { roleLabel } from '../../domain/access'
 import { withEvent } from '../../domain/caseHistory'
 import { shortNameFrom } from '../../domain/sampleData'
@@ -215,57 +213,6 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   )
 }
 
-/** A comment left on the franchise (prototype — persisted in formData). */
-interface FranchiseComment {
-  id: string
-  text: string
-  author: string
-  at: string
-  /** Users tagged on this comment (demo user id + display name). */
-  tagged?: { id: string; name: string }[]
-}
-
-// --- @mentions in comments -------------------------------------------------
-// People are tagged inline by typing "@Name" (native Ant Mentions). Every demo
-// name is a single word, so "@Name" tokens parse cleanly in both directions.
-/** display name → user id, for resolving "@Name" tokens back to a person. */
-const MENTION_BY_NAME = new Map(DEMO_USERS.map((u) => [u.name, u.id]))
-
-/** Suggestion rows shown in the @-mention popup (avatar + name + subtitle). */
-const MENTION_OPTIONS = DEMO_USERS.map((u) => ({
-  value: u.name,
-  key: u.id,
-  label: (
-    <span className="cmt-opt">
-      <span className="cmt-opt__avatar">{u.name.charAt(0)}</span>
-      <span className="cmt-opt__text">
-        <span className="cmt-opt__name">{u.name}</span>
-        <span className="cmt-opt__sub">Team member</span>
-      </span>
-    </span>
-  ),
-}))
-
-/** Pull the unique set of tagged people out of a comment's "@Name" tokens. */
-function extractMentions(text: string): { id: string; name: string }[] {
-  const found = new Map<string, string>()
-  for (const m of text.matchAll(/@(\w+)/g)) {
-    const id = MENTION_BY_NAME.get(m[1])
-    if (id) found.set(id, m[1])
-  }
-  return [...found].map(([id, name]) => ({ id, name }))
-}
-
-/** Render a comment body with "@Name" tokens shown as highlighted chips. */
-function renderCommentBody(text: string) {
-  return text.split(/(@\w+)/g).map((part, i) => {
-    if (part.startsWith('@') && MENTION_BY_NAME.has(part.slice(1))) {
-      return <span key={i} className="cmt-chip">{part}</span>
-    }
-    return <span key={i}>{part}</span>
-  })
-}
-
 /** Label with a right-side red asterisk for mandatory fields. */
 function reqLabel(label: string) {
   return (
@@ -279,7 +226,6 @@ function reqLabel(label: string) {
 export function CreateFranchise({ c }: { c: Case }) {
   const { patchCase } = useCases()
   const { user, can } = useActiveUser()
-  const { addMentions } = useMentions()
   const { message } = App.useApp()
   const [f, setF] = useState<FormState>(() => initialForm(c))
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -312,36 +258,6 @@ export function CreateFranchise({ c }: { c: Case }) {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setF((prev) => ({ ...prev, [key]: value }))
     setErrors((prev) => (prev[key as string] ? { ...prev, [key as string]: '' } : prev))
-  }
-
-  // Comments — persisted immediately on the franchise so they survive navigation.
-  // Tagging a user records a mention for them (seen in the header comment inbox).
-  const [commentDraft, setCommentDraft] = useState('')
-  const comments = (c.franchise.formData?.comments as FranchiseComment[] | undefined) ?? []
-  const addComment = () => {
-    const text = commentDraft.trim()
-    if (!text) return
-    const at = new Date().toISOString()
-    const tagged = extractMentions(text)
-    const comment: FranchiseComment = { id: `cm-${Date.now()}`, text, author: user.name, at, tagged: tagged.length ? tagged : undefined }
-    patchCase(c.id, (prev) => ({
-      ...prev,
-      franchise: {
-        ...prev.franchise,
-        formData: {
-          ...(prev.franchise.formData ?? {}),
-          comments: [...((prev.franchise.formData?.comments as FranchiseComment[] | undefined) ?? []), comment],
-        },
-      },
-    }))
-    // Notify everyone tagged (except yourself) via the header comment inbox.
-    addMentions(
-      tagged
-        .filter((t) => t.id !== user.id)
-        .map((t) => ({ toUserId: t.id, caseId: c.id, caseName: c.company.name, text, author: user.name, at })),
-    )
-    setCommentDraft('')
-    message.success(tagged.length ? 'Comment added and people notified.' : 'Comment added.')
   }
 
   const returnByField = useMemo(() => {
@@ -612,7 +528,7 @@ export function CreateFranchise({ c }: { c: Case }) {
 
   // Step through the tabs with "Next"; once the Documents step is reached and a
   // document is present, the primary action becomes "Submit for approval".
-  const TAB_ORDER = ['account', 'other', 'documents', 'affiliates', 'decisions', 'comments']
+  const TAB_ORDER = ['account', 'other', 'documents', 'affiliates', 'decisions']
   const tabIndex = TAB_ORDER.indexOf(activeTab)
   const isLastTab = tabIndex >= TAB_ORDER.length - 1
   const reachedDocuments = tabIndex >= TAB_ORDER.indexOf('documents')
@@ -842,52 +758,6 @@ export function CreateFranchise({ c }: { c: Case }) {
         </Form.Item>
       </Section>
     </>
-  )
-
-  // Comments — their own tab, beside Decisions and extensions.
-  const commentsTab = (
-    <Section title="Comments">
-      {/* Composer — type "@" to mention a team member inline (native Ant Mentions). */}
-      <div className="cmt-composer">
-        <Mentions
-          className="cmt-composer__input"
-          variant="borderless"
-          autoSize={{ minRows: 3, maxRows: 8 }}
-          placeholder="Add a comment… type @ to mention a team member"
-          value={commentDraft}
-          onChange={setCommentDraft}
-          options={MENTION_OPTIONS}
-          popupClassName="cmt-popup"
-          filterOption={(input, option) =>
-            String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())
-          }
-          aria-label="Add a comment"
-        />
-        <div className="cmt-composer__bar">
-          <span className="cmt-composer__hint" aria-hidden="true">@</span>
-          <Button type="primary" onClick={addComment} disabled={!commentDraft.trim()}>
-            Post comment
-          </Button>
-        </div>
-      </div>
-
-      {comments.length > 0 && (
-        <div className="cmt-list">
-          {comments.map((cm) => (
-            <div key={cm.id} className="cmt-item">
-              <span className="cmt-item__avatar">{cm.author.charAt(0)}</span>
-              <div className="cmt-item__body">
-                <div className="cmt-item__head">
-                  <span className="cmt-item__author">{cm.author}</span>
-                  <span className="cmt-item__time">{dayjs(cm.at).format('MMM D, YYYY · h:mm A')}</span>
-                </div>
-                <div className="cmt-item__text">{renderCommentBody(cm.text)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Section>
   )
 
   const documentsTab = (
@@ -1157,7 +1027,6 @@ export function CreateFranchise({ c }: { c: Case }) {
             { key: 'documents', label: 'Documents', children: documentsTab },
             { key: 'affiliates', label: 'Affiliates', children: affiliatesTab },
             { key: 'decisions', label: 'Decisions and extensions', children: decisionsTab },
-            { key: 'comments', label: 'Comments', children: commentsTab },
           ]}
         />
 

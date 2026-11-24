@@ -9,7 +9,7 @@ import { EnquiryProvider } from './state/EnquiryProvider'
 import { LeadProvider } from './state/LeadProvider'
 import { RenewalProvider } from './state/RenewalProvider'
 import { UiPrefsProvider } from './state/UiPrefsProvider'
-import { MentionsProvider } from './state/MentionsProvider'
+import { CommentsProvider } from './state/CommentsProvider'
 import { UnsavedChangesProvider } from './state/UnsavedChangesProvider'
 import { BreadcrumbProvider } from './state/BreadcrumbProvider'
 import { AppShell } from './components/shell/AppShell'
@@ -50,7 +50,7 @@ export default function App() {
                 <EnquiryProvider>
                 <LeadProvider>
                 <UnsavedChangesProvider>
-                <MentionsProvider>
+                <CommentsProvider>
                 <BreadcrumbProvider>
                   <Routes>
                     {/* Public: the login screen lives outside the application shell. */}
@@ -88,7 +88,7 @@ export default function App() {
                     </Route>
                   </Routes>
                 </BreadcrumbProvider>
-                </MentionsProvider>
+                </CommentsProvider>
                 </UnsavedChangesProvider>
                 </LeadProvider>
                 </EnquiryProvider>
