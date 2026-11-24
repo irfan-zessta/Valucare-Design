@@ -14,7 +14,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  App, Alert, Avatar, Button, Card, Col, DatePicker, Descriptions, Drawer, Dropdown, Empty, Flex, Form,
+  App, Alert, Avatar, Button, Card, Col, DatePicker, Descriptions, Drawer, Dropdown, Flex, Form,
   Input, Modal, Result, Row, Select, Space, Tag, Timeline, Tooltip, Typography,
 } from 'antd'
 import {
@@ -177,7 +177,6 @@ export default function EnquiryDetail() {
     return groups
   }, [enquiry.activities])
   const activityCount = enquiry.activities?.length ?? 0
-  const onlyCreation = activityCount <= 1
 
   return (
     <div className="app-page app-page--wide">
@@ -242,21 +241,6 @@ export default function EnquiryDetail() {
               />
             </div>
           ))}
-          {onlyCreation && (
-            <div className="enq-tl__empty">
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <span>
-                    No other activities yet.
-                    {isOpen && <><br />Record your interactions to keep track of this enquiry.</>}
-                  </span>
-                }
-              >
-                {isOpen && <Button size="small" icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>Log activity</Button>}
-              </Empty>
-            </div>
-          )}
         </Card>
         </Col>
 

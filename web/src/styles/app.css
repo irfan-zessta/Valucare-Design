@@ -1433,7 +1433,6 @@ button.app-stepper__item {
 .enq-tl__time { flex: none; font-size: 12px; color: #737373; }
 .enq-tl__desc { margin-block-start: 2px; color: #434343; }
 .enq-tl__by { display: flex; align-items: center; gap: 6px; margin-block-start: 6px; font-size: 12px; color: #737373; }
-.enq-tl__empty { padding-block: 8px 0; }
 
 /* Contact information rows. */
 .enq-contact__row { display: flex; gap: 12px; padding-block: 8px; }
