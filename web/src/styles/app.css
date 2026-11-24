@@ -1228,26 +1228,25 @@ button.app-stepper__item {
   display: none !important;
 }
 
-/* Tab label + small count badge. */
+/* Tab label + subtle inline count (no badge). */
 .dash-tab {
   display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 6px;
 }
 .dash-tab__count {
-  min-inline-size: 18px;
-  padding: 0 6px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 17px;
-  text-align: center;
-  color: #595959;
-  background: #f0f0f0;
-  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #8c8c8c;
+  font-variant-numeric: tabular-nums;
 }
+/* Active tab label is brand red; its count stays a quiet neutral. */
 .ant-tabs-tab-active .dash-tab__count {
-  color: #cb0a2f;
-  background: #fbe9ec;
+  color: #8c8c8c;
+}
+/* Thin 2px brand underline under the active primary tab. */
+.app-record-tabs .ant-tabs-ink-bar {
+  height: 2px;
 }
 
 /* Table surface — quiet uppercase header, light dividers, soft hover. */
@@ -1378,36 +1377,73 @@ button.app-stepper__item {
   margin-inline-start: auto;
 }
 
-/* Compact view selector (Segmented) — label + count; the priority view gets a
-   restrained crimson count pill. */
+/* Lifecycle view group: compact Segmented + divider + Needs-my-action button. */
+.app-viewgroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-inline-size: 0;
+}
+.app-viewgroup__divider {
+  flex: none;
+  inline-size: 1px;
+  block-size: 20px;
+  background: #e8e8e8;
+}
+
+/* Compact view selector (Segmented) — neutral grey track, white selected
+   segment, and subtle inline counts (no pills, no brand colour). */
 .app-viewseg.ant-segmented {
-  background: #f1f2f4;
+  background: #f0f1f3;
   padding: 3px;
+  border-radius: 6px;
+}
+.app-viewseg.ant-segmented .ant-segmented-item {
+  border-radius: 4px;
+}
+.app-viewseg.ant-segmented .ant-segmented-item-label {
+  color: #595959;
+}
+.app-viewseg.ant-segmented .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #1f1f1f;
 }
 .dash-seg {
   display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 6px;
 }
 .dash-seg__count {
-  min-inline-size: 18px;
-  padding: 0 6px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 17px;
-  text-align: center;
-  color: #595959;
-  background: rgba(0, 0, 0, 0.06);
-  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #8c8c8c;
   font-variant-numeric: tabular-nums;
 }
-.app-viewseg .ant-segmented-item-selected .dash-seg__count {
-  background: #fbe9ec;
+
+/* "Needs my action" — a text button, not a tab or lifecycle segment. Brand-red
+   label; red-tinted + heavier weight (a non-colour cue) when selected. */
+.app-needs.ant-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: #cb0a2f;
+  font-weight: 500;
+  padding-inline: 10px;
 }
-.dash-seg--attention .dash-seg__count {
-  background: #fbe9ec;
+.app-needs.ant-btn:hover {
   color: #cb0a2f;
+  background: rgba(203, 10, 47, 0.06);
+}
+.app-needs.app-needs--on {
+  background: #fbe9ec;
+  font-weight: 600;
+}
+.app-needs__count {
+  color: currentColor;
+  font-variant-numeric: tabular-nums;
+}
+.app-needs.ant-btn:focus-visible {
+  outline: 2px solid rgba(203, 10, 47, 0.55);
+  outline-offset: 1px;
 }
 
 /* Result-count footer — "Showing X of Y cases" (workspace totals stay in the
@@ -1787,5 +1823,12 @@ button.app-stepper__item {
   }
   .app-record-tabs > .ant-tabs-nav {
     margin-block-end: 12px;
+  }
+  .app-viewgroup {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .app-viewgroup__divider {
+    display: none;
   }
 }

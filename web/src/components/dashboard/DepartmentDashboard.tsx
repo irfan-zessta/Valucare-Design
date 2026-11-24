@@ -18,6 +18,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Button,
+  ConfigProvider,
   Drawer,
   Empty,
   Grid,
@@ -35,7 +36,7 @@ import {
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { CloseOutlined, FilterOutlined, SearchOutlined } from '@ant-design/icons'
+import { CloseOutlined, ExclamationCircleOutlined, FilterOutlined, SearchOutlined } from '@ant-design/icons'
 import { PageHeader } from '../ui/PageHeader'
 
 export interface DashboardFilterDef {
@@ -391,19 +392,24 @@ export function DepartmentDashboard<T>({
 
   // Compact view-selector segment: label + count; the priority view carries a
   // restrained crimson accent.
-  const seg = (text: string, n: number, attention = false) => (
-    <span className={`dash-seg${attention ? ' dash-seg--attention' : ''}`}>
+  const seg = (text: string, n: number) => (
+    <span className="dash-seg">
       {text}
       <span className="dash-seg__count">{n}</span>
     </span>
   )
 
-  const viewOptions = [
+  // Lifecycle filters live in the Segmented; "Needs my action" is a separate
+  // actionable shortcut (rendered beside it), so it is intentionally NOT a
+  // lifecycle segment.
+  const lifecycleOptions = [
     { value: 'all', label: seg('All', ws.all) },
     { value: 'in-progress', label: seg('In progress', ws.inProgress) },
     { value: 'completed', label: seg('Completed', ws.completed) },
-    { value: 'needs-action', label: seg('Needs my action', ws.needs, ws.needs > 0) },
   ]
+  const lifecycleValue = view === 'needs-action' ? '' : view
+  const toggleNeeds = () =>
+    setUi((s) => ({ ...s, view: s.view === 'needs-action' ? 'all' : 'needs-action' }))
 
   const footerNoun = viewTotal === 1 ? 'case' : 'cases'
   const footerText = hasQueryOrFilters
@@ -415,15 +421,29 @@ export function DepartmentDashboard<T>({
   const casesPanel = (
     <div className="app-cases">
       <div className="app-listbar">
-        <Segmented<string>
-          className="app-viewseg"
-          value={view}
-          onChange={(v) => setUi((s) => ({ ...s, view: String(v) }))}
-          options={viewOptions}
-          block={isMobile && !isPhone}
-          aria-label="Filter cases by status"
-        />
-        <div className="app-listbar__tools">{toolbar}</div>
+        <ConfigProvider theme={{ token: { controlHeight: 36 } }}>
+          <div className="app-viewgroup">
+            <Segmented<string>
+              className="app-viewseg"
+              value={lifecycleValue}
+              onChange={(v) => setUi((s) => ({ ...s, view: String(v) }))}
+              options={lifecycleOptions}
+              block={isMobile && !isPhone}
+              aria-label="Filter cases by lifecycle status"
+            />
+            <span className="app-viewgroup__divider" aria-hidden />
+            <Button
+              type="text"
+              className={`app-needs${view === 'needs-action' ? ' app-needs--on' : ''}`}
+              icon={<ExclamationCircleOutlined />}
+              aria-pressed={view === 'needs-action'}
+              onClick={toggleNeeds}
+            >
+              Needs my action <span className="app-needs__count">{ws.needs}</span>
+            </Button>
+          </div>
+          <div className="app-listbar__tools">{toolbar}</div>
+        </ConfigProvider>
       </div>
 
       {filterChips.length > 0 && (
