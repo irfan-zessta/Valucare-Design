@@ -18,7 +18,7 @@ import {
   Input, Modal, Result, Row, Select, Space, Tag, Timeline, Tooltip, Typography,
 } from 'antd'
 import {
-  ArrowRightOutlined, CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined,
+  CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined,
   CopyOutlined, EditOutlined, EllipsisOutlined, ExperimentOutlined, FileAddOutlined, FileTextOutlined,
   MailOutlined, MessageOutlined, PhoneOutlined, PlusOutlined, StopOutlined, TeamOutlined, UserOutlined,
 } from '@ant-design/icons'
@@ -141,7 +141,7 @@ export default function EnquiryDetail() {
       {isOpen && (
         <>
           <Button icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>Log activity</Button>
-          <Button type="primary" icon={<ArrowRightOutlined />} loading={converting} onClick={confirmConvert}>Convert to franchise</Button>
+          <Button type="primary" loading={converting} onClick={confirmConvert}>Convert to franchise</Button>
         </>
       )}
       {enquiry.status === 'converted' && linkedLead && (
