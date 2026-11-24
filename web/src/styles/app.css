@@ -1384,13 +1384,6 @@ button.app-stepper__item {
   gap: 12px;
   min-inline-size: 0;
 }
-.app-viewgroup__divider {
-  flex: none;
-  inline-size: 1px;
-  block-size: 20px;
-  background: #e8e8e8;
-}
-
 /* Compact view selector (Segmented) — neutral grey track, white selected
    segment, and subtle inline counts (no pills, no brand colour). */
 .app-viewseg.ant-segmented {
@@ -1419,31 +1412,30 @@ button.app-stepper__item {
   font-variant-numeric: tabular-nums;
 }
 
-/* "Needs my action" — a text button, not a tab or lifecycle segment. Brand-red
-   label; red-tinted + heavier weight (a non-colour cue) when selected. */
-.app-needs.ant-btn {
-  display: inline-flex;
+/* "Needs my action" — now the priority segment inside the view selector. It
+   keeps a brand-red label (plus the exclamation icon) so it still reads as the
+   actionable view; when selected the segment carries a red-tinted fill. */
+.dash-seg--needs {
   align-items: center;
   gap: 6px;
   color: #cb0a2f;
   font-weight: 500;
-  padding-inline: 10px;
 }
-.app-needs.ant-btn:hover {
+.app-viewseg.ant-segmented .ant-segmented-item-label:has(.dash-seg--needs) {
   color: #cb0a2f;
-  background: rgba(203, 10, 47, 0.06);
 }
-.app-needs.app-needs--on {
-  background: #fbe9ec;
+.app-viewseg.ant-segmented
+  .ant-segmented-item-selected
+  .ant-segmented-item-label:has(.dash-seg--needs) {
+  color: #cb0a2f;
   font-weight: 600;
 }
-.app-needs__count {
-  color: currentColor;
-  font-variant-numeric: tabular-nums;
+.app-viewseg.ant-segmented
+  .ant-segmented-item-selected:has(.dash-seg--needs) {
+  background: #fbe9ec;
 }
-.app-needs.ant-btn:focus-visible {
-  outline: 2px solid rgba(203, 10, 47, 0.55);
-  outline-offset: 1px;
+.app-viewseg.ant-segmented .dash-seg--needs .dash-seg__count {
+  color: currentColor;
 }
 
 /* Result-count footer — "Showing X of Y cases" (workspace totals stay in the
@@ -1827,8 +1819,5 @@ button.app-stepper__item {
   .app-viewgroup {
     flex-wrap: wrap;
     gap: 8px;
-  }
-  .app-viewgroup__divider {
-    display: none;
   }
 }

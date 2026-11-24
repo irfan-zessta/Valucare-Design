@@ -399,17 +399,24 @@ export function DepartmentDashboard<T>({
     </span>
   )
 
-  // Lifecycle filters live in the Segmented; "Needs my action" is a separate
-  // actionable shortcut (rendered beside it), so it is intentionally NOT a
-  // lifecycle segment.
+  // "Needs my action" label: carries the exclamation icon so it still reads as
+  // the priority view, but now lives inside the Segmented as its own segment.
+  const needsSeg = (
+    <span className="dash-seg dash-seg--needs">
+      <ExclamationCircleOutlined aria-hidden />
+      Needs my action
+      <span className="dash-seg__count">{ws.needs}</span>
+    </span>
+  )
+
+  // All views live in the one Segmented (the "tab card"): the three lifecycle
+  // filters plus "Needs my action" as the priority segment.
   const lifecycleOptions = [
     { value: 'all', label: seg('All', ws.all) },
     { value: 'in-progress', label: seg('In progress', ws.inProgress) },
     { value: 'completed', label: seg('Completed', ws.completed) },
+    { value: 'needs-action', label: needsSeg },
   ]
-  const lifecycleValue = view === 'needs-action' ? '' : view
-  const toggleNeeds = () =>
-    setUi((s) => ({ ...s, view: s.view === 'needs-action' ? 'all' : 'needs-action' }))
 
   const footerNoun = viewTotal === 1 ? 'case' : 'cases'
   const footerText = hasQueryOrFilters
@@ -425,22 +432,12 @@ export function DepartmentDashboard<T>({
           <div className="app-viewgroup">
             <Segmented<string>
               className="app-viewseg"
-              value={lifecycleValue}
+              value={view}
               onChange={(v) => setUi((s) => ({ ...s, view: String(v) }))}
               options={lifecycleOptions}
               block={isMobile && !isPhone}
               aria-label="Filter cases by lifecycle status"
             />
-            <span className="app-viewgroup__divider" aria-hidden />
-            <Button
-              type="text"
-              className={`app-needs${view === 'needs-action' ? ' app-needs--on' : ''}`}
-              icon={<ExclamationCircleOutlined />}
-              aria-pressed={view === 'needs-action'}
-              onClick={toggleNeeds}
-            >
-              Needs my action <span className="app-needs__count">{ws.needs}</span>
-            </Button>
           </div>
           <div className="app-listbar__tools">{toolbar}</div>
         </ConfigProvider>
