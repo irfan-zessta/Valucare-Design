@@ -55,6 +55,11 @@ export interface NavDept {
 
 const startsWith = (prefix: string) => (p: string) => p === prefix || p.startsWith(prefix + '/')
 
+// Every department is an expandable group whose FIRST submenu item is always
+// "Dashboard" (its role-aware dashboard). Work areas that have a real screen in
+// this build are `available`; those listed in the target structure but not yet
+// migrated from the legacy app are `coming-soon` (an honest placeholder page —
+// never a blank/invented screen).
 export const NAV: NavDept[] = [
   {
     id: 'home',
@@ -64,7 +69,6 @@ export const NAV: NavDept[] = [
     status: 'available',
     match: (p) => p === '/',
   },
-  { id: 'accounts', label: 'Accounts', Icon: BankOutlined, to: '/accounts', status: 'available' },
   {
     id: 'sales',
     label: 'Sales',
@@ -74,33 +78,120 @@ export const NAV: NavDept[] = [
     match: (p) => startsWith('/sales')(p) || startsWith('/cases')(p),
     children: [
       {
-        id: 'sales-new-business',
-        label: 'New Business',
+        id: 'sales-dashboard',
+        label: 'Dashboard',
         status: 'available',
         to: '/sales',
-        // The Sales dashboard, the creation journey, and open cases all live here —
-        // but NOT the renewals subtree (which has its own child below).
+        // The Sales dashboard (New Business worklist + enquiries), the creation
+        // journey, and open cases all live here — but NOT the renewals subtree.
         match: (p) =>
           (startsWith('/sales')(p) && !startsWith('/sales/renewals')(p)) || startsWith('/cases')(p),
       },
       {
         id: 'sales-renewal-business',
-        label: 'Corporate Renewal',
+        label: 'Renewal Business',
         status: 'available',
         to: '/sales/renewals',
         match: (p) => startsWith('/sales/renewals')(p),
       },
-      { id: 'sales-new-ifg', label: 'New IFG', status: 'coming-soon' },
-      { id: 'sales-renewal-ifg', label: 'Renewal IFG', status: 'coming-soon' },
+      { id: 'sales-ifg-new', label: 'IFG New Business', status: 'coming-soon' },
+      { id: 'sales-ifg-renewal', label: 'IFG Renewal Business', status: 'coming-soon' },
     ],
   },
-  { id: 'actuarial', label: 'Actuarial', Icon: BarChartOutlined, to: '/actuarial', status: 'available' },
-  { id: 'mda', label: 'MDA', Icon: TeamOutlined, to: '/mda', status: 'available' },
-  { id: 'billing', label: 'Billing & Collections', Icon: WalletOutlined, to: '/billing', status: 'available' },
-  { id: 'provider-networks', label: 'Provider Networks', Icon: DeploymentUnitOutlined, to: '/provider-networks', status: 'available' },
-  { id: 'claims', label: 'Claims', Icon: FileTextOutlined, to: '/claims', status: 'available' },
-  { id: 'ccd', label: 'CCD', Icon: CustomerServiceOutlined, to: '/ccd', status: 'available' },
-  { id: 'admin', label: 'Admin', Icon: SettingOutlined, status: 'coming-soon' },
+  {
+    id: 'actuarial',
+    label: 'Actuarial',
+    Icon: BarChartOutlined,
+    status: 'available',
+    match: startsWith('/actuarial'),
+    children: [
+      { id: 'actuarial-dashboard', label: 'Dashboard', status: 'available', to: '/actuarial', match: startsWith('/actuarial') },
+      { id: 'actuarial-new', label: 'New Business', status: 'coming-soon' },
+      { id: 'actuarial-renewal', label: 'Renewal Business', status: 'coming-soon' },
+      { id: 'actuarial-ifg-renewal', label: 'IFG Renewal Business', status: 'coming-soon' },
+    ],
+  },
+  {
+    id: 'mda',
+    label: 'MDA',
+    Icon: TeamOutlined,
+    status: 'available',
+    match: startsWith('/mda'),
+    children: [
+      { id: 'mda-dashboard', label: 'Dashboard', status: 'available', to: '/mda', match: startsWith('/mda') },
+    ],
+  },
+  {
+    id: 'billing',
+    label: 'Billing & Collections',
+    Icon: WalletOutlined,
+    status: 'available',
+    match: startsWith('/billing'),
+    children: [
+      { id: 'billing-dashboard', label: 'Dashboard', status: 'available', to: '/billing', match: startsWith('/billing') },
+      { id: 'billing-billing', label: 'Billing', status: 'coming-soon' },
+      { id: 'billing-collections', label: 'Collections', status: 'coming-soon' },
+    ],
+  },
+  {
+    id: 'provider-networks',
+    label: 'Provider Networks',
+    Icon: DeploymentUnitOutlined,
+    status: 'available',
+    match: startsWith('/provider-networks'),
+    children: [
+      { id: 'provider-networks-dashboard', label: 'Dashboard', status: 'available', to: '/provider-networks', match: startsWith('/provider-networks') },
+    ],
+  },
+  {
+    id: 'claims',
+    label: 'Claims',
+    Icon: FileTextOutlined,
+    status: 'available',
+    match: startsWith('/claims'),
+    children: [
+      { id: 'claims-dashboard', label: 'Dashboard', status: 'available', to: '/claims', match: startsWith('/claims') },
+      { id: 'claims-receiving', label: 'Receiving', status: 'coming-soon' },
+      { id: 'claims-processing', label: 'Processing', status: 'coming-soon' },
+      { id: 'claims-review', label: 'Review & Posting', status: 'coming-soon' },
+      { id: 'claims-reimbursements', label: 'Reimbursements', status: 'coming-soon' },
+      { id: 'claims-reconciliation', label: 'Reconciliation', status: 'coming-soon' },
+    ],
+  },
+  {
+    id: 'ccd',
+    label: 'CCD',
+    Icon: CustomerServiceOutlined,
+    status: 'available',
+    match: startsWith('/ccd'),
+    children: [
+      { id: 'ccd-dashboard', label: 'Dashboard', status: 'available', to: '/ccd', match: startsWith('/ccd') },
+      { id: 'ccd-outpatient', label: 'Outpatient & Dental', status: 'coming-soon' },
+      { id: 'ccd-inpatient', label: 'Inpatient', status: 'coming-soon' },
+      { id: 'ccd-inquiries', label: 'Inquiries & Special Approvals', status: 'coming-soon' },
+    ],
+  },
+  {
+    id: 'accounts',
+    label: 'Accounts',
+    Icon: BankOutlined,
+    status: 'available',
+    match: startsWith('/accounts'),
+    children: [
+      { id: 'accounts-dashboard', label: 'Dashboard', status: 'available', to: '/accounts', match: startsWith('/accounts') },
+    ],
+  },
+  {
+    id: 'admin',
+    label: 'Admin',
+    Icon: SettingOutlined,
+    status: 'available',
+    match: startsWith('/coming-soon/admin'),
+    children: [
+      { id: 'admin-dashboard', label: 'Dashboard', status: 'coming-soon' },
+      { id: 'admin-users-roles', label: 'Users & Roles', status: 'coming-soon' },
+    ],
+  },
 ]
 
 /** True when a department has at least one real child destination. */
