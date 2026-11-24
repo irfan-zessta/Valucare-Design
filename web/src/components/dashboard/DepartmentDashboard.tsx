@@ -366,7 +366,13 @@ export function DepartmentDashboard<T>({
           onClick: () => config.onRowClick!(r),
           style: { cursor: 'pointer' },
         }) : undefined}
-        pagination={{ pageSize: 10, hideOnSinglePage: true }}
+        pagination={{
+          pageSize: 10,
+          hideOnSinglePage: true,
+          size: 'small',
+          showSizeChanger: false,
+          position: ['bottomCenter'],
+        }}
         locale={{ emptyText: emptyNode }}
       />
     )

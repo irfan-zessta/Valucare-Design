@@ -1532,6 +1532,14 @@ button.app-stepper__item {
   max-inline-size: 100%;
 }
 
+/* Clean, minimal pager: centered, quiet, with breathing room above it. */
+.app-dash-table .ant-table-pagination.ant-pagination {
+  margin-block: 16px 4px;
+}
+.app-dash-table .ant-pagination .ant-pagination-item {
+  border-radius: 6px;
+}
+
 /* Company cell — dark semibold name (links to the case) + labelled refs. */
 .sales-co__name,
 .app-dash-table a.sales-co__name {
