@@ -168,8 +168,7 @@ export default function SalesDashboard() {
       return (
         <Tooltip title={meaningfulStatus(c)}>
           <span className="sales-chip-wrap" tabIndex={0}>
-            <Tag className="sales-chip" color={color}>{label}</Tag>
-            {sub && <span className="sales-status__sub">{sub}</span>}
+            <Tag className="sales-chip" color={color}>{sub ? `${label} ${sub}` : label}</Tag>
           </span>
         </Tooltip>
       )
