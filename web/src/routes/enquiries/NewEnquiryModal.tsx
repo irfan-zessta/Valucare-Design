@@ -29,7 +29,7 @@ export function NewEnquiryModal({
       mask={{ closable: false }}
     >
       <Typography.Paragraph type="secondary" style={{ marginBottom: 20 }}>
-        Enter the company name — any existing enquiry or case with a matching name is flagged so you
+        Enter the company name. Any existing enquiry or case with a matching name is flagged so you
         don’t log a duplicate.
       </Typography.Paragraph>
       {open && (

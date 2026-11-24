@@ -10,7 +10,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AutoComplete, Button, Col, Form, Input, Row, Select } from 'antd'
-import { ArrowRightOutlined } from '@ant-design/icons'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
 import { shortNameFrom } from '../../domain/sampleData'
@@ -127,7 +126,7 @@ export function NewEnquiryForm({
           nameInvalid
             ? 'Enter the company name to log the enquiry.'
             : options.length > 0
-              ? 'A similar company already exists — pick it to open instead of logging a duplicate.'
+              ? 'A similar company already exists. Pick it to open instead of logging a duplicate.'
               : undefined
         }
       >
@@ -188,8 +187,8 @@ export function NewEnquiryForm({
         </Col>
       </Row>
 
-      <Form.Item style={{ marginBottom: 0 }}>
-        <Button type="primary" htmlType="submit" icon={<ArrowRightOutlined />} loading={submitting}>
+      <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+        <Button type="primary" htmlType="submit" loading={submitting}>
           Log enquiry
         </Button>
       </Form.Item>
