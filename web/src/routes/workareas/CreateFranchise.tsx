@@ -8,6 +8,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Mentions,
   Select,
   Space,
   Spin,
@@ -224,8 +225,46 @@ interface FranchiseComment {
   tagged?: { id: string; name: string }[]
 }
 
-/** Everyone who can be tagged on a comment. */
-const TAG_OPTIONS = DEMO_USERS.map((u) => ({ value: u.id, label: u.name }))
+// --- @mentions in comments -------------------------------------------------
+// People are tagged inline by typing "@Name" (native Ant Mentions). Every demo
+// name is a single word, so "@Name" tokens parse cleanly in both directions.
+/** display name → user id, for resolving "@Name" tokens back to a person. */
+const MENTION_BY_NAME = new Map(DEMO_USERS.map((u) => [u.name, u.id]))
+
+/** Suggestion rows shown in the @-mention popup (avatar + name + subtitle). */
+const MENTION_OPTIONS = DEMO_USERS.map((u) => ({
+  value: u.name,
+  key: u.id,
+  label: (
+    <span className="cmt-opt">
+      <span className="cmt-opt__avatar">{u.name.charAt(0)}</span>
+      <span className="cmt-opt__text">
+        <span className="cmt-opt__name">{u.name}</span>
+        <span className="cmt-opt__sub">Team member</span>
+      </span>
+    </span>
+  ),
+}))
+
+/** Pull the unique set of tagged people out of a comment's "@Name" tokens. */
+function extractMentions(text: string): { id: string; name: string }[] {
+  const found = new Map<string, string>()
+  for (const m of text.matchAll(/@(\w+)/g)) {
+    const id = MENTION_BY_NAME.get(m[1])
+    if (id) found.set(id, m[1])
+  }
+  return [...found].map(([id, name]) => ({ id, name }))
+}
+
+/** Render a comment body with "@Name" tokens shown as highlighted chips. */
+function renderCommentBody(text: string) {
+  return text.split(/(@\w+)/g).map((part, i) => {
+    if (part.startsWith('@') && MENTION_BY_NAME.has(part.slice(1))) {
+      return <span key={i} className="cmt-chip">{part}</span>
+    }
+    return <span key={i}>{part}</span>
+  })
+}
 
 /** Label with a right-side red asterisk for mandatory fields. */
 function reqLabel(label: string) {
@@ -278,13 +317,12 @@ export function CreateFranchise({ c }: { c: Case }) {
   // Comments — persisted immediately on the franchise so they survive navigation.
   // Tagging a user records a mention for them (seen in the header comment inbox).
   const [commentDraft, setCommentDraft] = useState('')
-  const [commentTags, setCommentTags] = useState<string[]>([])
   const comments = (c.franchise.formData?.comments as FranchiseComment[] | undefined) ?? []
   const addComment = () => {
     const text = commentDraft.trim()
     if (!text) return
     const at = new Date().toISOString()
-    const tagged = commentTags.map((id) => ({ id, name: DEMO_USERS.find((u) => u.id === id)?.name ?? id }))
+    const tagged = extractMentions(text)
     const comment: FranchiseComment = { id: `cm-${Date.now()}`, text, author: user.name, at, tagged: tagged.length ? tagged : undefined }
     patchCase(c.id, (prev) => ({
       ...prev,
@@ -303,7 +341,6 @@ export function CreateFranchise({ c }: { c: Case }) {
         .map((t) => ({ toUserId: t.id, caseId: c.id, caseName: c.company.name, text, author: user.name, at })),
     )
     setCommentDraft('')
-    setCommentTags([])
     message.success(tagged.length ? 'Comment added and people notified.' : 'Comment added.')
   }
 
@@ -810,40 +847,46 @@ export function CreateFranchise({ c }: { c: Case }) {
   // Comments — their own tab, beside Decisions and extensions.
   const commentsTab = (
     <Section title="Comments">
+      {/* Composer — type "@" to mention a team member inline (native Ant Mentions). */}
+      <div className="cmt-composer">
+        <Mentions
+          className="cmt-composer__input"
+          variant="borderless"
+          autoSize={{ minRows: 3, maxRows: 8 }}
+          placeholder="Add a comment… type @ to mention a team member"
+          value={commentDraft}
+          onChange={setCommentDraft}
+          options={MENTION_OPTIONS}
+          popupClassName="cmt-popup"
+          filterOption={(input, option) =>
+            String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+          }
+          aria-label="Add a comment"
+        />
+        <div className="cmt-composer__bar">
+          <span className="cmt-composer__hint" aria-hidden="true">@</span>
+          <Button type="primary" onClick={addComment} disabled={!commentDraft.trim()}>
+            Post comment
+          </Button>
+        </div>
+      </div>
+
       {comments.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
+        <div className="cmt-list">
           {comments.map((cm) => (
-            <div key={cm.id} style={{ border: '1px solid #f0f0f0', borderRadius: 8, background: '#fafafa', padding: 12, marginBottom: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, color: '#595959', marginBottom: 4 }}>
-                <span style={{ fontWeight: 600, color: '#1f1f1f' }}>{cm.author}</span>
-                <span>{dayjs(cm.at).format('MMM D, YYYY · h:mm A')}</span>
-              </div>
-              <div style={{ whiteSpace: 'pre-wrap', color: '#1f1f1f' }}>{cm.text}</div>
-              {cm.tagged && cm.tagged.length > 0 && (
-                <div style={{ marginTop: 6, fontSize: 12, color: '#595959' }}>
-                  Tagged: {cm.tagged.map((t) => `@${t.name}`).join(', ')}
+            <div key={cm.id} className="cmt-item">
+              <span className="cmt-item__avatar">{cm.author.charAt(0)}</span>
+              <div className="cmt-item__body">
+                <div className="cmt-item__head">
+                  <span className="cmt-item__author">{cm.author}</span>
+                  <span className="cmt-item__time">{dayjs(cm.at).format('MMM D, YYYY · h:mm A')}</span>
                 </div>
-              )}
+                <div className="cmt-item__text">{renderCommentBody(cm.text)}</div>
+              </div>
             </div>
           ))}
         </div>
       )}
-      <Input.TextArea id="newComment" rows={3} value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder="Add a comment…" />
-      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <Select
-          mode="multiple"
-          allowClear
-          showSearch
-          optionFilterProp="label"
-          style={{ flex: 1, minWidth: 220 }}
-          placeholder="Tag people (optional)"
-          value={commentTags}
-          onChange={setCommentTags}
-          options={TAG_OPTIONS}
-          aria-label="Tag people on this comment"
-        />
-        <Button type="primary" onClick={addComment} disabled={!commentDraft.trim()}>Add comment</Button>
-      </div>
     </Section>
   )
 
