@@ -24,8 +24,8 @@ export default function NewEnquiry() {
         New enquiry
       </Typography.Title>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 24 }}>
-        Search first so you don’t log the same lead twice. If the company already has an enquiry or a
-        case you can open it; otherwise capture the basic details.
+        Enter the company name — any existing enquiry or case with a matching name is flagged so you
+        don’t log a duplicate.
       </Typography.Paragraph>
 
       <NewEnquiryForm onCreated={(e) => navigate(`/sales/enquiries/${e.id}`)} />

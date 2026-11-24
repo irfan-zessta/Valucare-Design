@@ -24,13 +24,13 @@ export function NewEnquiryModal({
       onCancel={onClose}
       footer={null}
       title={title}
-      width={640}
+      width={760}
       destroyOnHidden
       mask={{ closable: false }}
     >
       <Typography.Paragraph type="secondary" style={{ marginBottom: 20 }}>
-        Search first so you don’t log the same lead twice. If the company already has an enquiry or a
-        case you can open it; otherwise capture the basic details.
+        Enter the company name — any existing enquiry or case with a matching name is flagged so you
+        don’t log a duplicate.
       </Typography.Paragraph>
       {open && (
         <NewEnquiryForm

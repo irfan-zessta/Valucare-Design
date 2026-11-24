@@ -1,16 +1,16 @@
 // ===========================================================================
 // New enquiry capture flow — shared by the full page (/sales/enquiries/new)
 // and the "New lead" modal on the Sales dashboard / Enquiries list.
-//   1. Search first to avoid duplicate leads/companies (checks open enquiries,
-//      existing cases).
-//   2. Capture basic company details only.
-// On create it hands the new enquiry back to the caller via onCreated, which
-// decides where to go next (open its detail page).
+//
+// A single form: the Company name field doubles as the duplicate check — as
+// you type, any open enquiry or existing case with a matching name surfaces
+// inline so you don't log a duplicate. The remaining details sit in a compact
+// two-column layout (no separate search step, no scrolling).
 // ===========================================================================
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Alert, Button, Card, Form, Input, Select, Space, Tag, Typography } from 'antd'
-import { ArrowRightOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { Alert, Button, Col, Form, Input, Row, Select, Space } from 'antd'
+import { ArrowRightOutlined } from '@ant-design/icons'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
 import { shortNameFrom } from '../../domain/sampleData'
@@ -32,10 +32,6 @@ export function NewEnquiryForm({
   const { enquiries, createEnquiry } = useEnquiries()
   const navigate = useNavigate()
 
-  const [mode, setMode] = useState<'search' | 'capture'>('search')
-  const [query, setQuery] = useState('')
-
-  // Capture-step fields (basic company details only).
   const [name, setName] = useState('')
   const [source, setSource] = useState<BusinessSource>('Direct')
   const [product, setProduct] = useState<ProductType>('HMO')
@@ -46,7 +42,7 @@ export function NewEnquiryForm({
   const [nameInvalid, setNameInvalid] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  const q = query.trim().toLowerCase()
+  const q = name.trim().toLowerCase()
   const enquiryMatches = useMemo(
     () =>
       q.length < 2
@@ -58,15 +54,11 @@ export function NewEnquiryForm({
     () => (q.length < 2 ? [] : cases.filter((c) => c.company.name.toLowerCase().includes(q))),
     [cases, q],
   )
+  const hasDuplicates = enquiryMatches.length > 0 || caseMatches.length > 0
 
   function goToExisting(path: string) {
     onOpenExisting?.()
     navigate(path)
-  }
-
-  function startNewCompany(prefill?: string) {
-    setName(prefill ?? query.trim())
-    setMode('capture')
   }
 
   function handleCreate() {
@@ -89,98 +81,6 @@ export function NewEnquiryForm({
     onCreated(created)
   }
 
-  if (mode === 'search') {
-    return (
-      <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-        <div>
-          <label htmlFor="enq-company-search" className="app-field-plainlabel">
-            Company name
-          </label>
-          <Input
-            id="enq-company-search"
-            aria-label="Company name"
-            aria-describedby="enq-company-help"
-            allowClear
-            size="large"
-            prefix={<SearchOutlined />}
-            placeholder="Type a company name"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <div id="enq-company-help" className="app-help-text">
-            Type at least two characters to search existing enquiries and cases, or to log a new one.
-          </div>
-        </div>
-
-        {q.length >= 2 && enquiryMatches.length > 0 && (
-          <div>
-            <Typography.Text strong>Open enquiries</Typography.Text>
-            <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8 }}>
-              {enquiryMatches.map((e) => (
-                <Card key={e.id} size="small">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{e.companyName}</div>
-                      <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-                        {e.id} · {e.businessSource} · {e.productType}
-                      </Typography.Text>
-                    </div>
-                    <Button onClick={() => goToExisting(`/sales/enquiries/${e.id}`)}>Open enquiry</Button>
-                  </div>
-                </Card>
-              ))}
-            </Space>
-            <Alert
-              type="warning"
-              showIcon
-              style={{ marginTop: 12 }}
-              title="Possible duplicate lead"
-              description="An open enquiry already exists for a company with this name. Open it instead of logging a duplicate, unless this is genuinely a different entity."
-            />
-          </div>
-        )}
-
-        {q.length >= 2 && caseMatches.length > 0 && (
-          <div>
-            <Typography.Text strong>Existing cases</Typography.Text>
-            <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8 }}>
-              {caseMatches.map((c) => (
-                <Card key={c.id} size="small">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>
-                        {c.company.name} <Tag variant="filled">Already a case</Tag>
-                      </div>
-                      <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-                        {c.id} · {c.company.businessSource} · {c.company.productType}
-                      </Typography.Text>
-                    </div>
-                    <Button onClick={() => goToExisting(`/cases/${c.id}/${c.currentWorkArea}`)}>Open case</Button>
-                  </div>
-                </Card>
-              ))}
-            </Space>
-          </div>
-        )}
-
-        {q.length >= 2 && enquiryMatches.length === 0 && caseMatches.length === 0 && (
-          <Alert
-            type="info"
-            showIcon
-            title="No matches found"
-            description={`No open enquiry or case matches “${query.trim()}”.`}
-          />
-        )}
-
-        <div>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => startNewCompany()} disabled={q.length < 2}>
-            {q.length >= 2 ? `Log enquiry for “${query.trim()}”` : 'Log new enquiry'}
-          </Button>
-        </div>
-      </Space>
-    )
-  }
-
   return (
     <Form
       layout="vertical"
@@ -194,8 +94,11 @@ export function NewEnquiryForm({
         required
         validateStatus={nameInvalid ? 'error' : undefined}
         help={nameInvalid ? 'Enter the company name to log the enquiry.' : undefined}
+        style={{ marginBottom: hasDuplicates ? 12 : undefined }}
       >
         <Input
+          autoFocus
+          placeholder="Type a company name"
           value={name}
           onChange={(e) => {
             setName(e.target.value)
@@ -203,37 +106,80 @@ export function NewEnquiryForm({
           }}
         />
       </Form.Item>
-      <Form.Item label="Business source">
-        <Select value={source} onChange={(v) => setSource(v)} options={SOURCES.map((s) => ({ value: s, label: s }))} />
-      </Form.Item>
-      <Form.Item label="Product interest">
-        <Select value={product} onChange={(v) => setProduct(v)} options={PRODUCTS.map((p) => ({ value: p, label: p }))} />
-      </Form.Item>
-      <Form.Item label="Contact name (optional)">
-        <Input value={contactName} onChange={(e) => setContactName(e.target.value)} />
-      </Form.Item>
-      <Form.Item label="Contact email (optional)">
-        <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
-      </Form.Item>
-      <Form.Item label="Contact phone (optional)">
-        <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
-      </Form.Item>
-      <Form.Item label="Notes (optional)">
-        <Input.TextArea
-          rows={3}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="What is the lead asking about?"
+
+      {hasDuplicates && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="A similar company already exists"
+          description={
+            <Space orientation="vertical" size={4} style={{ display: 'flex' }}>
+              {enquiryMatches.slice(0, 3).map((e) => (
+                <span key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span>Open enquiry · <strong>{e.companyName}</strong> ({e.id})</span>
+                  <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => goToExisting(`/sales/enquiries/${e.id}`)}>
+                    Open
+                  </Button>
+                </span>
+              ))}
+              {caseMatches.slice(0, 3).map((c) => (
+                <span key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span>Existing case · <strong>{c.company.name}</strong> ({c.id})</span>
+                  <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => goToExisting(`/cases/${c.id}/${c.currentWorkArea}`)}>
+                    Open
+                  </Button>
+                </span>
+              ))}
+            </Space>
+          }
         />
-      </Form.Item>
-      <Space>
+      )}
+
+      <Row gutter={16}>
+        <Col xs={24} sm={12}>
+          <Form.Item label="Business source">
+            <Select value={source} onChange={(v) => setSource(v)} options={SOURCES.map((s) => ({ value: s, label: s }))} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Form.Item label="Product interest">
+            <Select value={product} onChange={(v) => setProduct(v)} options={PRODUCTS.map((p) => ({ value: p, label: p }))} />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={16}>
+        <Col xs={24} sm={12}>
+          <Form.Item label="Contact name (optional)">
+            <Input value={contactName} onChange={(e) => setContactName(e.target.value)} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Form.Item label="Contact email (optional)">
+            <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={16}>
+        <Col xs={24} sm={12}>
+          <Form.Item label="Contact phone (optional)">
+            <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Form.Item label="Notes (optional)">
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="What is the lead asking about?" />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Form.Item style={{ marginBottom: 0 }}>
         <Button type="primary" htmlType="submit" icon={<ArrowRightOutlined />} loading={submitting}>
           Log enquiry
         </Button>
-        <Button type="text" onClick={() => setMode('search')}>
-          Back to search
-        </Button>
-      </Space>
+      </Form.Item>
     </Form>
   )
 }
