@@ -60,44 +60,44 @@ export function roleHomePath(role: RoleKey): string {
 // and Account Services prominently").
 export const DEMO_USERS: DemoUser[] = [
   // --- AAT · Sales (Account Acquisition Team) ------------------------------
-  { id: 'u-alex-reyes', name: 'Alex Reyes', role: 'account-manager', department: 'AAT · Sales' },
-  { id: 'u-sam-tan', name: 'Sam Tan', role: 'account-manager', department: 'AAT · Sales' },
-  { id: 'u-jordan-cruz', name: 'Jordan Cruz', role: 'sales-supervisor', department: 'AAT · Sales' },
-  { id: 'u-carlos-mendoza', name: 'Carlos Mendoza', role: 'senior-management', department: 'Senior Management' },
+  { id: 'u-irfan', name: 'Irfan', role: 'account-manager', department: 'AAT · Sales' },
+  { id: 'u-santhosh', name: 'Santhosh', role: 'account-manager', department: 'AAT · Sales' },
+  { id: 'u-zameer', name: 'Zameer', role: 'sales-supervisor', department: 'AAT · Sales' },
+  { id: 'u-vidya', name: 'Vidya', role: 'senior-management', department: 'Senior Management' },
   // --- AMT · Account Services (two people → maker/checker within the team) --
-  { id: 'u-mina-lopez', name: 'Mina Lopez', role: 'account-services', department: 'AMT · Account Services', title: 'AMT Associate' },
-  { id: 'u-rafael-santos', name: 'Rafael Santos', role: 'account-services', department: 'AMT · Account Services', title: 'AMT Lead' },
+  { id: 'u-anija', name: 'Anija', role: 'account-services', department: 'AMT · Account Services', title: 'AMT Associate' },
+  { id: 'u-revanth', name: 'Revanth', role: 'account-services', department: 'AMT · Account Services', title: 'AMT Lead' },
   // --- Actuarial -----------------------------------------------------------
-  { id: 'u-priya-nair', name: 'Priya Nair', role: 'actuarial', department: 'Actuarial' },
-  { id: 'u-noah-kim', name: 'Noah Kim', role: 'actuarial', department: 'Actuarial', title: 'Actuarial Reviewer' },
+  { id: 'u-harshitha', name: 'Harshitha', role: 'actuarial', department: 'Actuarial' },
+  { id: 'u-ramya', name: 'Ramya', role: 'actuarial', department: 'Actuarial', title: 'Actuarial Reviewer' },
   // --- Legal ---------------------------------------------------------------
-  { id: 'u-diego-ramos', name: 'Diego Ramos', role: 'legal', department: 'Legal', title: 'Legal Counsel' },
+  { id: 'u-santanu', name: 'Santanu', role: 'legal', department: 'Legal', title: 'Legal Counsel' },
   // --- MDA -----------------------------------------------------------------
-  { id: 'u-grace-tan', name: 'Grace Tan', role: 'mda', department: 'MDA' },
+  { id: 'u-shashi', name: 'Shashi', role: 'mda', department: 'MDA' },
   // --- Billing & Collections ----------------------------------------------
-  { id: 'u-ben-uy', name: 'Ben Uy', role: 'billing-specialist', department: 'Billing & Collections' },
-  { id: 'u-liza-reyes', name: 'Liza Reyes', role: 'billing-supervisor', department: 'Billing & Collections' },
-  { id: 'u-omar-diaz', name: 'Omar Diaz', role: 'collection-specialist', department: 'Billing & Collections' },
+  { id: 'u-srinivas', name: 'Srinivas', role: 'billing-specialist', department: 'Billing & Collections' },
+  { id: 'u-venkat', name: 'Venkat', role: 'billing-supervisor', department: 'Billing & Collections' },
+  { id: 'u-praveen', name: 'Praveen', role: 'collection-specialist', department: 'Billing & Collections' },
   // --- Treasury / Accounting ----------------------------------------------
-  { id: 'u-tessa-lim', name: 'Tessa Lim', role: 'treasury', department: 'Treasury / Accounting' },
+  { id: 'u-tejas', name: 'Tejas', role: 'treasury', department: 'Treasury / Accounting' },
   // --- Accounts Payable ----------------------------------------------------
-  { id: 'u-paulo-reyes', name: 'Paulo Reyes', role: 'accounts-payable', department: 'Accounts Payable' },
+  { id: 'u-chaithanya', name: 'Chaithanya', role: 'accounts-payable', department: 'Accounts Payable' },
   // --- Claims --------------------------------------------------------------
-  { id: 'u-rina-santos', name: 'Rina Santos', role: 'claims-receiving', department: 'Claims' },
-  { id: 'u-mark-villa', name: 'Mark Villa', role: 'claims-processor', department: 'Claims' },
-  { id: 'u-ana-dizon', name: 'Ana Dizon', role: 'claims-reviewer', department: 'Claims' },
+  { id: 'u-keerthana', name: 'Keerthana', role: 'claims-receiving', department: 'Claims' },
+  { id: 'u-saraswathi', name: 'Saraswathi', role: 'claims-processor', department: 'Claims' },
+  { id: 'u-kartik', name: 'Kartik', role: 'claims-reviewer', department: 'Claims' },
   // --- Customer Care (CCD) -------------------------------------------------
-  { id: 'u-joy-ramos', name: 'Joy Ramos', role: 'ccd-outpatient', department: 'Customer Care (CCD)' },
-  { id: 'u-leo-garcia', name: 'Leo Garcia', role: 'ccd-inpatient', department: 'Customer Care (CCD)' },
-  { id: 'u-fe-castro', name: 'Fe Castro', role: 'ccd-supervisor', department: 'Customer Care (CCD)' },
+  { id: 'u-nagasai', name: 'Nagasai', role: 'ccd-outpatient', department: 'Customer Care (CCD)' },
+  { id: 'u-sushmitha', name: 'Sushmitha', role: 'ccd-inpatient', department: 'Customer Care (CCD)' },
+  { id: 'u-sourav', name: 'Sourav', role: 'ccd-supervisor', department: 'Customer Care (CCD)' },
   // --- Provider Networks ---------------------------------------------------
-  { id: 'u-ivan-chua', name: 'Ivan Chua', role: 'provider-network', department: 'Provider Networks' },
+  { id: 'u-addivita', name: 'Addivita', role: 'provider-network', department: 'Provider Networks' },
   // --- System Administration ----------------------------------------------
-  { id: 'u-sys-admin', name: 'Dana Flores', role: 'system-admin', department: 'System Administration' },
+  { id: 'u-nikhil', name: 'Nikhil', role: 'system-admin', department: 'System Administration' },
 ]
 
 /** The persona shown first (the presenter is NOT an unrestricted admin). */
-export const DEFAULT_USER_ID = 'u-alex-reyes'
+export const DEFAULT_USER_ID = 'u-irfan'
 
 export function findUser(id: string | null | undefined): DemoUser | undefined {
   return DEMO_USERS.find((u) => u.id === id)
