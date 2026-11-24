@@ -40,13 +40,13 @@ const STATUS_TAG: Record<Enquiry['status'], { color: string; label: string }> = 
 }
 
 const ACTIVITY_ICON: Record<EnquiryActivityType, ReactNode> = {
-  Call: <PhoneOutlined />, Email: <MailOutlined />, Meeting: <TeamOutlined />,
+  Call: <PhoneOutlined rotate={90} />, Email: <MailOutlined />, Meeting: <TeamOutlined />,
   Message: <MessageOutlined />, Note: <FileTextOutlined />, System: <FileTextOutlined />,
 }
 
 /** The four quick actions — each opens the activity form with its type preset. */
 const QUICK_ACTIONS: { type: EnquiryActivityType; label: string; icon: ReactNode }[] = [
-  { type: 'Call', label: 'Log call', icon: <PhoneOutlined /> },
+  { type: 'Call', label: 'Log call', icon: <PhoneOutlined rotate={90} /> },
   { type: 'Email', label: 'Log email', icon: <MailOutlined /> },
   { type: 'Meeting', label: 'Log meeting', icon: <CalendarOutlined /> },
   { type: 'Note', label: 'Add note', icon: <FileTextOutlined /> },
