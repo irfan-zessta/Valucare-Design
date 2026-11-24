@@ -54,6 +54,15 @@ const QUICK_ACTIONS: { type: EnquiryActivityType; label: string; icon: ReactNode
   { type: 'Note', label: 'Add note', icon: <FileTextOutlined /> },
 ]
 
+/** Next follow-up state — scheduled flag, urgency tone and a relative label. */
+function computeFollowUp(dateStr?: string): { scheduled: boolean; tone: 'empty' | 'overdue' | 'today' | 'upcoming'; label: string } {
+  if (!dateStr) return { scheduled: false, tone: 'empty', label: '' }
+  const diff = dayjs(dateStr).startOf('day').diff(dayjs().startOf('day'), 'day')
+  if (diff < 0) { const n = Math.abs(diff); return { scheduled: true, tone: 'overdue', label: `Overdue by ${n} day${n === 1 ? '' : 's'}` } }
+  if (diff === 0) return { scheduled: true, tone: 'today', label: 'Due today' }
+  return { scheduled: true, tone: 'upcoming', label: diff === 1 ? 'Due tomorrow' : `Due in ${diff} days` }
+}
+
 /** Meaningful event title, keyed off the event kind (not the generic type). */
 function activityTitle(a: EnquiryActivity): string {
   switch (a.kind) {
@@ -83,7 +92,7 @@ async function saveSim(): Promise<boolean> {
 
 export default function EnquiryDetail() {
   const { enquiryId = '' } = useParams()
-  const { getEnquiry, updateEnquiry, logActivity, convertEnquiry, markLost } = useEnquiries()
+  const { getEnquiry, updateEnquiry, logActivity, convertEnquiry, markLost, scheduleFollowUp, completeFollowUp } = useEnquiries()
   const { createLeadFromEnquiry, getLeadByEnquiry, linkCase } = useLeads()
   const { createCase, getCase } = useCases()
   const { can } = useActiveUser()
@@ -95,6 +104,8 @@ export default function EnquiryDetail() {
   const [editOpen, setEditOpen] = useState(false)
   const [lostOpen, setLostOpen] = useState(false)
   const [lostForm] = Form.useForm()
+  const [followUpOpen, setFollowUpOpen] = useState(false)
+  const [followUpForm] = Form.useForm()
   const [converting, setConverting] = useState(false)
 
   const enquiry = getEnquiry(enquiryId)
@@ -162,6 +173,12 @@ export default function EnquiryDetail() {
     return groups
   }, [enquiry.activities])
   const activityCount = enquiry.activities?.length ?? 0
+  const fu = computeFollowUp(enquiry.nextFollowUpDate)
+
+  function handleCompleteFollowUp() {
+    completeFollowUp(enquiry.id)
+    message.success('Follow-up marked complete.')
+  }
 
   return (
     <div className="enq-page">
@@ -186,6 +203,45 @@ export default function EnquiryDetail() {
         <Alert type="warning" showIcon style={{ marginBottom: 20 }}
           title="Enquiry marked lost"
           description={enquiry.lostReason ? `Reason: ${enquiry.lostReason}` : 'No longer being pursued.'} />
+      )}
+
+      {/* Next follow-up — the single next action, tinted by urgency. */}
+      {isOpen && (fu.scheduled || canEdit) && (
+        <Card size="small" className="enq-card" style={{ marginBottom: 20 }}>
+          <div className={`enq-followup enq-followup--${fu.tone}`}>
+            <span className="enq-followup__icon" aria-hidden><CalendarOutlined /></span>
+            <div className="enq-followup__text">
+              <div className="enq-followup__label">Next follow-up</div>
+              {fu.scheduled ? (
+                <div className="enq-followup__detail">
+                  <span className="enq-followup__when">{fu.label}</span>
+                  <span className="enq-followup__sep">·</span>
+                  <span className="enq-followup__date">{formatDate(enquiry.nextFollowUpDate!)}</span>
+                  {enquiry.nextFollowUpAction && (
+                    <>
+                      <span className="enq-followup__sep">·</span>
+                      <span className="enq-followup__act">{enquiry.nextFollowUpAction}</span>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="enq-followup__detail enq-followup__detail--empty">No follow-up scheduled</div>
+              )}
+            </div>
+            {canEdit && (
+              <div className="enq-followup__actions">
+                {fu.scheduled ? (
+                  <>
+                    <Button size="small" onClick={() => setFollowUpOpen(true)}>Reschedule</Button>
+                    <Button size="small" icon={<CheckCircleOutlined />} onClick={handleCompleteFollowUp}>Mark complete</Button>
+                  </>
+                ) : (
+                  <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => setFollowUpOpen(true)}>Schedule follow-up</Button>
+                )}
+              </div>
+            )}
+          </div>
+        </Card>
       )}
 
       <div className="enq-layout">
@@ -313,6 +369,30 @@ export default function EnquiryDetail() {
           message.success('Enquiry updated.')
           return true
         }} />
+
+      {/* Schedule / reschedule the next follow-up */}
+      <Modal title={fu.scheduled ? 'Reschedule follow-up' : 'Schedule follow-up'} open={followUpOpen} okText="Save follow-up"
+        onCancel={() => setFollowUpOpen(false)}
+        afterOpenChange={(open) => {
+          if (open) followUpForm.setFieldsValue({
+            date: enquiry.nextFollowUpDate ? dayjs(enquiry.nextFollowUpDate) : undefined,
+            action: enquiry.nextFollowUpAction,
+          })
+        }}
+        onOk={() => followUpForm.validateFields().then((v) => {
+          scheduleFollowUp(enquiry.id, { date: v.date.format('YYYY-MM-DD'), action: v.action?.trim() || undefined })
+          message.success('Follow-up scheduled.')
+          setFollowUpOpen(false)
+        })}>
+        <Form form={followUpForm} layout="vertical">
+          <Form.Item name="date" label="Follow-up date" rules={[{ required: true, message: 'Pick a date for the follow-up.' }]}>
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="action" label="Next step (optional)" style={{ marginBottom: 0 }}>
+            <Input placeholder="e.g. Send HMO options deck." />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* Mark as lost */}
       <Modal title="Mark this enquiry as lost?" open={lostOpen} okText="Mark as lost" okButtonProps={{ danger: true }}

@@ -1435,6 +1435,49 @@ button.app-stepper__item {
   padding: 20px;
 }
 
+/* Next follow-up — a single next-action strip, tinted by urgency. */
+.enq-followup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.enq-followup__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: 8px;
+  background: #f0f0f0;
+  color: #595959;
+  font-size: 18px;
+  flex: none;
+}
+.enq-followup--overdue .enq-followup__icon { background: #fde8e7; color: #cf1322; }
+.enq-followup--today .enq-followup__icon { background: #fff4e6; color: #d46b08; }
+.enq-followup--upcoming .enq-followup__icon { background: #e6f0ff; color: #1677ff; }
+.enq-followup__text { min-inline-size: 0; flex: 1; }
+.enq-followup__label { font-size: 12px; color: #595959; }
+.enq-followup__detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  color: #1f1f1f;
+  font-weight: 500;
+}
+.enq-followup__when { font-weight: 600; }
+.enq-followup--overdue .enq-followup__when { color: #cf1322; }
+.enq-followup--today .enq-followup__when { color: #d46b08; }
+.enq-followup__sep { color: #d9d9d9; }
+.enq-followup__act { font-weight: 400; color: #595959; }
+.enq-followup__detail--empty { color: #8c8c8c; font-weight: 400; }
+.enq-followup__actions { display: flex; gap: 8px; flex: none; margin-inline-start: auto; }
+@media (max-width: 575px) {
+  .enq-followup { flex-wrap: wrap; }
+  .enq-followup__actions { margin-inline-start: 0; inline-size: 100%; }
+}
+
 /* Quick actions — four equal, minimal tiles in a row. */
 .enq-quick {
   display: grid;
