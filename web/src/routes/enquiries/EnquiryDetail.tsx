@@ -24,8 +24,10 @@ import {
 import dayjs from 'dayjs'
 import { useEnquiries, type ActivityInput, type EnquiryEdit } from '../../state/EnquiryProvider'
 import { useLeads } from '../../state/LeadProvider'
+import { useCases } from '../../state/CaseProvider'
 import { useActiveUser } from '../../state/ActiveUserProvider'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { companyFromLead } from '../../domain/lead'
 import { formatDate } from '../../lib/format'
 import type { Enquiry, EnquiryActivity, EnquiryActivityType } from '../../domain/types'
 import { consumeFailure } from '../../services/demoFailure'
@@ -82,10 +84,11 @@ async function saveSim(): Promise<boolean> {
 export default function EnquiryDetail() {
   const { enquiryId = '' } = useParams()
   const { getEnquiry, updateEnquiry, logActivity, convertEnquiry, markLost } = useEnquiries()
-  const { createLeadFromEnquiry, getLeadByEnquiry } = useLeads()
+  const { createLeadFromEnquiry, getLeadByEnquiry, linkCase } = useLeads()
+  const { createCase, getCase } = useCases()
   const { can } = useActiveUser()
   const navigate = useNavigate()
-  const { message, modal } = App.useApp()
+  const { message } = App.useApp()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [logType, setLogType] = useState<EnquiryActivityType>('Call')
@@ -115,33 +118,35 @@ export default function EnquiryDetail() {
     setDrawerOpen(true)
   }
 
-  function confirmConvert() {
-    modal.confirm({
-      title: 'Convert to franchise?',
-      content: 'This creates a New Business franchise from this enquiry — carrying over the company, contact, business source, product interest and notes — and marks the enquiry converted.',
-      okText: 'Convert to franchise',
-      cancelText: 'Cancel',
-      onOk: () => handleConvert(),
-    })
-  }
-
+  // Convert to franchise — starts the New Business franchise creation process
+  // directly. The enquiry is carried forward to a lead (so its data and activity
+  // history stay linked and reviewable), a franchise case is seeded, and the user
+  // lands straight in the Create Franchise work area. Idempotent: a repeated
+  // conversion resolves to the same lead and case.
   async function handleConvert() {
     if (!enquiry || converting) return
-    // Idempotent: a repeated click resolves to the same lead.
-    const existing = getLeadByEnquiry(enquiry.id)
-    if (existing) { navigate(`/sales/leads/${existing.id}`); return }
+    let lead = getLeadByEnquiry(enquiry.id)
+    const existingCaseId = lead?.caseId && getCase(lead.caseId) ? lead.caseId : undefined
+    if (existingCaseId) { navigate(`/cases/${existingCaseId}/create-franchise`); return }
+
     setConverting(true)
     const ok = await saveSim()
     if (!ok) {
       setConverting(false)
-      message.error('Conversion failed (simulated). The enquiry is unchanged — retry when ready.')
+      message.error('Could not start franchise creation (simulated). The enquiry is unchanged — retry when ready.')
       return
     }
-    const lead = createLeadFromEnquiry(enquiry)
-    convertEnquiry(enquiry.id, lead.id)
+    // Carry the enquiry forward to a lead (links the enquiry) if not already done…
+    if (!lead) {
+      lead = createLeadFromEnquiry(enquiry)
+      convertEnquiry(enquiry.id, lead.id)
+    }
+    // …then seed the New Business franchise case and link it back to the lead.
+    const created = createCase(companyFromLead(lead))
+    linkCase(lead.id, created.id)
     setConverting(false)
-    message.success(`Converted to lead ${lead.id}.`)
-    navigate(`/sales/leads/${lead.id}`)
+    message.success(`Franchise case ${created.id} created from ${enquiry.companyName}.`)
+    navigate(`/cases/${created.id}/create-franchise`)
   }
 
   // Newest-first, grouped by calendar day (groups and items both descending).
@@ -286,7 +291,7 @@ export default function EnquiryDetail() {
         <div className="app-form-floatbar">
           <div className="app-form-floatbar__actions">
             <Button icon={<StopOutlined />} onClick={() => setLostOpen(true)}>Mark as lost</Button>
-            <Button type="primary" loading={converting} onClick={confirmConvert}>Convert to franchise</Button>
+            <Button type="primary" loading={converting} onClick={handleConvert}>Convert to franchise</Button>
           </div>
         </div>
       )}
