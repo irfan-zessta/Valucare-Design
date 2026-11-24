@@ -12,7 +12,7 @@
 // ===========================================================================
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Empty, Input, Popover, Select, Space, Table, Tag, Typography } from 'antd'
+import { Button, Empty, Input, Popover, Select, Space, Table, Tabs, Tag, Typography } from 'antd'
 import { FilterOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useEnquiries } from '../../state/EnquiryProvider'
@@ -25,9 +25,15 @@ const UI_KEY = 'valucare-hms:enquiries'
 
 interface UiState {
   search: string
-  status: string // 'open' | 'converted' | 'lost' | 'all'
+  /** Driven by the status tabs: 'all' | 'open' (In progress) | 'lost'. */
+  status: string
   source?: string
   followUp?: string // bucket
+}
+
+/** Normalise any stored/legacy status to the three supported tabs. */
+function normaliseStatus(s: unknown): string {
+  return s === 'all' || s === 'lost' ? s : 'open'
 }
 
 function loadUi(): UiState {
@@ -37,7 +43,7 @@ function loadUi(): UiState {
       const p = JSON.parse(raw) as Partial<UiState>
       return {
         search: typeof p.search === 'string' ? p.search : '',
-        status: typeof p.status === 'string' ? p.status : 'open',
+        status: normaliseStatus(p.status),
         source: p.source,
         followUp: p.followUp,
       }
@@ -85,23 +91,32 @@ export function useEnquiriesWorkspace() {
   const open = (e: Enquiry) => navigate(`/sales/enquiries/${e.id}`)
 
   const q = ui.search.trim().toLowerCase()
+  // Everything matching search + the non-status filters; the status tabs slice
+  // this further, and the per-tab counts read from it.
+  const base = useMemo(() => enquiries.filter((e) => {
+    if (ui.source && e.businessSource !== ui.source) return false
+    if (ui.followUp && followUpBucket(e) !== ui.followUp) return false
+    if (q) {
+      const hay = [e.companyName, e.shortName, e.id, e.contactName, e.contactEmail].filter(Boolean).join(' ').toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    return true
+  }), [enquiries, ui.source, ui.followUp, q])
+
+  const counts = useMemo(() => ({
+    all: base.length,
+    open: base.filter((e) => e.status === 'open').length,
+    lost: base.filter((e) => e.status === 'lost').length,
+  }), [base])
+
   const rows = useMemo(() => {
-    const matched = enquiries.filter((e) => {
-      if (ui.status !== 'all' && e.status !== ui.status) return false
-      if (ui.source && e.businessSource !== ui.source) return false
-      if (ui.followUp && followUpBucket(e) !== ui.followUp) return false
-      if (q) {
-        const hay = [e.companyName, e.shortName, e.id, e.contactName, e.contactEmail].filter(Boolean).join(' ').toLowerCase()
-        if (!hay.includes(q)) return false
-      }
-      return true
-    })
+    const matched = ui.status === 'all' ? base : base.filter((e) => e.status === ui.status)
     // Overdue first, then due today, then upcoming (soonest), then no follow-up.
     return [...matched].sort(compareByFollowUp)
-  }, [enquiries, ui.status, ui.source, ui.followUp, q])
+  }, [base, ui.status])
 
-  const activeFilterCount = (ui.status !== 'open' ? 1 : 0) + (ui.source ? 1 : 0) + (ui.followUp ? 1 : 0)
-  const clear = () => setUi({ search: '', status: 'open', source: undefined, followUp: undefined })
+  const activeFilterCount = (ui.source ? 1 : 0) + (ui.followUp ? 1 : 0)
+  const clear = () => setUi((s) => ({ ...s, search: '', source: undefined, followUp: undefined }))
 
   const columns: ColumnsType<Enquiry> = [
     {
@@ -131,11 +146,6 @@ export function useEnquiriesWorkspace() {
     <div role="group" aria-label="Filters" style={{ width: 240 }}>
       <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
         <div>
-          <Text type="secondary" id="enq-f-status" className="app-field-caption">Status</Text>
-          <Select aria-label="Status" aria-labelledby="enq-f-status" style={{ width: '100%', marginTop: 4 }} value={ui.status} onChange={(v) => setUi((s) => ({ ...s, status: v }))}
-            options={[{ label: 'Open', value: 'open' }, { label: 'Converted', value: 'converted' }, { label: 'Lost', value: 'lost' }, { label: 'All statuses', value: 'all' }]} />
-        </div>
-        <div>
           <Text type="secondary" id="enq-f-source" className="app-field-caption">Business source</Text>
           <Select aria-label="Business source" aria-labelledby="enq-f-source" allowClear placeholder="Any" style={{ width: '100%', marginTop: 4 }} value={ui.source} onChange={(v) => setUi((s) => ({ ...s, source: v }))}
             options={['Direct', 'Agent', 'Broker'].map((v) => ({ label: v, value: v }))} />
@@ -145,7 +155,7 @@ export function useEnquiriesWorkspace() {
           <Select aria-label="Follow-up" aria-labelledby="enq-f-followup" allowClear placeholder="Any" style={{ width: '100%', marginTop: 4 }} value={ui.followUp} onChange={(v) => setUi((s) => ({ ...s, followUp: v }))}
             options={[{ label: 'Overdue', value: 'overdue' }, { label: 'Due today', value: 'today' }, { label: 'Upcoming', value: 'upcoming' }, { label: 'No follow-up', value: 'none' }]} />
         </div>
-        {activeFilterCount > 0 && <Button type="link" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, status: 'open', source: undefined, followUp: undefined }))}>Clear filters</Button>}
+        {activeFilterCount > 0 && <Button type="link" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, source: undefined, followUp: undefined }))}>Clear filters</Button>}
       </Space>
     </div>
   )
@@ -163,20 +173,38 @@ export function useEnquiriesWorkspace() {
     </Space>
   )
 
+  const emptyDescription = ui.status === 'lost'
+    ? 'No lost leads.'
+    : ui.status === 'all'
+      ? 'No leads yet. Add one with “New Lead”.'
+      : 'No leads in progress. Add one with “New Lead”.'
+
   const content = (
-    <Table<Enquiry>
-      className="app-dash-table"
-      rowKey={(e) => e.id}
-      columns={columns}
-      dataSource={rows}
-      scroll={{ x: 'max-content' }}
-      pagination={{ pageSize: 10, hideOnSinglePage: true }}
-      locale={{
-        emptyText: (ui.search || activeFilterCount > 0)
-          ? <Empty description="No enquiries match"><Button onClick={clear}>Clear</Button></Empty>
-          : <Empty description="No open enquiries. Log one with “New enquiry”." />,
-      }}
-    />
+    <div>
+      <Tabs
+        className="enq-status-tabs"
+        activeKey={ui.status}
+        onChange={(k) => setUi((s) => ({ ...s, status: k }))}
+        items={[
+          { key: 'all', label: `All (${counts.all})` },
+          { key: 'open', label: `In progress (${counts.open})` },
+          { key: 'lost', label: `Lost (${counts.lost})` },
+        ]}
+      />
+      <Table<Enquiry>
+        className="app-dash-table"
+        rowKey={(e) => e.id}
+        columns={columns}
+        dataSource={rows}
+        scroll={{ x: 'max-content' }}
+        pagination={{ pageSize: 10, hideOnSinglePage: true }}
+        locale={{
+          emptyText: (ui.search || activeFilterCount > 0)
+            ? <Empty description="No leads match"><Button onClick={clear}>Clear</Button></Empty>
+            : <Empty description={emptyDescription} />,
+        }}
+      />
+    </div>
   )
 
   return { toolbar, content }

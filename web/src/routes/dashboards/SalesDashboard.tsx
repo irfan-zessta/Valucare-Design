@@ -47,8 +47,8 @@ export default function SalesDashboard() {
   // counting enquiries so the numbers match the list on that tab.
   const enquiryStats = useMemo(
     () => [
-      { key: 'total', title: 'Total enquiries', value: enquiries.length },
-      { key: 'open', title: 'Open', value: enquiries.filter((e) => e.status === 'open').length },
+      { key: 'total', title: 'Total leads', value: enquiries.length },
+      { key: 'open', title: 'In progress', value: enquiries.filter((e) => e.status === 'open').length },
       { key: 'converted', title: 'Converted', value: enquiries.filter((e) => e.status === 'converted').length },
       { key: 'lost', title: 'Lost', value: enquiries.filter((e) => e.status === 'lost').length },
     ],
@@ -328,7 +328,7 @@ export default function SalesDashboard() {
             key: 'enquiries',
             label: (
               <span className="dash-tab">
-                Enquiries
+                Lead
                 <span className="dash-tab__count">{openEnquiries}</span>
               </span>
             ),
