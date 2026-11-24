@@ -23,6 +23,11 @@ export interface EnquiryDraft {
   notes?: string
 }
 
+/** The editable subset of an enquiry (business details, contact and notes). */
+export type EnquiryEdit = Partial<
+  Pick<Enquiry, 'businessSource' | 'productType' | 'contactName' | 'contactEmail' | 'contactPhone' | 'notes'>
+>
+
 /** A manual activity logged from the Log activity drawer. */
 export interface ActivityInput {
   type: EnquiryActivityType
@@ -37,6 +42,8 @@ interface EnquiryContextValue {
   enquiries: Enquiry[]
   getEnquiry: (id: string) => Enquiry | undefined
   createEnquiry: (draft: EnquiryDraft) => Enquiry
+  /** Edit the captured enquiry fields (details, contact, notes); records a timeline event. */
+  updateEnquiry: (id: string, changes: EnquiryEdit, by?: string) => void
   /** Log a manual activity; also applies an optional follow-up change. */
   logActivity: (id: string, input: ActivityInput, followUp?: { date?: string; action?: string }) => void
   /** Set or change the next follow-up and record it on the timeline. */
@@ -96,6 +103,17 @@ export function EnquiryProvider({ children }: { children: ReactNode }) {
     })
     return created
   }, [])
+
+  const updateEnquiry = useCallback(
+    (id: string, changes: EnquiryEdit, by = DEFAULT_ACTOR) => {
+      patch(id, (e) => ({
+        ...e,
+        ...changes,
+        activities: [...(e.activities ?? []), activity('System', new Date().toISOString(), 'Enquiry details updated.', by, 'activity')],
+      }))
+    },
+    [patch],
+  )
 
   const logActivity = useCallback(
     (id: string, input: ActivityInput, followUp?: { date?: string; action?: string }) => {
@@ -172,8 +190,8 @@ export function EnquiryProvider({ children }: { children: ReactNode }) {
   const resetDemo = useCallback(() => setStore(resetEnquiryStore()), [])
 
   const value = useMemo<EnquiryContextValue>(
-    () => ({ enquiries: store.enquiries, getEnquiry, createEnquiry, logActivity, scheduleFollowUp, completeFollowUp, convertEnquiry, markLost, resetDemo }),
-    [store.enquiries, getEnquiry, createEnquiry, logActivity, scheduleFollowUp, completeFollowUp, convertEnquiry, markLost, resetDemo],
+    () => ({ enquiries: store.enquiries, getEnquiry, createEnquiry, updateEnquiry, logActivity, scheduleFollowUp, completeFollowUp, convertEnquiry, markLost, resetDemo }),
+    [store.enquiries, getEnquiry, createEnquiry, updateEnquiry, logActivity, scheduleFollowUp, completeFollowUp, convertEnquiry, markLost, resetDemo],
   )
 
   return <EnquiryContext.Provider value={value}>{children}</EnquiryContext.Provider>

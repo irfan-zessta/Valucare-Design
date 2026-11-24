@@ -1,33 +1,39 @@
 // ===========================================================================
-// Enquiry detail — a daily-work workspace in the shared case layout. The header
-// carries the enquiry name, reference and status, with Log activity (primary),
-// Convert to lead (separate), and Mark as lost (overflow, with a reason). Below:
-//   • Activity (left, widest) — the timeline newest-first, including system
-//     events (creation, follow-up changes, conversion, lost).
-//   • Enquiry details (right) — next follow-up on top, then the captured
-//     business source, product interest, contact and notes.
+// Enquiry detail — a premium, action-oriented CRM workspace in the shared case
+// layout.
+//   • Header: company name + status, reference and created date, with Log
+//     activity (default), Convert to lead (primary) and an overflow kebab.
+//   • Next follow-up: a compact horizontal next-action bar directly under the
+//     header, tinted by urgency (none / upcoming / today / overdue).
+//   • Two columns (≈60 / 40): the activity timeline (left), then Enquiry
+//     details, Contact information and Notes (right).
 // Converting produces a LEAD (carrying everything forward) and links the two.
+// All data and workflows are the existing ones; editing writes through the
+// EnquiryProvider's updateEnquiry.
 // ===========================================================================
-import { useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  App, Alert, Button, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Modal,
-  Result, Select, Space, Tag, Timeline, Typography,
+  App, Alert, Avatar, Button, Card, Col, DatePicker, Descriptions, Drawer, Dropdown, Empty, Flex, Form,
+  Input, Modal, Result, Row, Select, Space, Tag, Timeline, Tooltip, Typography,
 } from 'antd'
 import {
-  ArrowRightOutlined, EllipsisOutlined, PhoneOutlined, MailOutlined,
-  TeamOutlined, MessageOutlined, FileTextOutlined, PlusOutlined, StopOutlined, ExperimentOutlined,
+  ArrowRightOutlined, CalendarOutlined, CheckOutlined, CheckCircleOutlined, CloseCircleOutlined,
+  CopyOutlined, EditOutlined, EllipsisOutlined, ExperimentOutlined, FileAddOutlined, FileTextOutlined,
+  MailOutlined, MessageOutlined, PhoneOutlined, PlusOutlined, StopOutlined, TeamOutlined, UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { useEnquiries, type ActivityInput } from '../../state/EnquiryProvider'
+import { useEnquiries, type ActivityInput, type EnquiryEdit } from '../../state/EnquiryProvider'
 import { useLeads } from '../../state/LeadProvider'
+import { useActiveUser } from '../../state/ActiveUserProvider'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { formatDate, formatDateTime } from '../../lib/format'
+import { formatDate } from '../../lib/format'
+import { followUpBucket, type FollowUpBucket } from '../../domain/enquiry'
 import type { Enquiry, EnquiryActivity, EnquiryActivityType } from '../../domain/types'
 import { armNextSaveFailure, consumeFailure } from '../../services/demoFailure'
 import { simulate } from '../../services/mockClient'
 
-const { Text, Paragraph } = Typography
+const { Text, Title, Paragraph } = Typography
 
 const STATUS_TAG: Record<Enquiry['status'], { color: string; label: string }> = {
   open: { color: 'processing', label: 'Open' },
@@ -35,9 +41,29 @@ const STATUS_TAG: Record<Enquiry['status'], { color: string; label: string }> = 
   lost: { color: 'default', label: 'Lost' },
 }
 
-const ACTIVITY_ICON: Record<EnquiryActivityType, React.ReactNode> = {
+const ACTIVITY_ICON: Record<EnquiryActivityType, ReactNode> = {
   Call: <PhoneOutlined />, Email: <MailOutlined />, Meeting: <TeamOutlined />,
   Message: <MessageOutlined />, Note: <FileTextOutlined />, System: <FileTextOutlined />,
+}
+
+/** Meaningful event title, keyed off the event kind (not the generic type). */
+function activityTitle(a: EnquiryActivity): string {
+  switch (a.kind) {
+    case 'created': return 'Enquiry created'
+    case 'converted': return 'Converted to lead'
+    case 'lost': return 'Marked lost'
+    case 'follow-up': return 'Follow-up updated'
+    default: return a.type === 'System' ? 'Update' : a.type
+  }
+}
+
+/** Timeline dot: a semantic icon, tinted only where it carries real meaning. */
+function activityDot(a: EnquiryActivity): { node: ReactNode; tone: string } {
+  if (a.kind === 'created') return { node: <FileAddOutlined />, tone: 'neutral' }
+  if (a.kind === 'converted') return { node: <CheckCircleOutlined />, tone: 'ok' }
+  if (a.kind === 'lost') return { node: <CloseCircleOutlined />, tone: 'danger' }
+  if (a.kind === 'follow-up') return { node: <CalendarOutlined />, tone: 'info' }
+  return { node: ACTIVITY_ICON[a.type], tone: 'neutral' }
 }
 
 /** Simulate a persisted save; fails once if the demo failure switch is armed. */
@@ -49,14 +75,18 @@ async function saveSim(): Promise<boolean> {
 
 export default function EnquiryDetail() {
   const { enquiryId = '' } = useParams()
-  const { getEnquiry, logActivity, convertEnquiry, markLost } = useEnquiries()
+  const { getEnquiry, updateEnquiry, logActivity, scheduleFollowUp, completeFollowUp, convertEnquiry, markLost } = useEnquiries()
   const { createLeadFromEnquiry, getLeadByEnquiry } = useLeads()
+  const { can } = useActiveUser()
   const navigate = useNavigate()
   const { message } = App.useApp()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const [lostOpen, setLostOpen] = useState(false)
   const [lostForm] = Form.useForm()
+  const [followUpOpen, setFollowUpOpen] = useState(false)
+  const [followForm] = Form.useForm()
   const [converting, setConverting] = useState(false)
 
   const enquiry = getEnquiry(enquiryId)
@@ -71,6 +101,9 @@ export default function EnquiryDetail() {
   }
 
   const tag = STATUS_TAG[enquiry.status]
+  const bucket = followUpBucket(enquiry)
+  const isOpen = enquiry.status === 'open'
+  const canEdit = isOpen && can('enquiries', 'edit')
   const linkedLead = enquiry.convertedLeadId ? enquiry.convertedLeadId : getLeadByEnquiry(enquiry.id)?.id
 
   async function handleConvert() {
@@ -93,16 +126,13 @@ export default function EnquiryDetail() {
   }
 
   const overflowItems = [
-    enquiry.status === 'open'
-      ? { key: 'lost', icon: <StopOutlined />, label: 'Mark as lost', danger: true }
-      : null,
+    isOpen ? { key: 'lost', icon: <StopOutlined />, label: 'Mark as lost', danger: true } : null,
     { key: 'arm', icon: <ExperimentOutlined />, label: 'Simulate next save failure (demo)' },
-  ].filter(Boolean) as { key: string; icon: React.ReactNode; label: string; danger?: boolean }[]
+  ].filter(Boolean) as { key: string; icon: ReactNode; label: string; danger?: boolean }[]
 
   const headerActions = (
     <Space>
-      <Tag color={tag.color}>{tag.label}</Tag>
-      {enquiry.status === 'open' && (
+      {isOpen && (
         <>
           <Button icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>Log activity</Button>
           <Button type="primary" icon={<ArrowRightOutlined />} loading={converting} onClick={handleConvert}>Convert to lead</Button>
@@ -122,73 +152,162 @@ export default function EnquiryDetail() {
             },
           }}
         >
-          <Button icon={<EllipsisOutlined />} />
+          <Button icon={<EllipsisOutlined />} aria-label="More actions" />
         </Dropdown>
       )}
     </Space>
   )
 
-  const activities: EnquiryActivity[] = [...(enquiry.activities ?? [])].sort((a, b) => (a.at < b.at ? 1 : -1))
+  // Newest-first, grouped by calendar day (groups and items both descending).
+  const dateGroups = useMemo(() => {
+    const sorted = [...(enquiry.activities ?? [])].sort((a, b) => (a.at < b.at ? 1 : -1))
+    const groups: { date: string; items: EnquiryActivity[] }[] = []
+    for (const a of sorted) {
+      const date = formatDate(a.at)
+      const last = groups[groups.length - 1]
+      if (last && last.date === date) last.items.push(a)
+      else groups.push({ date, items: [a] })
+    }
+    return groups
+  }, [enquiry.activities])
+  const activityCount = enquiry.activities?.length ?? 0
+  const onlyCreation = activityCount <= 1
+
+  function openReschedule() {
+    followForm.setFieldsValue({
+      date: enquiry!.nextFollowUpDate ? dayjs(enquiry!.nextFollowUpDate) : undefined,
+      action: enquiry!.nextFollowUpAction,
+    })
+    setFollowUpOpen(true)
+  }
 
   return (
     <div className="app-page app-page--wide">
       <PageHeader
         breadcrumb={[{ title: 'Sales' }, { title: 'New Business', to: '/sales' }, { title: enquiry.companyName }]}
-        title={enquiry.companyName}
-        supporting={<>{enquiry.id} · {enquiry.businessSource} · {enquiry.productType} · logged {formatDate(enquiry.createdAt)}</>}
+        title={
+          <span className="enq-title">
+            {enquiry.companyName}
+            <Tag color={tag.color} className="enq-title__status">{tag.label}</Tag>
+          </span>
+        }
+        supporting={<>{enquiry.id} · Created {formatDate(enquiry.createdAt)}</>}
         extra={headerActions}
       />
 
       {enquiry.status === 'converted' && (
-        <Alert type="success" showIcon style={{ marginBottom: 16 }}
+        <Alert type="success" showIcon style={{ marginBottom: 20 }}
           title="Converted to a lead"
           description={linkedLead ? <>This enquiry became lead <b>{linkedLead}</b>. Its activity history carries forward — open it with “View lead”.</> : 'This enquiry has been converted.'}
           action={linkedLead ? <Button size="small" onClick={() => navigate(`/sales/leads/${linkedLead}`)}>View lead</Button> : undefined} />
       )}
       {enquiry.status === 'lost' && (
-        <Alert type="warning" showIcon style={{ marginBottom: 16 }}
+        <Alert type="warning" showIcon style={{ marginBottom: 20 }}
           title="Enquiry marked lost"
           description={enquiry.lostReason ? `Reason: ${enquiry.lostReason}` : 'No longer being pursued.'} />
       )}
 
-      <div className="enq-grid">
-        {/* Activity — widest column */}
-        <Card title="Activity" size="small">
-          {activities.length ? (
-            <Timeline
-              items={activities.map((a) => ({
-                icon: ACTIVITY_ICON[a.type],
-                color: a.kind === 'converted' ? 'green' : a.kind === 'lost' ? 'red' : a.kind === 'follow-up' ? 'blue' : 'gray',
-                content: (
-                  <div>
-                    <Space size={6}>
-                      <Text strong>{a.type === 'System' ? 'Update' : a.type}</Text>
-                      {a.kind !== 'activity' && a.kind !== 'created' && <Tag>{a.kind}</Tag>}
-                    </Space>
-                    <div style={{ marginTop: 2 }}>{a.summary}</div>
-                    <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)', marginTop: 2 }}>{formatDateTime(a.at)} · {a.by}</div>
-                  </div>
-                ),
-              }))}
-            />
-          ) : (
-            <Text type="secondary">No activity yet. Use “Log activity” to record a call, email or note.</Text>
+      {isOpen && (
+        <FollowUpBar
+          enquiry={enquiry}
+          bucket={bucket}
+          onSchedule={() => { followForm.resetFields(); setFollowUpOpen(true) }}
+          onReschedule={openReschedule}
+          onComplete={() => { completeFollowUp(enquiry.id); message.success('Follow-up marked complete.') }}
+        />
+      )}
+
+      <Row gutter={[20, 20]} align="top">
+        {/* Activity timeline — the widest, left column */}
+        <Col xs={24} lg={14}>
+        <Card
+          title="Activity timeline"
+          size="small"
+          className="enq-card"
+          extra={<Text type="secondary" style={{ fontSize: 13 }}>{activityCount} {activityCount === 1 ? 'activity' : 'activities'}</Text>}
+        >
+          {dateGroups.map((g) => (
+            <div key={g.date} className="enq-tl-group">
+              <div className="enq-tl__date">{g.date}</div>
+              <Timeline
+                items={g.items.map((a) => {
+                  const dot = activityDot(a)
+                  return {
+                    icon: <span className={`enq-tl__dot enq-tl__dot--${dot.tone}`}>{dot.node}</span>,
+                    content: (
+                      <div className="enq-tl__item">
+                        <div className="enq-tl__head">
+                          <span className="enq-tl__title">{activityTitle(a)}</span>
+                          <span className="enq-tl__time">{dayjs(a.at).format('h:mm A')}</span>
+                        </div>
+                        {a.summary && <div className="enq-tl__desc">{a.summary}</div>}
+                        <div className="enq-tl__by">
+                          <Avatar size={20} style={{ fontSize: 10, background: '#f0f0f0', color: '#595959' }}>
+                            {initials(a.by)}
+                          </Avatar>
+                          <span>{a.by}</span>
+                        </div>
+                      </div>
+                    ),
+                  }
+                })}
+              />
+            </div>
+          ))}
+          {onlyCreation && (
+            <div className="enq-tl__empty">
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={
+                  <span>
+                    No other activities yet.
+                    {isOpen && <><br />Record your interactions to keep track of this enquiry.</>}
+                  </span>
+                }
+              >
+                {isOpen && <Button size="small" icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>Log activity</Button>}
+              </Empty>
+            </div>
           )}
         </Card>
+        </Col>
 
-        {/* Enquiry details */}
-        <Card title="Enquiry details" size="small">
-          <Descriptions column={1} size="small" colon={false}
-            items={[
-              { key: 'source', label: 'Business source', children: enquiry.businessSource },
-              { key: 'product', label: 'Product interest', children: enquiry.productType },
-              { key: 'contact', label: 'Contact', children: enquiry.contactName || '—' },
-              { key: 'email', label: 'Email', children: enquiry.contactEmail || '—' },
-              { key: 'phone', label: 'Phone', children: enquiry.contactPhone || '—' },
-              { key: 'notes', label: 'Notes', children: enquiry.notes || '—' },
-            ]} />
-        </Card>
-      </div>
+        {/* Right column: details, contact, notes */}
+        <Col xs={24} lg={10}>
+        <Flex vertical gap={20}>
+          <Card
+            title="Enquiry details"
+            size="small"
+            className="enq-card"
+            extra={canEdit ? <Button type="text" size="small" icon={<EditOutlined />} aria-label="Edit enquiry details" onClick={() => setEditOpen(true)} /> : undefined}
+          >
+            <Descriptions column={1} size="small" colon={false} className="enq-desc"
+              items={[
+                { key: 'source', label: 'Business source', children: enquiry.businessSource },
+                { key: 'product', label: 'Product interest', children: enquiry.productType },
+              ]} />
+          </Card>
+
+          <ContactCard enquiry={enquiry} canEdit={canEdit} onEdit={() => setEditOpen(true)} onCopy={(v) => { navigator.clipboard?.writeText(v).catch(() => {}); message.success('Copied.') }} />
+
+          <Card
+            title="Notes"
+            size="small"
+            className="enq-card"
+            extra={canEdit && enquiry.notes ? <Button type="text" size="small" icon={<EditOutlined />} aria-label="Edit note" onClick={() => setEditOpen(true)} /> : undefined}
+          >
+            {enquiry.notes ? (
+              <Paragraph style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}>{enquiry.notes}</Paragraph>
+            ) : (
+              <Flex align="center" justify="space-between" gap={8}>
+                <Text type="secondary">No notes added</Text>
+                {canEdit && <Button type="link" size="small" style={{ paddingInline: 0 }} icon={<PlusOutlined />} onClick={() => setEditOpen(true)}>Add note</Button>}
+              </Flex>
+            )}
+          </Card>
+        </Flex>
+        </Col>
+      </Row>
 
       <LogActivityDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)}
         onSave={async (input, followUp) => {
@@ -198,6 +317,28 @@ export default function EnquiryDetail() {
           message.success('Activity logged.')
           return true
         }} />
+
+      <EditEnquiryDrawer open={editOpen} enquiry={enquiry} onClose={() => setEditOpen(false)}
+        onSave={async (changes) => {
+          const ok = await saveSim()
+          if (!ok) return false
+          updateEnquiry(enquiry.id, changes)
+          message.success('Enquiry updated.')
+          return true
+        }} />
+
+      {/* Schedule / reschedule follow-up */}
+      <Modal title="Schedule follow-up" open={followUpOpen} okText="Save follow-up" onCancel={() => setFollowUpOpen(false)}
+        onOk={() => followForm.validateFields().then((v) => {
+          scheduleFollowUp(enquiry.id, { date: v.date.format('YYYY-MM-DD'), action: v.action })
+          message.success('Follow-up scheduled.')
+          setFollowUpOpen(false)
+        })}>
+        <Form form={followForm} layout="vertical">
+          <Form.Item name="date" label="Follow-up date" rules={[{ required: true, message: 'Pick a date.' }]}><DatePicker style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name="action" label="Action"><Input placeholder="e.g. Send HMO options" /></Form.Item>
+        </Form>
+      </Modal>
 
       {/* Mark as lost */}
       <Modal title="Mark this enquiry as lost?" open={lostOpen} okText="Mark as lost" okButtonProps={{ danger: true }}
@@ -215,6 +356,164 @@ export default function EnquiryDetail() {
         </Form>
       </Modal>
     </div>
+  )
+}
+
+/** Two-letter initials for a person's name (for the timeline avatar). */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '—'
+}
+
+/** Compact next-action bar: calendar icon, follow-up state, date and one action. */
+function FollowUpBar({ enquiry, bucket, onSchedule, onReschedule, onComplete }: {
+  enquiry: Enquiry
+  bucket: FollowUpBucket
+  onSchedule: () => void
+  onReschedule: () => void
+  onComplete: () => void
+}) {
+  const scheduled = bucket !== 'none'
+  const statusText = bucket === 'overdue' ? 'Overdue' : bucket === 'today' ? 'Due today' : bucket === 'upcoming' ? 'Upcoming' : 'No follow-up scheduled'
+  const hint = scheduled
+    ? enquiry.nextFollowUpAction
+    : 'Set a reminder to reconnect with this enquiry.'
+
+  return (
+    <div className={`enq-next enq-next--${bucket}`}>
+      <span className="enq-next__icon"><CalendarOutlined /></span>
+      <div className="enq-next__body">
+        <div className="enq-next__eyebrow">Next follow-up</div>
+        <div className="enq-next__status">
+          {scheduled && bucket !== 'upcoming' && (
+            <Tag color={bucket === 'overdue' ? 'red' : 'gold'} style={{ marginInlineEnd: 2 }}>{statusText}</Tag>
+          )}
+          {!scheduled || bucket === 'upcoming' ? <span>{statusText}</span> : null}
+          {scheduled && <span className="enq-next__date">{formatDate(enquiry.nextFollowUpDate!)}</span>}
+        </div>
+        {hint && <div className="enq-next__hint">{hint}</div>}
+      </div>
+      <Space className="enq-next__action">
+        {scheduled ? (
+          <>
+            <Button size="small" onClick={onReschedule}>Reschedule</Button>
+            <Button size="small" type="primary" ghost icon={<CheckOutlined />} onClick={onComplete}>Mark complete</Button>
+          </>
+        ) : (
+          <Button icon={<CalendarOutlined />} onClick={onSchedule}>Schedule follow-up</Button>
+        )}
+      </Space>
+    </div>
+  )
+}
+
+/** Contact information card — labelled rows with mailto/tel + copy affordances. */
+function ContactCard({ enquiry, canEdit, onEdit, onCopy }: {
+  enquiry: Enquiry
+  canEdit: boolean
+  onEdit: () => void
+  onCopy: (v: string) => void
+}) {
+  const hasAny = Boolean(enquiry.contactName || enquiry.contactEmail || enquiry.contactPhone)
+
+  const row = (icon: ReactNode, label: string, value: string | undefined, href?: string) => (
+    <div className="enq-contact__row">
+      <span className="enq-contact__ico" aria-hidden>{icon}</span>
+      <div className="enq-contact__text">
+        <div className="enq-contact__label">{label}</div>
+        {value ? (
+          <div className="enq-contact__value">
+            {href ? <a href={href}>{value}</a> : <span>{value}</span>}
+            <Tooltip title={`Copy ${label.toLowerCase()}`}>
+              <Button type="text" size="small" className="enq-contact__copy" icon={<CopyOutlined />} aria-label={`Copy ${label.toLowerCase()}`} onClick={() => onCopy(value)} />
+            </Tooltip>
+          </div>
+        ) : (
+          <div className="enq-contact__value enq-contact__value--empty">Not provided</div>
+        )}
+      </div>
+    </div>
+  )
+
+  return (
+    <Card
+      title="Contact information"
+      size="small"
+      className="enq-card"
+      extra={canEdit && hasAny ? <Button type="text" size="small" icon={<EditOutlined />} aria-label="Edit contact information" onClick={onEdit} /> : undefined}
+    >
+      {row(<UserOutlined />, 'Contact', enquiry.contactName)}
+      {row(<MailOutlined />, 'Email', enquiry.contactEmail, enquiry.contactEmail ? `mailto:${enquiry.contactEmail}` : undefined)}
+      {row(<PhoneOutlined />, 'Phone', enquiry.contactPhone, enquiry.contactPhone ? `tel:${enquiry.contactPhone}` : undefined)}
+      {canEdit && !hasAny && (
+        <Button type="link" size="small" style={{ paddingInline: 0, marginTop: 8 }} icon={<PlusOutlined />} onClick={onEdit}>
+          Add contact details
+        </Button>
+      )}
+    </Card>
+  )
+}
+
+/** Edit enquiry — business details, contact and notes in one accessible drawer. */
+function EditEnquiryDrawer({ open, enquiry, onClose, onSave }: {
+  open: boolean
+  enquiry: Enquiry
+  onClose: () => void
+  onSave: (changes: EnquiryEdit) => Promise<boolean>
+}) {
+  const [form] = Form.useForm()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const initial: EnquiryEdit = {
+    businessSource: enquiry.businessSource,
+    productType: enquiry.productType,
+    contactName: enquiry.contactName,
+    contactEmail: enquiry.contactEmail,
+    contactPhone: enquiry.contactPhone,
+    notes: enquiry.notes,
+  }
+
+  async function submit() {
+    const v = await form.validateFields()
+    setSaving(true)
+    setError(null)
+    const changes: EnquiryEdit = {
+      businessSource: v.businessSource,
+      productType: v.productType,
+      contactName: v.contactName?.trim() || undefined,
+      contactEmail: v.contactEmail?.trim() || undefined,
+      contactPhone: v.contactPhone?.trim() || undefined,
+      notes: v.notes?.trim() || undefined,
+    }
+    const ok = await onSave(changes)
+    setSaving(false)
+    if (!ok) { setError('Could not save — network error (simulated). Your changes are kept; retry.'); return }
+    onClose()
+  }
+
+  return (
+    <Drawer title="Edit enquiry" open={open} onClose={onClose} destroyOnHidden
+      extra={<Button type="primary" loading={saving} onClick={submit}>{error ? 'Retry save' : 'Save changes'}</Button>}>
+      {error && <Alert type="error" showIcon closable style={{ marginBottom: 12 }} title="Save failed" description={error} onClose={() => setError(null)} />}
+      <Form form={form} layout="vertical" initialValues={initial} preserve={false}>
+        <Title level={5} style={{ marginTop: 0 }}>Details</Title>
+        <Form.Item name="businessSource" label="Business source">
+          <Select options={['Direct', 'Agent', 'Broker'].map((v) => ({ value: v, label: v }))} />
+        </Form.Item>
+        <Form.Item name="productType" label="Product interest">
+          <Select options={['HMO', 'TPA'].map((v) => ({ value: v, label: v }))} />
+        </Form.Item>
+        <Title level={5}>Contact</Title>
+        <Form.Item name="contactName" label="Contact name"><Input /></Form.Item>
+        <Form.Item name="contactEmail" label="Email" rules={[{ type: 'email', message: 'Enter a valid email.' }]}><Input type="email" /></Form.Item>
+        <Form.Item name="contactPhone" label="Phone"><Input /></Form.Item>
+        <Title level={5}>Notes</Title>
+        <Form.Item name="notes" label="Notes" style={{ marginBottom: 0 }}>
+          <Input.TextArea rows={4} placeholder="What is the lead asking about?" />
+        </Form.Item>
+      </Form>
+    </Drawer>
   )
 }
 
