@@ -12,6 +12,7 @@ import { ArrowRightOutlined } from '@ant-design/icons'
 import { useLeads } from '../../state/LeadProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
 import { useCases } from '../../state/CaseProvider'
+import { useActiveUser } from '../../state/ActiveUserProvider'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { companyFromLead } from '../../domain/lead'
 import { formatDate, formatDateTime } from '../../lib/format'
@@ -24,6 +25,7 @@ export default function LeadDetail() {
   const { getLead, linkCase } = useLeads()
   const { getEnquiry } = useEnquiries()
   const { createCase, getCase } = useCases()
+  const { user, role } = useActiveUser()
   const navigate = useNavigate()
   const { message } = App.useApp()
   const [creating, setCreating] = useState(false)
@@ -47,7 +49,7 @@ export default function LeadDetail() {
     // Idempotent: if the case already exists, just open it.
     if (lead.caseId && getCase(lead.caseId)) { navigate(`/cases/${lead.caseId}/create-franchise`); return }
     setCreating(true)
-    const created = createCase(companyFromLead(lead))
+    const created = createCase(companyFromLead(lead), role === 'account-manager' ? user.id : undefined)
     linkCase(lead.id, created.id)
     setCreating(false)
     message.success(`Franchise case ${created.id} created from this lead.`)

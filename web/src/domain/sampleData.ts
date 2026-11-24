@@ -4,6 +4,7 @@
 // has ONE consistent address, and member totals add up. No real policy values.
 // ===========================================================================
 import { makeCaseId, makeRequestRef, makeAccountRef, uid } from './ids'
+import { seededOwnerId } from './caseOwnership'
 import type { Address, BusinessSource, Case, Company, ProductType } from './types'
 
 export function shortNameFrom(name: string): string {
@@ -54,6 +55,8 @@ function baseCase(seq: number, company: Company): Case {
   const id = makeCaseId(seq)
   return {
     id,
+    // Seeded Account Manager (AAT) owner — configurable in caseOwnership.ts.
+    ownerId: seededOwnerId(seq),
     company,
     franchise: { status: 'draft', estimatedPrincipals: 0, estimatedDependents: 0 },
     quotation: { status: 'not-started', rateSheets: [] },
@@ -112,7 +115,17 @@ export function seedCases(): { cases: Case[]; nextSeq: number } {
       addr('88 Mabini Ave.', 'Cebu City', 'Cebu', 'Central Visayas', '6000'),
       'Rafael Ocampo'),
   )
-  c2.franchise = { ...c2.franchise, status: 'submitted', estimatedPrincipals: 330, estimatedDependents: 300, submittedAt: now }
+  c2.franchise = {
+    ...c2.franchise,
+    status: 'submitted',
+    estimatedPrincipals: 330,
+    estimatedDependents: 300,
+    submittedAt: now,
+    version: 1,
+    submittedById: 'u-irfan',
+    submittedByName: 'Irfan',
+    submittedByRole: 'Account Manager',
+  }
   cases.push(c2)
 
   // 3 — Returned by Account Services with specific corrections
@@ -127,6 +140,11 @@ export function seedCases(): { cases: Case[]; nextSeq: number } {
     status: 'returned',
     estimatedPrincipals: 75,
     estimatedDependents: 40,
+    version: 1,
+    submittedAt: now,
+    submittedById: 'u-santhosh',
+    submittedByName: 'Santhosh',
+    submittedByRole: 'Account Manager',
     returnReasons: [
       { field: 'coverageStart', message: 'Coverage start date is before the signed intent date — please confirm the correct effectivity.' },
       { field: 'contact.email', message: 'Contact email bounced; provide a reachable address.' },
@@ -224,7 +242,18 @@ export function seedCases(): { cases: Case[]; nextSeq: number } {
   ]
   cases.push(c6)
 
+  // 7 — Unassigned prospect, draft franchise with no Account Manager yet. This
+  // is the "unassigned work" the Sales Supervisor needs to see and route.
+  const c7 = baseCase(
+    20,
+    makeCompany('co-20', 'Sierra Madre Foods Inc.', 'HMO', 'Direct',
+      addr('7 Katipunan Ave.', 'Quezon City', 'Metro Manila', 'NCR', '1108'),
+      'Bea Fernandez'),
+  )
+  c7.franchise = { ...c7.franchise, status: 'draft', estimatedPrincipals: 140, estimatedDependents: 95 }
+  cases.push(c7)
+
   // Next sequence number is above the highest seeded case number.
-  const nextSeq = Math.max(18, 15, 12, 6, 23, 9) + 1
+  const nextSeq = Math.max(18, 15, 12, 6, 23, 9, 20) + 1
   return { cases, nextSeq }
 }

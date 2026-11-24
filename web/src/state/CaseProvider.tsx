@@ -12,8 +12,9 @@ import { loadStore, saveStore, resetStore, type StoreShape } from '../services/c
 interface CaseContextValue {
   cases: Case[]
   getCase: (id: string) => Case | undefined
-  /** Create a new case from a captured company; returns the new case. */
-  createCase: (company: Company) => Case
+  /** Create a new case from a captured company; returns the new case. The
+   *  optional ownerId assigns the Account Manager (AAT) who owns it. */
+  createCase: (company: Company, ownerId?: string) => Case
   /** Immutable update of one case by id. */
   patchCase: (id: string, recipe: (c: Case) => Case) => void
   /** Reset all demo data back to the seeded sample set. */
@@ -32,9 +33,9 @@ export function CaseProvider({ children }: { children: ReactNode }) {
   const getCase = useCallback((id: string) => store.cases.find((c) => c.id === id), [store.cases])
 
   const createCase = useCallback(
-    (company: Company): Case => {
+    (company: Company, ownerId?: string): Case => {
       const seq = store.nextSeq
-      const created = makeBlankCase(seq, { ...company, id: `co-${seq}` })
+      const created: Case = { ...makeBlankCase(seq, { ...company, id: `co-${seq}` }), ownerId }
       setStore((prev) => ({ cases: [created, ...prev.cases], nextSeq: prev.nextSeq + 1 }))
       return created
     },
