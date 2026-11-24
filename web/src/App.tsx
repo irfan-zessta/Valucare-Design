@@ -65,8 +65,9 @@ export default function App() {
                         <Route path="/sales/renewals" element={<RenewalsDashboard />} />
                         <Route path="/sales/renewals/:id" element={<RenewalWorkspace />} />
                         <Route path="/sales/renewals/:id/:phase" element={<RenewalWorkspace />} />
-                        {/* Old list route → the Sales dashboard (preserves saved links). */}
-                        <Route path="/sales/corporate-new-business" element={<Navigate to="/sales" replace />} />
+                        {/* Corporate New Business worklist — the "New Business" menu item
+                            (the same records the Sales dashboard shows). */}
+                        <Route path="/sales/corporate-new-business" element={<RequireScreen screen="sales"><SalesDashboard /></RequireScreen>} />
                         <Route path="/sales/corporate-new-business/new" element={<CreateCase />} />
                         {/* Enquiries now live in the Sales dashboard's New Enquiries tab;
                             the old standalone list redirects there (tab is preserved). */}

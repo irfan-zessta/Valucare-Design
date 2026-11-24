@@ -82,10 +82,17 @@ export const NAV: NavDept[] = [
         label: 'Dashboard',
         status: 'available',
         to: '/sales',
-        // The Sales dashboard (New Business worklist + enquiries), the creation
-        // journey, and open cases all live here — but NOT the renewals subtree.
+        // The Sales landing dashboard, plus the enquiry/lead funnel that feeds it.
         match: (p) =>
-          (startsWith('/sales')(p) && !startsWith('/sales/renewals')(p)) || startsWith('/cases')(p),
+          p === '/sales' || startsWith('/sales/enquiries')(p) || startsWith('/sales/leads')(p),
+      },
+      {
+        id: 'sales-new-business',
+        label: 'New Business',
+        status: 'available',
+        to: '/sales/corporate-new-business',
+        // The Corporate New Business worklist, the creation journey and open cases.
+        match: (p) => startsWith('/sales/corporate-new-business')(p) || startsWith('/cases')(p),
       },
       {
         id: 'sales-renewal-business',
