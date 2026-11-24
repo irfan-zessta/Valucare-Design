@@ -333,6 +333,7 @@ export default function SalesDashboard() {
               </span>
             ),
             toolbar: enquiriesTab.toolbar,
+            viewSelector: enquiriesTab.viewSelector,
             content: enquiriesTab.content,
             stats: enquiryStats,
           },

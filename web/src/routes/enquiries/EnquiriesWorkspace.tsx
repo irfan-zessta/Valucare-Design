@@ -12,7 +12,7 @@
 // ===========================================================================
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Empty, Input, Popover, Select, Space, Table, Tabs, Tag, Typography } from 'antd'
+import { Button, Empty, Input, Popover, Segmented, Select, Space, Table, Tag, Typography } from 'antd'
 import { FilterOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useEnquiries } from '../../state/EnquiryProvider'
@@ -22,6 +22,16 @@ import { formatDate, formatRelative } from '../../lib/format'
 
 const { Link: TLink, Text } = Typography
 const UI_KEY = 'valucare-hms:enquiries'
+
+/** Segmented label with a trailing count pill — identical to the case tabs. */
+function segLabel(text: string, n: number) {
+  return (
+    <span className="dash-seg">
+      {text}
+      <span className="dash-seg__count">{n}</span>
+    </span>
+  )
+}
 
 interface UiState {
   search: string
@@ -179,33 +189,37 @@ export function useEnquiriesWorkspace() {
       ? 'No leads yet. Add one with “New Lead”.'
       : 'No leads in progress. Add one with “New Lead”.'
 
-  const content = (
-    <div>
-      <Tabs
-        className="enq-status-tabs"
-        activeKey={ui.status}
-        onChange={(k) => setUi((s) => ({ ...s, status: k }))}
-        items={[
-          { key: 'all', label: `All (${counts.all})` },
-          { key: 'open', label: `In progress (${counts.open})` },
-          { key: 'lost', label: `Lost (${counts.lost})` },
-        ]}
-      />
-      <Table<Enquiry>
-        className="app-dash-table"
-        rowKey={(e) => e.id}
-        columns={columns}
-        dataSource={rows}
-        scroll={{ x: 'max-content' }}
-        pagination={{ pageSize: 10, hideOnSinglePage: true }}
-        locale={{
-          emptyText: (ui.search || activeFilterCount > 0)
-            ? <Empty description="No leads match"><Button onClick={clear}>Clear</Button></Empty>
-            : <Empty description={emptyDescription} />,
-        }}
-      />
-    </div>
+  // Lifecycle view selector — the same Segmented "tab card" the case list uses,
+  // continued here so Leads read identically. Placed on the left of the list bar.
+  const viewSelector = (
+    <Segmented<string>
+      className="app-viewseg"
+      value={ui.status}
+      onChange={(v) => setUi((s) => ({ ...s, status: String(v) }))}
+      options={[
+        { value: 'all', label: segLabel('All', counts.all) },
+        { value: 'open', label: segLabel('In progress', counts.open) },
+        { value: 'lost', label: segLabel('Lost', counts.lost) },
+      ]}
+      aria-label="Filter leads by status"
+    />
   )
 
-  return { toolbar, content }
+  const content = (
+    <Table<Enquiry>
+      className="app-dash-table"
+      rowKey={(e) => e.id}
+      columns={columns}
+      dataSource={rows}
+      scroll={{ x: 'max-content' }}
+      pagination={{ pageSize: 10, hideOnSinglePage: true }}
+      locale={{
+        emptyText: (ui.search || activeFilterCount > 0)
+          ? <Empty description="No leads match"><Button onClick={clear}>Clear</Button></Empty>
+          : <Empty description={emptyDescription} />,
+      }}
+    />
+  )
+
+  return { toolbar, content, viewSelector }
 }

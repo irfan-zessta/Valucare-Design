@@ -103,6 +103,9 @@ export interface DashboardConfig<T> {
     label: ReactNode
     content: ReactNode
     toolbar?: ReactNode
+    /** A lifecycle view selector (e.g. a Segmented) placed on the LEFT of the
+     *  list bar, exactly where the case tabs sit — so it reads identically. */
+    viewSelector?: ReactNode
     stats?: { key: string; title: string; value: number }[]
   }[]
 }
@@ -468,12 +471,16 @@ export function DepartmentDashboard<T>({
     </div>
   )
 
-  // An extra record panel (e.g. Enquiries): its own toolbar + table.
+  // An extra record panel (e.g. Leads): a lifecycle view selector + toolbar laid
+  // out exactly like the Cases panel, then the table.
   const extraPanel = (t: NonNullable<DashboardConfig<T>['extraTabs']>[number]) => (
     <div className="app-cases">
-      {t.toolbar && (
-        <div className="app-listbar app-listbar--tools-only">
-          <div className="app-listbar__tools">{t.toolbar}</div>
+      {(t.viewSelector || t.toolbar) && (
+        <div className={`app-listbar${t.viewSelector ? '' : ' app-listbar--tools-only'}`}>
+          <ConfigProvider theme={{ token: { controlHeight: 36 } }}>
+            {t.viewSelector && <div className="app-viewgroup">{t.viewSelector}</div>}
+            {t.toolbar && <div className="app-listbar__tools">{t.toolbar}</div>}
+          </ConfigProvider>
         </div>
       )}
       <div className="app-table-panel">{t.content}</div>
