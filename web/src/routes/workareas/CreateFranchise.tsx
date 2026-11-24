@@ -575,7 +575,7 @@ export function CreateFranchise({ c }: { c: Case }) {
 
   // Step through the tabs with "Next"; once the Documents step is reached and a
   // document is present, the primary action becomes "Submit for approval".
-  const TAB_ORDER = ['account', 'other', 'documents', 'affiliates', 'decisions']
+  const TAB_ORDER = ['account', 'other', 'documents', 'affiliates', 'decisions', 'comments']
   const tabIndex = TAB_ORDER.indexOf(activeTab)
   const isLastTab = tabIndex >= TAB_ORDER.length - 1
   const reachedDocuments = tabIndex >= TAB_ORDER.indexOf('documents')
@@ -804,44 +804,47 @@ export function CreateFranchise({ c }: { c: Case }) {
           />
         </Form.Item>
       </Section>
-
-      <Section title="Comments">
-        {comments.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            {comments.map((cm) => (
-              <div key={cm.id} style={{ border: '1px solid #f0f0f0', borderRadius: 8, background: '#fafafa', padding: 12, marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, color: '#595959', marginBottom: 4 }}>
-                  <span style={{ fontWeight: 600, color: '#1f1f1f' }}>{cm.author}</span>
-                  <span>{dayjs(cm.at).format('MMM D, YYYY · h:mm A')}</span>
-                </div>
-                <div style={{ whiteSpace: 'pre-wrap', color: '#1f1f1f' }}>{cm.text}</div>
-                {cm.tagged && cm.tagged.length > 0 && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: '#595959' }}>
-                    Tagged: {cm.tagged.map((t) => `@${t.name}`).join(', ')}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        <Input.TextArea id="newComment" rows={3} value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder="Add a comment…" />
-        <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <Select
-            mode="multiple"
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            style={{ flex: 1, minWidth: 220 }}
-            placeholder="Tag people (optional)"
-            value={commentTags}
-            onChange={setCommentTags}
-            options={TAG_OPTIONS}
-            aria-label="Tag people on this comment"
-          />
-          <Button type="primary" onClick={addComment} disabled={!commentDraft.trim()}>Add comment</Button>
-        </div>
-      </Section>
     </>
+  )
+
+  // Comments — their own tab, beside Decisions and extensions.
+  const commentsTab = (
+    <Section title="Comments">
+      {comments.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          {comments.map((cm) => (
+            <div key={cm.id} style={{ border: '1px solid #f0f0f0', borderRadius: 8, background: '#fafafa', padding: 12, marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, color: '#595959', marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, color: '#1f1f1f' }}>{cm.author}</span>
+                <span>{dayjs(cm.at).format('MMM D, YYYY · h:mm A')}</span>
+              </div>
+              <div style={{ whiteSpace: 'pre-wrap', color: '#1f1f1f' }}>{cm.text}</div>
+              {cm.tagged && cm.tagged.length > 0 && (
+                <div style={{ marginTop: 6, fontSize: 12, color: '#595959' }}>
+                  Tagged: {cm.tagged.map((t) => `@${t.name}`).join(', ')}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <Input.TextArea id="newComment" rows={3} value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder="Add a comment…" />
+      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <Select
+          mode="multiple"
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          style={{ flex: 1, minWidth: 220 }}
+          placeholder="Tag people (optional)"
+          value={commentTags}
+          onChange={setCommentTags}
+          options={TAG_OPTIONS}
+          aria-label="Tag people on this comment"
+        />
+        <Button type="primary" onClick={addComment} disabled={!commentDraft.trim()}>Add comment</Button>
+      </div>
+    </Section>
   )
 
   const documentsTab = (
@@ -1111,6 +1114,7 @@ export function CreateFranchise({ c }: { c: Case }) {
             { key: 'documents', label: 'Documents', children: documentsTab },
             { key: 'affiliates', label: 'Affiliates', children: affiliatesTab },
             { key: 'decisions', label: 'Decisions and extensions', children: decisionsTab },
+            { key: 'comments', label: 'Comments', children: commentsTab },
           ]}
         />
 
