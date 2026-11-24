@@ -290,10 +290,8 @@ export function CreateFranchise({ c }: { c: Case }) {
     need('vatStatus', 'Choose the VAT status.')
     need('currentCoverage', 'Choose the current coverage.')
     need('businessSource', 'Choose the business source.')
-    if (isIntermediary) {
-      need('businessSourceName', 'Enter the agent/broker name for this intermediary case.')
-      need('commissionType', 'Choose the commission type for this intermediary case.')
-    }
+    need('businessSourceName', isIntermediary ? 'Enter the agent/broker name for this intermediary case.' : 'Enter the name of the source.')
+    need('commissionType', 'Choose the commission type.')
     if (hasAffiliates && affiliates.length > 0 && affiliates.some((a) => !a.name.trim())) {
       e.affiliates = 'Each affiliate needs a name (or remove the empty row).'
     }
@@ -514,8 +512,7 @@ export function CreateFranchise({ c }: { c: Case }) {
     (f.sameAsCompany || (filled('billingAddress') && filled('billingProvince') && filled('billingCity')))
   const otherComplete =
     f.employeeCount > 0 &&
-    (['vatStatus', 'currentCoverage', 'businessSource'] as (keyof FormState)[]).every(filled) &&
-    (!isIntermediary || (filled('businessSourceName') && filled('commissionType')))
+    (['vatStatus', 'currentCoverage', 'businessSource', 'businessSourceName', 'commissionType'] as (keyof FormState)[]).every(filled)
   const docsComplete = Object.keys(docs).length > 0
   const canSubmit = accountComplete && otherComplete && docsComplete
   const submitBlockers = [
@@ -702,10 +699,10 @@ export function CreateFranchise({ c }: { c: Case }) {
           </div>
         ) : (
           <div style={two}>
-            <Form.Item label="Name of the Source">
+            <Form.Item label={reqLabel('Name of the Source')} validateStatus={statusOf('businessSourceName')} help={helpOf('businessSourceName')}>
               <Input id="businessSourceName" value={f.businessSourceName} onChange={(e) => set('businessSourceName', e.target.value)} />
             </Form.Item>
-            <Form.Item label="Commission Type" validateStatus={statusOf('commissionType')} help={helpOf('commissionType')}>
+            <Form.Item label={reqLabel('Commission Type')} validateStatus={statusOf('commissionType')} help={helpOf('commissionType')}>
               <Select id="commissionType" value={f.commissionType || undefined} options={opts(COMMISSION)} onChange={(v) => set('commissionType', v)} />
             </Form.Item>
           </div>
