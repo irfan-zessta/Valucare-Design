@@ -287,7 +287,7 @@ export default function SalesDashboard() {
         : undefined
     // Only roles that may create enquiries get the secondary action.
     const secondaryAction = can('enquiries', 'edit')
-      ? { label: 'New enquiry', onClick: () => navigate('/sales/enquiries/new') }
+      ? { label: 'New Lead', onClick: () => navigate('/sales/enquiries/new') }
       : undefined
 
     return {
