@@ -81,6 +81,9 @@ export interface DashboardConfig<T> {
    *  horizontally within its panel (with any fixed:'right' column pinned). */
   scrollX?: number
 
+  /** Phone (<576px) renderer: one labelled card per row instead of the table. */
+  renderMobileCard?: (row: T) => ReactNode
+
   emptyText?: string // "No records yet" default
 
   /** When set, the whole row is clickable (cursor + onClick) to open the record. */
@@ -177,6 +180,8 @@ export function DepartmentDashboard<T>({
 
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.md
+  // Phones (<576px): render the list as labelled cards instead of a table.
+  const isPhone = !screens.sm
   // Below lg (≈992px — tablet and down) the interactive filter panel opens in a
   // Drawer (real dialog semantics); lg+ uses a popover.
   const useDrawerFilters = !screens.lg
@@ -320,29 +325,53 @@ export function DepartmentDashboard<T>({
     </Space>
   )
 
-  const renderTable = (data: T[], columns: ColumnsType<T>) => (
-    <Table<T>
-      className="app-dash-table"
-      rowKey={config.rowId}
-      columns={columns}
-      dataSource={data}
-      scroll={config.scrollX ? { x: config.scrollX } : undefined}
-      onRow={config.onRowClick ? (r) => ({
-        onClick: () => config.onRowClick!(r),
-        style: { cursor: 'pointer' },
-      }) : undefined}
-      pagination={{ pageSize: 10, hideOnSinglePage: true }}
-      locale={{
-        emptyText: hasQueryOrFilters ? (
-          <Empty description="No cases match your search and filters">
-            <Button onClick={clearFilters}>Clear search and filters</Button>
-          </Empty>
-        ) : (
-          <Empty description={config.emptyText ?? 'No records yet'} />
-        ),
-      }}
-    />
+  const emptyNode = hasQueryOrFilters ? (
+    <Empty description="No cases match your search and filters">
+      <Button onClick={clearFilters}>Clear search and filters</Button>
+    </Empty>
+  ) : (
+    <Empty description={config.emptyText ?? 'No records yet'} />
   )
+
+  // Phones get a labelled card list (no horizontal table scrolling); larger
+  // screens get the table, which scrolls horizontally — contained in its panel,
+  // Action column pinned — when the content area is too narrow for all columns.
+  const renderList = (data: T[], columns: ColumnsType<T>) => {
+    if (isPhone && config.renderMobileCard) {
+      if (loading) return <Skeleton active />
+      if (data.length === 0) return <div className="app-cards__empty">{emptyNode}</div>
+      return (
+        <ul className="app-cards" role="list">
+          {data.map((r) => (
+            <li
+              key={config.rowId(r)}
+              className="app-card"
+              onClick={config.onRowClick ? () => config.onRowClick!(r) : undefined}
+              style={config.onRowClick ? { cursor: 'pointer' } : undefined}
+            >
+              {config.renderMobileCard!(r)}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    if (loading) return <Skeleton active />
+    return (
+      <Table<T>
+        className="app-dash-table"
+        rowKey={config.rowId}
+        columns={columns}
+        dataSource={data}
+        scroll={{ x: config.scrollX ?? 'max-content' }}
+        onRow={config.onRowClick ? (r) => ({
+          onClick: () => config.onRowClick!(r),
+          style: { cursor: 'pointer' },
+        }) : undefined}
+        pagination={{ pageSize: 10, hideOnSinglePage: true }}
+        locale={{ emptyText: emptyNode }}
+      />
+    )
+  }
 
   // Applied filters as removable chips (label + chosen option text).
   const filterChips = config.filters.flatMap((f) => {
@@ -391,7 +420,7 @@ export function DepartmentDashboard<T>({
           value={view}
           onChange={(v) => setUi((s) => ({ ...s, view: String(v) }))}
           options={viewOptions}
-          block={isMobile}
+          block={isMobile && !isPhone}
           aria-label="Filter cases by status"
         />
         <div className="app-listbar__tools">{toolbar}</div>
@@ -419,7 +448,7 @@ export function DepartmentDashboard<T>({
         </div>
       )}
 
-      <div className="app-table-panel">{loading ? <Skeleton active /> : renderTable(viewRows, viewColumns)}</div>
+      <div className="app-table-panel">{renderList(viewRows, viewColumns)}</div>
 
       {!loading && (
         <div className="app-list-foot" aria-live="polite">

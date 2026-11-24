@@ -169,6 +169,7 @@ export function useEnquiriesWorkspace() {
       rowKey={(e) => e.id}
       columns={columns}
       dataSource={rows}
+      scroll={{ x: 'max-content' }}
       pagination={{ pageSize: 10, hideOnSinglePage: true }}
       locale={{
         emptyText: (ui.search || activeFilterCount > 0)

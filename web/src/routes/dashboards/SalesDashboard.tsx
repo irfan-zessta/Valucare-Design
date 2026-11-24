@@ -225,6 +225,32 @@ export default function SalesDashboard() {
       { title: 'Action', key: 'action', width: 196, align: 'right', fixed: 'right', render: (_, c) => actionCell(c) },
     ]
 
+    // Phone card: the same company / status / action pieces as a row, plus a
+    // labelled metadata grid so nothing is an unlabelled stacked table cell.
+    const renderMobileCard = (c: Case) => (
+      <div className="case-card">
+        <div className="case-card__head">
+          {companyCell(c)}
+          {statusCell(c)}
+        </div>
+        <dl className="case-card__meta">
+          <div>
+            <dt>Product</dt>
+            <dd>{c.company.productType}</dd>
+          </div>
+          <div>
+            <dt>Stage</dt>
+            <dd>{WORK_AREA_LABELS[c.currentWorkArea]}</dd>
+          </div>
+          <div>
+            <dt>{c.isCompleted ? 'Completed' : 'Updated'}</dt>
+            <dd>{formatDate(c.isCompleted ? c.coverage.effectiveDate ?? c.updatedAt : c.updatedAt)}</dd>
+          </div>
+        </dl>
+        <div className="case-card__foot">{actionCell(c)}</div>
+      </div>
+    )
+
     return {
       deptId: 'sales',
       title: 'New Business',
@@ -284,6 +310,7 @@ export default function SalesDashboard() {
       completedColumns,
       // Below this width the table scrolls horizontally with Action pinned right.
       scrollX: 1000,
+      renderMobileCard,
     }
   }, [navigate])
 
