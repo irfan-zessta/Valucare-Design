@@ -135,7 +135,7 @@ export default function EnquiryDetail() {
       {isOpen && (
         <>
           <Button icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>Log activity</Button>
-          <Button type="primary" icon={<ArrowRightOutlined />} loading={converting} onClick={handleConvert}>Convert to lead</Button>
+          <Button type="primary" icon={<ArrowRightOutlined />} loading={converting} onClick={handleConvert}>Convert to franchise</Button>
         </>
       )}
       {enquiry.status === 'converted' && linkedLead && (
