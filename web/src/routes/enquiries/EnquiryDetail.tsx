@@ -377,7 +377,7 @@ function ContactCard({ enquiry, canEdit, onEdit, onCopy }: {
     >
       {row(<UserOutlined />, 'Contact', enquiry.contactName)}
       {row(<MailOutlined />, 'Email', enquiry.contactEmail, enquiry.contactEmail ? `mailto:${enquiry.contactEmail}` : undefined)}
-      {row(<PhoneOutlined />, 'Phone', enquiry.contactPhone, enquiry.contactPhone ? `tel:${enquiry.contactPhone}` : undefined)}
+      {row(<PhoneOutlined rotate={90} />, 'Phone', enquiry.contactPhone, enquiry.contactPhone ? `tel:${enquiry.contactPhone}` : undefined)}
       {canEdit && !hasAny && (
         <Button type="link" size="small" style={{ paddingInline: 0, marginTop: 8 }} icon={<PlusOutlined />} onClick={onEdit}>
           Add contact details
