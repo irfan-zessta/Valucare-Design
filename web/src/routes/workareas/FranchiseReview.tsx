@@ -429,18 +429,14 @@ export function FranchiseReview({ c }: { c: Case }) {
       {/* ---- Floating "waiting" card — what Sales sees while AMT reviews ----- */}
       {!accepted && !rejected && !canApprove && (
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Alert
-            type="info"
-            showIcon
-            icon={<LockOutlined />}
-            title="Waiting for AMT"
-            description={
-              c.franchise.submittedByName
-                ? `Submitted by ${c.franchise.submittedByName} and now with AMT (Account Services) for review. You can follow its status here, but the review decision is theirs.`
-                : 'This franchise is with AMT (Account Services) for review. You can follow its status here, but the review decision is theirs.'
-            }
-            style={{ flex: 1 }}
-          />
+          <Typography.Text type="secondary">
+            <LockOutlined style={{ marginInlineEnd: 8, color: '#1677ff' }} />
+            <Typography.Text strong>Waiting for AMT</Typography.Text>
+            {' — '}
+            {c.franchise.submittedByName
+              ? `submitted by ${c.franchise.submittedByName}, now with Account Services for review.`
+              : 'with Account Services for review.'}
+          </Typography.Text>
         </div>
       )}
 
