@@ -5,10 +5,9 @@
 // ===========================================================================
 import { useMemo, useState } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
-import { Button, Dropdown, Tag, Tooltip, Typography } from 'antd'
+import { Button, Tag, Tooltip, Typography } from 'antd'
 import {
   ExclamationCircleOutlined,
-  MoreOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -123,19 +122,10 @@ export default function SalesDashboard() {
       return { label: 'Continue', subtle: false }
     }
 
-    // Contextual action cell: one primary link action + an overflow menu for
-    // secondary actions. Stops row-click propagation so the controls are
-    // independently operable.
+    // Contextual action cell: one primary link action. Stops row-click
+    // propagation so the control is independently operable.
     const actionCell = (c: Case) => {
       const cta = rowCta(c)
-      const items = [
-        { key: 'open', label: 'Open case' },
-        { key: 'copy', label: 'Copy reference ID' },
-      ]
-      const onMenu = ({ key }: { key: string }) => {
-        if (key === 'open') openCase(c)
-        else if (key === 'copy') navigator.clipboard?.writeText(c.id).catch(() => {})
-      }
       return (
         <div className="sales-action" onClick={(e) => e.stopPropagation()}>
           <Button
@@ -145,14 +135,6 @@ export default function SalesDashboard() {
           >
             {cta.label}
           </Button>
-          <Dropdown menu={{ items, onClick: onMenu }} trigger={['click']} placement="bottomRight">
-            <Button
-              type="text"
-              className="sales-action__more"
-              icon={<MoreOutlined />}
-              aria-label={`More actions for ${c.company.name}`}
-            />
-          </Dropdown>
         </div>
       )
     }
