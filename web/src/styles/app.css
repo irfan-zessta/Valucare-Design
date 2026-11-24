@@ -478,6 +478,15 @@ body {
 .app-pageheader__extra {
   flex: none;
 }
+/* Keep the header actions (e.g. "New Lead" + "Create franchise") the same
+   height regardless of whether a button carries a leading icon. */
+.app-pageheader__extra .ant-btn {
+  height: 40px;
+}
+.app-pageheader__extra .ant-space,
+.app-pageheader__extra .ant-space-item {
+  align-items: stretch;
+}
 
 /* Page header on a white surface (used on the case workspace). */
 .app-pageheader-card {
