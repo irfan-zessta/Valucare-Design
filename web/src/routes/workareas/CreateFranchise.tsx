@@ -691,12 +691,18 @@ export function CreateFranchise({ c }: { c: Case }) {
             <Select id="department" value={f.department} options={opts(DEPARTMENT)} onChange={(v) => set('department', v)} />
           </Form.Item>
         </div>
-        {isIntermediary && (
+        {isIntermediary ? (
           <div style={two}>
             <Form.Item label={reqLabel('Name of Business Source')} validateStatus={statusOf('businessSourceName')} help={helpOf('businessSourceName')}>
               <Input id="businessSourceName" value={f.businessSourceName} onChange={(e) => set('businessSourceName', e.target.value)} />
             </Form.Item>
             <Form.Item label={reqLabel('Commission Type')} validateStatus={statusOf('commissionType')} help={helpOf('commissionType')}>
+              <Select id="commissionType" value={f.commissionType || undefined} options={opts(COMMISSION)} onChange={(v) => set('commissionType', v)} />
+            </Form.Item>
+          </div>
+        ) : (
+          <div style={two}>
+            <Form.Item label="Commission Type" validateStatus={statusOf('commissionType')} help={helpOf('commissionType')}>
               <Select id="commissionType" value={f.commissionType || undefined} options={opts(COMMISSION)} onChange={(v) => set('commissionType', v)} />
             </Form.Item>
           </div>
