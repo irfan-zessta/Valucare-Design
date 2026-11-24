@@ -1466,6 +1466,9 @@ button.app-stepper__item {
   gap: 4px;
   padding-inline: 8px 4px;
   border-radius: 6px;
+  color: #cb0a2f;
+  background: #fbe9ec;
+  border-color: rgba(203, 10, 47, 0.25);
 }
 .app-chip__close {
   display: inline-flex;
@@ -1478,14 +1481,14 @@ button.app-stepper__item {
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: #737373;
+  color: #cb0a2f;
   font-size: 11px;
   line-height: 1;
   cursor: pointer;
 }
 .app-chip__close:hover {
-  color: #1f1f1f;
-  background: rgba(0, 0, 0, 0.06);
+  color: #cb0a2f;
+  background: rgba(203, 10, 47, 0.12);
 }
 .app-chip__close:focus-visible {
   outline: 2px solid rgba(203, 10, 47, 0.55);
