@@ -1405,57 +1405,6 @@ button.app-stepper__item {
   font-weight: 500;
 }
 
-/* Next-action bar — one compact horizontal row under the header. Urgency is
-   carried by the status text AND tone (never colour alone). */
-.enq-next {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 20px;
-  background: #fff;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
-  margin-bottom: 20px;
-}
-.enq-next__icon {
-  flex: none;
-  inline-size: 40px;
-  block-size: 40px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #f4f4f4;
-  color: #595959;
-  font-size: 20px;
-}
-.enq-next__body { flex: 1 1 auto; min-inline-size: 0; }
-.enq-next__eyebrow { font-size: 12px; color: #595959; font-weight: 500; }
-.enq-next__status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-block-start: 2px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #1f1f1f;
-}
-.enq-next__status .ant-tag { margin: 0; }
-.enq-next__date { font-weight: 600; }
-.enq-next__hint { margin-block-start: 2px; font-size: 13px; color: #737373; }
-.enq-next__action { flex: none; }
-/* Tones */
-.enq-next--upcoming { background: #f0f6ff; border-color: #bedaff; }
-.enq-next--upcoming .enq-next__icon { background: #e0edff; color: #1677ff; }
-.enq-next--today { background: #fffbe6; border-color: #ffe58f; }
-.enq-next--today .enq-next__icon { background: #fff3cd; color: #d48806; }
-.enq-next--overdue { background: #fff1f0; border-color: #ffccc7; }
-.enq-next--overdue .enq-next__icon { background: #ffe2df; color: #cf1322; }
-@media (max-width: 575px) {
-  .enq-next { flex-wrap: wrap; }
-  .enq-next__action { inline-size: 100%; }
-}
-
 /* Activity timeline — date-grouped, with quiet semantic dots. */
 .enq-tl-group + .enq-tl-group { margin-block-start: 4px; }
 .enq-tl__date {

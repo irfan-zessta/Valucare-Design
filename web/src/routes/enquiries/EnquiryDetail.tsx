@@ -18,7 +18,7 @@ import {
   Input, Modal, Result, Row, Select, Space, Tag, Timeline, Tooltip, Typography,
 } from 'antd'
 import {
-  ArrowRightOutlined, CalendarOutlined, CheckOutlined, CheckCircleOutlined, CloseCircleOutlined,
+  ArrowRightOutlined, CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined,
   CopyOutlined, EditOutlined, EllipsisOutlined, ExperimentOutlined, FileAddOutlined, FileTextOutlined,
   MailOutlined, MessageOutlined, PhoneOutlined, PlusOutlined, StopOutlined, TeamOutlined, UserOutlined,
 } from '@ant-design/icons'
@@ -28,7 +28,6 @@ import { useLeads } from '../../state/LeadProvider'
 import { useActiveUser } from '../../state/ActiveUserProvider'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDate } from '../../lib/format'
-import { followUpBucket, type FollowUpBucket } from '../../domain/enquiry'
 import type { Enquiry, EnquiryActivity, EnquiryActivityType } from '../../domain/types'
 import { armNextSaveFailure, consumeFailure } from '../../services/demoFailure'
 import { simulate } from '../../services/mockClient'
@@ -75,7 +74,7 @@ async function saveSim(): Promise<boolean> {
 
 export default function EnquiryDetail() {
   const { enquiryId = '' } = useParams()
-  const { getEnquiry, updateEnquiry, logActivity, scheduleFollowUp, completeFollowUp, convertEnquiry, markLost } = useEnquiries()
+  const { getEnquiry, updateEnquiry, logActivity, convertEnquiry, markLost } = useEnquiries()
   const { createLeadFromEnquiry, getLeadByEnquiry } = useLeads()
   const { can } = useActiveUser()
   const navigate = useNavigate()
@@ -85,8 +84,6 @@ export default function EnquiryDetail() {
   const [editOpen, setEditOpen] = useState(false)
   const [lostOpen, setLostOpen] = useState(false)
   const [lostForm] = Form.useForm()
-  const [followUpOpen, setFollowUpOpen] = useState(false)
-  const [followForm] = Form.useForm()
   const [converting, setConverting] = useState(false)
 
   const enquiry = getEnquiry(enquiryId)
@@ -101,7 +98,6 @@ export default function EnquiryDetail() {
   }
 
   const tag = STATUS_TAG[enquiry.status]
-  const bucket = followUpBucket(enquiry)
   const isOpen = enquiry.status === 'open'
   const canEdit = isOpen && can('enquiries', 'edit')
   const linkedLead = enquiry.convertedLeadId ? enquiry.convertedLeadId : getLeadByEnquiry(enquiry.id)?.id
@@ -173,14 +169,6 @@ export default function EnquiryDetail() {
   const activityCount = enquiry.activities?.length ?? 0
   const onlyCreation = activityCount <= 1
 
-  function openReschedule() {
-    followForm.setFieldsValue({
-      date: enquiry!.nextFollowUpDate ? dayjs(enquiry!.nextFollowUpDate) : undefined,
-      action: enquiry!.nextFollowUpAction,
-    })
-    setFollowUpOpen(true)
-  }
-
   return (
     <div className="app-page app-page--wide">
       <PageHeader
@@ -205,16 +193,6 @@ export default function EnquiryDetail() {
         <Alert type="warning" showIcon style={{ marginBottom: 20 }}
           title="Enquiry marked lost"
           description={enquiry.lostReason ? `Reason: ${enquiry.lostReason}` : 'No longer being pursued.'} />
-      )}
-
-      {isOpen && (
-        <FollowUpBar
-          enquiry={enquiry}
-          bucket={bucket}
-          onSchedule={() => { followForm.resetFields(); setFollowUpOpen(true) }}
-          onReschedule={openReschedule}
-          onComplete={() => { completeFollowUp(enquiry.id); message.success('Follow-up marked complete.') }}
-        />
       )}
 
       <Row gutter={[20, 20]} align="top">
@@ -327,19 +305,6 @@ export default function EnquiryDetail() {
           return true
         }} />
 
-      {/* Schedule / reschedule follow-up */}
-      <Modal title="Schedule follow-up" open={followUpOpen} okText="Save follow-up" onCancel={() => setFollowUpOpen(false)}
-        onOk={() => followForm.validateFields().then((v) => {
-          scheduleFollowUp(enquiry.id, { date: v.date.format('YYYY-MM-DD'), action: v.action })
-          message.success('Follow-up scheduled.')
-          setFollowUpOpen(false)
-        })}>
-        <Form form={followForm} layout="vertical">
-          <Form.Item name="date" label="Follow-up date" rules={[{ required: true, message: 'Pick a date.' }]}><DatePicker style={{ width: '100%' }} /></Form.Item>
-          <Form.Item name="action" label="Action"><Input placeholder="e.g. Send HMO options" /></Form.Item>
-        </Form>
-      </Modal>
-
       {/* Mark as lost */}
       <Modal title="Mark this enquiry as lost?" open={lostOpen} okText="Mark as lost" okButtonProps={{ danger: true }}
         onCancel={() => setLostOpen(false)}
@@ -363,48 +328,6 @@ export default function EnquiryDetail() {
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/)
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '—'
-}
-
-/** Compact next-action bar: calendar icon, follow-up state, date and one action. */
-function FollowUpBar({ enquiry, bucket, onSchedule, onReschedule, onComplete }: {
-  enquiry: Enquiry
-  bucket: FollowUpBucket
-  onSchedule: () => void
-  onReschedule: () => void
-  onComplete: () => void
-}) {
-  const scheduled = bucket !== 'none'
-  const statusText = bucket === 'overdue' ? 'Overdue' : bucket === 'today' ? 'Due today' : bucket === 'upcoming' ? 'Upcoming' : 'No follow-up scheduled'
-  const hint = scheduled
-    ? enquiry.nextFollowUpAction
-    : 'Set a reminder to reconnect with this enquiry.'
-
-  return (
-    <div className={`enq-next enq-next--${bucket}`}>
-      <span className="enq-next__icon"><CalendarOutlined /></span>
-      <div className="enq-next__body">
-        <div className="enq-next__eyebrow">Next follow-up</div>
-        <div className="enq-next__status">
-          {scheduled && bucket !== 'upcoming' && (
-            <Tag color={bucket === 'overdue' ? 'red' : 'gold'} style={{ marginInlineEnd: 2 }}>{statusText}</Tag>
-          )}
-          {!scheduled || bucket === 'upcoming' ? <span>{statusText}</span> : null}
-          {scheduled && <span className="enq-next__date">{formatDate(enquiry.nextFollowUpDate!)}</span>}
-        </div>
-        {hint && <div className="enq-next__hint">{hint}</div>}
-      </div>
-      <Space className="enq-next__action">
-        {scheduled ? (
-          <>
-            <Button size="small" onClick={onReschedule}>Reschedule</Button>
-            <Button size="small" type="primary" ghost icon={<CheckOutlined />} onClick={onComplete}>Mark complete</Button>
-          </>
-        ) : (
-          <Button icon={<CalendarOutlined />} onClick={onSchedule}>Schedule follow-up</Button>
-        )}
-      </Space>
-    </div>
-  )
 }
 
 /** Contact information card — labelled rows with mailto/tel + copy affordances. */
