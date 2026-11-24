@@ -11,7 +11,6 @@ import { canAccessCase } from '../domain/caseAccess'
 import { roleLabel } from '../domain/access'
 import { roleHomePath } from '../domain/demoRoster'
 import { CaseStatusTag } from '../components/CaseStatusTag'
-import { CaseOwnershipBanner } from '../components/case/CaseOwnershipBanner'
 import { CaseHistory } from '../components/case/CaseHistory'
 import { PageHeader } from '../components/ui/PageHeader'
 import { JourneyStepper } from '../components/ui/JourneyStepper'
@@ -93,7 +92,6 @@ export default function CaseWorkspace() {
       </div>
 
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-        <CaseOwnershipBanner c={c} />
         <WorkAreaPanel c={c} workArea={activeWorkArea} />
         <CaseHistory c={c} />
       </Space>
