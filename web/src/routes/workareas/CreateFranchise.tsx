@@ -289,8 +289,6 @@ export function CreateFranchise({ c }: { c: Case }) {
     if (!(f.employeeCount > 0)) e.employeeCount = 'Enter the number of employees (at least 1).'
     need('vatStatus', 'Choose the VAT status.')
     need('currentCoverage', 'Choose the current coverage.')
-    need('mannerOfEnrollment', 'Choose the manner of enrollment.')
-    need('mannerOfPayment', 'Choose the manner of payment.')
     need('businessSource', 'Choose the business source.')
     if (isIntermediary) {
       need('businessSourceName', 'Enter the agent/broker name for this intermediary case.')
@@ -516,7 +514,7 @@ export function CreateFranchise({ c }: { c: Case }) {
     (f.sameAsCompany || (filled('billingAddress') && filled('billingProvince') && filled('billingCity')))
   const otherComplete =
     f.employeeCount > 0 &&
-    (['vatStatus', 'currentCoverage', 'mannerOfEnrollment', 'mannerOfPayment', 'businessSource'] as (keyof FormState)[]).every(filled) &&
+    (['vatStatus', 'currentCoverage', 'businessSource'] as (keyof FormState)[]).every(filled) &&
     (!isIntermediary || (filled('businessSourceName') && filled('commissionType')))
   const docsComplete = Object.keys(docs).length > 0
   const canSubmit = accountComplete && otherComplete && docsComplete
@@ -675,10 +673,10 @@ export function CreateFranchise({ c }: { c: Case }) {
           </Form.Item>
         </div>
         <div style={two}>
-          <Form.Item label={reqLabel('Manner of Enrollment')} validateStatus={statusOf('mannerOfEnrollment')} help={helpOf('mannerOfEnrollment')}>
+          <Form.Item label="Manner of Enrollment" validateStatus={statusOf('mannerOfEnrollment')} help={helpOf('mannerOfEnrollment')}>
             <Select id="mannerOfEnrollment" value={f.mannerOfEnrollment} options={opts(ENROLLMENT)} onChange={(v) => set('mannerOfEnrollment', v)} />
           </Form.Item>
-          <Form.Item label={reqLabel('Manner of Payment')} validateStatus={statusOf('mannerOfPayment')} help={helpOf('mannerOfPayment')}>
+          <Form.Item label="Manner of Payment" validateStatus={statusOf('mannerOfPayment')} help={helpOf('mannerOfPayment')}>
             <Select id="mannerOfPayment" value={f.mannerOfPayment} options={opts(PAYMENT)} onChange={(v) => set('mannerOfPayment', v)} />
           </Form.Item>
         </div>
