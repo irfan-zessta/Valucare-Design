@@ -365,6 +365,28 @@ body {
   color: rgba(0, 0, 0, 0.45);
 }
 
+/* "View as" persona switcher, pinned to the bottom of the sidebar above the
+   collapse toggle. */
+.app-sider-user {
+  flex: none;
+  border-block-start: 1px solid #f0f0f0;
+  padding: 8px;
+}
+.app-sider-user .app-viewas__trigger {
+  max-inline-size: none;
+  inline-size: 100%;
+}
+.app-sider-user--collapsed {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+.app-viewas__trigger--collapsed {
+  inline-size: auto;
+  padding: 4px;
+  justify-content: center;
+}
+
 /* Collapse/expand arrow pinned to the bottom of the sidebar. */
 .app-sider-toggle {
   flex: none;
@@ -2060,17 +2082,17 @@ button.app-stepper__item {
   display: inline-flex;
 }
 .notif-bell.ant-btn {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: #1f1f1f;
 }
 .notif-bell.ant-btn .anticon {
-  font-size: 21px;
+  font-size: 18px;
 }
 .notif-bell.ant-btn:hover {
   background: #f5f5f5;

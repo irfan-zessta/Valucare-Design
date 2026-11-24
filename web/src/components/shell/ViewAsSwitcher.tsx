@@ -14,6 +14,7 @@
 // ===========================================================================
 import { useMemo, useState } from 'react'
 import { App, Input, Popover, Typography, Button, Divider } from 'antd'
+import type { TooltipPlacement } from 'antd/es/tooltip'
 import { DownOutlined, CheckOutlined, LogoutOutlined, SearchOutlined } from '@ant-design/icons'
 import { useActiveUser } from '../../state/ActiveUserProvider'
 import { useAuth } from '../../auth/AuthProvider'
@@ -23,7 +24,15 @@ import { roleLabel } from '../../domain/access'
 import { groupedUsers, userTitle, type DemoUser } from '../../domain/demoRoster'
 import { Avatar } from './Avatar'
 
-export function ViewAsSwitcher() {
+export function ViewAsSwitcher({
+  placement = 'bottomRight',
+  collapsed = false,
+}: {
+  /** Where the persona panel opens relative to the trigger. */
+  placement?: TooltipPlacement
+  /** Icon-only trigger (collapsed sidebar rail). */
+  collapsed?: boolean
+} = {}) {
   const { user, setUserId } = useActiveUser()
   const { user: presenter } = useAuth()
   const { isDirty, canSave, saveNow } = useUnsavedChangesState()
@@ -147,28 +156,32 @@ export function ViewAsSwitcher() {
   return (
     <Popover
       trigger={['click']}
-      placement="bottomRight"
+      placement={placement}
       open={open}
       onOpenChange={setOpen}
       content={content}
       styles={{ body: { padding: 12, width: 320 } }}
     >
       <div
-        className="app-viewas__trigger"
+        className={`app-viewas__trigger${collapsed ? ' app-viewas__trigger--collapsed' : ''}`}
         role="button"
         tabIndex={0}
         aria-label={`Viewing as ${user.name}, ${roleLabel(user.role)}. Click to switch persona.`}
       >
         <Avatar name={user.name} size={32} />
-        <span className="app-viewas__trigger-text">
-          <span className="app-viewas__trigger-line1">
-            <span className="app-viewas__trigger-prefix">Viewing as:</span> {roleLabel(user.role)}
-          </span>
-          <span className="app-viewas__trigger-line2">
-            {user.name} · {user.department}
-          </span>
-        </span>
-        <DownOutlined style={{ fontSize: 11, color: 'rgba(0,0,0,0.45)' }} />
+        {!collapsed && (
+          <>
+            <span className="app-viewas__trigger-text">
+              <span className="app-viewas__trigger-line1">
+                <span className="app-viewas__trigger-prefix">Viewing as:</span> {roleLabel(user.role)}
+              </span>
+              <span className="app-viewas__trigger-line2">
+                {user.name} · {user.department}
+              </span>
+            </span>
+            <DownOutlined style={{ fontSize: 11, color: 'rgba(0,0,0,0.45)' }} />
+          </>
+        )}
       </div>
     </Popover>
   )

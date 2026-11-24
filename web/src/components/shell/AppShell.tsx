@@ -20,6 +20,7 @@ import { AppHeader } from './AppHeader'
 import { Sidebar } from './Sidebar'
 import { SidebarBrand } from './SidebarBrand'
 import { SidebarCollapseToggle } from './SidebarCollapseToggle'
+import { ViewAsSwitcher } from './ViewAsSwitcher'
 
 const { Sider, Content } = Layout
 const { useBreakpoint } = Grid
@@ -95,6 +96,9 @@ export function AppShell() {
           >
             <SidebarBrand collapsed={collapsed} />
             <Sidebar collapsed={collapsed} onNavigate={() => {}} />
+            <div className={`app-sider-user${collapsed ? ' app-sider-user--collapsed' : ''}`}>
+              <ViewAsSwitcher placement={collapsed ? 'rightBottom' : 'topLeft'} collapsed={collapsed} />
+            </div>
             <SidebarCollapseToggle collapsed={collapsed} onToggle={toggleSidebar} />
           </Sider>
         )}
@@ -117,6 +121,9 @@ export function AppShell() {
       >
         <SidebarBrand collapsed={false} />
         <Sidebar collapsed={false} onNavigate={closeMobileNav} />
+        <div className="app-sider-user">
+          <ViewAsSwitcher placement="topLeft" />
+        </div>
       </Drawer>
 
       <Modal
