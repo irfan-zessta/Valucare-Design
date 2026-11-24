@@ -1745,9 +1745,10 @@ button.app-stepper__item {
    leading icon, plus an optional responsible-team subline. Colour is always
    reinforced by the icon + label text (never colour alone). */
 .sales-chip-wrap {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  text-align: center;
   gap: 3px;
 }
 .sales-chip-wrap:focus-visible {

@@ -7,14 +7,9 @@ import { useMemo, useState } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { Button, Dropdown, Tag, Tooltip, Typography } from 'antd'
 import {
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  EditOutlined,
   ExclamationCircleOutlined,
   MoreOutlined,
   PlusOutlined,
-  SendOutlined,
-  SyncOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
@@ -162,40 +157,36 @@ export default function SalesDashboard() {
       )
     }
 
-    // Concise status: short label + leading icon (meaning never by colour
-    // alone), a responsible-department subline where relevant, and the full
-    // business status in a tooltip (focusable for keyboard users).
     // A clean, categorical status chip (Ant Tag) with a standard semantic
-    // colour, a leading icon (meaning never by colour alone) and an optional
-    // responsible-team subline. The full business status is in the tooltip.
+    // colour and an optional responsible-team subline. The full business status
+    // is in the tooltip (focusable for keyboard users).
     const statusCell = (c: Case) => {
       let label = 'In progress'
       let color = 'blue' // processing / in-progress
-      let icon = <SyncOutlined />
       let sub: string | undefined
       if (c.isCompleted) {
-        if (c.coverage.status === 'scheduled') { label = 'Scheduled'; color = 'cyan'; icon = <ClockCircleOutlined /> }
-        else { label = 'Active'; color = 'green'; icon = <CheckCircleOutlined /> }
+        if (c.coverage.status === 'scheduled') { label = 'Scheduled'; color = 'cyan' }
+        else { label = 'Active'; color = 'green' }
       } else if (c.franchise.status === 'returned') {
-        label = 'Returned'; color = 'red'; icon = <ExclamationCircleOutlined />; sub = 'by AMT'
+        label = 'Returned'; color = 'red'; sub = 'by AMT'
       } else if (c.franchise.status === 'rejected') {
-        label = 'Rejected'; color = 'red'; icon = <ExclamationCircleOutlined />
+        label = 'Rejected'; color = 'red'
       } else if (c.quotation.status === 'clarification') {
-        label = 'Needs info'; color = 'gold'; icon = <ExclamationCircleOutlined />; sub = 'from Actuarial'
+        label = 'Needs info'; color = 'gold'; sub = 'from Actuarial'
       } else if (c.franchise.status === 'draft' && c.currentWorkArea === 'create-franchise') {
-        label = 'Draft'; color = 'default'; icon = <EditOutlined />
+        label = 'Draft'; color = 'default'
       } else if (c.franchise.status === 'submitted') {
-        label = 'Waiting'; color = 'gold'; icon = <ClockCircleOutlined />; sub = 'with AMT'
+        label = 'Waiting'; color = 'gold'; sub = 'with AMT'
       } else if (c.quotation.status === 'submitted') {
-        label = 'Waiting'; color = 'gold'; icon = <ClockCircleOutlined />; sub = 'with Actuarial'
+        label = 'Waiting'; color = 'gold'; sub = 'with Actuarial'
       } else {
         const p = currentProposal(c)
-        if (c.currentWorkArea === 'finalize-offer' && p?.status === 'sent') { label = 'Sent to client'; color = 'geekblue'; icon = <SendOutlined /> }
+        if (c.currentWorkArea === 'finalize-offer' && p?.status === 'sent') { label = 'Sent to client'; color = 'geekblue' }
       }
       return (
         <Tooltip title={meaningfulStatus(c)}>
           <span className="sales-chip-wrap" tabIndex={0}>
-            <Tag className="sales-chip" color={color} icon={icon}>{label}</Tag>
+            <Tag className="sales-chip" color={color}>{label}</Tag>
             {sub && <span className="sales-status__sub">{sub}</span>}
           </span>
         </Tooltip>
