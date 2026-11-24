@@ -978,9 +978,6 @@ export function CreateFranchise({ c }: { c: Case }) {
             description="Fields across the tabs were filled from the uploaded form. Review them, correct anything, then submit."
           />
         )}
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '12px 0 0' }}>
-          Prototype: the document isn’t actually read — the fields are filled with sample data to show the flow.
-        </Typography.Paragraph>
       </div>
 
       {c.franchise.status === 'returned' && (
