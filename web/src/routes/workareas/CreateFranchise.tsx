@@ -28,6 +28,7 @@ import {
 import dayjs from 'dayjs'
 import { useCases } from '../../state/CaseProvider'
 import { useActiveUser } from '../../state/ActiveUserProvider'
+import { useMentions } from '../../state/MentionsProvider'
 import { roleLabel } from '../../domain/access'
 import { withEvent } from '../../domain/caseHistory'
 import { shortNameFrom } from '../../domain/sampleData'
@@ -219,7 +220,12 @@ interface FranchiseComment {
   text: string
   author: string
   at: string
+  /** Users tagged on this comment (demo user id + display name). */
+  tagged?: { id: string; name: string }[]
 }
+
+/** Everyone who can be tagged on a comment. */
+const TAG_OPTIONS = DEMO_USERS.map((u) => ({ value: u.id, label: u.name }))
 
 /** Label with a right-side red asterisk for mandatory fields. */
 function reqLabel(label: string) {
@@ -234,6 +240,7 @@ function reqLabel(label: string) {
 export function CreateFranchise({ c }: { c: Case }) {
   const { patchCase } = useCases()
   const { user, can } = useActiveUser()
+  const { addMentions } = useMentions()
   const { message } = App.useApp()
   const [f, setF] = useState<FormState>(() => initialForm(c))
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -269,12 +276,16 @@ export function CreateFranchise({ c }: { c: Case }) {
   }
 
   // Comments — persisted immediately on the franchise so they survive navigation.
+  // Tagging a user records a mention for them (seen in the header comment inbox).
   const [commentDraft, setCommentDraft] = useState('')
+  const [commentTags, setCommentTags] = useState<string[]>([])
   const comments = (c.franchise.formData?.comments as FranchiseComment[] | undefined) ?? []
   const addComment = () => {
     const text = commentDraft.trim()
     if (!text) return
-    const comment: FranchiseComment = { id: `cm-${Date.now()}`, text, author: user.name, at: new Date().toISOString() }
+    const at = new Date().toISOString()
+    const tagged = commentTags.map((id) => ({ id, name: DEMO_USERS.find((u) => u.id === id)?.name ?? id }))
+    const comment: FranchiseComment = { id: `cm-${Date.now()}`, text, author: user.name, at, tagged: tagged.length ? tagged : undefined }
     patchCase(c.id, (prev) => ({
       ...prev,
       franchise: {
@@ -285,8 +296,15 @@ export function CreateFranchise({ c }: { c: Case }) {
         },
       },
     }))
+    // Notify everyone tagged (except yourself) via the header comment inbox.
+    addMentions(
+      tagged
+        .filter((t) => t.id !== user.id)
+        .map((t) => ({ toUserId: t.id, caseId: c.id, caseName: c.company.name, text, author: user.name, at })),
+    )
     setCommentDraft('')
-    message.success('Comment added.')
+    setCommentTags([])
+    message.success(tagged.length ? 'Comment added and people notified.' : 'Comment added.')
   }
 
   const returnByField = useMemo(() => {
@@ -797,12 +815,29 @@ export function CreateFranchise({ c }: { c: Case }) {
                   <span>{dayjs(cm.at).format('MMM D, YYYY · h:mm A')}</span>
                 </div>
                 <div style={{ whiteSpace: 'pre-wrap', color: '#1f1f1f' }}>{cm.text}</div>
+                {cm.tagged && cm.tagged.length > 0 && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: '#595959' }}>
+                    Tagged: {cm.tagged.map((t) => `@${t.name}`).join(', ')}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
         <Input.TextArea id="newComment" rows={3} value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder="Add a comment…" />
-        <div style={{ marginTop: 8, textAlign: 'right' }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <Select
+            mode="multiple"
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            style={{ flex: 1, minWidth: 220 }}
+            placeholder="Tag people (optional)"
+            value={commentTags}
+            onChange={setCommentTags}
+            options={TAG_OPTIONS}
+            aria-label="Tag people on this comment"
+          />
           <Button type="primary" onClick={addComment} disabled={!commentDraft.trim()}>Add comment</Button>
         </div>
       </Section>

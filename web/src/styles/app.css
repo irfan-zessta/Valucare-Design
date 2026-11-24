@@ -1435,6 +1435,39 @@ button.app-stepper__item {
   padding: 20px;
 }
 
+/* Header comment (mentions) inbox — mirrors the notification panel chrome. */
+.mentions-panel { inline-size: 360px; max-inline-size: 92vw; }
+.mentions-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px 10px 16px;
+  border-block-end: 1px solid #f0f0f0;
+}
+.mentions-panel__heading { flex: 1; display: flex; align-items: baseline; gap: 8px; min-inline-size: 0; }
+.mentions-panel__title { font-weight: 600; font-size: 15px; color: #1f1f1f; }
+.mentions-panel__count { font-size: 12px; color: #cb0a2f; }
+.mentions-panel__scroll { max-block-size: 360px; overflow-y: auto; }
+.mentions-item {
+  display: block;
+  inline-size: 100%;
+  text-align: start;
+  background: #fff;
+  border: none;
+  border-block-end: 1px solid #f5f5f5;
+  padding: 12px 16px;
+  cursor: pointer;
+  font: inherit;
+  transition: background-color 0.15s ease;
+}
+.mentions-item:hover { background: #fafafa; }
+.mentions-item:focus-visible { outline: 2px solid #cb0a2f; outline-offset: -2px; }
+.mentions-item--unread { background: #fff7f8; }
+.mentions-item__top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #737373; margin-block-end: 3px; }
+.mentions-item__author { font-weight: 600; color: #1f1f1f; }
+.mentions-item__text { color: #1f1f1f; font-size: 14px; white-space: pre-wrap; }
+.mentions-item__case { margin-block-start: 4px; font-size: 12px; color: #8c8c8c; }
+
 /* Next follow-up — a single next-action strip, tinted by urgency. */
 .enq-followup {
   display: flex;

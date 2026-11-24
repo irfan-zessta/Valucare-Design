@@ -12,6 +12,7 @@ import { navTrail } from '../../config/navigation'
 import { useBreadcrumbItems, type Crumb } from '../../state/BreadcrumbProvider'
 import { ValucareLogo } from './ValucareLogo'
 import { HeaderNotifications } from './HeaderNotifications'
+import { HeaderMentions } from './HeaderMentions'
 
 const { Header } = Layout
 const { useBreakpoint } = Grid
@@ -68,6 +69,7 @@ export function AppHeader({
 
       <div className="app-header__spacer" />
 
+      <HeaderMentions />
       <HeaderNotifications />
     </Header>
   )
