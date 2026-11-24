@@ -108,6 +108,23 @@ body {
 .app-header__user:hover {
   background-color: rgba(0, 0, 0, 0.04);
 }
+.app-header__username {
+  max-inline-size: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Very narrow screens: compact avatar menu (name + caret hidden; the trigger
+   keeps its accessible name via aria-label). */
+@media (max-width: 480px) {
+  .app-header__username,
+  .app-header__user .anticon-down {
+    display: none;
+  }
+  .app-header__user {
+    padding: 4px;
+  }
+}
 
 /* --- Sider --------------------------------------------------------------- */
 .app-sider {
@@ -1301,6 +1318,145 @@ button.app-stepper__item {
   color: #1a1a1a;
   font-size: 14px;
   line-height: 1.3;
+}
+
+/* ---------------------------------------------------------------------------
+   Record tabs (Cases / Enquiries) + compact view selector + list bar.
+   One top-level tab set separates record types; within Cases a single
+   Segmented control selects the view, with the search/filters toolbar on the
+   same row. This replaces the earlier duplicate KPI-cards + tab-row controls.
+   --------------------------------------------------------------------------- */
+.app-record-tabs > .ant-tabs-nav {
+  margin-block-end: 16px;
+}
+.app-record-tabs > .ant-tabs-nav .ant-tabs-tab {
+  font-size: 15px;
+  padding-block: 10px;
+}
+
+.app-cases {
+  container-type: inline-size;
+}
+
+.app-listbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  margin-block-end: 16px;
+}
+.app-listbar--tools-only {
+  justify-content: flex-end;
+}
+.app-listbar__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+/* Compact view selector (Segmented) — label + count; the priority view gets a
+   restrained crimson count pill. */
+.app-viewseg.ant-segmented {
+  background: #f1f2f4;
+  padding: 3px;
+}
+.dash-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.dash-seg__count {
+  min-inline-size: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 17px;
+  text-align: center;
+  color: #595959;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.app-viewseg .ant-segmented-item-selected .dash-seg__count {
+  background: #fbe9ec;
+  color: #cb0a2f;
+}
+.dash-seg--attention .dash-seg__count {
+  background: #fbe9ec;
+  color: #cb0a2f;
+}
+
+/* Result-count footer — "Showing X of Y cases" (workspace totals stay in the
+   selector; this reports the filtered subset). */
+.app-list-foot {
+  margin-block-start: 12px;
+  font-size: 13px;
+  color: #737373;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Filter form inside the desktop popover. */
+.app-filterform {
+  inline-size: 260px;
+}
+
+/* Concise status cell — short label + leading icon + optional department
+   subline. Colour is reinforced by icon and text, never used alone. */
+.sales-status {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sales-status__line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: #1f1f1f;
+}
+.sales-status__ico {
+  display: inline-flex;
+  font-size: 13px;
+  color: #8c8c8c;
+}
+.sales-status__sub {
+  font-size: 12px;
+  color: #737373;
+}
+.sales-status--attention .sales-status__line,
+.sales-status--attention .sales-status__ico {
+  color: #cb0a2f;
+}
+.sales-status--ok .sales-status__line,
+.sales-status--ok .sales-status__ico {
+  color: #237804;
+}
+.sales-status--muted .sales-status__line {
+  color: #434343;
+}
+.sales-status:focus-visible {
+  outline: 2px solid rgba(203, 10, 47, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Narrow list bar: let the view selector take the full width above the tools. */
+@container (max-width: 720px) {
+  .app-listbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .app-listbar__tools {
+    margin-inline-start: 0;
+  }
+  .app-listbar__tools .ant-space,
+  .app-listbar__tools .ant-input-affix-wrapper {
+    width: 100%;
+  }
 }
 
 /* Last-updated / completed date — quiet, tabular. */

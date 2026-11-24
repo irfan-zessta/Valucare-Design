@@ -18,15 +18,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Button,
-  Card,
+  Drawer,
   Empty,
+  Grid,
   Input,
   Popover,
   Result,
+  Segmented,
   Select,
   Skeleton,
   Space,
-  Statistic,
   Table,
   Tabs,
   Tag,
@@ -98,35 +99,48 @@ export interface DashboardConfig<T> {
   }[]
 }
 
-// Case KPI card key → the tab it filters to (Total shows every case = "All").
-const STAT_TAB: Record<string, string> = {
-  total: 'all',
-  'in-progress': 'in-progress',
-  completed: 'completed',
-  'needs-action': 'needs-action',
-}
-
 interface UiState {
   search: string
   filters: Record<string, string | undefined>
-  tab: string
+  /** Top-level record type: 'cases' or an extra-tab key (e.g. enquiries). */
+  record: string
+  /** Case sub-view: all | in-progress | completed | needs-action. */
+  view: string
 }
+
+const CASE_VIEWS = ['all', 'in-progress', 'completed', 'needs-action']
 
 function loadUiState(deptId: string): UiState {
   try {
     const raw = sessionStorage.getItem(`valucare-hms:dashboard:${deptId}`)
     if (raw) {
-      const p = JSON.parse(raw) as Partial<UiState>
+      const p = JSON.parse(raw) as Partial<UiState> & { tab?: string }
+      // Back-compat: an older build stored a single `tab` (either a case view
+      // or an extra-tab key).
+      const legacy = typeof p.tab === 'string' ? p.tab : undefined
+      const record =
+        typeof p.record === 'string' && p.record
+          ? p.record
+          : legacy && !CASE_VIEWS.includes(legacy)
+            ? legacy
+            : 'cases'
+      const view =
+        typeof p.view === 'string' && CASE_VIEWS.includes(p.view)
+          ? p.view
+          : legacy && CASE_VIEWS.includes(legacy)
+            ? legacy
+            : 'in-progress'
       return {
         search: typeof p.search === 'string' ? p.search : '',
         filters: p.filters && typeof p.filters === 'object' ? p.filters : {},
-        tab: typeof p.tab === 'string' && p.tab ? p.tab : 'in-progress',
+        record,
+        view,
       }
     }
   } catch {
     // ignore
   }
-  return { search: '', filters: {}, tab: 'in-progress' }
+  return { search: '', filters: {}, record: 'cases', view: 'in-progress' }
 }
 
 export function DepartmentDashboard<T>({
@@ -153,15 +167,18 @@ export function DepartmentDashboard<T>({
   }, [config.deptId, ui])
 
   const extraTabs = config.extraTabs ?? []
-  const knownKeys = ['all', 'in-progress', 'completed', 'needs-action', ...extraTabs.map((t) => t.key)]
-  const activeTab = knownKeys.includes(ui.tab) ? ui.tab : 'in-progress'
-  const activeExtra = extraTabs.find((t) => t.key === activeTab)
-  const isExtraActive = !!activeExtra
+  const hasExtra = extraTabs.length > 0
+  const record = hasExtra && extraTabs.some((t) => t.key === ui.record) ? ui.record : 'cases'
+  const activeExtra = extraTabs.find((t) => t.key === record)
+
+  const screens = Grid.useBreakpoint()
+  const isMobile = !screens.md
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const activeFilterCount = Object.values(ui.filters).filter(Boolean).length
   const hasQueryOrFilters = ui.search.trim() !== '' || activeFilterCount > 0
 
-  // The one shared filtered dataset — drives stats AND tab counts.
+  // Rows passing the current search + filters — drives the visible table only.
   const filtered = useMemo(() => {
     const q = ui.search.trim().toLowerCase()
     return rows.filter(
@@ -169,23 +186,35 @@ export function DepartmentDashboard<T>({
     )
   }, [rows, ui.search, ui.filters, config])
 
-  const inProgress = useMemo(() => filtered.filter((r) => !config.isCompleted(r)), [filtered, config])
-  const completed = useMemo(() => filtered.filter((r) => config.isCompleted(r)), [filtered, config])
-  const needsActionRows = useMemo(() => filtered.filter((r) => config.needsMyAction(r)), [filtered, config])
-  const needsAction = needsActionRows.length
+  // Workspace totals — the full dataset, independent of search/filters, so the
+  // view-selector counts stay stable (a no-match search never zeroes them).
+  const ws = useMemo(() => {
+    let inProgress = 0
+    let completed = 0
+    let needs = 0
+    for (const r of rows) {
+      if (config.isCompleted(r)) completed++
+      else inProgress++
+      if (config.needsMyAction(r)) needs++
+    }
+    return { all: rows.length, inProgress, completed, needs }
+  }, [rows, config])
+
+  // The active case view's rows (search/filter applied) + its workspace total.
+  const view = CASE_VIEWS.includes(ui.view) ? ui.view : 'in-progress'
+  const viewRows = useMemo(() => {
+    if (view === 'completed') return filtered.filter((r) => config.isCompleted(r))
+    if (view === 'needs-action') return filtered.filter((r) => config.needsMyAction(r))
+    if (view === 'in-progress') return filtered.filter((r) => !config.isCompleted(r))
+    return filtered
+  }, [filtered, view, config])
+  const viewTotal =
+    view === 'completed' ? ws.completed : view === 'needs-action' ? ws.needs : view === 'in-progress' ? ws.inProgress : ws.all
+  const viewColumns = view === 'completed' ? config.completedColumns : config.inProgressColumns
 
   function clearFilters() {
     setUi((s) => ({ ...s, search: '', filters: {} }))
   }
-
-  const caseStats = [
-    { key: 'total', title: 'Total cases', value: filtered.length },
-    { key: 'in-progress', title: 'In progress', value: inProgress.length },
-    { key: 'completed', title: 'Completed', value: completed.length },
-    { key: 'needs-action', title: 'Needs my action', value: needsAction },
-  ]
-  // On an extra tab, show its own stats (if provided) in the same KPI row.
-  const stats = activeExtra?.stats ?? caseStats
 
   function renderAction(a: DashboardPrimaryAction | undefined, type: 'primary' | 'default') {
     if (!a) return null
@@ -207,31 +236,40 @@ export function DepartmentDashboard<T>({
       </Space>
     ) : null
 
-  const filtersPopover = (
-    <div style={{ width: 260 }}>
-      <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-        {config.filters.map((f) => (
-          <div key={f.key}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {f.label}
-            </Typography.Text>
-            <Select
-              allowClear
-              placeholder="All"
-              style={{ width: '100%', marginTop: 4 }}
-              value={ui.filters[f.key]}
-              options={f.options}
-              onChange={(v) => setUi((s) => ({ ...s, filters: { ...s.filters, [f.key]: v } }))}
-            />
-          </div>
-        ))}
-        {activeFilterCount > 0 && (
-          <Button type="link" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, filters: {} }))}>
-            Clear filters
-          </Button>
-        )}
-      </Space>
-    </div>
+  // Filter form — shared by the desktop popover and the mobile drawer.
+  const filterForm = (
+    <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+      {config.filters.map((f) => (
+        <div key={f.key}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            {f.label}
+          </Typography.Text>
+          <Select
+            allowClear
+            placeholder="All"
+            style={{ width: '100%', marginTop: 4 }}
+            value={ui.filters[f.key]}
+            options={f.options}
+            onChange={(v) => setUi((s) => ({ ...s, filters: { ...s.filters, [f.key]: v } }))}
+          />
+        </div>
+      ))}
+      {activeFilterCount > 0 && (
+        <Button type="link" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, filters: {} }))}>
+          Clear filters
+        </Button>
+      )}
+    </Space>
+  )
+
+  const filtersButton = (
+    <Button
+      icon={<FilterOutlined />}
+      aria-haspopup="dialog"
+      onClick={isMobile ? () => setFiltersOpen(true) : undefined}
+    >
+      Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+    </Button>
   )
 
   const toolbar = (
@@ -243,15 +281,25 @@ export function DepartmentDashboard<T>({
         aria-label="Search company or reference ID"
         value={ui.search}
         onChange={(e) => setUi((s) => ({ ...s, search: e.target.value }))}
-        style={{ width: 300 }}
+        style={{ width: 300, maxWidth: '100%' }}
       />
-      {config.filters.length > 0 && (
-        <Popover content={filtersPopover} title="Filters" trigger="click" placement="bottomLeft">
-          <Button icon={<FilterOutlined />}>
-            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-          </Button>
-        </Popover>
-      )}
+      {config.filters.length > 0 &&
+        (isMobile ? (
+          filtersButton
+        ) : (
+          <Popover
+            content={
+              <div role="dialog" aria-label="Filters" className="app-filterform">
+                {filterForm}
+              </div>
+            }
+            title="Filters"
+            trigger="click"
+            placement="bottomRight"
+          >
+            {filtersButton}
+          </Popover>
+        ))}
     </Space>
   )
 
@@ -261,15 +309,15 @@ export function DepartmentDashboard<T>({
       rowKey={config.rowId}
       columns={columns}
       dataSource={data}
-      onRow={config.onRowClick ? (record) => ({
-        onClick: () => config.onRowClick!(record),
+      onRow={config.onRowClick ? (r) => ({
+        onClick: () => config.onRowClick!(r),
         style: { cursor: 'pointer' },
       }) : undefined}
       pagination={{ pageSize: 10, hideOnSinglePage: true }}
       locale={{
         emptyText: hasQueryOrFilters ? (
-          <Empty description="No matching records">
-            <Button onClick={clearFilters}>Clear filters</Button>
+          <Empty description="No cases match your search and filters">
+            <Button onClick={clearFilters}>Clear search and filters</Button>
           </Empty>
         ) : (
           <Empty description={config.emptyText ?? 'No records yet'} />
@@ -294,9 +342,85 @@ export function DepartmentDashboard<T>({
     </span>
   )
 
+  // Compact view-selector segment: label + count; the priority view carries a
+  // restrained crimson accent.
+  const seg = (text: string, n: number, attention = false) => (
+    <span className={`dash-seg${attention ? ' dash-seg--attention' : ''}`}>
+      {text}
+      <span className="dash-seg__count">{n}</span>
+    </span>
+  )
+
+  const viewOptions = [
+    { value: 'all', label: seg('All', ws.all) },
+    { value: 'in-progress', label: seg('In progress', ws.inProgress) },
+    { value: 'completed', label: seg('Completed', ws.completed) },
+    { value: 'needs-action', label: seg('Needs my action', ws.needs, ws.needs > 0) },
+  ]
+
+  const footerNoun = viewTotal === 1 ? 'case' : 'cases'
+  const footerText = hasQueryOrFilters
+    ? `Showing ${viewRows.length} of ${viewTotal} ${footerNoun}`
+    : `${viewTotal} ${footerNoun}`
+
+  // The Cases panel: one compact view selector + aligned toolbar, filter chips,
+  // the table, and a result-count footer.
+  const casesPanel = (
+    <div className="app-cases">
+      <div className="app-listbar">
+        <Segmented<string>
+          className="app-viewseg"
+          value={view}
+          onChange={(v) => setUi((s) => ({ ...s, view: String(v) }))}
+          options={viewOptions}
+          block={isMobile}
+          aria-label="Filter cases by status"
+        />
+        <div className="app-listbar__tools">{toolbar}</div>
+      </div>
+
+      {filterChips.length > 0 && (
+        <div className="app-filterchips">
+          <span className="app-filterchips__label">Filters</span>
+          {filterChips.map((ch) => (
+            <Tag
+              key={ch.key}
+              closable
+              onClose={() => setUi((s) => ({ ...s, filters: { ...s.filters, [ch.key]: undefined } }))}
+            >
+              {ch.label}: {ch.text}
+            </Tag>
+          ))}
+          <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, filters: {} }))}>
+            Clear filters
+          </Button>
+        </div>
+      )}
+
+      <div className="app-table-panel">{loading ? <Skeleton active /> : renderTable(viewRows, viewColumns)}</div>
+
+      {!loading && (
+        <div className="app-list-foot" aria-live="polite">
+          {footerText}
+        </div>
+      )}
+    </div>
+  )
+
+  // An extra record panel (e.g. Enquiries): its own toolbar + table.
+  const extraPanel = (t: NonNullable<DashboardConfig<T>['extraTabs']>[number]) => (
+    <div className="app-cases">
+      {t.toolbar && (
+        <div className="app-listbar app-listbar--tools-only">
+          <div className="app-listbar__tools">{t.toolbar}</div>
+        </div>
+      )}
+      <div className="app-table-panel">{t.content}</div>
+    </div>
+  )
+
   return (
     <div className="app-page app-page--wide">
-      {/* 1. Page header */}
       <PageHeader title={config.title} supporting={config.supportingText} extra={headerActions} />
 
       {config.note && <div style={{ marginTop: -8, marginBottom: 16 }}>{config.note}</div>}
@@ -314,129 +438,33 @@ export function DepartmentDashboard<T>({
             }
           />
         </div>
+      ) : hasExtra ? (
+        // Two record types → top-level tabs (Cases / Enquiries …), each owning
+        // its own working list.
+        <Tabs
+          className="app-record-tabs"
+          activeKey={record}
+          onChange={(k) => setUi((s) => ({ ...s, record: k }))}
+          items={[
+            { key: 'cases', label: tabLabel('Cases', ws.all), children: casesPanel },
+            ...extraTabs.map((t) => ({ key: t.key, label: t.label, children: extraPanel(t) })),
+          ]}
+        />
       ) : (
-        <>
-          {/* 2. Four compact statistics — case stats, or an extra tab's own
-                 stats (e.g. enquiry counts) when it supplies them. */}
-          {(!isExtraActive || activeExtra?.stats) && (
-            <div className="app-dashboard__stats">
-              {stats.map((s) => {
-                // Case KPI cards double as filter shortcuts: clicking one selects
-                // the matching tab. (Extra-tab stats have no tab to drive.)
-                const tabKey = !isExtraActive ? STAT_TAB[s.key] : undefined
-                const interactive = !!tabKey && !loading
-                const selected = interactive && tabKey === activeTab
-                const attention = s.key === 'needs-action' && s.value > 0
-                const classes = [
-                  'app-kpi-card',
-                  interactive ? 'is-interactive' : '',
-                  selected ? 'is-selected' : '',
-                  attention ? 'app-kpi-card--attention' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')
-                const select = () => tabKey && setUi((st) => ({ ...st, tab: tabKey }))
-                return (
-                  <Card
-                    key={s.key}
-                    size="small"
-                    className={classes}
-                    hoverable={interactive}
-                    onClick={interactive ? select : undefined}
-                    role={interactive ? 'button' : undefined}
-                    tabIndex={interactive ? 0 : undefined}
-                    aria-pressed={interactive ? selected : undefined}
-                    aria-label={interactive ? `Filter by ${s.title}, ${s.value}` : undefined}
-                    onKeyDown={
-                      interactive
-                        ? (e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              select()
-                            }
-                          }
-                        : undefined
-                    }
-                  >
-                    {loading ? (
-                      <Skeleton active paragraph={false} title={{ width: '60%' }} />
-                    ) : (
-                      <Statistic title={s.title} value={s.value} />
-                    )}
-                  </Card>
-                )
-              })}
-            </div>
-          )}
+        casesPanel
+      )}
 
-          {/* Applied filters as removable chips. */}
-          {!isExtraActive && filterChips.length > 0 && (
-            <div className="app-filterchips">
-              <span className="app-filterchips__label">Filters</span>
-              {filterChips.map((ch) => (
-                <Tag
-                  key={ch.key}
-                  closable
-                  onClose={() => setUi((s) => ({ ...s, filters: { ...s.filters, [ch.key]: undefined } }))}
-                >
-                  {ch.label}: {ch.text}
-                </Tag>
-              ))}
-              <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, filters: {} }))}>
-                Clear filters
-              </Button>
-            </div>
-          )}
-
-          {/* 3. Work list — the tab bar + search/filters live in their own
-                 panel, with the active table in a separate panel below (the
-                 toolbar is hidden on an extra tab, which owns its own). */}
-          {(() => {
-            const tabDefs = [
-              {
-                key: 'all',
-                label: tabLabel('All', filtered.length),
-                content: loading ? <Skeleton active /> : renderTable(filtered, config.inProgressColumns),
-              },
-              {
-                key: 'in-progress',
-                label: tabLabel('In progress', inProgress.length),
-                content: loading ? <Skeleton active /> : renderTable(inProgress, config.inProgressColumns),
-              },
-              {
-                key: 'completed',
-                label: tabLabel('Completed', completed.length),
-                content: loading ? <Skeleton active /> : renderTable(completed, config.completedColumns),
-              },
-              {
-                key: 'needs-action',
-                label: tabLabel('Needs my action', needsAction),
-                content: loading ? <Skeleton active /> : renderTable(needsActionRows, config.inProgressColumns),
-              },
-              ...extraTabs.map((t) => ({ key: t.key, label: t.label, content: t.content })),
-            ]
-            const activeContent = tabDefs.find((t) => t.key === activeTab)?.content
-            return (
-              <>
-                <div className="app-toolbar-panel">
-                  <Tabs
-                    activeKey={activeTab}
-                    onChange={(k) => setUi((s) => ({ ...s, tab: k }))}
-                    tabBarExtraContent={
-                      isExtraActive
-                        ? activeExtra?.toolbar
-                          ? { right: activeExtra.toolbar }
-                          : undefined
-                        : { right: toolbar }
-                    }
-                    items={tabDefs.map((t) => ({ key: t.key, label: t.label }))}
-                  />
-                </div>
-                <div className="app-table-panel">{activeContent}</div>
-              </>
-            )
-          })()}
-        </>
+      {/* Mobile: filters open in an accessible drawer (dialog semantics,
+          Escape-to-close and focus handling handled by Ant Design). */}
+      {config.filters.length > 0 && (
+        <Drawer
+          title="Filters"
+          placement="right"
+          open={isMobile && filtersOpen}
+          onClose={() => setFiltersOpen(false)}
+        >
+          {filterForm}
+        </Drawer>
       )}
     </div>
   )

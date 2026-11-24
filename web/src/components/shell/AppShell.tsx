@@ -33,7 +33,10 @@ export function AppShell() {
 
   const screens = useBreakpoint()
   const isMobile = !screens.md
-  const collapsed = !sidebarExpanded
+  // Between md and lg the expanded 256px sidebar crowds the content (e.g. the
+  // case table), so force the icon rail there regardless of preference.
+  const forceRail = screens.md && !screens.lg
+  const collapsed = !sidebarExpanded || forceRail
 
   const [mobileOpen, setMobileOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)

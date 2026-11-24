@@ -5,8 +5,17 @@
 // ===========================================================================
 import { useMemo, useState } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
-import { Button, Dropdown, Typography } from 'antd'
-import { MoreOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Dropdown, Tooltip, Typography } from 'antd'
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  EditOutlined,
+  ExclamationCircleOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  SendOutlined,
+  SyncOutlined,
+} from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
@@ -14,9 +23,8 @@ import { useInitialLoad } from '../../hooks/useInitialLoad'
 import { DepartmentDashboard, type DashboardConfig } from '../../components/dashboard/DepartmentDashboard'
 import { CreateFranchiseModal } from '../../components/CreateFranchiseModal'
 import { useEnquiriesWorkspace } from '../enquiries/EnquiriesWorkspace'
-import { CaseStatusTag } from '../../components/CaseStatusTag'
 import { WORK_AREA_LABELS, WORK_AREA_ORDER, type Case } from '../../domain/types'
-import { currentProposal, nextAction, responsibleDepartment } from '../../domain/progress'
+import { currentProposal, meaningfulStatus, nextAction, responsibleDepartment } from '../../domain/progress'
 import { formatDate } from '../../lib/format'
 
 const { Text } = Typography
@@ -145,13 +153,53 @@ export default function SalesDashboard() {
       )
     }
 
+    // Concise status: short label + leading icon (meaning never by colour
+    // alone), a responsible-department subline where relevant, and the full
+    // business status in a tooltip (focusable for keyboard users).
+    const statusCell = (c: Case) => {
+      let label = 'In progress'
+      let tone: 'attention' | 'ok' | 'muted' | 'default' = 'default'
+      let icon = <SyncOutlined />
+      let sub: string | undefined
+      if (c.isCompleted) {
+        if (c.coverage.status === 'scheduled') { label = 'Scheduled'; icon = <ClockCircleOutlined /> }
+        else { label = 'Active'; tone = 'ok'; icon = <CheckCircleOutlined /> }
+      } else if (c.franchise.status === 'returned') {
+        label = 'Returned'; tone = 'attention'; icon = <ExclamationCircleOutlined />; sub = 'by Account Services'
+      } else if (c.franchise.status === 'rejected') {
+        label = 'Rejected'; tone = 'attention'; icon = <ExclamationCircleOutlined />
+      } else if (c.quotation.status === 'clarification') {
+        label = 'Needs info'; tone = 'attention'; icon = <ExclamationCircleOutlined />; sub = 'from Actuarial'
+      } else if (c.franchise.status === 'draft' && c.currentWorkArea === 'create-franchise') {
+        label = 'Draft'; tone = 'muted'; icon = <EditOutlined />
+      } else if (c.franchise.status === 'submitted') {
+        label = 'Waiting'; icon = <ClockCircleOutlined />; sub = 'with Account Services'
+      } else if (c.quotation.status === 'submitted') {
+        label = 'Waiting'; icon = <ClockCircleOutlined />; sub = 'with Actuarial'
+      } else {
+        const p = currentProposal(c)
+        if (c.currentWorkArea === 'finalize-offer' && p?.status === 'sent') { label = 'Sent to client'; icon = <SendOutlined /> }
+      }
+      return (
+        <Tooltip title={meaningfulStatus(c)}>
+          <span className={`sales-status sales-status--${tone}`} tabIndex={0}>
+            <span className="sales-status__line">
+              <span className="sales-status__ico" aria-hidden>{icon}</span>
+              <span>{label}</span>
+            </span>
+            {sub && <span className="sales-status__sub">{sub}</span>}
+          </span>
+        </Tooltip>
+      )
+    }
+
     // Scannable columns on desktop; widths are proportional hints, not hard
     // caps, so long names and statuses wrap naturally.
     const inProgressColumns: ColumnsType<Case> = [
       { title: 'Company', key: 'company', width: '26%', render: (_, c) => companyCell(c) },
       { title: 'Product', key: 'product', width: '8%', render: (_, c) => c.company.productType },
       { title: 'Stage', key: 'progress', width: '16%', render: (_, c) => progressCell(c) },
-      { title: 'Status', key: 'status', width: '20%', render: (_, c) => <CaseStatusTag c={c} /> },
+      { title: 'Status', key: 'status', width: '20%', render: (_, c) => statusCell(c) },
       { title: 'Last updated', key: 'updated', width: '12%', render: (_, c) => updatedCell(c) },
       { title: 'Action', key: 'action', width: '18%', align: 'right', render: (_, c) => actionCell(c) },
     ]
@@ -162,7 +210,7 @@ export default function SalesDashboard() {
     const completedColumns: ColumnsType<Case> = [
       { title: 'Company', key: 'company', width: '30%', render: (_, c) => companyCell(c) },
       { title: 'Product', key: 'product', width: '8%', render: (_, c) => c.company.productType },
-      { title: 'Status', key: 'status', width: '22%', render: (_, c) => <CaseStatusTag c={c} /> },
+      { title: 'Status', key: 'status', width: '22%', render: (_, c) => statusCell(c) },
       {
         title: 'Completed',
         key: 'done',
@@ -203,11 +251,11 @@ export default function SalesDashboard() {
           .join(' ')
           .toLowerCase(),
       filters: [
-        { key: 'type', label: 'Business type', options: [
+        { key: 'type', label: 'Product', options: [
           { label: 'HMO', value: 'HMO' },
           { label: 'TPA', value: 'TPA' },
         ] },
-        { key: 'workArea', label: 'Current work area', options: WORK_AREA_ORDER.map((w) => ({ label: WORK_AREA_LABELS[w], value: w })) },
+        { key: 'workArea', label: 'Stage', options: WORK_AREA_ORDER.map((w) => ({ label: WORK_AREA_LABELS[w], value: w })) },
         { key: 'status', label: 'Status', options: [
           { label: 'Needs a Sales action', value: 'needs-action' },
           { label: 'Waiting on another team', value: 'waiting' },
@@ -246,7 +294,7 @@ export default function SalesDashboard() {
         key: 'enquiries',
         label: (
           <span className="dash-tab">
-            New Enquiries
+            Enquiries
             <span className="dash-tab__count">{openEnquiries}</span>
           </span>
         ),

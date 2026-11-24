@@ -128,7 +128,7 @@ export function useEnquiriesWorkspace() {
   ]
 
   const filters = (
-    <div style={{ width: 240 }}>
+    <div role="dialog" aria-label="Filters" style={{ width: 240 }}>
       <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
         <div>
           <Text type="secondary" style={{ fontSize: 12 }}>Status</Text>
@@ -154,10 +154,11 @@ export function useEnquiriesWorkspace() {
   // (the dashboard drops this into the right of the tab bar).
   const toolbar = (
     <Space wrap size={8}>
-      <Input allowClear prefix={<SearchOutlined />} placeholder="Search company or reference"
-        value={ui.search} onChange={(e) => setUi((s) => ({ ...s, search: e.target.value }))} style={{ width: 240 }} />
-      <Popover content={filters} title="Filters" trigger="click" placement="bottomLeft">
-        <Button icon={<FilterOutlined />}>Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Button>
+      <Input allowClear prefix={<SearchOutlined />} placeholder="Search company or reference ID"
+        aria-label="Search company or reference ID"
+        value={ui.search} onChange={(e) => setUi((s) => ({ ...s, search: e.target.value }))} style={{ width: 300, maxWidth: '100%' }} />
+      <Popover content={filters} title="Filters" trigger="click" placement="bottomRight">
+        <Button icon={<FilterOutlined />} aria-haspopup="dialog">Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Button>
       </Popover>
     </Space>
   )
