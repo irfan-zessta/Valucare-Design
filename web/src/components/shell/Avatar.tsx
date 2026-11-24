@@ -1,8 +1,9 @@
 // ===========================================================================
-// Brand avatar — Ant Design Avatar showing the user's initials in brand red.
+// Avatar — a minimal initials chip: a quiet neutral circle with the user's
+// initials. Kept flat and low-contrast on purpose so the header and persona
+// switcher read calmly; it sits well on white and on the tinted selected row.
 // ===========================================================================
 import { Avatar as AntAvatar } from 'antd'
-import { BRAND_RED } from '../../theme'
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -13,7 +14,16 @@ function initialsOf(name: string): string {
 
 export function Avatar({ name, size = 32 }: { name: string; size?: number }) {
   return (
-    <AntAvatar size={size} style={{ backgroundColor: BRAND_RED, color: '#fff', fontWeight: 600, flex: 'none' }}>
+    <AntAvatar
+      size={size}
+      style={{
+        backgroundColor: '#f0f1f3',
+        color: '#4b4b4b',
+        fontWeight: 600,
+        fontSize: Math.round(size * 0.4),
+        flex: 'none',
+      }}
+    >
       {initialsOf(name)}
     </AntAvatar>
   )
