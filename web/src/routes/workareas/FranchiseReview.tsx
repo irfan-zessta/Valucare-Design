@@ -16,6 +16,7 @@ import {
   Divider,
   Empty,
   Input,
+  Mentions,
   Modal,
   Space,
   Tag,
@@ -26,9 +27,11 @@ import { CheckCircleOutlined, CloseCircleOutlined, EditOutlined, EyeOutlined, Fi
 import { useNavigate } from 'react-router-dom'
 import type { Case } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
+import { useComments } from '../../state/CommentsProvider'
 import { useActiveUser } from '../../state/ActiveUserProvider'
 import { roleLabel } from '../../domain/access'
 import { checkerDecision, withEvent } from '../../domain/caseHistory'
+import { MENTION_OPTIONS, extractMentions } from '../../components/comments/mentionUtils'
 import { CreateFranchise, FRANCHISE_DOCS, initialForm } from './CreateFranchise'
 
 const DOC_META: Record<string, { label: string; tag?: string }> = Object.fromEntries(
@@ -56,6 +59,7 @@ const dash = (v: unknown) => {
 
 export function FranchiseReview({ c }: { c: Case }) {
   const { patchCase } = useCases()
+  const { add: addComment } = useComments()
   const { user, can } = useActiveUser()
   const { message } = App.useApp()
   const navigate = useNavigate()
@@ -185,8 +189,24 @@ export function FranchiseReview({ c }: { c: Case }) {
         { action: 'Returned franchise for corrections', area: 'Franchise', version, from: 'submitted', to: 'returned' },
       ),
     )
+    // Record the return note as a case comment too, so it lands in the Comments
+    // thread and anyone @mentioned is notified (unread badge on the comment
+    // icon + their Unread list). Mentions are parsed from the "@Name" tokens.
+    const tagged = extractMentions(reason)
+    addComment({
+      caseId: c.id,
+      caseName: c.company.name,
+      authorId: user.id,
+      author: user.name,
+      text: `Returned for corrections: ${reason}`,
+      tagged,
+    })
     setReturning(false)
-    message.info('Franchise returned for corrections.')
+    message.info(
+      tagged.length
+        ? `Franchise returned for corrections — ${tagged.map((t) => `@${t.name}`).join(', ')} notified.`
+        : 'Franchise returned for corrections.',
+    )
   }
 
   function confirmReject() {
@@ -496,13 +516,20 @@ export function FranchiseReview({ c }: { c: Case }) {
       >
         <Typography.Paragraph type="secondary">
           Returning sends the franchise back to the AAT handler to fix. Tell them what needs
-          correcting — they'll see this on the Create Franchise form.
+          correcting — they'll see this on the Create Franchise form. Type <strong>@</strong> to
+          mention a teammate; they'll be notified and it appears in the case Comments.
         </Typography.Paragraph>
-        <Input.TextArea
-          rows={3}
+        <Mentions
+          autoSize={{ minRows: 3, maxRows: 6 }}
           value={returnReason}
-          onChange={(e) => setReturnReason(e.target.value)}
-          placeholder="Reason for return (what needs correcting)"
+          onChange={setReturnReason}
+          options={MENTION_OPTIONS}
+          popupClassName="cmt-popup"
+          filterOption={(input, option) =>
+            String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+          }
+          placeholder="Reason for return (what needs correcting) — type @ to mention a teammate"
+          aria-label="Reason for return"
         />
       </Modal>
 
