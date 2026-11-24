@@ -369,11 +369,6 @@ export function FranchiseReview({ c }: { c: Case }) {
               : `${checked.filter(Boolean).length}/${CHECKLIST.length} checks complete`}
           </Typography.Text>
           <div className="app-form-floatbar__actions">
-            {canEditForm && (
-              <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
-                Edit franchise form
-              </Button>
-            )}
             <Button onClick={openReturn} disabled={decision.selfApproval}>Return for corrections</Button>
             <Button danger icon={<CloseCircleOutlined />} onClick={() => setRejecting(true)} disabled={decision.selfApproval}>
               Reject
@@ -399,13 +394,6 @@ export function FranchiseReview({ c }: { c: Case }) {
               ? `Approved by ${c.franchise.acceptedByName}.`
               : 'This franchise was approved.'}
           </Typography.Text>
-          {canEditForm && (
-            <div className="app-form-floatbar__actions">
-              <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
-                Edit franchise form
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
