@@ -1393,6 +1393,99 @@ button.app-stepper__item {
   }
 }
 
+/* --- Enquiry detail (CRM workspace) -------------------------------------- */
+/* Centred, ≈1440px content container. Page padding comes from .app-content. */
+.enq-page {
+  max-inline-size: 1440px;
+  margin-inline: auto;
+}
+
+/* Balanced 60 / 40 two-column layout; cards sit to the top, grow to content. */
+.enq-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 991px) {
+  .enq-layout {
+    grid-template-columns: 1fr;
+  }
+}
+.enq-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-inline-size: 0;
+}
+
+/* Consistent card chrome across the four workspace cards. */
+.enq-card .ant-card-head {
+  min-block-size: auto;
+  padding-inline: 20px;
+  border-block-end: 1px solid #f0f0f0;
+}
+.enq-card .ant-card-head-title {
+  padding-block: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+.enq-card .ant-card-body {
+  padding: 20px;
+}
+
+/* Quick actions — four equal, minimal tiles in a row. */
+.enq-quick {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 575px) {
+  .enq-quick {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.enq-quick__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-block-size: 84px;
+  padding: 12px 8px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  color: #1f1f1f;
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.enq-quick__tile:hover {
+  border-color: #bfbfbf;
+  background: #fafafa;
+}
+.enq-quick__tile:active {
+  background: #f0f0f0;
+  border-color: #bfbfbf;
+}
+.enq-quick__tile:focus-visible {
+  outline: 2px solid #cb0a2f;
+  outline-offset: 2px;
+}
+.enq-quick__tile-icon {
+  display: inline-flex;
+  font-size: 22px;
+  color: #595959;
+}
+.enq-quick__tile-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f1f1f;
+}
+
 /* Company name + inline status in the page header. */
 .enq-title {
   display: inline-flex;
@@ -1436,14 +1529,31 @@ button.app-stepper__item {
 
 /* Contact information rows. */
 .enq-contact__row { display: flex; gap: 12px; padding-block: 8px; }
+.enq-contact__row:first-child { padding-block-start: 0; }
 .enq-contact__row + .enq-contact__row { border-block-start: 1px solid #f0f0f0; }
 .enq-contact__ico { flex: none; color: #8c8c8c; font-size: 16px; margin-block-start: 2px; }
 .enq-contact__text { min-inline-size: 0; }
 .enq-contact__label { font-size: 12px; color: #595959; }
-.enq-contact__value { display: flex; align-items: center; gap: 4px; color: #1f1f1f; word-break: break-word; }
-.enq-contact__value--empty { color: #8c8c8c; }
+.enq-contact__value { display: flex; align-items: center; gap: 4px; color: #1f1f1f; font-weight: 500; word-break: break-word; }
+.enq-contact__value a { color: #1f1f1f; }
+.enq-contact__value a:hover { color: #cb0a2f; text-decoration: underline; }
 .enq-contact__copy { color: #8c8c8c; }
 .enq-contact__copy:hover { color: #cb0a2f; }
+
+/* Contact — one consolidated, calm empty state (not an alert/warning). */
+.enq-contact__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 20px 16px;
+  background: #fafafa;
+  border-radius: 6px;
+}
+.enq-contact__empty-ico { font-size: 26px; color: #8c8c8c; }
+.enq-contact__empty-title { font-weight: 600; color: #1f1f1f; }
+.enq-contact__empty-desc { font-size: 13px; color: #595959; max-inline-size: 280px; }
 
 /* Descriptions in the details card read as clean label/value pairs. */
 .enq-desc .ant-descriptions-item-label { color: #595959; }
