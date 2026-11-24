@@ -371,7 +371,7 @@ export function DepartmentDashboard<T>({
           hideOnSinglePage: true,
           size: 'small',
           showSizeChanger: false,
-          position: ['bottomCenter'],
+          placement: ['bottomCenter'],
         }}
         locale={{ emptyText: emptyNode }}
       />

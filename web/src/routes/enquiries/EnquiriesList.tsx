@@ -3,13 +3,15 @@
 // status. Open a lead to convert it to a franchise or mark it lost. "New
 // enquiry" starts the duplicate-checked capture flow.
 // ===========================================================================
-import { useNavigate, Link } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button, Empty, Table, Tag, Typography } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useEnquiries } from '../../state/EnquiryProvider'
 import type { Enquiry } from '../../domain/types'
 import { formatDate } from '../../lib/format'
+import { NewEnquiryModal } from './NewEnquiryModal'
 
 const STATUS_TAG: Record<Enquiry['status'], { color: string; label: string }> = {
   open: { color: 'processing', label: 'Open' },
@@ -20,6 +22,7 @@ const STATUS_TAG: Record<Enquiry['status'], { color: string; label: string }> = 
 export default function EnquiriesList() {
   const { enquiries } = useEnquiries()
   const navigate = useNavigate()
+  const [newOpen, setNewOpen] = useState(false)
 
   const open = (e: Enquiry) => navigate(`/sales/enquiries/${e.id}`)
 
@@ -73,11 +76,9 @@ export default function EnquiriesList() {
             Leads captured before a franchise exists. Convert a promising lead into New Business.
           </Typography.Paragraph>
         </div>
-        <Link to="/sales/enquiries/new">
-          <Button type="primary" icon={<PlusOutlined />}>
-            New enquiry
-          </Button>
-        </Link>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setNewOpen(true)}>
+          New enquiry
+        </Button>
       </div>
 
       <Table<Enquiry>
@@ -88,6 +89,8 @@ export default function EnquiriesList() {
         pagination={{ pageSize: 10, hideOnSinglePage: true }}
         locale={{ emptyText: <Empty description="No enquiries yet" /> }}
       />
+
+      <NewEnquiryModal open={newOpen} onClose={() => setNewOpen(false)} title="New enquiry" />
     </div>
   )
 }

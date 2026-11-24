@@ -18,6 +18,7 @@ import { useInitialLoad } from '../../hooks/useInitialLoad'
 import { DepartmentDashboard, type DashboardConfig } from '../../components/dashboard/DepartmentDashboard'
 import { CreateFranchiseModal } from '../../components/CreateFranchiseModal'
 import { useEnquiriesWorkspace } from '../enquiries/EnquiriesWorkspace'
+import { NewEnquiryModal } from '../enquiries/NewEnquiryModal'
 import { WORK_AREA_LABELS, WORK_AREA_ORDER, type Case } from '../../domain/types'
 import { currentProposal, meaningfulStatus, nextAction, responsibleDepartment } from '../../domain/progress'
 import { isNextActionMine, roleDepartment, salesWorklist } from '../../domain/caseAccess'
@@ -33,6 +34,7 @@ export default function SalesDashboard() {
   const { loading, error, retry } = useInitialLoad()
   const navigate = useNavigate()
   const [franchiseModalOpen, setFranchiseModalOpen] = useState(false)
+  const [leadModalOpen, setLeadModalOpen] = useState(false)
 
   // Records this persona works within — the dashboard counts and table share
   // this scoped source, so a count always equals its worklist.
@@ -259,7 +261,7 @@ export default function SalesDashboard() {
         : undefined
     // Only roles that may create enquiries get the secondary action.
     const secondaryAction = can('enquiries', 'edit')
-      ? { label: 'New Lead', onClick: () => navigate('/sales/enquiries/new') }
+      ? { label: 'New Lead', onClick: () => setLeadModalOpen(true) }
       : undefined
 
     return {
@@ -342,6 +344,7 @@ export default function SalesDashboard() {
     <>
       <DepartmentDashboard<Case> config={config} rows={rows} loading={loading} error={error} onRetry={retry} />
       <CreateFranchiseModal open={franchiseModalOpen} onClose={() => setFranchiseModalOpen(false)} />
+      <NewEnquiryModal open={leadModalOpen} onClose={() => setLeadModalOpen(false)} />
     </>
   )
 }
