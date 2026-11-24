@@ -1769,9 +1769,9 @@ button.app-stepper__item {
   align-items: center;
   gap: 6px;
   margin: 0;
-  padding-block: 2px;
-  padding-inline: 10px;
-  border-radius: 999px;
+  padding-block: 4px;
+  padding-inline: 12px;
+  border-radius: 8px;
   font-weight: 500;
   line-height: 1.4;
 }
