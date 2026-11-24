@@ -1279,6 +1279,28 @@ button.app-stepper__item {
   background: #fafafa;
 }
 
+/* Horizontal scroll: keep the pinned (right) Action column opaque so rows
+   scrolling underneath never show through, and match the row hover tint. The
+   discoverability shadow on the pinned edge is Ant's built-in fixed-column
+   shadow. (Ant Design v6 marks the pinned cell `ant-table-cell-fix-end`.) */
+.app-dash-table .ant-table-cell-fix-end,
+.app-dash-table .ant-table-cell-fix-right {
+  background: #fff;
+}
+.app-dash-table .ant-table-thead > tr > th.ant-table-cell-fix-end,
+.app-dash-table .ant-table-thead > tr > th.ant-table-cell-fix-right {
+  background: #fafafa;
+}
+.app-dash-table .ant-table-tbody > tr:hover > td.ant-table-cell-fix-end,
+.app-dash-table .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+  background: #fafafa;
+}
+/* Contain any horizontal scroll inside the table panel (no page-level scroll). */
+.app-cases,
+.app-table-panel {
+  max-inline-size: 100%;
+}
+
 /* Company cell — dark semibold name (links to the case) + labelled refs. */
 .sales-co__name,
 .app-dash-table a.sales-co__name {
@@ -1301,12 +1323,12 @@ button.app-stepper__item {
 }
 .sales-co__refs {
   margin-block-start: 3px;
-  font-size: 12px;
-  color: #8c8c8c;
+  font-size: 13px;
+  color: #595959; /* ≥ 4.5:1 on white */
   font-variant-numeric: tabular-nums;
 }
 .sales-co__reflabel {
-  color: #b0b0b0;
+  color: #737373; /* ≥ 4.5:1 on white */
 }
 .sales-co__sep {
   margin-inline: 6px;
@@ -1400,6 +1422,60 @@ button.app-stepper__item {
 /* Filter form inside the desktop popover. */
 .app-filterform {
   inline-size: 260px;
+}
+
+/* Filter field caption (label above each filter control). */
+.app-field-caption.ant-typography {
+  display: block;
+  font-size: 12px;
+  color: #595959;
+}
+
+/* Removable filter chip with a real, labelled close button. */
+.app-chip.ant-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 8px 4px;
+  border-radius: 6px;
+}
+.app-chip__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 20px;
+  block-size: 20px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #737373;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.app-chip__close:hover {
+  color: #1f1f1f;
+  background: rgba(0, 0, 0, 0.06);
+}
+.app-chip__close:focus-visible {
+  outline: 2px solid rgba(203, 10, 47, 0.55);
+  outline-offset: 1px;
+}
+
+/* Plain (non-Form) field label + helper text — e.g. the New enquiry search. */
+.app-field-plainlabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f1f1f;
+  margin-block-end: 6px;
+}
+.app-help-text {
+  margin-block-start: 6px;
+  font-size: 13px;
+  color: #595959; /* ≥ 4.5:1 on white */
 }
 
 /* Concise status cell — short label + leading icon + optional department

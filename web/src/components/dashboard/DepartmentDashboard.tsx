@@ -35,7 +35,7 @@ import {
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { FilterOutlined, SearchOutlined } from '@ant-design/icons'
+import { CloseOutlined, FilterOutlined, SearchOutlined } from '@ant-design/icons'
 import { PageHeader } from '../ui/PageHeader'
 
 export interface DashboardFilterDef {
@@ -76,6 +76,10 @@ export interface DashboardConfig<T> {
 
   inProgressColumns: ColumnsType<T>
   completedColumns: ColumnsType<T>
+
+  /** Min table width (px). When the content area is narrower, the table scrolls
+   *  horizontally within its panel (with any fixed:'right' column pinned). */
+  scrollX?: number
 
   emptyText?: string // "No records yet" default
 
@@ -173,6 +177,9 @@ export function DepartmentDashboard<T>({
 
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.md
+  // Below lg (≈992px — tablet and down) the interactive filter panel opens in a
+  // Drawer (real dialog semantics); lg+ uses a popover.
+  const useDrawerFilters = !screens.lg
   const [filtersOpen, setFiltersOpen] = useState(false)
 
   const activeFilterCount = Object.values(ui.filters).filter(Boolean).length
@@ -236,24 +243,30 @@ export function DepartmentDashboard<T>({
       </Space>
     ) : null
 
-  // Filter form — shared by the desktop popover and the mobile drawer.
+  // Filter form — shared by the desktop popover and the tablet/mobile drawer.
+  // Each control carries an accessible name associated with its visible label.
   const filterForm = (
     <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-      {config.filters.map((f) => (
-        <div key={f.key}>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {f.label}
-          </Typography.Text>
-          <Select
-            allowClear
-            placeholder="All"
-            style={{ width: '100%', marginTop: 4 }}
-            value={ui.filters[f.key]}
-            options={f.options}
-            onChange={(v) => setUi((s) => ({ ...s, filters: { ...s.filters, [f.key]: v } }))}
-          />
-        </div>
-      ))}
+      {config.filters.map((f) => {
+        const labelId = `dash-filter-${config.deptId}-${f.key}`
+        return (
+          <div key={f.key}>
+            <Typography.Text type="secondary" id={labelId} className="app-field-caption">
+              {f.label}
+            </Typography.Text>
+            <Select
+              allowClear
+              placeholder="All"
+              aria-label={f.label}
+              aria-labelledby={labelId}
+              style={{ width: '100%', marginTop: 4 }}
+              value={ui.filters[f.key]}
+              options={f.options}
+              onChange={(v) => setUi((s) => ({ ...s, filters: { ...s.filters, [f.key]: v } }))}
+            />
+          </div>
+        )
+      })}
       {activeFilterCount > 0 && (
         <Button type="link" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, filters: {} }))}>
           Clear filters
@@ -266,7 +279,7 @@ export function DepartmentDashboard<T>({
     <Button
       icon={<FilterOutlined />}
       aria-haspopup="dialog"
-      onClick={isMobile ? () => setFiltersOpen(true) : undefined}
+      onClick={useDrawerFilters ? () => setFiltersOpen(true) : undefined}
     >
       Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
     </Button>
@@ -284,12 +297,16 @@ export function DepartmentDashboard<T>({
         style={{ width: 300, maxWidth: '100%' }}
       />
       {config.filters.length > 0 &&
-        (isMobile ? (
+        (useDrawerFilters ? (
           filtersButton
         ) : (
+          // lg+ desktop: a popover. Its content is a labelled group of controls
+          // (not a nested dialog) so it never puts a dialog inside Ant's
+          // tooltip-role popover overlay; tablet/mobile use the Drawer below for
+          // full dialog semantics.
           <Popover
             content={
-              <div role="dialog" aria-label="Filters" className="app-filterform">
+              <div role="group" aria-label="Filters" className="app-filterform">
                 {filterForm}
               </div>
             }
@@ -309,6 +326,7 @@ export function DepartmentDashboard<T>({
       rowKey={config.rowId}
       columns={columns}
       dataSource={data}
+      scroll={config.scrollX ? { x: config.scrollX } : undefined}
       onRow={config.onRowClick ? (r) => ({
         onClick: () => config.onRowClick!(r),
         style: { cursor: 'pointer' },
@@ -383,12 +401,16 @@ export function DepartmentDashboard<T>({
         <div className="app-filterchips">
           <span className="app-filterchips__label">Filters</span>
           {filterChips.map((ch) => (
-            <Tag
-              key={ch.key}
-              closable
-              onClose={() => setUi((s) => ({ ...s, filters: { ...s.filters, [ch.key]: undefined } }))}
-            >
+            <Tag key={ch.key} className="app-chip">
               {ch.label}: {ch.text}
+              <button
+                type="button"
+                className="app-chip__close"
+                aria-label={`Remove ${ch.label}: ${ch.text} filter`}
+                onClick={() => setUi((s) => ({ ...s, filters: { ...s.filters, [ch.key]: undefined } }))}
+              >
+                <CloseOutlined aria-hidden />
+              </button>
             </Tag>
           ))}
           <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, filters: {} }))}>
@@ -460,7 +482,7 @@ export function DepartmentDashboard<T>({
         <Drawer
           title="Filters"
           placement="right"
-          open={isMobile && filtersOpen}
+          open={useDrawerFilters && filtersOpen}
           onClose={() => setFiltersOpen(false)}
         >
           {filterForm}

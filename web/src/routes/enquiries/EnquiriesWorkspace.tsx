@@ -62,7 +62,7 @@ function followUpTag(e: Enquiry) {
   return (
     <span>
       <Tag color={color}>{label}</Tag>
-      <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>
+      <div style={{ fontSize: 13, color: '#595959' }}>
         {formatDate(e.nextFollowUpDate)}{e.nextFollowUpAction ? ` · ${e.nextFollowUpAction}` : ''}
       </div>
     </span>
@@ -109,40 +109,40 @@ export function useEnquiriesWorkspace() {
       render: (_, e) => (
         <div>
           <TLink onClick={() => open(e)} style={{ fontWeight: 500 }}>{e.companyName}</TLink>
-          <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{e.id} · {e.businessSource} · {e.productType}</div>
+          <div style={{ fontSize: 13, color: '#595959' }}>{e.id} · {e.businessSource} · {e.productType}</div>
         </div>
       ),
     },
     {
       title: 'Contact', key: 'contact',
       render: (_, e) => e.contactName ? (
-        <div>{e.contactName}{e.contactEmail ? <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{e.contactEmail}</div> : null}</div>
+        <div>{e.contactName}{e.contactEmail ? <div style={{ fontSize: 13, color: '#595959' }}>{e.contactEmail}</div> : null}</div>
       ) : <Text type="secondary">—</Text>,
     },
     { title: 'Status', key: 'status', render: (_, e) => { const t = STATUS_TAG[e.status]; return <Tag color={t.color}>{t.label}</Tag> } },
     {
       title: 'Last activity', key: 'last',
-      render: (_, e) => { const a = lastActivity(e); return a ? <div>{a.type === 'System' ? 'Update' : a.type}<div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{formatRelative(a.at)}</div></div> : <Text type="secondary">—</Text> },
+      render: (_, e) => { const a = lastActivity(e); return a ? <div>{a.type === 'System' ? 'Update' : a.type}<div style={{ fontSize: 13, color: '#595959' }}>{formatRelative(a.at)}</div></div> : <Text type="secondary">—</Text> },
     },
     { title: 'Next follow-up', key: 'followup', render: (_, e) => followUpTag(e) },
   ]
 
   const filters = (
-    <div role="dialog" aria-label="Filters" style={{ width: 240 }}>
+    <div role="group" aria-label="Filters" style={{ width: 240 }}>
       <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
         <div>
-          <Text type="secondary" style={{ fontSize: 12 }}>Status</Text>
-          <Select style={{ width: '100%', marginTop: 4 }} value={ui.status} onChange={(v) => setUi((s) => ({ ...s, status: v }))}
+          <Text type="secondary" id="enq-f-status" className="app-field-caption">Status</Text>
+          <Select aria-label="Status" aria-labelledby="enq-f-status" style={{ width: '100%', marginTop: 4 }} value={ui.status} onChange={(v) => setUi((s) => ({ ...s, status: v }))}
             options={[{ label: 'Open', value: 'open' }, { label: 'Converted', value: 'converted' }, { label: 'Lost', value: 'lost' }, { label: 'All statuses', value: 'all' }]} />
         </div>
         <div>
-          <Text type="secondary" style={{ fontSize: 12 }}>Business source</Text>
-          <Select allowClear placeholder="Any" style={{ width: '100%', marginTop: 4 }} value={ui.source} onChange={(v) => setUi((s) => ({ ...s, source: v }))}
+          <Text type="secondary" id="enq-f-source" className="app-field-caption">Business source</Text>
+          <Select aria-label="Business source" aria-labelledby="enq-f-source" allowClear placeholder="Any" style={{ width: '100%', marginTop: 4 }} value={ui.source} onChange={(v) => setUi((s) => ({ ...s, source: v }))}
             options={['Direct', 'Agent', 'Broker'].map((v) => ({ label: v, value: v }))} />
         </div>
         <div>
-          <Text type="secondary" style={{ fontSize: 12 }}>Follow-up</Text>
-          <Select allowClear placeholder="Any" style={{ width: '100%', marginTop: 4 }} value={ui.followUp} onChange={(v) => setUi((s) => ({ ...s, followUp: v }))}
+          <Text type="secondary" id="enq-f-followup" className="app-field-caption">Follow-up</Text>
+          <Select aria-label="Follow-up" aria-labelledby="enq-f-followup" allowClear placeholder="Any" style={{ width: '100%', marginTop: 4 }} value={ui.followUp} onChange={(v) => setUi((s) => ({ ...s, followUp: v }))}
             options={[{ label: 'Overdue', value: 'overdue' }, { label: 'Due today', value: 'today' }, { label: 'Upcoming', value: 'upcoming' }, { label: 'No follow-up', value: 'none' }]} />
         </div>
         {activeFilterCount > 0 && <Button type="link" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, status: 'open', source: undefined, followUp: undefined }))}>Clear filters</Button>}

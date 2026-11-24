@@ -193,35 +193,36 @@ export default function SalesDashboard() {
       )
     }
 
-    // Scannable columns on desktop; widths are proportional hints, not hard
-    // caps, so long names and statuses wrap naturally.
+    // Company flexes (and wraps) to fill the remaining width; every other column
+    // has a fixed pixel width, and Action is pinned to the right so it stays
+    // visible when the table scrolls horizontally on narrow (tablet) widths.
     const inProgressColumns: ColumnsType<Case> = [
-      { title: 'Company', key: 'company', width: '26%', render: (_, c) => companyCell(c) },
-      { title: 'Product', key: 'product', width: '8%', render: (_, c) => c.company.productType },
-      { title: 'Stage', key: 'progress', width: '16%', render: (_, c) => progressCell(c) },
-      { title: 'Status', key: 'status', width: '20%', render: (_, c) => statusCell(c) },
-      { title: 'Last updated', key: 'updated', width: '12%', render: (_, c) => updatedCell(c) },
-      { title: 'Action', key: 'action', width: '18%', align: 'right', render: (_, c) => actionCell(c) },
+      { title: 'Company', key: 'company', render: (_, c) => companyCell(c) },
+      { title: 'Product', key: 'product', width: 96, render: (_, c) => c.company.productType },
+      { title: 'Stage', key: 'progress', width: 150, render: (_, c) => progressCell(c) },
+      { title: 'Status', key: 'status', width: 190, render: (_, c) => statusCell(c) },
+      { title: 'Last updated', key: 'updated', width: 128, render: (_, c) => updatedCell(c) },
+      { title: 'Action', key: 'action', width: 196, align: 'right', fixed: 'right', render: (_, c) => actionCell(c) },
     ]
 
     // Completed: coverage status (active / scheduled) is independent of case
     // completion, so an account can be active with handover still pending; the
     // completion date comes from the coverage effective date.
     const completedColumns: ColumnsType<Case> = [
-      { title: 'Company', key: 'company', width: '30%', render: (_, c) => companyCell(c) },
-      { title: 'Product', key: 'product', width: '8%', render: (_, c) => c.company.productType },
-      { title: 'Status', key: 'status', width: '22%', render: (_, c) => statusCell(c) },
+      { title: 'Company', key: 'company', render: (_, c) => companyCell(c) },
+      { title: 'Product', key: 'product', width: 96, render: (_, c) => c.company.productType },
+      { title: 'Status', key: 'status', width: 190, render: (_, c) => statusCell(c) },
       {
         title: 'Completed',
         key: 'done',
-        width: '20%',
+        width: 140,
         render: (_, c) => (
           <Text type="secondary" className="sales-updated">
             {formatDate(c.coverage.effectiveDate ?? c.updatedAt)}
           </Text>
         ),
       },
-      { title: 'Action', key: 'action', width: '18%', align: 'right', render: (_, c) => actionCell(c) },
+      { title: 'Action', key: 'action', width: 196, align: 'right', fixed: 'right', render: (_, c) => actionCell(c) },
     ]
 
     return {
@@ -281,6 +282,8 @@ export default function SalesDashboard() {
       },
       inProgressColumns,
       completedColumns,
+      // Below this width the table scrolls horizontally with Action pinned right.
+      scrollX: 1000,
     }
   }, [navigate])
 

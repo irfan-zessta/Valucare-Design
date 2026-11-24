@@ -32,13 +32,16 @@ export function useBreadcrumbItems(): Crumb[] | null {
 
 /** Publish a page's breadcrumb trail for the lifetime of the component. */
 export function useSetBreadcrumb(items: Crumb[] | undefined) {
-  const ctx = useContext(BreadcrumbContext)
+  // Depend on the stable setState function, NOT the whole context object: the
+  // context value is recreated whenever `items` changes, and this effect
+  // changes `items`, so depending on the object would loop infinitely.
+  const setItems = useContext(BreadcrumbContext)?.setItems
   // Serialize the link targets so the effect only re-runs on a real change.
   const key = items ? items.map((c) => c.to ?? '').join('>') + '|' + items.length : ''
   useEffect(() => {
-    if (!ctx) return
-    ctx.setItems(items ?? null)
-    return () => ctx.setItems(null)
+    if (!setItems) return
+    setItems(items ?? null)
+    return () => setItems(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx, key])
+  }, [setItems, key])
 }

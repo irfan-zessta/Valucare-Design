@@ -7,11 +7,12 @@
 // to a franchise. (Creating a franchise directly is a separate entry point.)
 // ===========================================================================
 import { useMemo, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { Alert, Breadcrumb, Button, Card, Form, Input, Select, Space, Tag, Typography } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import { Alert, Button, Card, Form, Input, Select, Space, Tag, Typography } from 'antd'
 import { ArrowRightOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
+import { useSetBreadcrumb } from '../../state/BreadcrumbProvider'
 import { shortNameFrom } from '../../domain/sampleData'
 import type { BusinessSource, ProductType } from '../../domain/types'
 
@@ -22,6 +23,13 @@ export default function NewEnquiry() {
   const { cases } = useCases()
   const { enquiries, createEnquiry } = useEnquiries()
   const navigate = useNavigate()
+
+  // One accurate trail in the shared header: Sales / Enquiries / New enquiry.
+  useSetBreadcrumb([
+    { title: 'Sales', to: '/sales' },
+    { title: 'Enquiries', to: '/sales/enquiries' },
+    { title: 'New enquiry' },
+  ])
 
   const [mode, setMode] = useState<'search' | 'capture'>('search')
   const [query, setQuery] = useState('')
@@ -77,15 +85,6 @@ export default function NewEnquiry() {
 
   return (
     <div className="app-page" style={{ maxWidth: 720 }}>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/sales">Sales</Link> },
-          { title: <Link to="/sales/enquiries">Enquiries</Link> },
-          { title: 'New enquiry' },
-        ]}
-      />
-
       <Typography.Title level={2} style={{ marginBottom: 4 }}>
         New enquiry
       </Typography.Title>
@@ -96,14 +95,25 @@ export default function NewEnquiry() {
 
       {mode === 'search' && (
         <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-          <Input
-            allowClear
-            size="large"
-            prefix={<SearchOutlined />}
-            placeholder="Type a company name"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div>
+            <label htmlFor="enq-company-search" className="app-field-plainlabel">
+              Company name
+            </label>
+            <Input
+              id="enq-company-search"
+              aria-label="Company name"
+              aria-describedby="enq-company-help"
+              allowClear
+              size="large"
+              prefix={<SearchOutlined />}
+              placeholder="Type a company name"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <div id="enq-company-help" className="app-help-text">
+              Type at least two characters to search existing enquiries and cases, or to log a new one.
+            </div>
+          </div>
 
           {q.length >= 2 && enquiryMatches.length > 0 && (
             <div>
@@ -114,7 +124,7 @@ export default function NewEnquiry() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                       <div>
                         <div style={{ fontWeight: 600 }}>{e.companyName}</div>
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
                           {e.id} · {e.businessSource} · {e.productType}
                         </Typography.Text>
                       </div>
@@ -144,7 +154,7 @@ export default function NewEnquiry() {
                         <div style={{ fontWeight: 600 }}>
                           {c.company.name} <Tag variant="filled">Already a case</Tag>
                         </div>
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
                           {c.id} · {c.company.businessSource} · {c.company.productType}
                         </Typography.Text>
                       </div>
@@ -169,11 +179,6 @@ export default function NewEnquiry() {
             <Button type="primary" icon={<PlusOutlined />} onClick={() => startNewCompany()} disabled={q.length < 2}>
               {q.length >= 2 ? `Log enquiry for “${query.trim()}”` : 'Log new enquiry'}
             </Button>
-            {q.length < 2 && (
-              <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
-                Type at least two characters to search or create.
-              </Typography.Paragraph>
-            )}
           </div>
         </Space>
       )}

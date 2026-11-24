@@ -102,6 +102,7 @@ export function Sidebar({ onNavigate, collapsed = false }: { onNavigate: () => v
     <Menu
       className="app-sider-menu"
       mode="inline"
+      inlineCollapsed={collapsed}
       items={items}
       selectedKeys={[selectedKeyFor(pathname)]}
       openKeys={collapsed ? undefined : openKeys}
