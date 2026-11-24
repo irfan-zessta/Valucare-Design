@@ -15,7 +15,6 @@ import Login from './routes/Login'
 import Home from './routes/Home'
 import ComingSoon from './routes/ComingSoon'
 import SalesDashboard from './routes/dashboards/SalesDashboard'
-import NewBusinessRedesign from './routes/dashboards/NewBusinessRedesign'
 import DepartmentPlaceholderDashboard from './routes/dashboards/DepartmentPlaceholderDashboard'
 import CreateCase from './routes/CreateCase'
 import CaseWorkspace from './routes/CaseWorkspace'
@@ -54,9 +53,6 @@ export default function App() {
 
                     {/* Everything else requires a (simulated) session and renders in the shell. */}
                     <Route element={<ProtectedRoute />}>
-                      {/* New Business redesign — a self-contained, full-bleed prototype
-                          that owns its own shell, so it sits outside <AppShell>. */}
-                      <Route path="/sales/new-business" element={<NewBusinessRedesign />} />
                       <Route element={<AppShell />}>
                         <Route path="/" element={<Home />} />
                         <Route path="/sales" element={<SalesDashboard />} />

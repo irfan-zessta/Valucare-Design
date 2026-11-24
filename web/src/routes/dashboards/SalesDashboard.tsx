@@ -5,8 +5,8 @@
 // ===========================================================================
 import { useMemo, useState } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
-import { Typography } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { Button, Dropdown, Typography } from 'antd'
+import { MoreOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
@@ -16,7 +16,7 @@ import { CreateFranchiseModal } from '../../components/CreateFranchiseModal'
 import { useEnquiriesWorkspace } from '../enquiries/EnquiriesWorkspace'
 import { CaseStatusTag } from '../../components/CaseStatusTag'
 import { WORK_AREA_LABELS, WORK_AREA_ORDER, type Case } from '../../domain/types'
-import { nextAction, responsibleDepartment } from '../../domain/progress'
+import { currentProposal, nextAction, responsibleDepartment } from '../../domain/progress'
 import { formatDate } from '../../lib/format'
 
 const { Text } = Typography
@@ -81,46 +81,111 @@ export default function SalesDashboard() {
       )
     }
 
-    // Progress = current work area; Status = the exact workflow status chip.
+    // Stage = current work area; Status = the exact workflow status chip.
     // Kept in separate columns so each reads cleanly under its own header.
     const progressCell = (c: Case) => (
       <div className="sales-progress__area">{WORK_AREA_LABELS[c.currentWorkArea]}</div>
     )
 
-    // Four scannable columns on desktop (~44 / 12 / 22 / 22). Long names and
-    // statuses wrap naturally; widths are proportional hints, not hard caps.
+    const updatedCell = (c: Case) => (
+      <Text type="secondary" className="sales-updated">
+        {formatDate(c.updatedAt)}
+      </Text>
+    )
+
+    // One concise, contextual next action per case, derived from workflow state.
+    // Cases waiting on another team get a quiet "View" affordance so that rows
+    // needing the user's own action stand out.
+    const rowCta = (c: Case): { label: string; subtle: boolean } => {
+      if (c.isCompleted) return { label: 'View franchise', subtle: true }
+      const a = nextAction(c)
+      if (a.waiting) return { label: 'View case', subtle: true }
+      if (c.franchise.status === 'returned' || c.franchise.status === 'rejected')
+        return { label: 'Review feedback', subtle: false }
+      if (c.franchise.status === 'draft') return { label: 'Continue draft', subtle: false }
+      if (c.quotation.status === 'clarification') return { label: 'Respond to Actuarial', subtle: false }
+      if (c.quotation.status === 'responded') return { label: 'Finalize offer', subtle: false }
+      const p = currentProposal(c)
+      if (c.currentWorkArea === 'finalize-offer' && p?.status === 'sent')
+        return { label: 'Follow up', subtle: false }
+      return { label: 'Continue', subtle: false }
+    }
+
+    // Contextual action cell: one primary link action + an overflow menu for
+    // secondary actions. Stops row-click propagation so the controls are
+    // independently operable.
+    const actionCell = (c: Case) => {
+      const cta = rowCta(c)
+      const items = [
+        { key: 'open', label: 'Open case' },
+        { key: 'copy', label: 'Copy reference ID' },
+      ]
+      const onMenu = ({ key }: { key: string }) => {
+        if (key === 'open') openCase(c)
+        else if (key === 'copy') navigator.clipboard?.writeText(c.id).catch(() => {})
+      }
+      return (
+        <div className="sales-action" onClick={(e) => e.stopPropagation()}>
+          <Button
+            type={cta.subtle ? 'text' : 'link'}
+            className={`sales-action__cta${cta.subtle ? ' sales-action__cta--subtle' : ''}`}
+            onClick={() => openCase(c)}
+          >
+            {cta.label}
+          </Button>
+          <Dropdown menu={{ items, onClick: onMenu }} trigger={['click']} placement="bottomRight">
+            <Button
+              type="text"
+              className="sales-action__more"
+              icon={<MoreOutlined />}
+              aria-label={`More actions for ${c.company.name}`}
+            />
+          </Dropdown>
+        </div>
+      )
+    }
+
+    // Scannable columns on desktop; widths are proportional hints, not hard
+    // caps, so long names and statuses wrap naturally.
     const inProgressColumns: ColumnsType<Case> = [
-      { title: 'Company', key: 'company', width: '44%', render: (_, c) => companyCell(c) },
-      { title: 'Product', key: 'product', width: '12%', render: (_, c) => c.company.productType },
-      { title: 'Progress', key: 'progress', width: '22%', render: (_, c) => progressCell(c) },
-      { title: 'Status', key: 'status', width: '22%', render: (_, c) => <CaseStatusTag c={c} /> },
+      { title: 'Company', key: 'company', width: '26%', render: (_, c) => companyCell(c) },
+      { title: 'Product', key: 'product', width: '8%', render: (_, c) => c.company.productType },
+      { title: 'Stage', key: 'progress', width: '16%', render: (_, c) => progressCell(c) },
+      { title: 'Status', key: 'status', width: '20%', render: (_, c) => <CaseStatusTag c={c} /> },
+      { title: 'Last updated', key: 'updated', width: '12%', render: (_, c) => updatedCell(c) },
+      { title: 'Action', key: 'action', width: '18%', align: 'right', render: (_, c) => actionCell(c) },
     ]
 
     // Completed: coverage status (active / scheduled) is independent of case
     // completion, so an account can be active with handover still pending; the
     // completion date comes from the coverage effective date.
     const completedColumns: ColumnsType<Case> = [
-      { title: 'Company', key: 'company', width: '38%', render: (_, c) => companyCell(c) },
-      { title: 'Product', key: 'product', width: '10%', render: (_, c) => c.company.productType },
-      { title: 'Status', key: 'status', width: '24%', render: (_, c) => <CaseStatusTag c={c} /> },
+      { title: 'Company', key: 'company', width: '30%', render: (_, c) => companyCell(c) },
+      { title: 'Product', key: 'product', width: '8%', render: (_, c) => c.company.productType },
+      { title: 'Status', key: 'status', width: '22%', render: (_, c) => <CaseStatusTag c={c} /> },
       {
         title: 'Completed',
         key: 'done',
-        width: '28%',
-        render: (_, c) => <Text type="secondary">{formatDate(c.coverage.effectiveDate ?? c.updatedAt)}</Text>,
+        width: '20%',
+        render: (_, c) => (
+          <Text type="secondary" className="sales-updated">
+            {formatDate(c.coverage.effectiveDate ?? c.updatedAt)}
+          </Text>
+        ),
       },
+      { title: 'Action', key: 'action', width: '18%', align: 'right', render: (_, c) => actionCell(c) },
     ]
 
     return {
       deptId: 'sales',
-      title: 'Sales',
-      supportingText: 'Manage your corporate and IFG business.',
+      title: 'New Business',
+      supportingText: 'Manage enquiries, franchises and sales proposals.',
       secondaryAction: {
         label: 'New enquiry',
         onClick: () => navigate('/sales/enquiries/new'),
       },
       primaryAction: {
-        label: 'Create New Franchise',
+        label: 'Create franchise',
         icon: <PlusOutlined />,
         onClick: () => setFranchiseModalOpen(true),
       },

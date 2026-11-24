@@ -1303,6 +1303,108 @@ button.app-stepper__item {
   line-height: 1.3;
 }
 
+/* Last-updated / completed date — quiet, tabular. */
+.sales-updated.ant-typography {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Contextual action cell — one primary link action + overflow menu, aligned
+   to the right edge of the column. */
+.sales-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  inline-size: 100%;
+}
+.sales-action__cta.ant-btn {
+  padding-inline: 6px;
+  font-weight: 600;
+}
+.sales-action__cta--subtle.ant-btn {
+  color: #595959;
+  font-weight: 500;
+}
+.sales-action__cta--subtle.ant-btn:hover {
+  color: #cb0a2f;
+}
+.sales-action__more.ant-btn {
+  inline-size: 32px;
+  min-inline-size: 32px;
+  padding: 0;
+  color: #8c8c8c;
+}
+.sales-action__more.ant-btn:hover {
+  color: #1f1f1f;
+}
+
+/* Status tag — colour + icon + label, consistent radius and spacing. */
+.app-status-tag.ant-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-block: 1px;
+  padding-inline: 8px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+.app-status-tag.ant-tag .anticon {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------------------
+   KPI cards as filter shortcuts — clickable, with clear selected / hover /
+   focus states synced to the active tab. "Needs my action" carries a restrained
+   brand accent so it reads as the priority metric.
+   --------------------------------------------------------------------------- */
+.app-kpi-card.ant-card {
+  border-color: #e8e8e8;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.app-kpi-card.is-interactive {
+  cursor: pointer;
+}
+.app-kpi-card.is-interactive:hover {
+  border-color: #d0d0d0;
+}
+.app-kpi-card.is-interactive:focus-visible {
+  outline: 2px solid rgba(203, 10, 47, 0.55);
+  outline-offset: 2px;
+}
+.app-kpi-card.is-selected.ant-card {
+  border-color: #cb0a2f;
+  box-shadow: inset 0 0 0 1px #cb0a2f;
+}
+.app-kpi-card .ant-statistic-title {
+  color: #595959;
+  margin-block-end: 4px;
+}
+.app-kpi-card .ant-statistic-content {
+  color: #1f1f1f;
+  font-weight: 600;
+  line-height: 1.1;
+}
+/* Priority metric: short brand accent bar + brand-red figure (only when > 0). */
+.app-kpi-card--attention.ant-card {
+  position: relative;
+}
+.app-kpi-card--attention.ant-card::before {
+  content: '';
+  position: absolute;
+  inset-block: 12px;
+  inset-inline-start: 0;
+  inline-size: 3px;
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
+  background: #cb0a2f;
+}
+.app-kpi-card--attention .ant-statistic-content {
+  color: #cb0a2f;
+}
+
 /* Next action — readable instruction; muted + clock when waiting. */
 .sales-next {
   display: inline-flex;

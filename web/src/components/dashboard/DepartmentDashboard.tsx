@@ -98,6 +98,14 @@ export interface DashboardConfig<T> {
   }[]
 }
 
+// Case KPI card key → the tab it filters to (Total shows every case = "All").
+const STAT_TAB: Record<string, string> = {
+  total: 'all',
+  'in-progress': 'in-progress',
+  completed: 'completed',
+  'needs-action': 'needs-action',
+}
+
 interface UiState {
   search: string
   filters: Record<string, string | undefined>
@@ -231,10 +239,11 @@ export function DepartmentDashboard<T>({
       <Input
         allowClear
         prefix={<SearchOutlined />}
-        placeholder="Search company or reference"
+        placeholder="Search company or reference ID"
+        aria-label="Search company or reference ID"
         value={ui.search}
         onChange={(e) => setUi((s) => ({ ...s, search: e.target.value }))}
-        style={{ width: 240 }}
+        style={{ width: 300 }}
       />
       {config.filters.length > 0 && (
         <Popover content={filtersPopover} title="Filters" trigger="click" placement="bottomLeft">
@@ -311,15 +320,52 @@ export function DepartmentDashboard<T>({
                  stats (e.g. enquiry counts) when it supplies them. */}
           {(!isExtraActive || activeExtra?.stats) && (
             <div className="app-dashboard__stats">
-              {stats.map((s) => (
-                <Card key={s.key} size="small">
-                  {loading ? (
-                    <Skeleton active paragraph={false} title={{ width: '60%' }} />
-                  ) : (
-                    <Statistic title={s.title} value={s.value} />
-                  )}
-                </Card>
-              ))}
+              {stats.map((s) => {
+                // Case KPI cards double as filter shortcuts: clicking one selects
+                // the matching tab. (Extra-tab stats have no tab to drive.)
+                const tabKey = !isExtraActive ? STAT_TAB[s.key] : undefined
+                const interactive = !!tabKey && !loading
+                const selected = interactive && tabKey === activeTab
+                const attention = s.key === 'needs-action' && s.value > 0
+                const classes = [
+                  'app-kpi-card',
+                  interactive ? 'is-interactive' : '',
+                  selected ? 'is-selected' : '',
+                  attention ? 'app-kpi-card--attention' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+                const select = () => tabKey && setUi((st) => ({ ...st, tab: tabKey }))
+                return (
+                  <Card
+                    key={s.key}
+                    size="small"
+                    className={classes}
+                    hoverable={interactive}
+                    onClick={interactive ? select : undefined}
+                    role={interactive ? 'button' : undefined}
+                    tabIndex={interactive ? 0 : undefined}
+                    aria-pressed={interactive ? selected : undefined}
+                    aria-label={interactive ? `Filter by ${s.title}, ${s.value}` : undefined}
+                    onKeyDown={
+                      interactive
+                        ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              select()
+                            }
+                          }
+                        : undefined
+                    }
+                  >
+                    {loading ? (
+                      <Skeleton active paragraph={false} title={{ width: '60%' }} />
+                    ) : (
+                      <Statistic title={s.title} value={s.value} />
+                    )}
+                  </Card>
+                )
+              })}
             </div>
           )}
 

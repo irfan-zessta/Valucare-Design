@@ -25,9 +25,17 @@ export const theme: ThemeConfig = {
     colorPrimary: BRAND_RED,
     colorLink: BRAND_RED,
     colorBgLayout: APP_BG,
+    // Text ramp — AA-contrast on white. Secondary is reserved for labels and
+    // supporting copy; tertiary only for non-essential metadata.
+    colorText: '#1f1f1f',
+    colorTextSecondary: '#595959',
+    colorTextTertiary: '#737373',
+    colorBorderSecondary: '#e8e8e8',
     borderRadius: 6,
+    borderRadiusLG: 8,
     controlHeight: 40, // comfortable form controls
     fontSize: 14, // base body text
+    fontWeightStrong: 600,
     fontFamily: FONT_FAMILY,
     // Subtle borders, minimal shadows.
     boxShadow:
@@ -52,7 +60,16 @@ export const theme: ThemeConfig = {
       itemBorderRadius: 6,
     },
     Card: {
-      borderRadiusLG: 6,
+      borderRadiusLG: 8,
+    },
+    // KPI figures: prominent but restrained (brief §9 / §14).
+    Statistic: {
+      titleFontSize: 14,
+      contentFontSize: 30,
+    },
+    // Premium button text weight; heights inherit the 40px control token.
+    Button: {
+      fontWeight: 500,
     },
   },
 }

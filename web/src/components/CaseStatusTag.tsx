@@ -1,18 +1,46 @@
+import type { ReactNode } from 'react'
 import { Tag } from 'antd'
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  EditOutlined,
+  ExclamationCircleOutlined,
+  SyncOutlined,
+} from '@ant-design/icons'
 import type { Case } from '../domain/types'
 import { meaningfulStatus } from '../domain/progress'
 
-// Maps a case to a calm, categorical status tag. Red is reserved for
-// attention-needing states (returned / clarification); the label text always
-// carries the meaning so colour is never the only signal.
-function colorFor(c: Case): string {
-  if (c.isCompleted) return c.coverage.status === 'scheduled' ? 'cyan' : 'green'
-  if (c.franchise.status === 'returned' || c.franchise.status === 'rejected' || c.quotation.status === 'clarification') return 'red'
-  const waiting = c.franchise.status === 'submitted' || c.quotation.status === 'submitted'
-  if (waiting) return 'blue'
-  return 'default'
+// A calm, categorical status tag. Colour is reserved (red only for
+// attention-needing states), and every tag pairs a colour with a leading icon
+// and meaningful label text, so status is never communicated by colour alone.
+function statusLook(c: Case): { color: string; icon: ReactNode } {
+  if (c.isCompleted) {
+    return c.coverage.status === 'scheduled'
+      ? { color: 'cyan', icon: <ClockCircleOutlined /> } // coverage scheduled
+      : { color: 'green', icon: <CheckCircleOutlined /> } // active
+  }
+  if (
+    c.franchise.status === 'returned' ||
+    c.franchise.status === 'rejected' ||
+    c.quotation.status === 'clarification'
+  ) {
+    return { color: 'red', icon: <ExclamationCircleOutlined /> } // needs attention
+  }
+  if (c.franchise.status === 'draft' && c.currentWorkArea === 'create-franchise') {
+    return { color: 'default', icon: <EditOutlined /> } // draft
+  }
+  const waitingOnOtherTeam = c.franchise.status === 'submitted' || c.quotation.status === 'submitted'
+  if (waitingOnOtherTeam) {
+    return { color: 'blue', icon: <ClockCircleOutlined /> } // awaiting another team
+  }
+  return { color: 'blue', icon: <SyncOutlined /> } // in progress
 }
 
 export function CaseStatusTag({ c }: { c: Case }) {
-  return <Tag color={colorFor(c)}>{meaningfulStatus(c)}</Tag>
+  const { color, icon } = statusLook(c)
+  return (
+    <Tag color={color} icon={icon} className="app-status-tag">
+      {meaningfulStatus(c)}
+    </Tag>
+  )
 }
