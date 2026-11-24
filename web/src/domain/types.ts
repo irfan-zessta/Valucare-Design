@@ -752,14 +752,6 @@ export interface CaseEvent {
 
 export interface Case {
   id: string // e.g. NB-2026-0031 — stable for the whole journey
-  /**
-   * The Account Manager (AAT) who owns this case — a demo user id (demoRoster).
-   * Drives the personal "My work" worklist and the Supervisor's "unassigned"
-   * bucket. A case with no owner is unassigned (appears for the Supervisor, not
-   * on any Account Manager's personal list). This is a PROPOSED demo assignment,
-   * configurable centrally — see domain/caseOwnership.ts.
-   */
-  ownerId?: string
   company: Company
   franchise: Franchise
   quotation: QuotationPackage

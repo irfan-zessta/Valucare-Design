@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Alert, AutoComplete, Button, Card, Col, Form, Input, Row, Select, Space, Typography } from 'antd'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { useCases } from '../state/CaseProvider'
-import { useActiveUser } from '../state/ActiveUserProvider'
 import { useUnsavedChanges } from '../state/UnsavedChangesProvider'
 import { shortNameFrom } from '../domain/sampleData'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -34,10 +33,7 @@ type SuggestGroup = { label: string; options: SuggestOption[] }
 
 export default function CreateCase() {
   const { cases, createCase } = useCases()
-  const { user, role } = useActiveUser()
   const navigate = useNavigate()
-  // The creating Account Manager owns the new case; other roles leave it unassigned.
-  const newOwnerId = role === 'account-manager' ? user.id : undefined
 
   const [mode, setMode] = useState<'search' | 'capture'>('capture')
   const [query, setQuery] = useState('')
@@ -144,7 +140,7 @@ export default function CreateCase() {
       return
     }
     setSubmitting(true)
-    const created = createCase(buildCompany(), newOwnerId)
+    const created = createCase(buildCompany())
     navigate(`/cases/${created.id}/create-franchise`)
   }
 
@@ -153,7 +149,7 @@ export default function CreateCase() {
   const hasCaptureInput = mode === 'capture' && (name.trim() !== '' || contactName.trim() !== '')
   useUnsavedChanges({
     dirty: hasCaptureInput && !submitting,
-    onSave: name.trim() !== '' ? () => void createCase(buildCompany(), newOwnerId) : undefined,
+    onSave: name.trim() !== '' ? () => void createCase(buildCompany()) : undefined,
   })
 
   return (

@@ -25,7 +25,6 @@ import RenewalsDashboard from './routes/renewals/RenewalsDashboard'
 import RenewalWorkspace from './routes/renewals/RenewalWorkspace'
 import NewEnquiry from './routes/enquiries/NewEnquiry'
 import EnquiryDetail from './routes/enquiries/EnquiryDetail'
-import EnquiriesList from './routes/enquiries/EnquiriesList'
 import LeadDetail from './routes/leads/LeadDetail'
 
 // /cases/:caseId with no work area → resume the case's latest saved work area.
@@ -70,10 +69,9 @@ export default function App() {
                             (the same records the Sales dashboard shows). */}
                         <Route path="/sales/corporate-new-business" element={<RequireScreen screen="sales"><SalesDashboard /></RequireScreen>} />
                         <Route path="/sales/corporate-new-business/new" element={<CreateCase />} />
-                        {/* Enquiries list — the lead funnel that feeds New Business.
-                            Reached from the Sales dashboard's "New lead" action and the
-                            "Follow-ups due today" card. */}
-                        <Route path="/sales/enquiries" element={<RequireScreen screen="sales"><EnquiriesList /></RequireScreen>} />
+                        {/* Enquiries now live in the Sales dashboard's New Enquiries tab;
+                            the old standalone list redirects there (tab is preserved). */}
+                        <Route path="/sales/enquiries" element={<Navigate to="/sales" replace />} />
                         <Route path="/sales/enquiries/new" element={<NewEnquiry />} />
                         <Route path="/sales/enquiries/:enquiryId" element={<EnquiryDetail />} />
                         {/* Leads — the qualified stage between an enquiry and a franchise. */}

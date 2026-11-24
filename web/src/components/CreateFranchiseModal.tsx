@@ -9,7 +9,6 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AutoComplete, Col, Form, Input, Modal, Row, Select } from 'antd'
 import { useCases } from '../state/CaseProvider'
-import { useActiveUser } from '../state/ActiveUserProvider'
 import { shortNameFrom } from '../domain/sampleData'
 import { KNOWN_COMPANIES, PRODUCTS, SOURCES } from '../routes/CreateCase'
 import type { BusinessSource, Company, ProductType } from '../domain/types'
@@ -23,7 +22,6 @@ type SuggestGroup = { label: string; options: SuggestOption[] }
 
 export function CreateFranchiseModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { cases, createCase } = useCases()
-  const { user, role } = useActiveUser()
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
@@ -116,8 +114,7 @@ export function CreateFranchiseModal({ open, onClose }: { open: boolean; onClose
       return
     }
     setSubmitting(true)
-    // The creating Account Manager owns the new case (it lands on their My work).
-    const created = createCase(buildCompany(), role === 'account-manager' ? user.id : undefined)
+    const created = createCase(buildCompany())
     onClose()
     navigate(`/cases/${created.id}/create-franchise`)
   }
