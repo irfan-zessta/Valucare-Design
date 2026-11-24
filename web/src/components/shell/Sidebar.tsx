@@ -78,6 +78,12 @@ export function Sidebar({ onNavigate, collapsed = false }: { onNavigate: () => v
             key: dept.id,
             icon: <Icon />,
             label: dept.label,
+            // Clicking the department name opens its landing page (where the
+            // "Dashboard" sub-item used to point), while the arrow still expands.
+            onTitleClick: () => {
+              navigate(deptTarget(dept))
+              onNavigate()
+            },
             children: dept.children!.map((c) => ({ key: childTarget(c), label: childLabel(c) })),
           }
         }

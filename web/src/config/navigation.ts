@@ -74,18 +74,11 @@ export const NAV: NavDept[] = [
     label: 'Sales',
     Icon: LineChartOutlined,
     status: 'available',
+    // The department name opens the Sales landing dashboard.
+    to: '/sales',
     // Also current inside the creation journey and any case workspace.
     match: (p) => startsWith('/sales')(p) || startsWith('/cases')(p),
     children: [
-      {
-        id: 'sales-dashboard',
-        label: 'Dashboard',
-        status: 'available',
-        to: '/sales',
-        // The Sales landing dashboard, plus the enquiry/lead funnel that feeds it.
-        match: (p) =>
-          p === '/sales' || startsWith('/sales/enquiries')(p) || startsWith('/sales/leads')(p),
-      },
       {
         id: 'sales-new-business',
         label: 'New Business',
@@ -110,9 +103,9 @@ export const NAV: NavDept[] = [
     label: 'Actuarial',
     Icon: BarChartOutlined,
     status: 'available',
+    to: '/actuarial',
     match: startsWith('/actuarial'),
     children: [
-      { id: 'actuarial-dashboard', label: 'Dashboard', status: 'available', to: '/actuarial', match: startsWith('/actuarial') },
       { id: 'actuarial-new', label: 'New Business', status: 'coming-soon' },
       { id: 'actuarial-renewal', label: 'Renewal Business', status: 'coming-soon' },
       { id: 'actuarial-ifg-renewal', label: 'IFG Renewal Business', status: 'coming-soon' },
@@ -123,19 +116,17 @@ export const NAV: NavDept[] = [
     label: 'MDA',
     Icon: TeamOutlined,
     status: 'available',
+    to: '/mda',
     match: startsWith('/mda'),
-    children: [
-      { id: 'mda-dashboard', label: 'Dashboard', status: 'available', to: '/mda', match: startsWith('/mda') },
-    ],
   },
   {
     id: 'billing',
     label: 'Billing & Collections',
     Icon: WalletOutlined,
     status: 'available',
+    to: '/billing',
     match: startsWith('/billing'),
     children: [
-      { id: 'billing-dashboard', label: 'Dashboard', status: 'available', to: '/billing', match: startsWith('/billing') },
       { id: 'billing-billing', label: 'Billing', status: 'coming-soon' },
       { id: 'billing-collections', label: 'Collections', status: 'coming-soon' },
     ],
@@ -145,19 +136,17 @@ export const NAV: NavDept[] = [
     label: 'Provider Networks',
     Icon: DeploymentUnitOutlined,
     status: 'available',
+    to: '/provider-networks',
     match: startsWith('/provider-networks'),
-    children: [
-      { id: 'provider-networks-dashboard', label: 'Dashboard', status: 'available', to: '/provider-networks', match: startsWith('/provider-networks') },
-    ],
   },
   {
     id: 'claims',
     label: 'Claims',
     Icon: FileTextOutlined,
     status: 'available',
+    to: '/claims',
     match: startsWith('/claims'),
     children: [
-      { id: 'claims-dashboard', label: 'Dashboard', status: 'available', to: '/claims', match: startsWith('/claims') },
       { id: 'claims-receiving', label: 'Receiving', status: 'coming-soon' },
       { id: 'claims-processing', label: 'Processing', status: 'coming-soon' },
       { id: 'claims-review', label: 'Review & Posting', status: 'coming-soon' },
@@ -170,9 +159,9 @@ export const NAV: NavDept[] = [
     label: 'CCD',
     Icon: CustomerServiceOutlined,
     status: 'available',
+    to: '/ccd',
     match: startsWith('/ccd'),
     children: [
-      { id: 'ccd-dashboard', label: 'Dashboard', status: 'available', to: '/ccd', match: startsWith('/ccd') },
       { id: 'ccd-outpatient', label: 'Outpatient & Dental', status: 'coming-soon' },
       { id: 'ccd-inpatient', label: 'Inpatient', status: 'coming-soon' },
       { id: 'ccd-inquiries', label: 'Inquiries & Special Approvals', status: 'coming-soon' },
@@ -183,10 +172,8 @@ export const NAV: NavDept[] = [
     label: 'Accounts',
     Icon: BankOutlined,
     status: 'available',
+    to: '/accounts',
     match: startsWith('/accounts'),
-    children: [
-      { id: 'accounts-dashboard', label: 'Dashboard', status: 'available', to: '/accounts', match: startsWith('/accounts') },
-    ],
   },
   {
     id: 'admin',
@@ -195,7 +182,6 @@ export const NAV: NavDept[] = [
     status: 'available',
     match: startsWith('/coming-soon/admin'),
     children: [
-      { id: 'admin-dashboard', label: 'Dashboard', status: 'coming-soon' },
       { id: 'admin-users-roles', label: 'Users & Roles', status: 'coming-soon' },
     ],
   },
