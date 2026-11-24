@@ -8,7 +8,7 @@
 // find NB cases at all — not in search, not via a direct link. These are
 // PROPOSED demo scopes, centrally configurable here.
 // ===========================================================================
-import type { Case, Department } from './types'
+import type { Case, Department, WorkAreaId } from './types'
 import { nextAction } from './progress'
 import { ROLES, type RoleKey } from './access'
 
@@ -76,4 +76,20 @@ export function isNextActionMine(role: RoleKey, c: Case): boolean {
   if (!dept) return false
   const na = nextAction(c)
   return !c.isCompleted && na.department === dept
+}
+
+// The two Sales-owned journey steps. Once AMT (Account Services) approves the
+// franchise, these belong to AAT (Sales) — AMT must not continue the case into
+// them. AMT still owns its own later steps (setup-account, activate-handover).
+const AAT_ONLY_WORK_AREAS: WorkAreaId[] = ['prepare-quotation', 'finalize-offer']
+
+/**
+ * May this role open a given work area of the NB journey? Access to the CASE is
+ * decided by canAccessCase; this is the finer, per-STEP rule. Account Services
+ * (AMT) cannot open the Sales-owned quotation/offer steps — that is AAT's job —
+ * so they can neither navigate the stepper into them nor reach them by URL.
+ */
+export function canOpenWorkArea(role: RoleKey, workArea: WorkAreaId): boolean {
+  if (role === 'account-services' && AAT_ONLY_WORK_AREAS.includes(workArea)) return false
+  return true
 }

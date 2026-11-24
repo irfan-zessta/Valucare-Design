@@ -24,7 +24,6 @@ import {
   Typography,
 } from 'antd'
 import { CheckCircleOutlined, CloseCircleOutlined, EditOutlined, EyeOutlined, FileTextOutlined, LockOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
 import type { Case } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
 import { useComments } from '../../state/CommentsProvider'
@@ -63,7 +62,6 @@ export function FranchiseReview({ c }: { c: Case }) {
   const { add: addComment } = useComments()
   const { user, can } = useActiveUser()
   const { message } = App.useApp()
-  const navigate = useNavigate()
   const accepted = c.franchise.status === 'accepted'
   const rejected = c.franchise.status === 'rejected'
 
@@ -171,12 +169,13 @@ export function FranchiseReview({ c }: { c: Case }) {
       })
     }
     setApproving(false)
+    // AMT stays on the approved franchise — Prepare Quotation is AAT's step.
+    // The AAT handler is notified and picks it up from their dashboard.
     message.success(
       tagged.length
-        ? `Franchise approved — ${tagged.map((t) => `@${t.name}`).join(', ')} notified. Moving on to Prepare Quotation.`
-        : 'Franchise approved — moving on to Prepare Quotation.',
+        ? `Franchise approved — ${tagged.map((t) => `@${t.name}`).join(', ')} notified. Handed to AAT to start the quotation.`
+        : 'Franchise approved — handed to AAT to start the quotation.',
     )
-    navigate(`/cases/${c.id}/prepare-quotation`)
   }
 
   function openReturn() {

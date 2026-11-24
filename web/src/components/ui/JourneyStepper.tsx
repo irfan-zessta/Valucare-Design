@@ -34,6 +34,7 @@ export function JourneyStepper({
   viewing,
   reachable,
   onSelect,
+  canNavigate,
 }: {
   current: WorkAreaId
   variant?: 'full' | 'mini'
@@ -49,6 +50,8 @@ export function JourneyStepper({
   reachable?: WorkAreaId
   /** When provided, reached steps (up to `reachable`) become clickable. */
   onSelect?: (wa: WorkAreaId) => void
+  /** Further gate which reached steps are navigable (e.g. role can't open a step). */
+  canNavigate?: (wa: WorkAreaId) => boolean
 }) {
   const currentIdx = WORK_AREA_ORDER.indexOf(current)
   const reachableIdx = Math.max(currentIdx, WORK_AREA_ORDER.indexOf(reachable ?? current))
@@ -88,9 +91,11 @@ export function JourneyStepper({
   return (
     <div className={`app-stepper${minimal ? ' app-stepper--minimal' : ''}`}>
       {WORK_AREA_ORDER.map((wa, i) => {
-        // Reached steps (up to the furthest reached) are navigable when onSelect is given.
+        // Reached steps (up to the furthest reached) are navigable when onSelect is
+        // given — and when the optional per-step gate allows it (e.g. AMT can't
+        // open the Sales-owned quotation/offer steps).
         const reached = i <= reachableIdx
-        const clickable = Boolean(onSelect) && reached
+        const clickable = Boolean(onSelect) && reached && (canNavigate?.(wa) ?? true)
         const cls =
           `app-stepper__item${stateClass(i, currentIdx)}` +
           (clickable ? ' is-clickable' : '') +
