@@ -7,9 +7,9 @@
 // inline so you don't log a duplicate. The remaining details sit in a compact
 // two-column layout (no separate search step, no scrolling).
 // ===========================================================================
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Alert, Button, Col, Form, Input, Row, Select, Space } from 'antd'
+import { AutoComplete, Button, Col, Form, Input, Row, Select } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
@@ -54,7 +54,37 @@ export function NewEnquiryForm({
     () => (q.length < 2 ? [] : cases.filter((c) => c.company.name.toLowerCase().includes(q))),
     [cases, q],
   )
-  const hasDuplicates = enquiryMatches.length > 0 || caseMatches.length > 0
+  // Google-style suggestions: matching enquiries/cases shown inline under the
+  // field as you type. Each option's value is the path to open it; picking one
+  // navigates there instead of logging a new lead.
+  const suggestRow = (title: string, meta: string) => (
+    <div className="enq-suggest">
+      <span className="enq-suggest__name">{title}</span>
+      <span className="enq-suggest__meta">{meta}</span>
+    </div>
+  )
+  const options = useMemo(() => {
+    const groups: { label: string; options: { value: string; label: ReactNode }[] }[] = []
+    if (enquiryMatches.length) {
+      groups.push({
+        label: 'Open enquiries',
+        options: enquiryMatches.slice(0, 5).map((e) => ({
+          value: `/sales/enquiries/${e.id}`,
+          label: suggestRow(e.companyName, `Open enquiry · ${e.id}`),
+        })),
+      })
+    }
+    if (caseMatches.length) {
+      groups.push({
+        label: 'Existing cases',
+        options: caseMatches.slice(0, 5).map((c) => ({
+          value: `/cases/${c.id}/${c.currentWorkArea}`,
+          label: suggestRow(c.company.name, `Existing case · ${c.id}`),
+        })),
+      })
+    }
+    return groups
+  }, [enquiryMatches, caseMatches])
 
   function goToExisting(path: string) {
     onOpenExisting?.()
@@ -93,48 +123,31 @@ export function NewEnquiryForm({
         label="Company name"
         required
         validateStatus={nameInvalid ? 'error' : undefined}
-        help={nameInvalid ? 'Enter the company name to log the enquiry.' : undefined}
-        style={{ marginBottom: hasDuplicates ? 12 : undefined }}
+        help={
+          nameInvalid
+            ? 'Enter the company name to log the enquiry.'
+            : options.length > 0
+              ? 'A similar company already exists — pick it to open instead of logging a duplicate.'
+              : undefined
+        }
       >
-        <Input
+        <AutoComplete
           autoFocus
-          placeholder="Type a company name"
+          style={{ width: '100%' }}
           value={name}
-          onChange={(e) => {
-            setName(e.target.value)
+          options={options}
+          classNames={{ popup: { root: 'enq-suggest-dropdown' } }}
+          filterOption={false}
+          status={nameInvalid ? 'error' : undefined}
+          onSelect={(value) => goToExisting(String(value))}
+          onChange={(v) => {
+            setName(v)
             if (nameInvalid) setNameInvalid(false)
           }}
-        />
+        >
+          <Input placeholder="Type a company name" />
+        </AutoComplete>
       </Form.Item>
-
-      {hasDuplicates && (
-        <Alert
-          type="warning"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message="A similar company already exists"
-          description={
-            <Space orientation="vertical" size={4} style={{ display: 'flex' }}>
-              {enquiryMatches.slice(0, 3).map((e) => (
-                <span key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span>Open enquiry · <strong>{e.companyName}</strong> ({e.id})</span>
-                  <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => goToExisting(`/sales/enquiries/${e.id}`)}>
-                    Open
-                  </Button>
-                </span>
-              ))}
-              {caseMatches.slice(0, 3).map((c) => (
-                <span key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span>Existing case · <strong>{c.company.name}</strong> ({c.id})</span>
-                  <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => goToExisting(`/cases/${c.id}/${c.currentWorkArea}`)}>
-                    Open
-                  </Button>
-                </span>
-              ))}
-            </Space>
-          }
-        />
-      )}
 
       <Row gutter={16}>
         <Col xs={24} sm={12}>
