@@ -221,8 +221,6 @@ export function DepartmentDashboard<T>({
     if (view === 'in-progress') return filtered.filter((r) => !config.isCompleted(r))
     return filtered
   }, [filtered, view, config])
-  const viewTotal =
-    view === 'completed' ? ws.completed : view === 'needs-action' ? ws.needs : view === 'in-progress' ? ws.inProgress : ws.all
   const viewColumns = view === 'completed' ? config.completedColumns : config.inProgressColumns
 
   function clearFilters() {
@@ -418,11 +416,6 @@ export function DepartmentDashboard<T>({
     { value: 'needs-action', label: needsSeg },
   ]
 
-  const footerNoun = viewTotal === 1 ? 'case' : 'cases'
-  const footerText = hasQueryOrFilters
-    ? `Showing ${viewRows.length} of ${viewTotal} ${footerNoun}`
-    : `${viewTotal} ${footerNoun}`
-
   // The Cases panel: one compact view selector + aligned toolbar, filter chips,
   // the table, and a result-count footer.
   const casesPanel = (
@@ -466,12 +459,6 @@ export function DepartmentDashboard<T>({
       )}
 
       <div className="app-table-panel">{renderList(viewRows, viewColumns)}</div>
-
-      {!loading && (
-        <div className="app-list-foot" aria-live="polite">
-          {footerText}
-        </div>
-      )}
     </div>
   )
 
