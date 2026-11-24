@@ -213,6 +213,14 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   )
 }
 
+/** A comment left on the franchise (prototype — persisted in formData). */
+interface FranchiseComment {
+  id: string
+  text: string
+  author: string
+  at: string
+}
+
 /** Label with a right-side red asterisk for mandatory fields. */
 function reqLabel(label: string) {
   return (
@@ -258,6 +266,27 @@ export function CreateFranchise({ c }: { c: Case }) {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setF((prev) => ({ ...prev, [key]: value }))
     setErrors((prev) => (prev[key as string] ? { ...prev, [key as string]: '' } : prev))
+  }
+
+  // Comments — persisted immediately on the franchise so they survive navigation.
+  const [commentDraft, setCommentDraft] = useState('')
+  const comments = (c.franchise.formData?.comments as FranchiseComment[] | undefined) ?? []
+  const addComment = () => {
+    const text = commentDraft.trim()
+    if (!text) return
+    const comment: FranchiseComment = { id: `cm-${Date.now()}`, text, author: user.name, at: new Date().toISOString() }
+    patchCase(c.id, (prev) => ({
+      ...prev,
+      franchise: {
+        ...prev.franchise,
+        formData: {
+          ...(prev.franchise.formData ?? {}),
+          comments: [...((prev.franchise.formData?.comments as FranchiseComment[] | undefined) ?? []), comment],
+        },
+      },
+    }))
+    setCommentDraft('')
+    message.success('Comment added.')
   }
 
   const returnByField = useMemo(() => {
@@ -758,13 +787,24 @@ export function CreateFranchise({ c }: { c: Case }) {
         </Form.Item>
       </Section>
 
-      <Section title="Remarks">
-        <Form.Item label="Sales Remarks">
-          <Input.TextArea id="salesRemarks" rows={3} value={f.salesRemarks} onChange={(e) => set('salesRemarks', e.target.value)} />
-        </Form.Item>
-        <Form.Item label="Actuarial Remarks" help="Entered by Actuarial or AMT.">
-          <Input.TextArea id="acusaRemarks" rows={3} disabled value={f.acusaRemarks} placeholder="Added later by Actuarial / AMT" />
-        </Form.Item>
+      <Section title="Comments">
+        {comments.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            {comments.map((cm) => (
+              <div key={cm.id} style={{ border: '1px solid #f0f0f0', borderRadius: 8, background: '#fafafa', padding: 12, marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, color: '#595959', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, color: '#1f1f1f' }}>{cm.author}</span>
+                  <span>{dayjs(cm.at).format('MMM D, YYYY · h:mm A')}</span>
+                </div>
+                <div style={{ whiteSpace: 'pre-wrap', color: '#1f1f1f' }}>{cm.text}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        <Input.TextArea id="newComment" rows={3} value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} placeholder="Add a comment…" />
+        <div style={{ marginTop: 8, textAlign: 'right' }}>
+          <Button type="primary" onClick={addComment} disabled={!commentDraft.trim()}>Add comment</Button>
+        </div>
       </Section>
     </>
   )
