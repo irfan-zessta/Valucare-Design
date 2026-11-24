@@ -46,6 +46,8 @@ import type {
   SetupTaskId,
 } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
+import { RemarksField } from '../../components/comments/RemarksField'
+import { useRemarkComment } from '../../components/comments/useRemarkComment'
 import { SETUP_TASK_ORDER, makeInitialSetup, setupTaskMeta } from '../../domain/setup'
 import { emptyRichSob } from '../../domain/sobModel'
 import { FormSection } from '../../components/ui/FormSection'
@@ -104,6 +106,7 @@ export function SetupAccount({ c }: { c: Case }) {
   const { patchCase } = useCases()
   const { message } = App.useApp()
   const navigate = useNavigate()
+  const postRemark = useRemarkComment()
 
   // Create the setup state on first entry (carry-forward from the accepted case).
   useEffect(() => {
@@ -977,7 +980,14 @@ export function SetupAccount({ c }: { c: Case }) {
         preparedAt: new Date().toISOString(),
         basis: { accountVersion: undefined, sobVersion: onbVersion, planCodeCount: c.account.planCodes.length },
       })
-      message.success('COC generated — pending approval.')
+      // Mirror the COC remarks into the case Comments thread (+ notify anyone
+      // @mentioned).
+      const tagged = postRemark({ caseId: c.id, caseName: c.company.name, label: 'COC remarks' }, coc.remarks ?? '')
+      message.success(
+        tagged.length
+          ? `COC generated — pending approval. ${tagged.map((t) => `@${t.name}`).join(', ')} notified.`
+          : 'COC generated — pending approval.',
+      )
     }
 
     return (
@@ -1019,10 +1029,12 @@ export function SetupAccount({ c }: { c: Case }) {
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 <div style={{ fontSize: 13, marginBottom: 4 }}>Remarks</div>
-                <Input.TextArea
-                  rows={2}
+                <RemarksField
+                  minRows={2}
                   value={coc.remarks ?? ''}
-                  onChange={(e) => setCoc({ remarks: e.target.value })}
+                  onChange={(v) => setCoc({ remarks: v })}
+                  placeholder="COC remarks — type @ to mention a teammate"
+                  ariaLabel="COC remarks"
                 />
               </div>
             </div>

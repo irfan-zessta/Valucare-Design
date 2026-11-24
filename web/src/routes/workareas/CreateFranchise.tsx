@@ -52,6 +52,10 @@ const DEPARTMENT = ['Corporate Sales', 'Account Services', 'Actuarial']
 const HANDLER_OPTIONS = DEMO_USERS
   .filter((u) => u.department.startsWith('AAT'))
   .map((u) => ({ value: u.name, label: u.title ? `${u.name} · ${u.title}` : u.name }))
+// AMT (Account Services) members the franchise can be routed to for review.
+const AMT_OPTIONS = DEMO_USERS
+  .filter((u) => u.department.startsWith('AMT'))
+  .map((u) => ({ value: u.name, label: u.title ? `${u.name} · ${u.title}` : u.name }))
 
 // Franchise attachment slots — the legacy (HMS3) requirement list, plus GIS as
 // a new additional requirement. AOR/BOR applies to Agent/Broker accounts.
@@ -117,6 +121,8 @@ export interface FormState {
   mannerOfEnrollment: string
   mannerOfPayment: string
   requestedBy: string
+  /** AMT (Account Services) person this franchise is being requested to. */
+  requestedToAmt: string
   department: string
   businessSource: BusinessSource
   commissionType: string
@@ -179,6 +185,7 @@ export function initialForm(c: Case): FormState {
     mannerOfEnrollment: 'Compulsory',
     mannerOfPayment: 'Contributory',
     requestedBy: '',
+    requestedToAmt: c.franchise.requestedToAmtName ?? '',
     department: 'Corporate Sales',
     businessSource: c.company.businessSource,
     commissionType: '',
@@ -305,6 +312,7 @@ export function CreateFranchise({ c }: { c: Case }) {
 
   function persist(status: 'draft' | 'submitted') {
     const productType: ProductType = f.accountType === 'TPA/ASO' ? 'TPA' : 'HMO'
+    const amt = DEMO_USERS.find((u) => u.name === f.requestedToAmt)
     patchCase(c.id, (prev) => {
     const next: Case = {
       ...prev,
@@ -345,6 +353,10 @@ export function CreateFranchise({ c }: { c: Case }) {
         status,
         estimatedPrincipals: Number(f.employeeCount) || 0,
         estimatedDependents: Number(f.dependentCount) || 0,
+        createdById: prev.franchise.createdById ?? user.id,
+        createdByName: prev.franchise.createdByName ?? user.name,
+        requestedToAmtName: f.requestedToAmt.trim() || prev.franchise.requestedToAmtName,
+        requestedToAmtId: amt?.id ?? prev.franchise.requestedToAmtId,
         currentCoverage: f.currentCoverage,
         coverageStart: f.targetEffectiveDate || prev.franchise.coverageStart,
         formData: { ...f },
@@ -723,11 +735,19 @@ export function CreateFranchise({ c }: { c: Case }) {
           </Form.Item>
         </div>
         <div style={two}>
-          <Form.Item label="Requested By">
-            <Input id="requestedBy" value={f.requestedBy} onChange={(e) => set('requestedBy', e.target.value)} />
+          <Form.Item label="Requesting to (AMT)" help="Which Account Services (AMT) reviewer this franchise is sent to.">
+            <Select
+              id="requestedToAmt"
+              showSearch
+              allowClear
+              placeholder="Choose an AMT reviewer"
+              value={f.requestedToAmt || undefined}
+              options={AMT_OPTIONS}
+              onChange={(v) => set('requestedToAmt', v ?? '')}
+            />
           </Form.Item>
-          <Form.Item label="Created By">
-            <Input disabled value="Demo Admin" />
+          <Form.Item label="Created By" help="The person who created this franchise.">
+            <Input disabled value={user.name} />
           </Form.Item>
         </div>
       </Section>

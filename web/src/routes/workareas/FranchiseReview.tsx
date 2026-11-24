@@ -32,6 +32,7 @@ import { useActiveUser } from '../../state/ActiveUserProvider'
 import { roleLabel } from '../../domain/access'
 import { checkerDecision, withEvent } from '../../domain/caseHistory'
 import { MENTION_OPTIONS, extractMentions } from '../../components/comments/mentionUtils'
+import { RemarksField } from '../../components/comments/RemarksField'
 import { CreateFranchise, FRANCHISE_DOCS, initialForm } from './CreateFranchise'
 
 const DOC_META: Record<string, { label: string; tag?: string }> = Object.fromEntries(
@@ -156,8 +157,25 @@ export function FranchiseReview({ c }: { c: Case }) {
         { action: 'Approved franchise', area: 'Franchise', version, from: 'submitted', to: 'accepted' },
       ),
     )
+    // Mirror the approval remarks into the case Comments thread (+ notify any
+    // @mentioned teammate), same as the return note.
+    const tagged = extractMentions(approveRemarks.trim())
+    if (approveRemarks.trim()) {
+      addComment({
+        caseId: c.id,
+        caseName: c.company.name,
+        authorId: user.id,
+        author: user.name,
+        text: `Approval remarks: ${approveRemarks.trim()}`,
+        tagged,
+      })
+    }
     setApproving(false)
-    message.success('Franchise approved — moving on to Prepare Quotation.')
+    message.success(
+      tagged.length
+        ? `Franchise approved — ${tagged.map((t) => `@${t.name}`).join(', ')} notified. Moving on to Prepare Quotation.`
+        : 'Franchise approved — moving on to Prepare Quotation.',
+    )
     navigate(`/cases/${c.id}/prepare-quotation`)
   }
 
@@ -496,13 +514,14 @@ export function FranchiseReview({ c }: { c: Case }) {
           (for rates), and the AAT handler is notified (simulated email).
         </Typography.Paragraph>
         <Typography.Text>Remarks (optional)</Typography.Text>
-        <Input.TextArea
-          rows={3}
-          style={{ marginTop: 6 }}
-          value={approveRemarks}
-          onChange={(e) => setApproveRemarks(e.target.value)}
-          placeholder="Any notes for the AAT handler"
-        />
+        <div style={{ marginTop: 6 }}>
+          <RemarksField
+            value={approveRemarks}
+            onChange={setApproveRemarks}
+            placeholder="Any notes for the AAT handler — type @ to mention a teammate"
+            ariaLabel="Approval remarks"
+          />
+        </div>
       </Modal>
 
       {/* ---- Return for corrections dialog ----------------------------------- */}

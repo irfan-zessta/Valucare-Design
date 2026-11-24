@@ -90,6 +90,23 @@ export default function SalesDashboard() {
               </span>
             ))}
           </div>
+          {(c.franchise.createdByName || c.franchise.requestedToAmtName) && (
+            <div className="sales-co__refs">
+              {c.franchise.createdByName && (
+                <span>
+                  <span className="sales-co__reflabel">Created by</span> {c.franchise.createdByName}
+                </span>
+              )}
+              {c.franchise.createdByName && c.franchise.requestedToAmtName && (
+                <span className="sales-co__sep">→</span>
+              )}
+              {c.franchise.requestedToAmtName && (
+                <span>
+                  <span className="sales-co__reflabel">AMT</span> {c.franchise.requestedToAmtName}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )
     }

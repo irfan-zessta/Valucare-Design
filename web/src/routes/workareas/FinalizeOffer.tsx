@@ -56,6 +56,8 @@ import type {
   SobSection,
 } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
+import { RemarksField } from '../../components/comments/RemarksField'
+import { useRemarkComment } from '../../components/comments/useRemarkComment'
 import { currentProposal } from '../../domain/progress'
 import { uid } from '../../domain/ids'
 import { ProposalRateSchedule, emptyRateSchedule, sampleRateSchedule } from './ProposalRateSchedule'
@@ -142,6 +144,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
   const { patchCase } = useCases()
   const { message } = App.useApp()
   const navigate = useNavigate()
+  const postRemark = useRemarkComment()
 
   const inter = c.company.businessSource !== 'Direct'
   const recipient = inter ? c.company.intermediaryName ?? 'the agent/broker' : 'the client'
@@ -599,10 +602,17 @@ export function FinalizeOffer({ c }: { c: Case }) {
         ? { status: 'draft' as const, returnReason: reviewRemarks.trim() || 'Returned for revision.' }
         : {}),
     }))
+    // Mirror the review remarks into the case Comments thread (+ notify anyone
+    // @mentioned).
+    const label = outcome === 'approve'
+      ? `Pricing ${stage === 'first' ? '1st-level' : '2nd-level'} approval remarks`
+      : 'Pricing review returned'
+    const tagged = postRemark({ caseId: c.id, caseName: c.company.name, label }, reviewRemarks)
     setReview(null)
     setReviewRemarks('')
+    const who = tagged.length ? ` — ${tagged.map((t) => `@${t.name}`).join(', ')} notified` : ''
     message[outcome === 'approve' ? 'success' : 'info'](
-      outcome === 'approve' ? 'Pricing decision approved.' : 'Returned to the AAT handler.',
+      (outcome === 'approve' ? 'Pricing decision approved.' : 'Returned to the AAT handler.') + who,
     )
   }
 
@@ -1457,12 +1467,14 @@ export function FinalizeOffer({ c }: { c: Case }) {
           <Typography.Paragraph type="secondary">Justification: {proposal.justification}</Typography.Paragraph>
         )}
         <Typography.Text>Remarks (required to return)</Typography.Text>
-        <Input.TextArea
-          rows={3}
-          style={{ marginTop: 6 }}
-          value={reviewRemarks}
-          onChange={(e) => setReviewRemarks(e.target.value)}
-        />
+        <div style={{ marginTop: 6 }}>
+          <RemarksField
+            value={reviewRemarks}
+            onChange={setReviewRemarks}
+            placeholder="Pricing review notes — type @ to mention a teammate"
+            ariaLabel="Pricing review remarks"
+          />
+        </div>
       </Modal>
 
       {/* ---- Send dialog --------------------------------------------------- */}

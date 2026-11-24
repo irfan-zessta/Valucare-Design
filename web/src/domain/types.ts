@@ -377,6 +377,13 @@ export interface Franchise {
   submittedById?: string
   submittedByName?: string
   submittedByRole?: string
+  /** Who created this franchise (stamped on first save, AAT side). */
+  createdById?: string
+  createdByName?: string
+  /** The AMT (Account Services) person the AAT creator routed this franchise to —
+      "requesting to whom". Chosen on the Create Franchise form. */
+  requestedToAmtId?: string
+  requestedToAmtName?: string
   /** When the franchise was approved/accepted, by whom (checker identity), and any remarks. */
   acceptedAt?: string
   acceptedRemarks?: string
