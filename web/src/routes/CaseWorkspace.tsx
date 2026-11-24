@@ -1,9 +1,8 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Button, Result, Space } from 'antd'
 import { useCases } from '../state/CaseProvider'
 import { useActiveUser } from '../state/ActiveUserProvider'
 import {
-  WORK_AREA_LABELS,
   WORK_AREA_ORDER,
   type WorkAreaId,
 } from '../domain/types'
@@ -66,26 +65,12 @@ export default function CaseWorkspace() {
   const activeWorkArea = (WORK_AREAS.has(workArea) ? workArea : c.currentWorkArea) as WorkAreaId
 
   // Per-step role gate: e.g. AMT (Account Services) can open the case but not the
-  // Sales-owned Prepare Quotation / Finalize Offer steps — that is AAT's job.
-  // Block it for a direct URL too, not just the stepper click.
+  // Sales-owned Prepare Quotation / Finalize Offer steps — that is AAT's job. If
+  // a role lands on a step it can't open (a stale link, or the case has advanced
+  // to a Sales step after AMT's approval), quietly show the franchise form it CAN
+  // see rather than a block screen.
   if (!canOpenWorkArea(role, activeWorkArea)) {
-    return (
-      <div className="app-page">
-        <Result
-          status="info"
-          title="This step is handled by AAT"
-          subTitle={`${WORK_AREA_LABELS[activeWorkArea]} is a Sales (AAT) step. Your part on ${c.company.name} is done for now — the AAT handler has been notified to continue.`}
-          extra={
-            <Space>
-              <Button type="primary" onClick={() => navigate(`/cases/${c.id}/create-franchise`)}>
-                View franchise
-              </Button>
-              <Button onClick={() => navigate(roleHomePath(role))}>Back to dashboard</Button>
-            </Space>
-          }
-        />
-      </div>
-    )
+    return <Navigate to={`/cases/${c.id}/create-franchise`} replace />
   }
 
   return (
