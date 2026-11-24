@@ -112,6 +112,11 @@ export default function SalesDashboard() {
     const rowCta = (c: Case): { label: string; subtle: boolean } => {
       if (c.isCompleted) return { label: 'View franchise', subtle: true }
       const a = nextAction(c)
+      // Account Services reviewing a submitted franchise: this IS their action,
+      // so give it a prominent, explicit label rather than the quiet "View case"
+      // the Sales-centric `waiting` flag would otherwise produce.
+      if (role === 'account-services' && c.franchise.status === 'submitted')
+        return { label: 'Review franchise', subtle: false }
       if (a.waiting) return { label: 'View case', subtle: true }
       if (c.franchise.status === 'returned' || c.franchise.status === 'rejected')
         return { label: 'Review feedback', subtle: false }

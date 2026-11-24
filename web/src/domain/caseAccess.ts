@@ -61,10 +61,19 @@ export function salesWorklist(role: RoleKey, cases: Case[]): Case[] {
   return cases
 }
 
-/** Does the case's single next action belong to this role's department? */
+/**
+ * Does the case's single next action belong to this role's department?
+ *
+ * The `waiting` flag on a next action is framed from the ORIGINATING team's
+ * point of view (e.g. a submitted franchise is "waiting for AMT" as far as
+ * Sales is concerned). But for the department the action is actually assigned
+ * to, that same step IS their action — so "needs my action" keys off the
+ * action's department, not the originator's waiting flag. Otherwise a franchise
+ * submitted to AMT for review would never surface in AMT's "Needs my action".
+ */
 export function isNextActionMine(role: RoleKey, c: Case): boolean {
   const dept = roleDepartment(role)
   if (!dept) return false
   const na = nextAction(c)
-  return !c.isCompleted && !na.waiting && na.department === dept
+  return !c.isCompleted && na.department === dept
 }
