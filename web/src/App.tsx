@@ -2,6 +2,7 @@ import { ConfigProvider, App as AntApp } from 'antd'
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { theme } from './theme'
 import { AuthProvider } from './auth/AuthProvider'
+import { ActiveUserProvider } from './state/ActiveUserProvider'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { CaseProvider, useCases } from './state/CaseProvider'
 import { EnquiryProvider } from './state/EnquiryProvider'
@@ -11,6 +12,7 @@ import { UiPrefsProvider } from './state/UiPrefsProvider'
 import { UnsavedChangesProvider } from './state/UnsavedChangesProvider'
 import { BreadcrumbProvider } from './state/BreadcrumbProvider'
 import { AppShell } from './components/shell/AppShell'
+import { RequireScreen } from './components/access/AccessGuards'
 import Login from './routes/Login'
 import Home from './routes/Home'
 import ComingSoon from './routes/ComingSoon'
@@ -40,6 +42,7 @@ export default function App() {
       <AntApp>
         <BrowserRouter>
           <AuthProvider>
+            <ActiveUserProvider>
             <UiPrefsProvider>
               <CaseProvider>
                 <RenewalProvider>
@@ -55,9 +58,9 @@ export default function App() {
                     <Route element={<ProtectedRoute />}>
                       <Route element={<AppShell />}>
                         <Route path="/" element={<Home />} />
-                        <Route path="/sales" element={<SalesDashboard />} />
+                        <Route path="/sales" element={<RequireScreen screen="sales"><SalesDashboard /></RequireScreen>} />
                         {/* Accounts directory — the master register of created accounts. */}
-                        <Route path="/accounts" element={<AccountsDirectory />} />
+                        <Route path="/accounts" element={<RequireScreen screen="accounts"><AccountsDirectory /></RequireScreen>} />
                         {/* Corporate Renewal — dashboard + per-renewal case workspace. */}
                         <Route path="/sales/renewals" element={<RenewalsDashboard />} />
                         <Route path="/sales/renewals/:id" element={<RenewalWorkspace />} />
@@ -88,6 +91,7 @@ export default function App() {
                 </RenewalProvider>
               </CaseProvider>
             </UiPrefsProvider>
+            </ActiveUserProvider>
           </AuthProvider>
         </BrowserRouter>
       </AntApp>

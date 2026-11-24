@@ -12,6 +12,7 @@ import { Navigate, useParams } from 'react-router-dom'
 import { Alert } from 'antd'
 import { useInitialLoad } from '../../hooks/useInitialLoad'
 import { DepartmentDashboard, type DashboardConfig } from '../../components/dashboard/DepartmentDashboard'
+import { RequireScreen } from '../../components/access/AccessGuards'
 
 type EmptyRow = Record<string, unknown>
 
@@ -97,5 +98,9 @@ export default function DepartmentPlaceholderDashboard() {
 
   if (!meta || !config) return <Navigate to="/" replace />
 
-  return <DepartmentDashboard<EmptyRow> config={config} rows={[]} loading={loading} error={error} onRetry={retry} />
+  return (
+    <RequireScreen screen={deptId}>
+      <DepartmentDashboard<EmptyRow> config={config} rows={[]} loading={loading} error={error} onRetry={retry} />
+    </RequireScreen>
+  )
 }

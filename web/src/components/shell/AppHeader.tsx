@@ -11,7 +11,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { navTrail } from '../../config/navigation'
 import { useBreadcrumbItems, type Crumb } from '../../state/BreadcrumbProvider'
 import { ValucareLogo } from './ValucareLogo'
-import { UserMenu } from './UserMenu'
+import { ViewAsSwitcher } from './ViewAsSwitcher'
 import { HeaderNotifications } from './HeaderNotifications'
 
 const { Header } = Layout
@@ -70,7 +70,7 @@ export function AppHeader({
       <div className="app-header__spacer" />
 
       <HeaderNotifications />
-      <UserMenu variant="header" />
+      <ViewAsSwitcher />
     </Header>
   )
 }

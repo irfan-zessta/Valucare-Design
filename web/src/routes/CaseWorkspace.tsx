@@ -1,12 +1,18 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Result, Space } from 'antd'
 import { useCases } from '../state/CaseProvider'
+import { useActiveUser } from '../state/ActiveUserProvider'
 import {
   WORK_AREA_ORDER,
   type WorkAreaId,
 } from '../domain/types'
 import { furthestWorkArea } from '../domain/progress'
+import { canAccessCase } from '../domain/caseAccess'
+import { roleLabel } from '../domain/access'
+import { roleHomePath } from '../domain/demoRoster'
 import { CaseStatusTag } from '../components/CaseStatusTag'
+import { CaseOwnershipBanner } from '../components/case/CaseOwnershipBanner'
+import { CaseHistory } from '../components/case/CaseHistory'
 import { PageHeader } from '../components/ui/PageHeader'
 import { JourneyStepper } from '../components/ui/JourneyStepper'
 import { WorkAreaPanel } from './workareas/WorkAreaPanel'
@@ -16,8 +22,28 @@ const WORK_AREAS = new Set<string>(WORK_AREA_ORDER)
 export default function CaseWorkspace() {
   const { caseId = '', workArea = '' } = useParams()
   const { getCase } = useCases()
+  const { role } = useActiveUser()
   const navigate = useNavigate()
   const c = getCase(caseId)
+
+  // Out of scope for this persona — the case is not in their worklist, so it
+  // must not be reachable even by a direct link.
+  if (c && !canAccessCase(role, c)) {
+    return (
+      <div className="app-page">
+        <Result
+          status="403"
+          title="This case isn’t in your worklist"
+          subTitle={`The ${roleLabel(role)} role doesn’t take part in this case. Here is your own worklist instead.`}
+          extra={
+            <Button type="primary" onClick={() => navigate(roleHomePath(role))}>
+              Go to my worklist
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
 
   // Missing or inaccessible case — explain and offer a way back.
   if (!c) {
@@ -67,7 +93,9 @@ export default function CaseWorkspace() {
       </div>
 
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+        <CaseOwnershipBanner c={c} />
         <WorkAreaPanel c={c} workArea={activeWorkArea} />
+        <CaseHistory c={c} />
       </Space>
     </div>
   )

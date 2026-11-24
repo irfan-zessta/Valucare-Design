@@ -19,12 +19,14 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { useCases } from '../../state/CaseProvider'
 import { useEnquiries } from '../../state/EnquiryProvider'
+import { useActiveUser } from '../../state/ActiveUserProvider'
 import { useInitialLoad } from '../../hooks/useInitialLoad'
 import { DepartmentDashboard, type DashboardConfig } from '../../components/dashboard/DepartmentDashboard'
 import { CreateFranchiseModal } from '../../components/CreateFranchiseModal'
 import { useEnquiriesWorkspace } from '../enquiries/EnquiriesWorkspace'
 import { WORK_AREA_LABELS, WORK_AREA_ORDER, type Case } from '../../domain/types'
 import { currentProposal, meaningfulStatus, nextAction, responsibleDepartment } from '../../domain/progress'
+import { isNextActionMine, roleDepartment, salesWorklist } from '../../domain/caseAccess'
 import { formatDate } from '../../lib/format'
 
 const { Text } = Typography
@@ -32,9 +34,15 @@ const { Text } = Typography
 export default function SalesDashboard() {
   const { cases } = useCases()
   const { enquiries } = useEnquiries()
+  const { role, can } = useActiveUser()
   const { loading, error, retry } = useInitialLoad()
   const navigate = useNavigate()
   const [franchiseModalOpen, setFranchiseModalOpen] = useState(false)
+
+  // Records this persona works within — the dashboard counts and table share
+  // this scoped source, so a count always equals its worklist.
+  const rows = useMemo(() => salesWorklist(role, cases), [role, cases])
+  const deptLabel = roleDepartment(role) ?? 'your team'
 
   // Enquiry counts are kept separate from the case (lead/franchise) counts.
   const openEnquiries = useMemo(() => enquiries.filter((e) => e.status === 'open').length, [enquiries])
@@ -251,27 +259,47 @@ export default function SalesDashboard() {
       </div>
     )
 
+    // --- Role-aware header + primary action ---------------------------------
+    // Account Manager drives the commercial pursuit (create); Account Services
+    // reviews assigned franchises and does onboarding setup (review). Neither
+    // owns the other's primary action.
+    const isAccountServices = role === 'account-services'
+    const title = isAccountServices ? 'Account Services — New Business' : 'New Business'
+    const supportingText = isAccountServices
+      ? 'Review assigned franchises and complete account setup.'
+      : 'Manage enquiries, franchises and sales proposals.'
+
+    // Account Manager can create; others cannot.
+    const primaryAction = can('franchise', 'edit') && role === 'account-manager'
+      ? { label: 'Create franchise', icon: <PlusOutlined />, onClick: () => setFranchiseModalOpen(true) }
+      : can('franchise', 'approve')
+        ? (() => {
+            const pending = rows.find((c) => c.franchise.status === 'submitted')
+            return {
+              label: 'Review franchises',
+              icon: <ExclamationCircleOutlined />,
+              onClick: () => pending && navigate(`/cases/${pending.id}/create-franchise`),
+              disabled: !pending,
+              disabledReason: 'No franchises are awaiting your review.',
+            }
+          })()
+        : undefined
+    // Only roles that may create enquiries get the secondary action.
+    const secondaryAction = can('enquiries', 'edit')
+      ? { label: 'New enquiry', onClick: () => navigate('/sales/enquiries/new') }
+      : undefined
+
     return {
-      deptId: 'sales',
-      title: 'New Business',
-      supportingText: 'Manage enquiries, franchises and sales proposals.',
-      secondaryAction: {
-        label: 'New enquiry',
-        onClick: () => navigate('/sales/enquiries/new'),
-      },
-      primaryAction: {
-        label: 'Create franchise',
-        icon: <PlusOutlined />,
-        onClick: () => setFranchiseModalOpen(true),
-      },
+      deptId: `sales:${role}`,
+      title,
+      supportingText,
+      secondaryAction,
+      primaryAction,
       rowId: (c) => c.id,
       onRowClick: openCase,
       isCompleted: (c) => c.isCompleted,
-      // Only cases whose next action belongs to Sales — not every pending case.
-      needsMyAction: (c) => {
-        const a = nextAction(c)
-        return !c.isCompleted && !a.waiting && a.department === 'Sales'
-      },
+      // Only cases whose next action belongs to THIS persona's department.
+      needsMyAction: (c) => isNextActionMine(role, c),
       searchText: (c) =>
         [c.company.name, c.company.shortName, c.id, c.account.accountRef, c.quotation.requestRef]
           .filter(Boolean)
@@ -284,7 +312,7 @@ export default function SalesDashboard() {
         ] },
         { key: 'workArea', label: 'Stage', options: WORK_AREA_ORDER.map((w) => ({ label: WORK_AREA_LABELS[w], value: w })) },
         { key: 'status', label: 'Status', options: [
-          { label: 'Needs a Sales action', value: 'needs-action' },
+          { label: `Needs a ${deptLabel} action`, value: 'needs-action' },
           { label: 'Waiting on another team', value: 'waiting' },
           { label: 'Returned / clarification', value: 'attention' },
         ] },
@@ -300,7 +328,7 @@ export default function SalesDashboard() {
         if (s.responsible && responsibleDepartment(c) !== s.responsible) return false
         if (s.status) {
           const a = nextAction(c)
-          if (s.status === 'needs-action' && !(!c.isCompleted && !a.waiting && a.department === 'Sales')) return false
+          if (s.status === 'needs-action' && !isNextActionMine(role, c)) return false
           if (s.status === 'waiting' && !a.waiting) return false
           if (s.status === 'attention' && !(c.franchise.status === 'returned' || c.quotation.status === 'clarification')) return false
         }
@@ -312,32 +340,34 @@ export default function SalesDashboard() {
       scrollX: 1000,
       renderMobileCard,
     }
-  }, [navigate])
+  }, [navigate, role, can, rows, deptLabel])
 
   // New Enquiries sits after the case tabs; its badge counts open enquiries
   // only, separate from the case (lead/franchise) counts. Built outside the
   // memo because its toolbar/content are fresh nodes tied to live state.
   const config: DashboardConfig<Case> = {
     ...baseConfig,
-    extraTabs: [
-      {
-        key: 'enquiries',
-        label: (
-          <span className="dash-tab">
-            Enquiries
-            <span className="dash-tab__count">{openEnquiries}</span>
-          </span>
-        ),
-        toolbar: enquiriesTab.toolbar,
-        content: enquiriesTab.content,
-        stats: enquiryStats,
-      },
-    ],
+    extraTabs: can('enquiries', 'read')
+      ? [
+          {
+            key: 'enquiries',
+            label: (
+              <span className="dash-tab">
+                Enquiries
+                <span className="dash-tab__count">{openEnquiries}</span>
+              </span>
+            ),
+            toolbar: enquiriesTab.toolbar,
+            content: enquiriesTab.content,
+            stats: enquiryStats,
+          },
+        ]
+      : undefined,
   }
 
   return (
     <>
-      <DepartmentDashboard<Case> config={config} rows={cases} loading={loading} error={error} onRetry={retry} />
+      <DepartmentDashboard<Case> config={config} rows={rows} loading={loading} error={error} onRetry={retry} />
       <CreateFranchiseModal open={franchiseModalOpen} onClose={() => setFranchiseModalOpen(false)} />
     </>
   )

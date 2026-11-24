@@ -373,12 +373,21 @@ export interface Franchise {
   submittedAt?: string
   /** Revision number — bumped each time the franchise is submitted to review. */
   version?: number
-  /** When the franchise was approved/accepted (prototype admin action), and any remarks. */
+  /** Maker identity for this submission (the user who submitted for review). */
+  submittedById?: string
+  submittedByName?: string
+  submittedByRole?: string
+  /** When the franchise was approved/accepted, by whom (checker identity), and any remarks. */
   acceptedAt?: string
   acceptedRemarks?: string
-  /** When the franchise was rejected, and the reason given (prototype admin action). */
+  acceptedById?: string
+  acceptedByName?: string
+  acceptedByRole?: string
+  /** When the franchise was rejected, by whom, and the reason given. */
   rejectedAt?: string
   rejectedReason?: string
+  rejectedById?: string
+  rejectedByName?: string
   /** Full franchise form capture (all wireframe fields across the tabs). Loosely
       typed because it mirrors the legacy schema, which is broader than the fields
       the rest of this app reads. */
@@ -721,6 +730,26 @@ export interface SetupState {
   completed: boolean
 }
 
+// --- Case history (actor-stamped audit log) --------------------------------
+// One shared, append-only trail of meaningful actions on a case. Records the
+// BUSINESS actor (the active persona), never the presenter. Mirrors the
+// EnquiryActivity shape used elsewhere.
+export interface CaseEvent {
+  id: string
+  at: string // ISO datetime
+  /** Business actor: the demo user id + display name + role label. */
+  actorId: string
+  actorName: string
+  actorRole: string
+  /** Human-readable action, e.g. "Submitted franchise for review". */
+  action: string
+  /** Optional area/entity, submitted version, and status transition. */
+  area?: string
+  version?: number
+  from?: string
+  to?: string
+}
+
 export interface Case {
   id: string // e.g. NB-2026-0031 — stable for the whole journey
   company: Company
@@ -748,6 +777,8 @@ export interface Case {
   isProspect: boolean
   /** True once the whole journey is finished (coverage active/scheduled + handovers done). */
   isCompleted: boolean
+  /** Append-only actor-stamped audit trail (newest last). */
+  history?: CaseEvent[]
 }
 
 // --- Enquiries ---------------------------------------------------------------

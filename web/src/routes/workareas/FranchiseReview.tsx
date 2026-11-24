@@ -22,10 +22,13 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
-import { CheckCircleOutlined, CloseCircleOutlined, EditOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, CloseCircleOutlined, EditOutlined, EyeOutlined, FileTextOutlined, LockOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import type { Case } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
+import { useActiveUser } from '../../state/ActiveUserProvider'
+import { roleLabel } from '../../domain/access'
+import { checkerDecision, withEvent } from '../../domain/caseHistory'
 import { CreateFranchise, FRANCHISE_DOCS, initialForm } from './CreateFranchise'
 
 const DOC_META: Record<string, { label: string; tag?: string }> = Object.fromEntries(
@@ -53,10 +56,16 @@ const dash = (v: unknown) => {
 
 export function FranchiseReview({ c }: { c: Case }) {
   const { patchCase } = useCases()
+  const { user, can } = useActiveUser()
   const { message } = App.useApp()
   const navigate = useNavigate()
   const accepted = c.franchise.status === 'accepted'
   const rejected = c.franchise.status === 'rejected'
+
+  // Maker/checker: only an authorized checker who is NOT the maker may decide.
+  const canApprove = can('franchise', 'approve')
+  const decision = checkerDecision('franchise', user, canApprove, c.franchise.submittedById)
+  const canEditForm = can('franchise', 'edit') || canApprove
 
   // Full captured form (saved formData overlaid on the company/franchise record).
   const f = initialForm(c)
@@ -107,6 +116,13 @@ export function FranchiseReview({ c }: { c: Case }) {
   }
 
   function confirmApprove() {
+    // Enforce the maker/checker rule at action time, not just by hiding the
+    // button (a stale control must not succeed).
+    if (!decision.allowed) {
+      setApproving(false)
+      message.error(decision.reason ?? 'You are not authorized to approve this franchise.')
+      return
+    }
     // Concurrency: if the handler resubmitted a newer revision while the dialog
     // was open, bounce the reviewer back to re-check the latest version.
     if ((c.franchise.version ?? 1) !== reviewVersion) {
@@ -114,19 +130,28 @@ export function FranchiseReview({ c }: { c: Case }) {
       message.warning('The franchise changed since you opened this — please review the latest version again.')
       return
     }
-    patchCase(c.id, (prev) => ({
-      ...prev,
-      currentWorkArea: 'prepare-quotation',
-      franchise: {
-        ...prev.franchise,
-        status: 'accepted',
-        returnReasons: undefined,
-        rejectedAt: undefined,
-        rejectedReason: undefined,
-        acceptedAt: new Date().toISOString(),
-        acceptedRemarks: approveRemarks.trim() || undefined,
-      },
-    }))
+    patchCase(c.id, (prev) =>
+      withEvent(
+        {
+          ...prev,
+          currentWorkArea: 'prepare-quotation',
+          franchise: {
+            ...prev.franchise,
+            status: 'accepted',
+            returnReasons: undefined,
+            rejectedAt: undefined,
+            rejectedReason: undefined,
+            acceptedAt: new Date().toISOString(),
+            acceptedRemarks: approveRemarks.trim() || undefined,
+            acceptedById: user.id,
+            acceptedByName: user.name,
+            acceptedByRole: roleLabel(user.role),
+          },
+        },
+        user,
+        { action: 'Approved franchise', area: 'Franchise', version, from: 'submitted', to: 'accepted' },
+      ),
+    )
     setApproving(false)
     message.success('Franchise approved — moving on to Prepare Quotation.')
     navigate(`/cases/${c.id}/prepare-quotation`)
@@ -138,33 +163,57 @@ export function FranchiseReview({ c }: { c: Case }) {
   }
 
   function confirmReturn() {
+    if (!decision.allowed) {
+      setReturning(false)
+      message.error(decision.reason ?? 'You are not authorized to review this franchise.')
+      return
+    }
     const reason = returnReason.trim()
-    patchCase(c.id, (prev) => ({
-      ...prev,
-      currentWorkArea: 'create-franchise',
-      franchise: {
-        ...prev.franchise,
-        status: 'returned',
-        acceptedAt: undefined,
-        returnReasons: [{ field: 'general', message: reason }],
-      },
-    }))
+    patchCase(c.id, (prev) =>
+      withEvent(
+        {
+          ...prev,
+          currentWorkArea: 'create-franchise',
+          franchise: {
+            ...prev.franchise,
+            status: 'returned',
+            acceptedAt: undefined,
+            returnReasons: [{ field: 'general', message: reason }],
+          },
+        },
+        user,
+        { action: 'Returned franchise for corrections', area: 'Franchise', version, from: 'submitted', to: 'returned' },
+      ),
+    )
     setReturning(false)
     message.info('Franchise returned for corrections.')
   }
 
   function confirmReject() {
-    patchCase(c.id, (prev) => ({
-      ...prev,
-      currentWorkArea: 'create-franchise',
-      franchise: {
-        ...prev.franchise,
-        status: 'rejected',
-        acceptedAt: undefined,
-        rejectedAt: new Date().toISOString(),
-        rejectedReason: rejectReason.trim() || undefined,
-      },
-    }))
+    if (!decision.allowed) {
+      setRejecting(false)
+      message.error(decision.reason ?? 'You are not authorized to review this franchise.')
+      return
+    }
+    patchCase(c.id, (prev) =>
+      withEvent(
+        {
+          ...prev,
+          currentWorkArea: 'create-franchise',
+          franchise: {
+            ...prev.franchise,
+            status: 'rejected',
+            acceptedAt: undefined,
+            rejectedAt: new Date().toISOString(),
+            rejectedReason: rejectReason.trim() || undefined,
+            rejectedById: user.id,
+            rejectedByName: user.name,
+          },
+        },
+        user,
+        { action: 'Rejected franchise', area: 'Franchise', version, from: 'submitted', to: 'rejected' },
+      ),
+    )
     setRejecting(false)
     message.warning('Franchise rejected.')
   }
@@ -283,7 +332,21 @@ export function FranchiseReview({ c }: { c: Case }) {
         </Typography.Text>
       )}
 
-      {!accepted && !rejected && (
+      {!accepted && !rejected && !canApprove && (
+        <Alert
+          type="info"
+          showIcon
+          icon={<LockOutlined />}
+          title="Waiting for Account Services"
+          description={
+            c.franchise.submittedByName
+              ? `Submitted by ${c.franchise.submittedByName} and now with Account Services for review. You can follow its status here, but the review decision is theirs.`
+              : 'This franchise is with Account Services for review. You can follow its status here, but the review decision is theirs.'
+          }
+        />
+      )}
+
+      {!accepted && !rejected && canApprove && (
         <>
           <Divider style={{ margin: '4px 0' }} />
         <section>
@@ -311,22 +374,31 @@ export function FranchiseReview({ c }: { c: Case }) {
       )}
       </Space>
 
-      {/* ---- Floating decision bar (consistent with the Create Franchise form) */}
-      {!accepted && !rejected && (
+      {/* ---- Floating decision bar — only an authorized checker sees it ------ */}
+      {!accepted && !rejected && canApprove && (
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
           <Typography.Text type="secondary">
-            {checked.filter(Boolean).length}/{CHECKLIST.length} checks complete
+            {decision.selfApproval
+              ? 'You submitted this version — a different checker must decide.'
+              : `${checked.filter(Boolean).length}/${CHECKLIST.length} checks complete`}
           </Typography.Text>
           <div className="app-form-floatbar__actions">
-            <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
-              Edit franchise form
-            </Button>
-            <Button onClick={openReturn}>Return for corrections</Button>
-            <Button danger icon={<CloseCircleOutlined />} onClick={() => setRejecting(true)}>
+            {canEditForm && (
+              <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
+                Edit franchise form
+              </Button>
+            )}
+            <Button onClick={openReturn} disabled={decision.selfApproval}>Return for corrections</Button>
+            <Button danger icon={<CloseCircleOutlined />} onClick={() => setRejecting(true)} disabled={decision.selfApproval}>
               Reject
             </Button>
-            <Tooltip title={allChecked ? '' : 'Tick every checklist item to approve.'}>
-              <Button type="primary" icon={<CheckCircleOutlined />} disabled={!allChecked} onClick={openApprove}>
+            <Tooltip title={decision.selfApproval ? decision.reason : allChecked ? '' : 'Tick every checklist item to approve.'}>
+              <Button
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                disabled={!allChecked || decision.selfApproval}
+                onClick={openApprove}
+              >
                 Approve request
               </Button>
             </Tooltip>
@@ -336,23 +408,35 @@ export function FranchiseReview({ c }: { c: Case }) {
 
       {accepted && (
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Typography.Text type="secondary">This franchise was approved.</Typography.Text>
-          <div className="app-form-floatbar__actions">
-            <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
-              Edit franchise form
-            </Button>
-          </div>
+          <Typography.Text type="secondary">
+            {c.franchise.acceptedByName
+              ? `Approved by ${c.franchise.acceptedByName}.`
+              : 'This franchise was approved.'}
+          </Typography.Text>
+          {canEditForm && (
+            <div className="app-form-floatbar__actions">
+              <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
+                Edit franchise form
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
       {rejected && (
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Typography.Text type="secondary">This franchise was rejected.</Typography.Text>
-          <div className="app-form-floatbar__actions">
-            <Button type="primary" icon={<EditOutlined />} onClick={() => setEditing(true)}>
-              Reopen & edit
-            </Button>
-          </div>
+          <Typography.Text type="secondary">
+            {c.franchise.rejectedByName
+              ? `Rejected by ${c.franchise.rejectedByName}.`
+              : 'This franchise was rejected.'}
+          </Typography.Text>
+          {canEditForm && (
+            <div className="app-form-floatbar__actions">
+              <Button type="primary" icon={<EditOutlined />} onClick={() => setEditing(true)}>
+                Reopen & edit
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

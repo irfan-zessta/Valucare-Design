@@ -27,6 +27,9 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useCases } from '../../state/CaseProvider'
+import { useActiveUser } from '../../state/ActiveUserProvider'
+import { roleLabel } from '../../domain/access'
+import { withEvent } from '../../domain/caseHistory'
 import { shortNameFrom } from '../../domain/sampleData'
 import type { BusinessSource, Case, FranchiseAffiliate, ProductType } from '../../domain/types'
 
@@ -217,6 +220,7 @@ function reqLabel(label: string) {
 
 export function CreateFranchise({ c }: { c: Case }) {
   const { patchCase } = useCases()
+  const { user, can } = useActiveUser()
   const { message } = App.useApp()
   const [f, setF] = useState<FormState>(() => initialForm(c))
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -300,7 +304,8 @@ export function CreateFranchise({ c }: { c: Case }) {
 
   function persist(status: 'draft' | 'submitted') {
     const productType: ProductType = f.accountType === 'TPA/ASO' ? 'TPA' : 'HMO'
-    patchCase(c.id, (prev) => ({
+    patchCase(c.id, (prev) => {
+    const next: Case = {
       ...prev,
       company: {
         ...prev.company,
@@ -348,11 +353,33 @@ export function CreateFranchise({ c }: { c: Case }) {
         submittedAt: status === 'submitted' ? new Date().toISOString() : prev.franchise.submittedAt,
         // Each submission to review is a new revision the reviewer approves against.
         version: status === 'submitted' ? (prev.franchise.version ?? 0) + 1 : prev.franchise.version,
+        // Maker identity recorded on submission (the checker must be someone else).
+        submittedById: status === 'submitted' ? user.id : prev.franchise.submittedById,
+        submittedByName: status === 'submitted' ? user.name : prev.franchise.submittedByName,
+        submittedByRole: status === 'submitted' ? roleLabel(user.role) : prev.franchise.submittedByRole,
       },
-    }))
+    }
+      if (status === 'submitted') {
+        return withEvent(next, user, {
+          action: 'Submitted franchise for review',
+          area: 'Franchise',
+          version: next.franchise.version ?? 1,
+          to: 'submitted',
+        })
+      }
+      return next
+    })
   }
 
+  // Permission re-check at action time — a role that can't prepare the
+  // franchise must not be able to save or submit it, even via a stale control.
+  const mayEdit = can('franchise', 'edit') || can('franchise', 'approve')
+
   function handleSubmit() {
+    if (!mayEdit) {
+      message.error('Only Sales can prepare and submit this franchise.')
+      return
+    }
     const e = validate()
     setSubmitted(true)
     if (Object.keys(e).length > 0) {
@@ -370,6 +397,10 @@ export function CreateFranchise({ c }: { c: Case }) {
   }
 
   function saveDraft() {
+    if (!mayEdit) {
+      message.error('Only Sales can prepare and submit this franchise.')
+      return
+    }
     persist('draft')
     message.success('Draft saved.')
   }

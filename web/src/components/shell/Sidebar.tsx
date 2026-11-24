@@ -24,6 +24,7 @@ import {
   type NavDept,
 } from '../../config/navigation'
 import { useUiPrefs } from '../../state/UiPrefsProvider'
+import { useActiveUser } from '../../state/ActiveUserProvider'
 
 function withSoon(label: string, comingSoon: boolean) {
   if (!comingSoon) return label
@@ -62,10 +63,15 @@ export function Sidebar({ onNavigate, collapsed = false }: { onNavigate: () => v
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { isSectionOpen, toggleSection } = useUiPrefs()
+  const { canSeeScreen } = useActiveUser()
+
+  // Only the departments the active persona may use appear in the sidebar —
+  // unrelated modules are hidden (not merely disabled). 'home' is always shown.
+  const visibleNav = useMemo(() => NAV.filter((dept) => canSeeScreen(dept.id)), [canSeeScreen])
 
   const items: MenuProps['items'] = useMemo(
     () =>
-      NAV.map((dept) => {
+      visibleNav.map((dept) => {
         const Icon = dept.Icon
         if (hasChildren(dept)) {
           return {
@@ -77,7 +83,7 @@ export function Sidebar({ onNavigate, collapsed = false }: { onNavigate: () => v
         }
         return { key: deptTarget(dept), icon: <Icon />, label: deptLeafLabel(dept) }
       }),
-    [],
+    [visibleNav],
   )
 
   const activeId = activeDeptId(pathname)
