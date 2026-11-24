@@ -37,10 +37,10 @@ import type { BusinessSource, Case, FranchiseAffiliate, ProductType } from '../.
 const ACCOUNT_TYPE = ['CORPORATE/HMO', 'TPA/ASO']
 const VAT = ['20% VAT-able', 'Fully VAT-able', 'Non Vat', 'VAT exempt', 'VAT-able', 'Zero Rated']
 const CURRENT_COVERAGE = [
-  { value: 'AA', label: 'None (AA)' },
-  { value: 'CP', label: 'HMI (CP)' },
-  { value: 'TP', label: 'TPA (TP)' },
-  { value: 'AT', label: 'HMO (AT)' },
+  { value: 'AA', label: 'None' },
+  { value: 'CP', label: 'HMI' },
+  { value: 'TP', label: 'TPA' },
+  { value: 'AT', label: 'HMO' },
 ]
 const ENROLLMENT = ['Compulsory', 'Voluntary']
 const PAYMENT = ['Subsidized', 'Contributory', 'Salary Deduction']
