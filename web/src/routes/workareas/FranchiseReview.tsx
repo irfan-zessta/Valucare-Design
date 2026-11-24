@@ -96,7 +96,7 @@ export function FranchiseReview({ c }: { c: Case }) {
         <Alert
           type="warning"
           showIcon
-          title="Editing on behalf of Sales"
+          title="Editing on behalf of AAT"
           description="You've taken ownership of this franchise. Save a draft or resubmit from the form below, or stop editing to return to the review."
           action={
             <Button size="small" onClick={() => setEditing(false)}>
@@ -337,11 +337,11 @@ export function FranchiseReview({ c }: { c: Case }) {
           type="info"
           showIcon
           icon={<LockOutlined />}
-          title="Waiting for Account Services"
+          title="Waiting for AMT"
           description={
             c.franchise.submittedByName
-              ? `Submitted by ${c.franchise.submittedByName} and now with Account Services for review. You can follow its status here, but the review decision is theirs.`
-              : 'This franchise is with Account Services for review. You can follow its status here, but the review decision is theirs.'
+              ? `Submitted by ${c.franchise.submittedByName} and now with AMT (Account Services) for review. You can follow its status here, but the review decision is theirs.`
+              : 'This franchise is with AMT (Account Services) for review. You can follow its status here, but the review decision is theirs.'
           }
         />
       )}

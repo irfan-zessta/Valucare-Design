@@ -13,6 +13,7 @@ import { ArrowRightOutlined } from '@ant-design/icons'
 import type { Case } from '../../domain/types'
 import { meaningfulStatus, nextAction } from '../../domain/progress'
 import { roleDepartment } from '../../domain/caseAccess'
+import { departmentDisplay } from '../../domain/access'
 import { userForDepartment } from '../../domain/caseHistory'
 import { useActiveUser } from '../../state/ActiveUserProvider'
 
@@ -47,7 +48,7 @@ export function CaseOwnershipBanner({ c }: { c: Case }) {
           </span>
         ) : (
           <span className="case-own__resp">
-            Responsible now: <strong>{responsible}</strong>
+            Responsible now: <strong>{departmentDisplay(responsible)}</strong>
           </span>
         )}
       </div>
@@ -56,7 +57,7 @@ export function CaseOwnershipBanner({ c }: { c: Case }) {
           <Tag className="case-own__tag">Your task</Tag>
         ) : target ? (
           <Button size="small" onClick={onContinue} icon={<ArrowRightOutlined />}>
-            Continue as {target.department}
+            Continue as {departmentDisplay(responsible)}
           </Button>
         ) : null}
       </div>

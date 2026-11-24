@@ -59,14 +59,14 @@ export function roleHomePath(role: RoleKey): string {
 // Order matters: Sales + Account Services lead (brief: "Include Account Manager
 // and Account Services prominently").
 export const DEMO_USERS: DemoUser[] = [
-  // --- Sales ---------------------------------------------------------------
-  { id: 'u-alex-reyes', name: 'Alex Reyes', role: 'account-manager', department: 'Sales' },
-  { id: 'u-sam-tan', name: 'Sam Tan', role: 'account-manager', department: 'Sales' },
-  { id: 'u-jordan-cruz', name: 'Jordan Cruz', role: 'sales-supervisor', department: 'Sales' },
+  // --- AAT · Sales (Account Acquisition Team) ------------------------------
+  { id: 'u-alex-reyes', name: 'Alex Reyes', role: 'account-manager', department: 'AAT · Sales' },
+  { id: 'u-sam-tan', name: 'Sam Tan', role: 'account-manager', department: 'AAT · Sales' },
+  { id: 'u-jordan-cruz', name: 'Jordan Cruz', role: 'sales-supervisor', department: 'AAT · Sales' },
   { id: 'u-carlos-mendoza', name: 'Carlos Mendoza', role: 'senior-management', department: 'Senior Management' },
-  // --- Account Services (two people → maker/checker within the team) -------
-  { id: 'u-mina-lopez', name: 'Mina Lopez', role: 'account-services', department: 'Account Services', title: 'Account Services Associate' },
-  { id: 'u-rafael-santos', name: 'Rafael Santos', role: 'account-services', department: 'Account Services', title: 'Account Services Lead' },
+  // --- AMT · Account Services (two people → maker/checker within the team) --
+  { id: 'u-mina-lopez', name: 'Mina Lopez', role: 'account-services', department: 'AMT · Account Services', title: 'AMT Associate' },
+  { id: 'u-rafael-santos', name: 'Rafael Santos', role: 'account-services', department: 'AMT · Account Services', title: 'AMT Lead' },
   // --- Actuarial -----------------------------------------------------------
   { id: 'u-priya-nair', name: 'Priya Nair', role: 'actuarial', department: 'Actuarial' },
   { id: 'u-noah-kim', name: 'Noah Kim', role: 'actuarial', department: 'Actuarial', title: 'Actuarial Reviewer' },

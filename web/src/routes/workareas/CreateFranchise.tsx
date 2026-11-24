@@ -393,7 +393,7 @@ export function CreateFranchise({ c }: { c: Case }) {
     }
     setErrors({})
     persist('submitted')
-    message.success('Franchise submitted to Account Services.')
+    message.success('Franchise submitted to AMT (Account Services).')
   }
 
   function saveDraft() {
@@ -881,7 +881,7 @@ export function CreateFranchise({ c }: { c: Case }) {
           <Alert
             type="warning"
             showIcon
-            title="Returned by Account Services"
+            title="Returned by AMT"
             description={
               <ul style={{ margin: 0, paddingInlineStart: 16 }}>
                 {c.franchise.returnReasons!.map((r, i) => (

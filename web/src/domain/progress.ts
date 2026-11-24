@@ -29,8 +29,8 @@ export function meaningfulStatus(c: Case): string {
   switch (c.currentWorkArea) {
     case 'create-franchise':
       if (c.franchise.status === 'draft') return 'Draft franchise'
-      if (c.franchise.status === 'submitted') return 'Waiting for Account Services'
-      if (c.franchise.status === 'returned') return 'Returned by Account Services'
+      if (c.franchise.status === 'submitted') return 'Waiting for AMT'
+      if (c.franchise.status === 'returned') return 'Returned by AMT'
       if (c.franchise.status === 'rejected') return 'Franchise rejected'
       return 'Franchise accepted'
     case 'prepare-quotation':
@@ -88,7 +88,7 @@ export function nextAction(c: Case): NextAction {
       if (c.franchise.status === 'draft')
         return { label: 'Complete and submit the franchise', workArea: 'create-franchise', department: 'Sales', waiting: false }
       if (c.franchise.status === 'submitted')
-        return { label: 'Waiting for Account Services to review', workArea: 'create-franchise', department: 'Account Services', waiting: true }
+        return { label: 'Waiting for AMT to review', workArea: 'create-franchise', department: 'Account Services', waiting: true }
       if (c.franchise.status === 'returned')
         return { label: 'Review requested corrections and resubmit', workArea: 'create-franchise', department: 'Sales', waiting: false }
       if (c.franchise.status === 'rejected')

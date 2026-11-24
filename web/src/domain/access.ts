@@ -53,7 +53,7 @@ export interface RoleMeta {
 
 export const ROLES: Record<RoleKey, RoleMeta> = {
   'account-manager': { key: 'account-manager', label: 'Account Manager', department: 'Sales' },
-  'account-services': { key: 'account-services', label: 'Account Services', department: 'Account Services' },
+  'account-services': { key: 'account-services', label: 'AMT', department: 'Account Services' },
   'sales-supervisor': { key: 'sales-supervisor', label: 'Sales Supervisor', department: 'Sales' },
   'senior-management': { key: 'senior-management', label: 'Senior Management', department: 'Sales' },
   actuarial: { key: 'actuarial', label: 'Actuarial', department: 'Actuarial' },
@@ -76,6 +76,18 @@ export const ROLES: Record<RoleKey, RoleMeta> = {
 
 export function roleLabel(role: RoleKey): string {
   return ROLES[role].label
+}
+
+/**
+ * How a responsible department is shown to users. The two Corporate New
+ * Business teams carry their team acronyms: Sales → AAT (Account Acquisition
+ * Team), Account Services → AMT (Account Management Team). Other departments
+ * display as-is.
+ */
+export function departmentDisplay(dept: Department | null | undefined): string {
+  if (dept === 'Sales') return 'AAT'
+  if (dept === 'Account Services') return 'AMT'
+  return dept ?? ''
 }
 
 // --- Areas of work + access levels -----------------------------------------

@@ -27,6 +27,7 @@ import { useEnquiriesWorkspace } from '../enquiries/EnquiriesWorkspace'
 import { WORK_AREA_LABELS, WORK_AREA_ORDER, type Case } from '../../domain/types'
 import { currentProposal, meaningfulStatus, nextAction, responsibleDepartment } from '../../domain/progress'
 import { isNextActionMine, roleDepartment, salesWorklist } from '../../domain/caseAccess'
+import { departmentDisplay } from '../../domain/access'
 import { formatDate } from '../../lib/format'
 
 const { Text } = Typography
@@ -42,7 +43,7 @@ export default function SalesDashboard() {
   // Records this persona works within — the dashboard counts and table share
   // this scoped source, so a count always equals its worklist.
   const rows = useMemo(() => salesWorklist(role, cases), [role, cases])
-  const deptLabel = roleDepartment(role) ?? 'your team'
+  const deptLabel = departmentDisplay(roleDepartment(role)) || 'your team'
 
   // Enquiry counts are kept separate from the case (lead/franchise) counts.
   const openEnquiries = useMemo(() => enquiries.filter((e) => e.status === 'open').length, [enquiries])
@@ -173,7 +174,7 @@ export default function SalesDashboard() {
         if (c.coverage.status === 'scheduled') { label = 'Scheduled'; icon = <ClockCircleOutlined /> }
         else { label = 'Active'; tone = 'ok'; icon = <CheckCircleOutlined /> }
       } else if (c.franchise.status === 'returned') {
-        label = 'Returned'; tone = 'attention'; icon = <ExclamationCircleOutlined />; sub = 'by Account Services'
+        label = 'Returned'; tone = 'attention'; icon = <ExclamationCircleOutlined />; sub = 'by AMT'
       } else if (c.franchise.status === 'rejected') {
         label = 'Rejected'; tone = 'attention'; icon = <ExclamationCircleOutlined />
       } else if (c.quotation.status === 'clarification') {
@@ -181,7 +182,7 @@ export default function SalesDashboard() {
       } else if (c.franchise.status === 'draft' && c.currentWorkArea === 'create-franchise') {
         label = 'Draft'; tone = 'muted'; icon = <EditOutlined />
       } else if (c.franchise.status === 'submitted') {
-        label = 'Waiting'; icon = <ClockCircleOutlined />; sub = 'with Account Services'
+        label = 'Waiting'; icon = <ClockCircleOutlined />; sub = 'with AMT'
       } else if (c.quotation.status === 'submitted') {
         label = 'Waiting'; icon = <ClockCircleOutlined />; sub = 'with Actuarial'
       } else {
@@ -264,7 +265,7 @@ export default function SalesDashboard() {
     // reviews assigned franchises and does onboarding setup (review). Neither
     // owns the other's primary action.
     const isAccountServices = role === 'account-services'
-    const title = isAccountServices ? 'Account Services — New Business' : 'New Business'
+    const title = isAccountServices ? 'AMT — New Business' : 'New Business'
     const supportingText = isAccountServices
       ? 'Review assigned franchises and complete account setup.'
       : 'Manage enquiries, franchises and sales proposals.'
@@ -317,8 +318,8 @@ export default function SalesDashboard() {
           { label: 'Returned / clarification', value: 'attention' },
         ] },
         { key: 'responsible', label: 'Responsible department', options: [
-          { label: 'Sales', value: 'Sales' },
-          { label: 'Account Services', value: 'Account Services' },
+          { label: 'AAT (Sales)', value: 'Sales' },
+          { label: 'AMT (Account Services)', value: 'Account Services' },
           { label: 'Actuarial', value: 'Actuarial' },
         ] },
       ],
