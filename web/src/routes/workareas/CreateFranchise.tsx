@@ -31,6 +31,7 @@ import { useActiveUser } from '../../state/ActiveUserProvider'
 import { roleLabel } from '../../domain/access'
 import { withEvent } from '../../domain/caseHistory'
 import { shortNameFrom } from '../../domain/sampleData'
+import { DEMO_USERS } from '../../domain/demoRoster'
 import type { BusinessSource, Case, FranchiseAffiliate, ProductType } from '../../domain/types'
 
 // --- Option lists (mirrored from the legacy franchise schema) ---------------
@@ -47,6 +48,10 @@ const PAYMENT = ['Subsidized', 'Contributory', 'Salary Deduction', 'N/A']
 const SOURCES: BusinessSource[] = ['Direct', 'Agent', 'Broker']
 const COMMISSION = ['Percentage of premium', 'Percentage of net premium', 'None']
 const DEPARTMENT = ['Corporate Sales', 'Account Services', 'Actuarial']
+// AAT (Sales / Account Acquisition Team) members selectable as case handlers.
+const HANDLER_OPTIONS = DEMO_USERS
+  .filter((u) => u.department.startsWith('AAT'))
+  .map((u) => ({ value: u.name, label: u.title ? `${u.name} · ${u.title}` : u.name }))
 
 // Franchise attachment slots — the legacy (HMS3) requirement list, plus GIS as
 // a new additional requirement. AOR/BOR applies to Agent/Broker accounts.
@@ -431,8 +436,8 @@ export function CreateFranchise({ c }: { c: Case }) {
           mannerOfPayment: 'Contributory',
           requestedBy: prev.requestedBy || 'Liza Mercado',
           department: prev.department || 'Corporate Sales',
-          accountManager: prev.accountManager || 'Demo Admin',
-          salesManager: prev.salesManager || 'Demo Admin',
+          accountManager: prev.accountManager || 'Irfan',
+          salesManager: prev.salesManager || 'Santhosh',
           targetEffectiveDate: prev.targetEffectiveDate || '2027-01-01',
           businessSourceName: isInt ? prev.businessSourceName || 'Pioneer Insurance Brokers' : prev.businessSourceName,
           commissionType: isInt ? prev.commissionType || 'Percentage of premium' : prev.commissionType,
@@ -472,8 +477,8 @@ export function CreateFranchise({ c }: { c: Case }) {
         mannerOfPayment: 'Contributory',
         requestedBy: prev.requestedBy || 'Liza Mercado',
         department: prev.department || 'Corporate Sales',
-        accountManager: prev.accountManager || 'Demo Admin',
-        salesManager: prev.salesManager || 'Demo Admin',
+        accountManager: prev.accountManager || 'Irfan',
+        salesManager: prev.salesManager || 'Santhosh',
         targetEffectiveDate: prev.targetEffectiveDate || '2027-01-01',
         businessSourceName: isInt ? prev.businessSourceName || 'Pioneer Insurance Brokers' : prev.businessSourceName,
         commissionType: isInt ? prev.commissionType || 'Percentage of premium' : prev.commissionType,
@@ -709,10 +714,12 @@ export function CreateFranchise({ c }: { c: Case }) {
         )}
         <div style={two}>
           <Form.Item label="Account handler (AAT)">
-            <Input id="accountManager" value={f.accountManager} onChange={(e) => set('accountManager', e.target.value)} />
+            <Select id="accountManager" showSearch placeholder="Select a handler" value={f.accountManager || undefined}
+              options={HANDLER_OPTIONS} onChange={(v) => set('accountManager', v)} />
           </Form.Item>
           <Form.Item label="Secondary handler (AAT)">
-            <Input id="salesManager" value={f.salesManager} onChange={(e) => set('salesManager', e.target.value)} />
+            <Select id="salesManager" showSearch placeholder="Select a handler" value={f.salesManager || undefined}
+              options={HANDLER_OPTIONS} onChange={(v) => set('salesManager', v)} />
           </Form.Item>
         </div>
         <div style={two}>
