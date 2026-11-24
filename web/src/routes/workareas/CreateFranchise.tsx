@@ -702,6 +702,9 @@ export function CreateFranchise({ c }: { c: Case }) {
           </div>
         ) : (
           <div style={two}>
+            <Form.Item label="Name of the Source">
+              <Input id="businessSourceName" value={f.businessSourceName} onChange={(e) => set('businessSourceName', e.target.value)} />
+            </Form.Item>
             <Form.Item label="Commission Type" validateStatus={statusOf('commissionType')} help={helpOf('commissionType')}>
               <Select id="commissionType" value={f.commissionType || undefined} options={opts(COMMISSION)} onChange={(v) => set('commissionType', v)} />
             </Form.Item>
