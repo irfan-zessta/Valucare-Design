@@ -1755,8 +1755,8 @@ button.app-stepper__item {
 .sales-chip-wrap {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
+  align-items: flex-start;
+  text-align: left;
   gap: 3px;
 }
 .sales-chip-wrap:focus-visible {
