@@ -78,7 +78,7 @@ export default function EnquiryDetail() {
   const { createLeadFromEnquiry, getLeadByEnquiry } = useLeads()
   const { can } = useActiveUser()
   const navigate = useNavigate()
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
@@ -101,6 +101,16 @@ export default function EnquiryDetail() {
   const isOpen = enquiry.status === 'open'
   const canEdit = isOpen && can('enquiries', 'edit')
   const linkedLead = enquiry.convertedLeadId ? enquiry.convertedLeadId : getLeadByEnquiry(enquiry.id)?.id
+
+  function confirmConvert() {
+    modal.confirm({
+      title: 'Convert to franchise?',
+      content: 'This creates a New Business franchise from this enquiry — carrying over the company, contact, business source, product interest and notes — and marks the enquiry converted.',
+      okText: 'Convert to franchise',
+      cancelText: 'Cancel',
+      onOk: () => handleConvert(),
+    })
+  }
 
   async function handleConvert() {
     if (!enquiry || converting) return
@@ -131,7 +141,7 @@ export default function EnquiryDetail() {
       {isOpen && (
         <>
           <Button icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>Log activity</Button>
-          <Button type="primary" icon={<ArrowRightOutlined />} loading={converting} onClick={handleConvert}>Convert to franchise</Button>
+          <Button type="primary" icon={<ArrowRightOutlined />} loading={converting} onClick={confirmConvert}>Convert to franchise</Button>
         </>
       )}
       {enquiry.status === 'converted' && linkedLead && (
