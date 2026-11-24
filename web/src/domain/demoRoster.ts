@@ -91,7 +91,7 @@ export const DEMO_USERS: DemoUser[] = [
   { id: 'u-sushmitha', name: 'Sushmitha', role: 'ccd-inpatient', department: 'Customer Care (CCD)' },
   { id: 'u-sourav', name: 'Sourav', role: 'ccd-supervisor', department: 'Customer Care (CCD)' },
   // --- Provider Networks ---------------------------------------------------
-  { id: 'u-addivita', name: 'Addivita', role: 'provider-network', department: 'Provider Networks' },
+  { id: 'u-anurahh', name: 'Anurahh', role: 'provider-network', department: 'Provider Networks' },
   // --- System Administration ----------------------------------------------
   { id: 'u-nikhil', name: 'Nikhil', role: 'system-admin', department: 'System Administration' },
 ]
