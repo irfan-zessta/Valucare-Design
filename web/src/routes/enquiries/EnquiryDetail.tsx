@@ -15,7 +15,7 @@ import {
   Result, Select, Space, Tag, Timeline, Typography,
 } from 'antd'
 import {
-  ArrowRightOutlined, CheckOutlined, EllipsisOutlined, PhoneOutlined, MailOutlined,
+  ArrowRightOutlined, EllipsisOutlined, PhoneOutlined, MailOutlined,
   TeamOutlined, MessageOutlined, FileTextOutlined, PlusOutlined, StopOutlined, ExperimentOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -23,7 +23,6 @@ import { useEnquiries, type ActivityInput } from '../../state/EnquiryProvider'
 import { useLeads } from '../../state/LeadProvider'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDate, formatDateTime } from '../../lib/format'
-import { followUpBucket, followUpLabel } from '../../domain/enquiry'
 import type { Enquiry, EnquiryActivity, EnquiryActivityType } from '../../domain/types'
 import { armNextSaveFailure, consumeFailure } from '../../services/demoFailure'
 import { simulate } from '../../services/mockClient'
@@ -50,7 +49,7 @@ async function saveSim(): Promise<boolean> {
 
 export default function EnquiryDetail() {
   const { enquiryId = '' } = useParams()
-  const { getEnquiry, logActivity, scheduleFollowUp, completeFollowUp, convertEnquiry, markLost } = useEnquiries()
+  const { getEnquiry, logActivity, convertEnquiry, markLost } = useEnquiries()
   const { createLeadFromEnquiry, getLeadByEnquiry } = useLeads()
   const navigate = useNavigate()
   const { message } = App.useApp()
@@ -58,8 +57,6 @@ export default function EnquiryDetail() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [lostOpen, setLostOpen] = useState(false)
   const [lostForm] = Form.useForm()
-  const [followUpOpen, setFollowUpOpen] = useState(false)
-  const [followForm] = Form.useForm()
   const [converting, setConverting] = useState(false)
 
   const enquiry = getEnquiry(enquiryId)
@@ -74,7 +71,6 @@ export default function EnquiryDetail() {
   }
 
   const tag = STATUS_TAG[enquiry.status]
-  const bucket = followUpBucket(enquiry)
   const linkedLead = enquiry.convertedLeadId ? enquiry.convertedLeadId : getLeadByEnquiry(enquiry.id)?.id
 
   async function handleConvert() {
@@ -182,34 +178,6 @@ export default function EnquiryDetail() {
 
         {/* Enquiry details */}
         <Card title="Enquiry details" size="small">
-          <div className="enq-followup">
-            <div className="enq-followup__eyebrow">Next follow-up</div>
-            {enquiry.nextFollowUpDate ? (
-              <>
-                <div style={{ marginTop: 4 }}>
-                  <Tag color={bucket === 'overdue' ? 'red' : bucket === 'today' ? 'gold' : 'blue'}>{followUpLabel(enquiry)}</Tag>
-                  <Text strong>{formatDate(enquiry.nextFollowUpDate)}</Text>
-                </div>
-                {enquiry.nextFollowUpAction && <div style={{ marginTop: 2 }}>{enquiry.nextFollowUpAction}</div>}
-                {enquiry.status === 'open' && (
-                  <Space style={{ marginTop: 8 }}>
-                    <Button size="small" icon={<CheckOutlined />} onClick={() => { completeFollowUp(enquiry.id); message.success('Follow-up completed.') }}>Complete</Button>
-                    <Button size="small" onClick={() => { followForm.setFieldsValue({ date: dayjs(enquiry.nextFollowUpDate), action: enquiry.nextFollowUpAction }); setFollowUpOpen(true) }}>Reschedule</Button>
-                  </Space>
-                )}
-              </>
-            ) : (
-              <div style={{ marginTop: 4 }}>
-                <Text type="secondary">No follow-up scheduled</Text>
-                {enquiry.status === 'open' && (
-                  <div style={{ marginTop: 8 }}>
-                    <Button size="small" onClick={() => { followForm.resetFields(); setFollowUpOpen(true) }}>Schedule follow-up</Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
           <Descriptions column={1} size="small" colon={false}
             items={[
               { key: 'source', label: 'Business source', children: enquiry.businessSource },
@@ -230,19 +198,6 @@ export default function EnquiryDetail() {
           message.success('Activity logged.')
           return true
         }} />
-
-      {/* Schedule / reschedule follow-up */}
-      <Modal title="Schedule follow-up" open={followUpOpen} okText="Save follow-up" onCancel={() => setFollowUpOpen(false)}
-        onOk={() => followForm.validateFields().then((v) => {
-          scheduleFollowUp(enquiry.id, { date: v.date.format('YYYY-MM-DD'), action: v.action })
-          message.success('Follow-up scheduled.')
-          setFollowUpOpen(false)
-        })}>
-        <Form form={followForm} layout="vertical">
-          <Form.Item name="date" label="Follow-up date" rules={[{ required: true, message: 'Pick a date.' }]}><DatePicker style={{ width: '100%' }} /></Form.Item>
-          <Form.Item name="action" label="Action"><Input placeholder="e.g. Send HMO options" /></Form.Item>
-        </Form>
-      </Modal>
 
       {/* Mark as lost */}
       <Modal title="Mark this enquiry as lost?" open={lostOpen} okText="Mark as lost" okButtonProps={{ danger: true }}
