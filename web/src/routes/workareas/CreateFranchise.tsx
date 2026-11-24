@@ -42,8 +42,8 @@ const CURRENT_COVERAGE = [
   { value: 'TP', label: 'TPA' },
   { value: 'AT', label: 'HMO' },
 ]
-const ENROLLMENT = ['Compulsory', 'Voluntary']
-const PAYMENT = ['Subsidized', 'Contributory', 'Salary Deduction']
+const ENROLLMENT = ['Compulsory', 'Voluntary', 'N/A']
+const PAYMENT = ['Subsidized', 'Contributory', 'Salary Deduction', 'N/A']
 const SOURCES: BusinessSource[] = ['Direct', 'Agent', 'Broker']
 const COMMISSION = ['Percentage of premium', 'Percentage of net premium', 'None']
 const DEPARTMENT = ['Corporate Sales', 'Account Services', 'Actuarial']
