@@ -13,12 +13,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  App, Alert, Avatar, Button, Card, DatePicker, Descriptions, Drawer, Dropdown, Form,
-  Input, Modal, Result, Select, Space, Tag, Timeline, Tooltip, Typography,
+  App, Alert, Avatar, Button, Card, DatePicker, Descriptions, Drawer, Form,
+  Input, Modal, Result, Select, Tag, Timeline, Tooltip, Typography,
 } from 'antd'
 import {
   CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined, ContactsOutlined,
-  CopyOutlined, EditOutlined, EllipsisOutlined, ExperimentOutlined, FileAddOutlined, FileTextOutlined,
+  CopyOutlined, EditOutlined, FileAddOutlined, FileTextOutlined,
   MailOutlined, MessageOutlined, PhoneOutlined, PlusOutlined, StopOutlined, TeamOutlined, UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -28,7 +28,7 @@ import { useActiveUser } from '../../state/ActiveUserProvider'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDate } from '../../lib/format'
 import type { Enquiry, EnquiryActivity, EnquiryActivityType } from '../../domain/types'
-import { armNextSaveFailure, consumeFailure } from '../../services/demoFailure'
+import { consumeFailure } from '../../services/demoFailure'
 import { simulate } from '../../services/mockClient'
 
 const { Text, Title, Paragraph } = Typography
@@ -144,36 +144,6 @@ export default function EnquiryDetail() {
     navigate(`/sales/leads/${lead.id}`)
   }
 
-  const overflowItems = [
-    isOpen ? { key: 'lost', icon: <StopOutlined />, label: 'Mark as lost', danger: true } : null,
-    { key: 'arm', icon: <ExperimentOutlined />, label: 'Simulate next save failure (demo)' },
-  ].filter(Boolean) as { key: string; icon: ReactNode; label: string; danger?: boolean }[]
-
-  const headerActions = (
-    <Space>
-      {isOpen && (
-        <Button type="primary" loading={converting} onClick={confirmConvert}>Convert to franchise</Button>
-      )}
-      {enquiry.status === 'converted' && linkedLead && (
-        <Button type="primary" onClick={() => navigate(`/sales/leads/${linkedLead}`)}>View lead</Button>
-      )}
-      {overflowItems.length > 0 && (
-        <Dropdown
-          trigger={['click']}
-          menu={{
-            items: overflowItems,
-            onClick: ({ key }) => {
-              if (key === 'lost') setLostOpen(true)
-              if (key === 'arm') { armNextSaveFailure(true); message.info('The next save or conversion will fail once (demo).') }
-            },
-          }}
-        >
-          <Button icon={<EllipsisOutlined />} aria-label="More actions" />
-        </Dropdown>
-      )}
-    </Space>
-  )
-
   // Newest-first, grouped by calendar day (groups and items both descending).
   const dateGroups = useMemo(() => {
     const sorted = [...(enquiry.activities ?? [])].sort((a, b) => (a.at < b.at ? 1 : -1))
@@ -199,7 +169,6 @@ export default function EnquiryDetail() {
           </span>
         }
         supporting={<>{enquiry.id} · Created {formatDate(enquiry.createdAt)}</>}
-        extra={headerActions}
       />
 
       {enquiry.status === 'converted' && (
@@ -310,6 +279,17 @@ export default function EnquiryDetail() {
           </Card>
         </div>
       </div>
+
+      {/* Floating action bar — the enquiry's primary/secondary actions, pinned
+          near the viewport bottom while the user scrolls the workspace. */}
+      {isOpen && (
+        <div className="app-form-floatbar">
+          <div className="app-form-floatbar__actions">
+            <Button icon={<StopOutlined />} onClick={() => setLostOpen(true)}>Mark as lost</Button>
+            <Button type="primary" loading={converting} onClick={confirmConvert}>Convert to franchise</Button>
+          </div>
+        </div>
+      )}
 
       <LogActivityDrawer open={drawerOpen} defaultType={logType} onClose={() => setDrawerOpen(false)}
         onSave={async (input) => {
