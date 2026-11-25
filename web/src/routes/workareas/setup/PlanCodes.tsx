@@ -184,10 +184,13 @@ export function PlanCodes({
   c,
   setup,
   patchCase,
+  onComplete,
 }: {
   c: Case
   setup: SetupState
   patchCase: (recipe: (c: Case) => Case) => void
+  /** Finish the plan-codes task (enabled only once every code is approved). */
+  onComplete?: () => void
 }) {
   const { message } = App.useApp()
   const codes = c.account.planCodes ?? []
@@ -406,6 +409,7 @@ export function PlanCodes({
   // Lead: approve or return codes awaiting approval.
   const selInReview = selectedCodes.filter((p) => p.status === 'for-approval').length
   const approvedCount = codes.filter((p) => p.status === 'approved').length
+  const allApproved = codes.length > 0 && approvedCount === codes.length
 
   // ---- Manual-form field renderer ------------------------------------------
   const renderField = (f: SetupField) => {
@@ -537,33 +541,17 @@ export function PlanCodes({
         />
       </FormSection>
 
-      {/* ---- Maker-checker: AMT Associate submits, AMT Lead approves ---- */}
-      {codes.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 12,
-            padding: '12px 16px',
-            marginTop: 8,
-            background: '#fafafa',
-            border: '1px solid #f0f0f0',
-            borderRadius: 8,
-          }}
-        >
-          <Space size="middle" wrap>
-            <Typography.Text type="secondary">
-              {user.name} · {isAmtLead ? 'AMT Lead' : 'AMT Associate'}
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              {selectedKeys.length ? `${selectedKeys.length} selected · ` : ''}
-              {approvedCount}/{codes.length} approved
-            </Typography.Text>
-          </Space>
-          <Space wrap>
-            {isAmtLead ? (
+      {/* ---- Maker-checker (AMT Associate submits, AMT Lead approves) +
+             finish — all on the floating action bar ---- */}
+      <div className="app-form-floatbar" style={{ marginTop: 16 }}>
+        <Typography.Text type="secondary">
+          {codes.length === 0
+            ? 'Generate, add or import plan codes to begin.'
+            : `${user.name} · ${isAmtLead ? 'AMT Lead' : 'AMT Associate'} · ${selectedKeys.length ? `${selectedKeys.length} selected · ` : ''}${approvedCount}/${codes.length} approved`}
+        </Typography.Text>
+        <div className="app-form-floatbar__actions">
+          {codes.length > 0 &&
+            (isAmtLead ? (
               <>
                 {selInReview > 0 && (
                   <Button danger onClick={() => setReturning(true)}>
@@ -572,7 +560,6 @@ export function PlanCodes({
                 )}
                 <Tooltip title={selInReview ? '' : 'Select plan codes awaiting your approval.'}>
                   <Button
-                    type="primary"
                     icon={<CheckCircleOutlined />}
                     disabled={!selInReview}
                     onClick={() => {
@@ -587,7 +574,6 @@ export function PlanCodes({
             ) : (
               <Tooltip title={selSubmittable ? '' : 'Select draft or returned plan codes to send.'}>
                 <Button
-                  type="primary"
                   disabled={!selSubmittable}
                   onClick={() => {
                     const n = setStatusForSelected('for-approval', ['draft', 'returned'])
@@ -597,10 +583,16 @@ export function PlanCodes({
                   Submit to AMT Lead{selSubmittable ? ` (${selSubmittable})` : ''}
                 </Button>
               </Tooltip>
-            )}
-          </Space>
+            ))}
+          {onComplete && (
+            <Tooltip title={allApproved ? '' : 'The AMT Lead must approve every plan code first.'}>
+              <Button type="primary" disabled={!allApproved} onClick={onComplete}>
+                Continue to Activate &amp; Handover
+              </Button>
+            </Tooltip>
+          )}
         </div>
-      )}
+      </div>
 
       <Modal
         open={returning}

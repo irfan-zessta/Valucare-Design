@@ -1235,30 +1235,18 @@ export function SetupAccount({ c }: { c: Case }) {
 
   // ===== Plan codes =========================================================
   function PlanCodesPanel() {
-    const allApproved = c.account.planCodes.length > 0 && c.account.planCodes.every((p) => p.status === 'approved')
     return (
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-        <PlanCodes c={c} setup={setup!} patchCase={patch} />
-        <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Typography.Text type="secondary">
-            {allApproved ? 'All plan codes approved by the AMT Lead.' : 'All plan codes must be approved by the AMT Lead to finish.'}
-          </Typography.Text>
-          <div className="app-form-floatbar__actions">
-            <Tooltip title={allApproved ? '' : 'The AMT Lead must approve every plan code first.'}>
-              <Button
-                type="primary"
-                disabled={!allApproved}
-                onClick={() => {
-                  completeTask('plan-codes')
-                  patch((prev) => ({ ...prev, currentWorkArea: 'activate-handover' }))
-                  navigate(`/cases/${c.id}/activate-handover`)
-                }}
-              >
-                Continue to Activate &amp; Handover
-              </Button>
-            </Tooltip>
-          </div>
-        </div>
+        <PlanCodes
+          c={c}
+          setup={setup!}
+          patchCase={patch}
+          onComplete={() => {
+            completeTask('plan-codes')
+            patch((prev) => ({ ...prev, currentWorkArea: 'activate-handover' }))
+            navigate(`/cases/${c.id}/activate-handover`)
+          }}
+        />
       </Space>
     )
   }
