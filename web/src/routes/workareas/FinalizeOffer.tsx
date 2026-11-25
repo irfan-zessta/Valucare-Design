@@ -661,9 +661,16 @@ export function FinalizeOffer({ c }: { c: Case }) {
       rounds: proposal.rounds,
     }
     patchCase(c.id, (prev) => ({ ...prev, offer: { ...prev.offer, proposals: [...prev.offer.proposals, next] } }))
+    // Mirror the revision reason into the case Comments thread (+ notify anyone
+    // @mentioned), the same convention every other remarks field follows.
+    const tagged = postRemark(
+      { caseId: c.id, caseName: c.company.name, label: `Proposal revised to v${next.version}` },
+      reviseReason,
+    )
     setRevising(false)
     setReviseReason('')
-    message.success(`Proposal version ${next.version} created as a draft.`)
+    const who = tagged.length ? ` — ${tagged.map((t) => `@${t.name}`).join(', ')} notified` : ''
+    message.success(`Proposal version ${next.version} created as a draft.${who}`)
   }
 
   // ---- SOB section (shown whether or not a proposal exists yet) -------------
@@ -1556,12 +1563,14 @@ export function FinalizeOffer({ c }: { c: Case }) {
           history but do not apply to the new version.
         </Typography.Paragraph>
         <Typography.Text>Reason *</Typography.Text>
-        <Input.TextArea
-          rows={3}
-          style={{ marginTop: 6 }}
-          value={reviseReason}
-          onChange={(e) => setReviseReason(e.target.value)}
-        />
+        <div style={{ marginTop: 6 }}>
+          <RemarksField
+            value={reviseReason}
+            onChange={setReviseReason}
+            placeholder="Why this revision — type @ to mention a teammate"
+            ariaLabel="Revision reason"
+          />
+        </div>
       </Modal>
 
       {/* ---- SOB document preview (formal client-facing layout) ------------ */}
