@@ -810,7 +810,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
     { key: 'tor', label: 'TOR', children: torTab },
     { key: 'members', label: 'Member Data', children: memberTab },
     { key: 'rates', label: 'Rate request', children: ratesTab },
-    { key: 'sheets', label: `Clarifications & rate sheets${sheets.length ? ` (${sheets.length})` : ''}`, children: sheetsTab },
+    { key: 'sheets', label: `Rate sheets & Versions${sheets.length ? ` (${sheets.length})` : ''}`, children: sheetsTab },
   ]
 
   // While assembling, the primary action walks the handler through the tabs with
