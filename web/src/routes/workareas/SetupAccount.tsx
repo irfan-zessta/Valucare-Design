@@ -289,18 +289,33 @@ export function SetupAccount({ c }: { c: Case }) {
   // ===== Internal alignment =================================================
   function InternalAlignment() {
     const a = setup!.alignment
-    // Mark both departments aligned and advance (the per-department cards were
-    // removed; alignment is confirmed in one step here).
-    const completeAlignment = () => {
-      patchSetup((s) => ({
-        ...s,
-        alignment: {
-          ...s.alignment,
-          billing: { ...s.alignment.billing, status: 'completed', updatedAt: new Date().toISOString() },
-          mda: { ...s.alignment.mda, status: 'completed', updatedAt: new Date().toISOString() },
-        },
-      }))
-      completeTask('internal-alignment')
+    const sharedCount = (a.sharedDocs ?? []).length
+    // Hand the case over to AMT: mark alignment complete, notify AMT in the case
+    // Comments, and advance into the Contract & KYC process (through to
+    // activation and handover).
+    const handoverToAMT = () => {
+      postRemark(
+        { caseId: c.id, caseName: c.company.name, label: 'Handover to AMT' },
+        'Internal alignment complete and documents shared. Handing over to AMT to start the contract and KYC process through to activation and handover.',
+      )
+      patchSetup((s) => {
+        const done = s.completedTasks.includes('internal-alignment')
+          ? s.completedTasks
+          : [...s.completedTasks, 'internal-alignment']
+        const next = SETUP_TASK_ORDER[SETUP_TASK_ORDER.indexOf('internal-alignment') + 1]
+        return {
+          ...s,
+          alignment: {
+            ...s.alignment,
+            billing: { ...s.alignment.billing, status: 'completed', updatedAt: new Date().toISOString() },
+            mda: { ...s.alignment.mda, status: 'completed', updatedAt: new Date().toISOString() },
+          },
+          completedTasks: done,
+          activeTask: next ?? s.activeTask,
+          completed: done.length === SETUP_TASK_ORDER.length,
+        }
+      })
+      message.success('Handed over to AMT — contract & KYC process can begin.')
     }
 
     // Post a free-text comment to both the Billing & Collections and MDA teams
@@ -443,12 +458,16 @@ export function SetupAccount({ c }: { c: Case }) {
 
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
           <Typography.Text type="secondary">
-            Share the documents above with Billing &amp; Collections and MDA, then continue.
+            {sharedCount > 0
+              ? 'Documents shared — hand over to AMT to start the contract and KYC process.'
+              : 'Share the documents above with Billing & Collections and MDA, then hand over to AMT.'}
           </Typography.Text>
           <div className="app-form-floatbar__actions">
-            <Button type="primary" onClick={completeAlignment}>
-              Complete alignment and continue
-            </Button>
+            <Tooltip title={sharedCount > 0 ? '' : 'Share at least one document before handing over to AMT.'}>
+              <Button type="primary" icon={<SendOutlined />} disabled={sharedCount === 0} onClick={handoverToAMT}>
+                Handover to AMT
+              </Button>
+            </Tooltip>
           </div>
         </div>
 
