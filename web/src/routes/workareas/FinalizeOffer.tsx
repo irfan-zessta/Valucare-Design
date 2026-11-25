@@ -1392,7 +1392,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
               <Button danger onClick={() => setDeclining(true)}>
                 Record decline
               </Button>
-              <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setAccepting(true)}>
+              <Button type="primary" onClick={() => setAccepting(true)}>
                 Record acceptance
               </Button>
             </>
