@@ -860,12 +860,9 @@ export function PrepareQuotation({ c }: { c: Case }) {
             </Button>
           )}
           {(submitted || awaitingClarification) && (
-            <>
-              <Button onClick={() => setClarifyAsk(true)}>Simulate: Actuarial clarification</Button>
-              <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setIssuing(true)}>
-                Simulate: Actuarial issues rate sheet
-              </Button>
-            </>
+            <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setIssuing(true)}>
+              Simulate: Actuarial issues rate sheet
+            </Button>
           )}
           {responded && (
             <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => selectAndFinalize(sheets[0].id)}>
