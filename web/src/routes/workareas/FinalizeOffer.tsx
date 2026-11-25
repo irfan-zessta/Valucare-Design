@@ -1329,7 +1329,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
               </Button>
               {isProposalMaker && (
                 <Button type="primary" icon={<SendOutlined />} onClick={() => setSending(true)}>
-                  {inter ? `Send via ${c.company.intermediaryName ?? 'intermediary'}` : 'Send to client'}
+                  Send to client
                 </Button>
               )}
             </>
