@@ -72,6 +72,7 @@ export const FRANCHISE_DOCS: DocSlot[] = [
   { key: 'masterlist', label: 'Member Data (Master List)', tag: 'HMS3', hint: 'Sensitive personal data (Data Privacy Act).' },
   { key: 'tor', label: 'TOR', tag: 'HMS3' },
   { key: 'utilization', label: 'Utilization', tag: 'HMS3' },
+  { key: 'target_rates', label: 'Target rates', tag: 'New', hint: 'Optional: if the client has target rates, attach them here — they carry over to Prepare Quotation.' },
   { key: 'gis', label: 'GIS (additional requirement)', tag: 'New' },
 ]
 

@@ -52,7 +52,7 @@ const DEFAULT_REQUIREMENTS: QuotationRequirement[] = [
   { key: 'masterlist', label: 'Member Data (Master List)', status: 'Requested' },
   { key: 'tor', label: 'Current SOB / TOR', status: 'Requested' },
   { key: 'utilization', label: 'Utilization report', status: 'Requested' },
-  { key: 'intent', label: 'Signed letter of intent', status: 'Requested' },
+  { key: 'intent', label: 'Signed letter of intent', status: 'Requested', optional: true },
   { key: 'target_rates', label: 'Target rates', status: 'Requested' },
 ]
 const PAYMENT_MODES = ['Annual', 'Semi-annual', 'Quarterly', 'Monthly']
@@ -142,11 +142,15 @@ export function PrepareQuotation({ c }: { c: Case }) {
     const fileName = r.fileName ?? franchiseDoc?.fileName
     const fromForm = !r.fileName && !!franchiseDoc
     const status: QuotationRequirement['status'] = fileName ? 'Received' : r.status
-    return { ...r, fileName, fromForm, status }
+    // Derive `optional` from the default checklist so cases whose requirements
+    // were persisted before this flag existed still treat it as optional.
+    const optional = r.optional ?? DEFAULT_REQUIREMENTS.find((d) => d.key === r.key)?.optional
+    return { ...r, fileName, fromForm, status, optional }
   })
 
-  // Completeness for sending the rate request.
-  const reqComplete = effectiveReqs.every((r) => r.status !== 'Requested')
+  // Completeness for sending the rate request. Optional requirements (e.g. the
+  // signed letter of intent) can be attached but never block submission.
+  const reqComplete = effectiveReqs.every((r) => r.optional || r.status !== 'Requested')
   const memberComplete = c.memberData.importProcessed || masterlistAttached
   // Rate-request fields are optional — they no longer gate submission.
   const canSubmit = reqComplete && memberComplete
@@ -409,6 +413,8 @@ export function PrepareQuotation({ c }: { c: Case }) {
                 <Tag color="green" icon={<CheckCircleOutlined />}>
                   Received
                 </Tag>
+              ) : row.optional ? (
+                <Tag>Optional</Tag>
               ) : (
                 <Select
                   size="small"
@@ -749,7 +755,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
     </Space>
   )
 
-  const reqOutstanding = effectiveReqs.filter((r) => r.status === 'Requested').length
+  const reqOutstanding = effectiveReqs.filter((r) => !r.optional && r.status === 'Requested').length
   const items = [
     { key: 'requirements', label: `Requirements${reqOutstanding ? ` (${reqOutstanding})` : ''}`, children: requirementsTab },
     { key: 'tor', label: 'TOR', children: torTab },

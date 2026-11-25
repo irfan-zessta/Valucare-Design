@@ -157,6 +157,8 @@ export interface QuotationRequirement {
   note?: string
   /** A document attached directly on this requirement (overrides a franchise-form doc). */
   fileName?: string
+  /** Optional requirement: can be attached but never blocks submitting the rate request. */
+  optional?: boolean
 }
 
 /** A structured TOR (current benefits) line. */
