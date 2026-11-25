@@ -506,9 +506,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
         <Button size="small" icon={<PlusOutlined />} onClick={addTorLine}>
           Add line
         </Button>
-        <Button size="small" onClick={loadSampleTor}>
-          Load sample TOR
-        </Button>
         <Upload
           showUploadList={false}
           beforeUpload={(file) => {
@@ -777,6 +774,11 @@ export function PrepareQuotation({ c }: { c: Case }) {
           {tab === 'requirements' && (
             <Button size="small" onClick={attachSampleToMissing}>
               Attach sample documents
+            </Button>
+          )}
+          {tab === 'tor' && (
+            <Button size="small" onClick={loadSampleTor}>
+              Load sample TOR
             </Button>
           )}
         </div>
