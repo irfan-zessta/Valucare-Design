@@ -394,19 +394,36 @@ export function FinalizeOffer({ c }: { c: Case }) {
         coverage,
         limits,
       })
-      // Benefit lines keyed by the scaffold section they belong in. Room & Board
-      // and Outpatient match the TOR exactly (unchanged); MBL and pre-existing
-      // differ (changed); the annual physical exam is new (added); Dental is left
-      // out on purpose so it reads as "not in SOB".
+      // Benefit lines keyed by the scaffold section they belong in. The first
+      // five keep the TOR comparison meaningful: Room & Board and Outpatient
+      // match the TOR exactly (unchanged); MBL and pre-existing differ (changed);
+      // the annual physical exam is new (added); Dental is left out on purpose so
+      // it reads as "not in SOB". The remaining lines just make the sample SOB
+      // read as fully populated (the comparison keys off the names above).
       const seed: Record<string, SobBenefitLine[]> = {
         'Basis of Coverage': [line('Annual Benefit Limit (MBL)', 'covered', 'Php 300,000')],
         'Pre-existing Conditions': [line('Pre-existing conditions', 'covered', 'Covered after 12 months')],
         'Preventive Health Care': [line('Annual physical exam', 'covered', '1 per member/year')],
         'Outpatient Care': [line('Outpatient', 'covered', 'Full coverage')],
         'Inpatient Care': [line('Room & Board', 'covered', 'Php 5,000/day')],
+        'Emergency Care': [
+          line('Emergency care — in-network', 'covered', 'Full coverage'),
+          line('Emergency care — out-of-network', 'covered', 'Reimbursed up to Php 30,000'),
+        ],
+        'Other Benefits': [
+          line('Ambulance services', 'covered', 'Php 5,000/conveyance'),
+          line('Outpatient prescription drugs', 'not-covered', '—'),
+        ],
+        'Financial Assistance': [line('Death assistance', 'covered', 'Php 20,000')],
+        'Special Features': [line('24/7 teleconsultation', 'covered', 'Unlimited')],
       }
+      // Eligibility + plans from the reference content so the whole SOB document
+      // is populated, not just the benefit lines (keep the case's own header).
+      const ref = wesupportReferenceSob()
       patchSob((s) => ({
         ...s,
+        eligibility: s.eligibility && Object.values(s.eligibility).some(Boolean) ? s.eligibility : ref.eligibility,
+        plans: s.plans && s.plans.some((p) => p.planId) ? s.plans : ref.plans,
         sections: (s.sections ?? []).map((sec: SobSection) =>
           seed[sec.title] ? { ...sec, lines: [...(sec.lines ?? []), ...seed[sec.title]] } : sec,
         ),
@@ -1168,7 +1185,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
                               {sob.status}
                             </Tag>
                             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                              {sob.lines?.length ?? 0} benefit lines · source: {sob.source ?? 'template'}
+                              {flattenSobLines().length} benefit lines · source: {sob.source ?? 'template'}
                             </Typography.Text>
                           </>
                         ) : (
