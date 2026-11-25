@@ -10,8 +10,6 @@ import {
   Button,
   Collapse,
   Empty,
-  Input,
-  Segmented,
   Select,
   Space,
   Table,
@@ -24,14 +22,10 @@ import {
   EyeOutlined,
   FileTextOutlined,
   LinkOutlined,
-  SearchOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type { Case, SobDraft, TorLine } from '../../../domain/types'
-import { buildComparison, STATUS_META, type CompareRow, type CompareStatus } from './sobCompare'
-
-type FilterKey = 'all' | 'attention' | 'changed' | 'added'
-const CHANGED: CompareStatus[] = ['improved', 'reduced', 'mixed', 'review']
+import { buildComparison, STATUS_META, type CompareRow } from './sobCompare'
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ')
 
@@ -54,8 +48,6 @@ export function SobTorCompare({
   onViewTor: () => void
   onEditSob: () => void
 }) {
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<FilterKey>('all')
   const [plan, setPlan] = useState('all')
   const [confirmed, setConfirmed] = useState<Record<string, string>>({})
 
@@ -96,21 +88,10 @@ export function SobTorCompare({
     return [...set]
   }, [sob])
 
-  const { rows, summary } = useMemo(
+  const { rows } = useMemo(
     () => buildComparison(torLines, sob, { plan, confirmedMatches: confirmed }),
     [torLines, sob, plan, confirmed],
   )
-
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter((r) => {
-      if (q && !r.benefit.toLowerCase().includes(q)) return false
-      if (filter === 'attention') return STATUS_META[r.status].attention
-      if (filter === 'changed') return CHANGED.includes(r.status)
-      if (filter === 'added') return r.status === 'added'
-      return true
-    })
-  }, [rows, search, filter])
 
   // ---- Empty / honest states ----------------------------------------------
   if (!sob) {
@@ -148,7 +129,7 @@ export function SobTorCompare({
 
   // ---- Grouped rows by category -------------------------------------------
   const byCategory = new Map<string, CompareRow[]>()
-  visible.forEach((r) => {
+  rows.forEach((r) => {
     const list = byCategory.get(r.category) ?? []
     list.push(r)
     byCategory.set(r.category, list)
@@ -325,54 +306,6 @@ export function SobTorCompare({
         </Space>
       )}
 
-      {/* ---- Review toolbar -------------------------------------------------- */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-        <Typography.Text strong>
-          {summary.compared} benefit{summary.compared === 1 ? '' : 's'} compared
-          {summary.attention > 0 && (
-            <Typography.Text type="danger"> · {summary.attention} require attention</Typography.Text>
-          )}
-        </Typography.Text>
-        <span style={{ flex: 1 }} />
-        <Input
-          allowClear
-          size="small"
-          prefix={<SearchOutlined />}
-          placeholder="Search benefit"
-          style={{ width: 200 }}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <Segmented
-          size="small"
-          value={filter}
-          onChange={(v) => setFilter(v as FilterKey)}
-          options={[
-            { value: 'all', label: 'All' },
-            { value: 'attention', label: 'Needs attention' },
-            { value: 'changed', label: 'Changed' },
-            { value: 'added', label: 'Added' },
-          ]}
-        />
-        {summary.attention > 0 && (
-          <Button size="small" danger onClick={() => setFilter('attention')}>
-            Review items needing attention
-          </Button>
-        )}
-        {(search || filter !== 'all') && (
-          <Button
-            size="small"
-            type="text"
-            onClick={() => {
-              setSearch('')
-              setFilter('all')
-            }}
-          >
-            Clear filters
-          </Button>
-        )}
-      </div>
-
       {/* ---- Legend --------------------------------------------------------- */}
       <Space wrap size={[8, 4]}>
         {(['unchanged', 'improved', 'reduced', 'added', 'missing', 'mixed', 'review'] as const).map((s) => (
@@ -383,8 +316,8 @@ export function SobTorCompare({
       </Space>
 
       {/* ---- Grouped comparison --------------------------------------------- */}
-      {visible.length === 0 ? (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No benefits match the current filters." />
+      {rows.length === 0 ? (
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No benefits to compare." />
       ) : (
         <Collapse
           defaultActiveKey={[...byCategory.keys()]}
