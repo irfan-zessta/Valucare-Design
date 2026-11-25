@@ -41,6 +41,7 @@ import {
   FileTextOutlined,
   PlusOutlined,
   RollbackOutlined,
+  SendOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -1319,11 +1320,18 @@ export function FinalizeOffer({ c }: { c: Case }) {
               Draft in preparation by the AAT handler — view only. You can review and decide once it's submitted.
             </Typography.Text>
           ) : proposal.status === 'in-review' && fullyApproved ? (
-            // Senior manager has approved — the only remaining action is to
-            // generate the proposal PDF. No send / revise / return here.
-            <Button icon={<FileTextOutlined />} onClick={generateProposalPdf}>
-              Generate proposal PDF
-            </Button>
+            // Senior manager has approved — the AAT handler can generate the
+            // proposal PDF and send it to the client. No revise / return here.
+            <>
+              <Button icon={<FileTextOutlined />} onClick={generateProposalPdf}>
+                Generate proposal PDF
+              </Button>
+              {isProposalMaker && (
+                <Button type="primary" icon={<SendOutlined />} onClick={() => setSending(true)}>
+                  {inter ? `Send via ${c.company.intermediaryName ?? 'intermediary'}` : 'Send to client'}
+                </Button>
+              )}
+            </>
           ) : (
           <>
           <Button icon={<FileTextOutlined />} onClick={generateProposalPdf}>
