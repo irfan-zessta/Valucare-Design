@@ -218,9 +218,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
   const [returning, setReturning] = useState(false)
   const [returnConcern, setReturnConcern] = useState('')
   const [viewRates, setViewRates] = useState(false)
-  // Inline customization of the rates recommendation / justification outside the draft stage.
-  const [editRates, setEditRates] = useState(false)
-  const [editJustification, setEditJustification] = useState(false)
   // SOB document preview (formal, client-facing layout) + print.
   const [sobPreview, setSobPreview] = useState(false)
   const previewFrameRef = useRef<HTMLIFrameElement>(null)
@@ -239,7 +236,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
   }
 
   // ---- SOB (Summary of Benefits) -------------------------------------------
-  const sobEditable = sob?.status === 'draft'
+  // The SOB is editable only while it is a draft AND the proposal has not yet
+  // been submitted. Once the AAT handler submits for internal review, the whole
+  // Proposal preparation step is view-only until a pricing decision comes back.
+  const sobEditable = sob?.status === 'draft' && (!proposal || proposal.status === 'draft')
   function patchSob(recipe: (s: SobDraft) => SobDraft) {
     patchCase(c.id, (prev) => (prev.offer.sob ? { ...prev, offer: { ...prev.offer, sob: recipe(prev.offer.sob) } } : prev))
   }
@@ -538,41 +538,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
   const torDocName =
     c.quotation.requirements?.find((r) => r.key === 'tor')?.fileName ??
     c.franchise.documents?.find((d) => d.slot === 'tor')?.fileName
-
-  // Customize just the rates recommendation (commission + sales recommendation),
-  // available after the draft stage via an inline Edit toggle.
-  function saveRates() {
-    if (!proposal) return
-    patchProposal((p) => ({
-      ...p,
-      commissionPct: draft.commissionPct.trim() === '' ? undefined : Number(draft.commissionPct),
-      commissionNote: draft.commissionNote.trim() || undefined,
-      recommendation: draft.recommendation.trim() || undefined,
-    }))
-    setEditRates(false)
-    message.success('Rates recommendation updated.')
-  }
-  function cancelRates() {
-    setDraft((d) => ({
-      ...d,
-      commissionPct: proposal?.commissionPct != null ? String(proposal.commissionPct) : '',
-      commissionNote: proposal?.commissionNote ?? '',
-      recommendation: proposal?.recommendation ?? '',
-    }))
-    setEditRates(false)
-  }
-
-  // Customize just the rates justification, available after the draft stage.
-  function saveJustification() {
-    if (!proposal) return
-    patchProposal((p) => ({ ...p, justification: draft.justification.trim() || undefined }))
-    setEditJustification(false)
-    message.success('Rates justification updated.')
-  }
-  function cancelJustification() {
-    setDraft((d) => ({ ...d, justification: proposal?.justification ?? '' }))
-    setEditJustification(false)
-  }
 
   // ---- Review (two-level maker-checker) ------------------------------------
   const approvalsThis = (proposal?.approvals ?? []).filter((a) => a.version === proposal?.version)
@@ -959,16 +924,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
         {/* ---- Activity 2 · Rates recommendation ---------------------------- */}
         <Card>
-          {activityHead(
-            2,
-            'Rates recommendation',
-            !editable && !editRates ? (
-              <Button size="small" icon={<EditOutlined />} onClick={() => setEditRates(true)}>
-                Customize
-              </Button>
-            ) : undefined,
-          )}
-          {editable || editRates ? (
+          {activityHead(2, 'Rates recommendation')}
+          {editable ? (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
                 <div>
@@ -997,16 +954,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
                   />
                 </div>
               </div>
-              {/* In draft, the floating bar saves everything; outside draft this
-                  inline toggle commits just the rates recommendation. */}
-              {!editable && editRates && (
-                <Space style={{ marginTop: 16 }}>
-                  <Button type="primary" icon={<CheckCircleOutlined />} onClick={saveRates}>
-                    Save recommendation
-                  </Button>
-                  <Button onClick={cancelRates}>Cancel</Button>
-                </Space>
-              )}
             </>
           ) : (
             <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered style={{ marginTop: 16 }}>
@@ -1021,16 +968,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
 
         {/* ---- Activity 3 · Rates justification ------------------------------ */}
         <Card>
-          {activityHead(
-            3,
-            'Rates justification',
-            !editable && !editJustification ? (
-              <Button size="small" icon={<EditOutlined />} onClick={() => setEditJustification(true)}>
-                Customize
-              </Button>
-            ) : undefined,
-          )}
-          {editable || editJustification ? (
+          {activityHead(3, 'Rates justification')}
+          {editable ? (
             <div style={{ marginTop: 12 }}>
               <Typography.Text>Rates justification *</Typography.Text>
               <Input.TextArea
@@ -1039,16 +978,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
                 value={draft.justification}
                 onChange={(e) => setDraft({ ...draft, justification: e.target.value })}
               />
-              {/* In draft, the floating bar saves everything; outside draft this
-                  inline toggle commits just the justification. */}
-              {!editable && editJustification && (
-                <Space style={{ marginTop: 16 }}>
-                  <Button type="primary" icon={<CheckCircleOutlined />} onClick={saveJustification}>
-                    Save justification
-                  </Button>
-                  <Button onClick={cancelJustification}>Cancel</Button>
-                </Space>
-              )}
             </div>
           ) : (
             <Typography.Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
@@ -1066,23 +995,27 @@ export function FinalizeOffer({ c }: { c: Case }) {
               <Button size="small" type="text" icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>
                 Preview document
               </Button>
-              <Button size="small" type="text" icon={<DownloadOutlined />} onClick={downloadSobTemplate}>
-                Download template
-              </Button>
-              <Upload
-                showUploadList={false}
-                accept=".xlsx,.csv,.pdf"
-                beforeUpload={(file) => {
-                  message.info(
-                    `Attached “${file.name}” as a reference. Structured parsing arrives next — build the SOB below for now.`,
-                  )
-                  return false
-                }}
-              >
-                <Button size="small" type="text" icon={<CloudUploadOutlined />}>
-                  Upload SOB template
-                </Button>
-              </Upload>
+              {sobEditable && (
+                <>
+                  <Button size="small" type="text" icon={<DownloadOutlined />} onClick={downloadSobTemplate}>
+                    Download template
+                  </Button>
+                  <Upload
+                    showUploadList={false}
+                    accept=".xlsx,.csv,.pdf"
+                    beforeUpload={(file) => {
+                      message.info(
+                        `Attached “${file.name}” as a reference. Structured parsing arrives next — build the SOB below for now.`,
+                      )
+                      return false
+                    }}
+                  >
+                    <Button size="small" type="text" icon={<CloudUploadOutlined />}>
+                      Upload SOB template
+                    </Button>
+                  </Upload>
+                </>
+              )}
             </Space>,
           )}
           <div style={{ marginTop: 16 }}>{sobSection}</div>
