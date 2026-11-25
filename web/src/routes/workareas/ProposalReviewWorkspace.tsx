@@ -15,7 +15,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  Anchor,
   Button,
   Card,
   Collapse,
@@ -300,13 +299,6 @@ export function ProposalReviewWorkspace({
     </span>
   )
 
-  const anchorItems = [
-    { key: 'rev-commercial', href: '#rev-commercial', title: 'Commercial summary' },
-    { key: 'rev-comparison', href: '#rev-comparison', title: 'Benefits comparison' },
-    { key: 'rev-sob', href: '#rev-sob', title: 'Summary of Benefits' },
-    { key: 'case-history', href: '#case-history', title: 'Case history' },
-  ]
-
   const sectionTitle = (text: string) => (
     <Typography.Title level={5} style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
       {text}
@@ -340,27 +332,6 @@ export function ProposalReviewWorkspace({
             </Button>
           </div>
         </Card>
-
-        {/* ---- Sticky in-page navigation --------------------------------- */}
-        <div
-          style={{
-            position: 'sticky',
-            top: 56,
-            zIndex: 5,
-            background: '#fff',
-            border: `1px solid ${BORDER}`,
-            borderRadius: 8,
-            padding: '4px 12px',
-          }}
-        >
-          <Anchor
-            direction="horizontal"
-            affix={false}
-            offsetTop={120}
-            targetOffset={130}
-            items={anchorItems}
-          />
-        </div>
 
         {/* ---- 1 · Commercial summary ------------------------------------ */}
         <section id="rev-commercial">
