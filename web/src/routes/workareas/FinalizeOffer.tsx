@@ -141,6 +141,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
   // (account-manager: proposal = edit, not approve) can't act on an in-review
   // proposal — once they submit, it's out of their hands until a decision.
   const canApproveProposal = can('proposal', 'approve')
+  // The MAKER is whoever prepares and submits the proposal — the AAT handler
+  // (proposal = edit but NOT approve). A checker (approve) only reviews, so they
+  // never see the preparation/draft actions; the draft is view-only to them.
+  const isProposalMaker = can('proposal', 'edit') && !canApproveProposal
 
   const inter = c.company.businessSource !== 'Direct'
   const recipient = inter ? c.company.intermediaryName ?? 'the agent/broker' : 'the client'
@@ -239,7 +243,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
   // The SOB is editable only while it is a draft AND the proposal has not yet
   // been submitted. Once the AAT handler submits for internal review, the whole
   // Proposal preparation step is view-only until a pricing decision comes back.
-  const sobEditable = sob?.status === 'draft' && (!proposal || proposal.status === 'draft')
+  const sobEditable = sob?.status === 'draft' && (!proposal || proposal.status === 'draft') && isProposalMaker
   function patchSob(recipe: (s: SobDraft) => SobDraft) {
     patchCase(c.id, (prev) => (prev.offer.sob ? { ...prev, offer: { ...prev.offer, sob: recipe(prev.offer.sob) } } : prev))
   }
@@ -330,7 +334,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
   }
 
   // ---- Draft edits ----------------------------------------------------------
-  const editable = proposal?.status === 'draft'
+  const editable = proposal?.status === 'draft' && isProposalMaker
   // Activity 1 — Sales confirms it has checked Actuarial's rate sheet.
   function toggleRateSheetChecked() {
     patchProposal((p) => ({ ...p, rateSheetCheckedAt: p.rateSheetCheckedAt ? undefined : new Date().toISOString() }))
@@ -1289,12 +1293,17 @@ export function FinalizeOffer({ c }: { c: Case }) {
               <ClockCircleOutlined style={{ marginRight: 6 }} />
               Submitted for internal review — awaiting pricing approval. No further action needed from you.
             </Typography.Text>
+          ) : proposal.status === 'draft' && !isProposalMaker ? (
+            <Typography.Text type="secondary">
+              <ClockCircleOutlined style={{ marginRight: 6 }} />
+              Draft in preparation by the AAT handler — view only. You can review and decide once it's submitted.
+            </Typography.Text>
           ) : (
           <>
           <Button icon={<FileTextOutlined />} onClick={generateProposalPdf}>
             Generate proposal PDF
           </Button>
-          {proposal.status !== 'draft' && proposal.status !== 'accepted' && (
+          {isProposalMaker && proposal.status !== 'draft' && proposal.status !== 'accepted' && (
             <Button onClick={() => setRevising(true)}>Revise (new version)</Button>
           )}
           {proposal.status === 'draft' && (
