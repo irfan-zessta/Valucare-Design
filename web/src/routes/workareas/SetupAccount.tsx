@@ -282,46 +282,18 @@ export function SetupAccount({ c }: { c: Case }) {
   // ===== Internal alignment =================================================
   function InternalAlignment() {
     const a = setup!.alignment
-    const bothDone = a.billing.status === 'completed' && a.mda.status === 'completed'
-    const setDept = (dept: 'billing' | 'mda', patchFields: Partial<typeof a.billing>) =>
+    // Mark both departments aligned and advance (the per-department cards were
+    // removed; alignment is confirmed in one step here).
+    const completeAlignment = () => {
       patchSetup((s) => ({
         ...s,
-        alignment: { ...s.alignment, [dept]: { ...s.alignment[dept], ...patchFields, updatedAt: new Date().toISOString() } },
+        alignment: {
+          ...s.alignment,
+          billing: { ...s.alignment.billing, status: 'completed', updatedAt: new Date().toISOString() },
+          mda: { ...s.alignment.mda, status: 'completed', updatedAt: new Date().toISOString() },
+        },
       }))
-
-    const deptCard = (dept: 'billing' | 'mda', title: string) => {
-      const d = a[dept]
-      return (
-        <FormSection key={dept} title={title} wide>
-          <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
-            <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Alignment status</div>
-              <Select
-                style={{ width: 220 }}
-                value={d.status}
-                onChange={(v) => setDept(dept, { status: v })}
-                options={[
-                  { value: 'pending', label: 'Pending' },
-                  { value: 'in-progress', label: 'In progress' },
-                  { value: 'completed', label: 'Completed' },
-                ]}
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Alignment notes</div>
-              <Input.TextArea rows={2} value={d.notes} onChange={(e) => setDept(dept, { notes: e.target.value })} />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Outstanding clarifications</div>
-              <Input.TextArea rows={2} value={d.clarifications} onChange={(e) => setDept(dept, { clarifications: e.target.value })} />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Coordination outcome</div>
-              <Input.TextArea rows={2} value={d.outcome} onChange={(e) => setDept(dept, { outcome: e.target.value })} />
-            </div>
-          </Space>
-        </FormSection>
-      )
+      completeTask('internal-alignment')
     }
 
     // ---- Documents Sales shares with Billing & Collections and MDA ----------
@@ -441,19 +413,14 @@ export function SetupAccount({ c }: { c: Case }) {
           </Space>
         </FormSection>
 
-        {deptCard('billing', 'Billing & Collections')}
-        {deptCard('mda', 'MDA (Members Data Administration)')}
-
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
           <Typography.Text type="secondary">
-            {bothDone ? 'Both departments aligned.' : 'Mark both departments completed to continue.'}
+            Share the documents above with Billing &amp; Collections and MDA, then continue.
           </Typography.Text>
           <div className="app-form-floatbar__actions">
-            <Tooltip title={bothDone ? '' : 'Set both Billing and MDA alignment to Completed.'}>
-              <Button type="primary" disabled={!bothDone} onClick={() => completeTask('internal-alignment')}>
-                Complete alignment and continue
-              </Button>
-            </Tooltip>
+            <Button type="primary" onClick={completeAlignment}>
+              Complete alignment and continue
+            </Button>
           </div>
         </div>
       </Space>
