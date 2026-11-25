@@ -62,6 +62,8 @@ import { currentProposal } from '../../domain/progress'
 import { uid } from '../../domain/ids'
 import { ProposalRateSchedule, emptyRateSchedule, sampleRateSchedule } from './ProposalRateSchedule'
 import { SobBuilder } from './sob/SobBuilder'
+import { SobTorCompare } from './sob/SobTorCompare'
+import { buildComparison, STATUS_META } from './sob/sobCompare'
 import { emptyRichSob, isRichSob } from '../../domain/sobModel'
 import { buildSobDocumentHtml } from './sob/sobDocument'
 import { wesupportReferenceSob } from './sob/wesupportSample'
@@ -93,30 +95,15 @@ function proposalCode(c: Case): string {
   return `PR-${c.id.replace(/^[A-Z]+-/, '')}`
 }
 
-// SOB-vs-TOR comparison: how each benefit changed from the client's current
-// Terms of Reference (captured in Prepare Quotation) to the proposed SOB.
-type CmpStatus = 'same' | 'changed' | 'added' | 'removed'
-interface CmpRow {
-  benefit: string
-  tor: string
-  sob: string
-  status: CmpStatus
-}
-const CMP_META: Record<CmpStatus, { label: string; color: string; hex: string }> = {
-  same: { label: 'Unchanged', color: 'default', hex: '#8c8c8c' },
-  changed: { label: 'Changed', color: 'gold', hex: '#d48806' },
-  added: { label: 'Added in SOB', color: 'blue', hex: '#1677ff' },
-  removed: { label: 'Not in SOB', color: 'red', hex: '#cf1322' },
-}
-// How a benefit's coverage reads in the comparison. A plainly "covered" line is
-// compared on its limits alone (no noisy prefix); anything else is called out.
+// How a benefit's coverage reads when flattening the SOB. A plainly "covered"
+// line is shown on its limits alone (no noisy prefix); anything else is called out.
 const COVERAGE_LABEL: Record<SobCoverage, string> = {
   covered: '',
   'not-covered': 'Not covered',
   'not-specified': 'Not specified',
 }
-// Mirror of Prepare Quotation's TOR fallback: when a TOR document is attached
-// but not yet digitised, the TOR view shows this representative set.
+// Representative TOR benefit set used only by "Load sample data" to seed this
+// case's editable TOR when it has none — never shown as another client's data.
 const SAMPLE_TOR: { benefit: string; limit: string; note?: string }[] = [
   { benefit: 'Room & Board', limit: 'Php 5,000/day', note: 'Semi-private' },
   { benefit: 'Annual Benefit Limit (MBL)', limit: 'Php 200,000', note: 'Per member/year' },
@@ -433,13 +420,16 @@ export function FinalizeOffer({ c }: { c: Case }) {
     const esc = (s: unknown) =>
       String(s ?? '').replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch] as string)
     const code = proposal.code ?? proposalCode(c)
-    const cmp = sobTorComparison()
+    // Same saved SOB + this case's TOR that drive the on-screen comparison.
+    const cmp = buildComparison(c.quotation.torLines, sob).rows
+    const sobPdfCell = (r: (typeof cmp)[number]) =>
+      !r.sob ? '—' : r.sob.coverage === 'not-covered' ? 'Excluded' : r.sob.coverage === 'not-specified' ? 'Not specified' : r.sob.limits || 'Covered'
     const cmpRows = cmp
       .map(
         (r) =>
-          `<tr><td>${esc(r.benefit)}</td><td>${esc(r.tor)}</td><td>${esc(r.sob)}</td><td style="color:${
-            CMP_META[r.status].hex
-          };font-weight:600">${esc(CMP_META[r.status].label)}</td></tr>`,
+          `<tr><td>${esc(r.benefit)}</td><td>${esc(r.tor ? r.tor.limit || 'Not specified in TOR' : '—')}</td><td>${esc(
+            sobPdfCell(r),
+          )}</td><td style="color:${STATUS_META[r.status].hex};font-weight:600">${esc(STATUS_META[r.status].label)}</td></tr>`,
       )
       .join('')
     const sobRows =
@@ -481,8 +471,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
       <div class="field">${esc(proposal.justification || '—')}</div>
       <h2>Summary of Benefits${sob ? ` · v${esc(sob.version)}` : ''}</h2>
       ${sobRows ? `<table><thead><tr><th>Benefit</th><th>Coverage</th><th>Limits</th></tr></thead><tbody>${sobRows}</tbody></table>` : '<div class="field">No benefit lines yet.</div>'}
-      <h2>SOB vs TOR comparison</h2>
-      ${cmpRows ? `<table><thead><tr><th>Benefit</th><th>TOR (current)</th><th>SOB (proposed)</th><th>Change</th></tr></thead><tbody>${cmpRows}</tbody></table>` : '<div class="field">No TOR captured for this case.</div>'}
+      <h2>Compare proposed benefits</h2>
+      ${cmpRows ? `<table><thead><tr><th>Benefit</th><th>Client TOR</th><th>Created SOB</th><th>Difference / impact</th></tr></thead><tbody>${cmpRows}</tbody></table>` : '<div class="field">No TOR captured for this case.</div>'}
       </body></html>`
     const iframe = document.createElement('iframe')
     iframe.style.position = 'fixed'
@@ -520,38 +510,14 @@ export function FinalizeOffer({ c }: { c: Case }) {
     return out
   }
 
-  // The TOR to compare against — digitised lines, else the sample fallback
-  // when a TOR document is on file (matching the Prepare Quotation view).
+  // The client's TOR source document (captured in Prepare Quotation), for the
+  // comparison's TOR source panel.
   const torAttached =
     !!c.quotation.requirements?.find((r) => r.key === 'tor')?.fileName ||
     !!c.franchise.documents?.find((d) => d.slot === 'tor')
-  const effectiveTor = c.quotation.torLines ?? (torAttached ? SAMPLE_TOR : [])
-
-  // Diff the client's TOR against the proposed SOB, matched by benefit name.
-  function sobTorComparison(): CmpRow[] {
-    const tor = effectiveTor
-    const sobFlat = flattenSobLines()
-    const norm = (s: string) => s.trim().toLowerCase()
-    const sobByName = new Map(sobFlat.map((x) => [norm(x.name), x]))
-    const rows: CmpRow[] = []
-    const seen = new Set<string>()
-    tor.forEach((t) => {
-      const key = norm(t.benefit)
-      seen.add(key)
-      const s = sobByName.get(key)
-      const torVal = t.limit || '—'
-      if (!s) {
-        rows.push({ benefit: t.benefit, tor: torVal, sob: '—', status: 'removed' })
-      } else {
-        const sobVal = s.detail || '—'
-        rows.push({ benefit: t.benefit, tor: torVal, sob: sobVal, status: norm(torVal) === norm(sobVal) ? 'same' : 'changed' })
-      }
-    })
-    sobFlat.forEach((s) => {
-      if (!seen.has(norm(s.name))) rows.push({ benefit: s.name, tor: '—', sob: s.detail || '—', status: 'added' })
-    })
-    return rows
-  }
+  const torDocName =
+    c.quotation.requirements?.find((r) => r.key === 'tor')?.fileName ??
+    c.franchise.documents?.find((d) => d.slot === 'tor')?.fileName
 
   // Customize just the rates recommendation (commission + sales recommendation),
   // available after the draft stage via an inline Edit toggle.
@@ -1102,48 +1068,21 @@ export function FinalizeOffer({ c }: { c: Case }) {
           <div style={{ marginTop: 16 }}>{sobSection}</div>
         </Card>
 
-        {/* ---- Activity 5 · SOB vs TOR comparison --------------------------- */}
+        {/* ---- Activity 5 · Compare proposed benefits ---------------------- */}
         <Card>
-          {activityHead(5, 'SOB vs TOR comparison')}
-          {effectiveTor.length === 0 ? (
-            <Alert
-              style={{ marginTop: 12 }}
-              type="info"
-              showIcon
-              title="No TOR on file"
-              description="The client's Terms of Reference (current benefits) is captured during Prepare Quotation → Requirements/TOR. Digitise it there to see the comparison here."
-            />
-          ) : (
-            <>
-              <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
-                How each benefit changed from the client's current coverage (TOR) to the proposed SOB.
-              </Typography.Paragraph>
-              <Space wrap size={[8, 4]} style={{ marginBottom: 12 }}>
-                {(['same', 'changed', 'added', 'removed'] as const).map((s) => (
-                  <Tag key={s} color={CMP_META[s].color}>
-                    {CMP_META[s].label}
-                  </Tag>
-                ))}
-              </Space>
-              <Table<CmpRow>
-                size="small"
-                rowKey={(r, i) => `${r.benefit}-${i}`}
-                dataSource={sobTorComparison()}
-                pagination={false}
-                columns={[
-                  { title: 'Benefit', dataIndex: 'benefit', render: (v: string) => <strong>{v}</strong> },
-                  { title: 'TOR (current)', dataIndex: 'tor' },
-                  { title: 'SOB (proposed)', dataIndex: 'sob' },
-                  {
-                    title: 'Change',
-                    dataIndex: 'status',
-                    width: 140,
-                    render: (s: CmpStatus) => <Tag color={CMP_META[s].color}>{CMP_META[s].label}</Tag>,
-                  },
-                ]}
-              />
-            </>
-          )}
+          {activityHead(5, 'Compare proposed benefits')}
+          <SobTorCompare
+            c={c}
+            sob={sob}
+            torLines={c.quotation.torLines}
+            torAttached={torAttached}
+            torDocName={torDocName}
+            onViewSob={() => setSobPreview(true)}
+            onViewTor={() => navigate(`/cases/${c.id}/prepare-quotation`)}
+            onEditSob={() => {
+              document.getElementById('sob-creation')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }}
+          />
         </Card>
 
                 </Space>
