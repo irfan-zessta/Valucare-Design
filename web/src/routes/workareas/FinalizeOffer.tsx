@@ -32,6 +32,7 @@ import {
 } from 'antd'
 import {
   CheckCircleOutlined,
+  ClockCircleOutlined,
   CloudUploadOutlined,
   DeleteOutlined,
   DownloadOutlined,
@@ -56,6 +57,7 @@ import type {
   SobSection,
 } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
+import { useActiveUser } from '../../state/ActiveUserProvider'
 import { RemarksField } from '../../components/comments/RemarksField'
 import { useRemarkComment } from '../../components/comments/useRemarkComment'
 import { currentProposal } from '../../domain/progress'
@@ -129,9 +131,16 @@ function initDraft(p?: ProposalVersion): DraftForm {
 
 export function FinalizeOffer({ c }: { c: Case }) {
   const { patchCase } = useCases()
+  const { can } = useActiveUser()
   const { message } = App.useApp()
   const navigate = useNavigate()
   const postRemark = useRemarkComment()
+
+  // Pricing review/approval belongs to a checker persona (Sales Supervisor /
+  // Senior Management), never the AAT handler who prepares and submits. The AAT
+  // (account-manager: proposal = edit, not approve) can't act on an in-review
+  // proposal — once they submit, it's out of their hands until a decision.
+  const canApproveProposal = can('proposal', 'approve')
 
   const inter = c.company.businessSource !== 'Direct'
   const recipient = inter ? c.company.intermediaryName ?? 'the agent/broker' : 'the client'
@@ -1332,6 +1341,16 @@ export function FinalizeOffer({ c }: { c: Case }) {
           )}
         </div>
         <div className="app-form-floatbar__actions">
+          {/* Once the AAT handler submits, the proposal is with the pricing
+              reviewers — the handler has nothing more to do until a decision
+              comes back, so the bar just confirms the submission. */}
+          {proposal.status === 'in-review' && !fullyApproved && !canApproveProposal ? (
+            <Typography.Text type="secondary">
+              <ClockCircleOutlined style={{ marginRight: 6 }} />
+              Submitted for internal review — awaiting pricing approval. No further action needed from you.
+            </Typography.Text>
+          ) : (
+          <>
           <Button icon={<FileTextOutlined />} onClick={generateProposalPdf}>
             Generate proposal PDF
           </Button>
@@ -1382,6 +1401,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
             <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => navigate(`/cases/${c.id}/setup-account`)}>
               Begin account setup
             </Button>
+          )}
+          </>
           )}
         </div>
       </div>
