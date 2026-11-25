@@ -103,7 +103,9 @@ export default function CaseWorkspace() {
 
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
         <WorkAreaPanel c={c} workArea={activeWorkArea} />
-        <CaseHistory c={c} />
+        <div id="case-history">
+          <CaseHistory c={c} />
+        </div>
       </Space>
     </div>
   )

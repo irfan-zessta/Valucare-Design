@@ -65,6 +65,7 @@ import { uid } from '../../domain/ids'
 import { ProposalRateSchedule, emptyRateSchedule, sampleRateSchedule } from './ProposalRateSchedule'
 import { SobBuilder } from './sob/SobBuilder'
 import { SobTorCompare } from './sob/SobTorCompare'
+import { ProposalReviewWorkspace } from './ProposalReviewWorkspace'
 import { buildComparison, STATUS_META } from './sob/sobCompare'
 import { emptyRichSob, isRichSob } from '../../domain/sobModel'
 import { buildSobDocumentHtml } from './sob/sobDocument'
@@ -522,13 +523,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
     window.setTimeout(() => document.body.removeChild(iframe), 1000)
   }
 
-  // Reviewers (checkers) read the proposal as a document, not an editable form —
-  // built only for them so makers keep the normal preparation cards.
-  const proposalDocHtml = useMemo(
-    () => (isProposalMaker ? '' : buildProposalDocHtml()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isProposalMaker, proposal, sob, c],
-  )
 
   // Flatten the SOB (rich sections + nested lines, or simple lines) to a list
   // of { benefit name, detail } for the TOR comparison.
@@ -898,6 +892,18 @@ export function FinalizeOffer({ c }: { c: Case }) {
           />
         )}
 
+        {!isProposalMaker ? (
+          // Internal reviewers get the decision-first review workspace — a
+          // structured presentation of the same proposal data (never the editable
+          // preparation cards). The original document stays reachable via Print.
+          <ProposalReviewWorkspace
+            c={c}
+            proposal={proposal}
+            sob={sob}
+            sobVersion={sobVersion}
+            onPrintPdf={generateProposalPdf}
+          />
+        ) : (
         <Tabs
           defaultActiveKey={defaultTab}
           size="small"
@@ -905,7 +911,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
             {
               key: 'prep',
               label: 'Proposal preparation',
-              children: isProposalMaker ? (
+              children: (
                 <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
 
         {/* ---- Activity 1 · Rate sheet checking ----------------------------- */}
@@ -1064,48 +1070,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
         </Card>
 
                 </Space>
-              ) : (
-                // ---- Internal reviewer view: read-only proposal document ----
-                <Card
-                  title={
-                    <Space>
-                      <FileTextOutlined />
-                      <span>Proposal document</span>
-                      <Tag>v{proposal.version}</Tag>
-                      <Tag
-                        color={
-                          proposal.status === 'accepted'
-                            ? 'green'
-                            : proposal.status === 'in-review'
-                              ? 'blue'
-                              : 'default'
-                        }
-                      >
-                        {proposal.status}
-                      </Tag>
-                    </Space>
-                  }
-                  extra={
-                    <Button size="small" icon={<DownloadOutlined />} onClick={generateProposalPdf}>
-                      Print / Save as PDF
-                    </Button>
-                  }
-                  styles={{ body: { padding: 0 } }}
-                >
-                  {proposalDocHtml ? (
-                    <iframe
-                      title="Proposal document"
-                      srcDoc={proposalDocHtml}
-                      style={{ width: '100%', height: '75vh', border: 0, background: '#f0f0f0' }}
-                    />
-                  ) : (
-                    <div style={{ padding: 24 }}>
-                      <Typography.Text type="secondary">
-                        The proposal document isn't ready to preview yet.
-                      </Typography.Text>
-                    </div>
-                  )}
-                </Card>
               ),
             },
             {
@@ -1329,6 +1293,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
             },
           ]}
         />
+        )}
       </Space>
 
       {/* ---- Floating action bar ------------------------------------------- */}
