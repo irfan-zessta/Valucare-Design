@@ -13,6 +13,16 @@ import {
 
 export type WorkAreaState = 'done' | 'current' | 'todo'
 
+/**
+ * Whether a case is complete. A case is done once its coverage is active or
+ * scheduled (the final Activate & Handover step), even if the stored
+ * `isCompleted` flag was never set — so activating always moves a case out of
+ * "In progress". This is the single source of truth for completion.
+ */
+export function isCaseComplete(c: Case): boolean {
+  return c.isCompleted || c.coverage.status === 'active' || c.coverage.status === 'scheduled'
+}
+
 export interface NextAction {
   label: string
   workArea: WorkAreaId
@@ -23,7 +33,7 @@ export interface NextAction {
 
 /** Meaningful status text — never a bare "Pending". */
 export function meaningfulStatus(c: Case): string {
-  if (c.isCompleted) {
+  if (isCaseComplete(c)) {
     return c.coverage.status === 'scheduled' ? 'Coverage scheduled' : 'Active'
   }
   switch (c.currentWorkArea) {
@@ -143,7 +153,7 @@ export function furthestWorkArea(c: Case): WorkAreaId {
 export function workAreaState(c: Case, id: WorkAreaId): WorkAreaState {
   const currentIdx = WORK_AREA_ORDER.indexOf(c.currentWorkArea)
   const thisIdx = WORK_AREA_ORDER.indexOf(id)
-  if (c.isCompleted) return 'done'
+  if (isCaseComplete(c)) return 'done'
   if (thisIdx < currentIdx) return 'done'
   if (thisIdx === currentIdx) return 'current'
   return 'todo'

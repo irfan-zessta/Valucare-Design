@@ -20,7 +20,7 @@ import { CreateFranchiseModal } from '../../components/CreateFranchiseModal'
 import { useEnquiriesWorkspace } from '../enquiries/EnquiriesWorkspace'
 import { NewEnquiryModal } from '../enquiries/NewEnquiryModal'
 import { WORK_AREA_LABELS, WORK_AREA_ORDER, type Case } from '../../domain/types'
-import { currentProposal, meaningfulStatus, nextAction, responsibleDepartment } from '../../domain/progress'
+import { currentProposal, isCaseComplete, meaningfulStatus, nextAction, responsibleDepartment } from '../../domain/progress'
 import { isNextActionMine, roleDepartment, salesWorklist } from '../../domain/caseAccess'
 import { departmentDisplay } from '../../domain/access'
 import { formatDate } from '../../lib/format'
@@ -127,7 +127,7 @@ export default function SalesDashboard() {
     // Cases waiting on another team get a quiet "View" affordance so that rows
     // needing the user's own action stand out.
     const rowCta = (c: Case): { label: string; subtle: boolean } => {
-      if (c.isCompleted) return { label: 'View franchise', subtle: true }
+      if (isCaseComplete(c)) return { label: 'View franchise', subtle: true }
       const a = nextAction(c)
       // Account Services reviewing a submitted franchise: this IS their action,
       // so give it a prominent, explicit label rather than the quiet "View case"
@@ -170,7 +170,7 @@ export default function SalesDashboard() {
       let label = 'In progress'
       let color = 'blue' // processing / in-progress
       let sub: string | undefined
-      if (c.isCompleted) {
+      if (isCaseComplete(c)) {
         if (c.coverage.status === 'scheduled') { label = 'Scheduled'; color = 'cyan' }
         else { label = 'Active'; color = 'green' }
       } else if (c.franchise.status === 'returned') {
@@ -248,8 +248,8 @@ export default function SalesDashboard() {
             <dd>{WORK_AREA_LABELS[c.currentWorkArea]}</dd>
           </div>
           <div>
-            <dt>{c.isCompleted ? 'Completed' : 'Updated'}</dt>
-            <dd>{formatDate(c.isCompleted ? c.coverage.effectiveDate ?? c.updatedAt : c.updatedAt)}</dd>
+            <dt>{isCaseComplete(c) ? 'Completed' : 'Updated'}</dt>
+            <dd>{formatDate(isCaseComplete(c) ? c.coverage.effectiveDate ?? c.updatedAt : c.updatedAt)}</dd>
           </div>
         </dl>
         <div className="case-card__foot">{actionCell(c)}</div>
@@ -294,7 +294,7 @@ export default function SalesDashboard() {
       primaryAction,
       rowId: (c) => c.id,
       onRowClick: openCase,
-      isCompleted: (c) => c.isCompleted,
+      isCompleted: (c) => isCaseComplete(c),
       // Only cases whose next action belongs to THIS persona's department.
       needsMyAction: (c) => isNextActionMine(role, c),
       searchText: (c) =>

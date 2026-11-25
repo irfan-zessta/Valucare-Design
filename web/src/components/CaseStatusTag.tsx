@@ -8,13 +8,13 @@ import {
   SyncOutlined,
 } from '@ant-design/icons'
 import type { Case } from '../domain/types'
-import { meaningfulStatus } from '../domain/progress'
+import { isCaseComplete, meaningfulStatus } from '../domain/progress'
 
 // A calm, categorical status tag. Colour is reserved (red only for
 // attention-needing states), and every tag pairs a colour with a leading icon
 // and meaningful label text, so status is never communicated by colour alone.
 function statusLook(c: Case): { color: string; icon: ReactNode } {
-  if (c.isCompleted) {
+  if (isCaseComplete(c)) {
     return c.coverage.status === 'scheduled'
       ? { color: 'cyan', icon: <ClockCircleOutlined /> } // coverage scheduled
       : { color: 'green', icon: <CheckCircleOutlined /> } // active

@@ -65,8 +65,10 @@ export function ActivateHandover({ c }: { c: Case }) {
   // ---- Activation -----------------------------------------------------------
   function schedule(d: Dayjs | null) {
     if (!d) {
+      // Activation removed — the case is no longer done.
       patch((prev) => ({
         ...prev,
+        isCompleted: false,
         coverage: { ...prev.coverage, status: 'not-activated', scheduledFor: undefined, activatedAt: undefined },
       }))
       return
@@ -74,6 +76,9 @@ export function ActivateHandover({ c }: { c: Case }) {
     const future = d.isAfter(dayjs())
     patch((prev) => ({
       ...prev,
+      // Once coverage is scheduled or active the case is complete — this is what
+      // the dashboards/status tags key off to move it out of "In progress".
+      isCompleted: true,
       coverage: {
         ...prev.coverage,
         status: future ? 'scheduled' : 'active',
