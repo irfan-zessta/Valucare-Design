@@ -610,11 +610,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
       </Space>
       {(c.memberData.importProcessed || masterlistAttached) && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Source: Sales endorsement · member master list · v1
-            </Typography.Text>
-          </div>
           <div
             style={{
               display: 'grid',
@@ -640,14 +635,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
               </div>
             ))}
           </div>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Average principal and dependent ages are each the arithmetic mean of valid ages (to three
-            decimals), computed separately.
-          </Typography.Text>
           <div>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Member list · initial gathering (sample of {formatCount(memberPreview.total)})
-            </Typography.Text>
             <Table
               style={{ marginTop: 6 }}
               rowKey="companyId"
