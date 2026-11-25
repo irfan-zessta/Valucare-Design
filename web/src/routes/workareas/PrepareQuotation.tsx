@@ -717,19 +717,10 @@ export function PrepareQuotation({ c }: { c: Case }) {
 
   const sheetsTab = (
     <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-      {submitted && sheets.length === 0 && !openClarification && (
-        <Alert
-          type="info"
-          showIcon
-          title="Request sent to Actuarial — waiting for the rate sheet"
-          description="This case is with Actuarial. You can't move it forward until a rate sheet is received. If Actuarial raises a clarification, you'll answer it here."
-        />
-      )}
+      {(clarifications.length > 0 || (awaitingClarification && openClarification)) && (
       <section>
         <Typography.Title level={5} style={{ marginTop: 0 }}>Clarifications</Typography.Title>
-        {clarifications.length === 0 ? (
-          <Typography.Text type="secondary">No clarifications.</Typography.Text>
-        ) : (
+        {clarifications.length > 0 && (
           <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
             {clarifications.map((cl, i) => (
               <Alert
@@ -772,6 +763,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
           </div>
         )}
       </section>
+      )}
 
       <section>
         <Typography.Title level={5}>Rate sheet versions ({sheets.length})</Typography.Title>
