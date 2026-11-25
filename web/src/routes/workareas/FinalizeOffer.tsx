@@ -554,8 +554,9 @@ export function FinalizeOffer({ c }: { c: Case }) {
   // ---- Review (two-level maker-checker) ------------------------------------
   const approvalsThis = (proposal?.approvals ?? []).filter((a) => a.version === proposal?.version)
   const firstApproved = approvalsThis.some((a) => a.stage === 'first' && a.decision === 'approve')
-  const secondApproved = approvalsThis.some((a) => a.stage === 'second' && a.decision === 'approve')
-  const fullyApproved = firstApproved && secondApproved
+  // Single-level approval: once the sales manager approves, the proposal is fully
+  // approved — no separate second-level step. One Approve click completes it.
+  const fullyApproved = approvalsThis.some((a) => a.decision === 'approve')
 
   function decide(outcome: 'approve' | 'return') {
     if (!review || !proposal) return
@@ -1400,9 +1401,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
         title={
           review?.intent === 'return'
             ? 'Return to AAT handler'
-            : review?.stage === 'first'
-              ? 'First-level pricing review'
-              : 'Second-level pricing approval'
+            : 'Pricing approval'
         }
         onCancel={() => {
           setReview(null)
