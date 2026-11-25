@@ -510,7 +510,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
           }}
         >
           <Button size="small" icon={<CloudUploadOutlined />}>
-            {torAttached ? 'Re-upload TOR' : 'Upload TOR'}
+            Upload xlsx
           </Button>
         </Upload>
       </Space>
