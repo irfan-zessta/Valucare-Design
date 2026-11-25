@@ -867,12 +867,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
           )}
           {responded && (
             <Tooltip title={selectedSheet ? '' : 'Choose a rate sheet version to continue.'}>
-              <Button
-                type="primary"
-                icon={<ArrowRightOutlined />}
-                disabled={!selectedSheet}
-                onClick={proceedToProposal}
-              >
+              <Button type="primary" disabled={!selectedSheet} onClick={proceedToProposal}>
                 Proceed to proposal
               </Button>
             </Tooltip>
