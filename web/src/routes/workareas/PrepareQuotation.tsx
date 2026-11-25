@@ -843,6 +843,8 @@ export function PrepareQuotation({ c }: { c: Case }) {
           <Modal
             open={viewSheetId !== null}
             width={1100}
+            style={{ top: 32 }}
+            styles={{ body: { height: '72vh', overflowY: 'auto' } }}
             title={vs ? `Rate sheet v${vs.version} · ${vs.status} · issued ${dayjs(vs.receivedAt).format('YYYY-MM-DD HH:mm')} by ${vs.preparedBy}` : 'Rate sheet'}
             onCancel={() => setViewSheetId(null)}
             footer={[
