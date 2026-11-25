@@ -1356,7 +1356,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
                 type="primary"
                 onClick={() => setReview({ stage: firstApproved ? 'second' : 'first', intent: 'approve' })}
               >
-                {firstApproved ? 'Second-level pricing approval' : 'First-level pricing review'}
+                Approve
               </Button>
             </>
           )}
