@@ -591,9 +591,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
   const memberTab = (
     <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
       <Space wrap style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <Button size="small" onClick={validateMemberData}>
-          {c.memberData.importProcessed ? 'Re-validate sample data' : 'Validate sample Member Data'}
-        </Button>
         <Upload
           showUploadList={false}
           beforeUpload={(file) => {
@@ -854,6 +851,11 @@ export function PrepareQuotation({ c }: { c: Case }) {
           {tab === 'tor' && (
             <Button size="small" onClick={loadSampleTor}>
               Load sample TOR
+            </Button>
+          )}
+          {tab === 'members' && (
+            <Button size="small" onClick={validateMemberData}>
+              {c.memberData.importProcessed ? 'Re-validate sample data' : 'Validate sample Member Data'}
             </Button>
           )}
         </div>
