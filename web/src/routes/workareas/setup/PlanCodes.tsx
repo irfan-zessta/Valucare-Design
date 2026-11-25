@@ -18,10 +18,12 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   Upload,
 } from 'antd'
 import {
+  CheckCircleOutlined,
   DownloadOutlined,
   ImportOutlined,
   PlusOutlined,
@@ -40,6 +42,7 @@ import {
   type SetupField,
 } from '../../../domain/setup'
 import { FormSection } from '../../../components/ui/FormSection'
+import { useActiveUser } from '../../../state/ActiveUserProvider'
 
 const STATUS_TAG: Record<PlanCodeStatus, { color: string; label: string }> = {
   draft: { color: 'default', label: 'Draft' },
@@ -202,6 +205,15 @@ export function PlanCodes({
   const [submitted, setSubmitted] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importText, setImportText] = useState('')
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
+  const [returning, setReturning] = useState(false)
+  const [returnReason, setReturnReason] = useState('')
+
+  // Maker-checker within AMT: an AMT Associate creates and submits plan codes;
+  // only the AMT Lead can approve (or return) them — and never their own, since
+  // the two are different people in the roster.
+  const { user } = useActiveUser()
+  const isAmtLead = user.title === 'AMT Lead'
 
   function setCodes(next: PlanCode[]) {
     const allApproved = next.length > 0 && next.every((p) => p.status === 'approved')
@@ -371,6 +383,30 @@ export function PlanCodes({
     message.success(notes.join(' '))
   }
 
+  // Apply a status change to the selected rows whose current status is allowed.
+  function setStatusForSelected(to: PlanCodeStatus, allowedFrom: PlanCodeStatus[], reason?: string) {
+    const ids = new Set(selectedKeys)
+    let changed = 0
+    const next = codes.map((p) => {
+      if (ids.has(p.id) && allowedFrom.includes(p.status ?? 'draft')) {
+        changed++
+        return { ...p, status: to, returnReason: to === 'returned' ? reason : undefined }
+      }
+      return p
+    })
+    setCodes(next)
+    setSelectedKeys([])
+    return changed
+  }
+
+  // Selection broken down by what each role can act on.
+  const selectedCodes = codes.filter((p) => selectedKeys.includes(p.id))
+  // Associate: submit drafts / returned codes to the lead.
+  const selSubmittable = selectedCodes.filter((p) => (p.status ?? 'draft') === 'draft' || p.status === 'returned').length
+  // Lead: approve or return codes awaiting approval.
+  const selInReview = selectedCodes.filter((p) => p.status === 'for-approval').length
+  const approvedCount = codes.filter((p) => p.status === 'approved').length
+
   // ---- Manual-form field renderer ------------------------------------------
   const renderField = (f: SetupField) => {
     const val = form[f.key]
@@ -465,6 +501,11 @@ export function PlanCodes({
           dataSource={codes}
           pagination={false}
           scroll={{ x: 'max-content' }}
+          rowSelection={{
+            selectedRowKeys: selectedKeys,
+            onChange: (keys) => setSelectedKeys(keys.map(String)),
+            getCheckboxProps: (r) => ({ disabled: r.status === 'approved' }),
+          }}
           locale={{ emptyText: 'No plan codes yet — generate from the SOB, add one, or bulk import.' }}
           columns={[
             { title: 'Plan code', dataIndex: 'code', fixed: 'left', render: (v: string) => <strong>{v}</strong> },
@@ -495,6 +536,92 @@ export function PlanCodes({
           ]}
         />
       </FormSection>
+
+      {/* ---- Maker-checker: AMT Associate submits, AMT Lead approves ---- */}
+      {codes.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+            padding: '12px 16px',
+            marginTop: 8,
+            background: '#fafafa',
+            border: '1px solid #f0f0f0',
+            borderRadius: 8,
+          }}
+        >
+          <Space size="middle" wrap>
+            <Typography.Text type="secondary">
+              {user.name} · {isAmtLead ? 'AMT Lead' : 'AMT Associate'}
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              {selectedKeys.length ? `${selectedKeys.length} selected · ` : ''}
+              {approvedCount}/{codes.length} approved
+            </Typography.Text>
+          </Space>
+          <Space wrap>
+            {isAmtLead ? (
+              <>
+                {selInReview > 0 && (
+                  <Button danger onClick={() => setReturning(true)}>
+                    Return ({selInReview})
+                  </Button>
+                )}
+                <Tooltip title={selInReview ? '' : 'Select plan codes awaiting your approval.'}>
+                  <Button
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    disabled={!selInReview}
+                    onClick={() => {
+                      const n = setStatusForSelected('approved', ['for-approval'])
+                      message.success(`Approved ${n} plan code(s).`)
+                    }}
+                  >
+                    Approve selected{selInReview ? ` (${selInReview})` : ''}
+                  </Button>
+                </Tooltip>
+              </>
+            ) : (
+              <Tooltip title={selSubmittable ? '' : 'Select draft or returned plan codes to send.'}>
+                <Button
+                  type="primary"
+                  disabled={!selSubmittable}
+                  onClick={() => {
+                    const n = setStatusForSelected('for-approval', ['draft', 'returned'])
+                    message.success(`Submitted ${n} plan code(s) to the AMT Lead for approval.`)
+                  }}
+                >
+                  Submit to AMT Lead{selSubmittable ? ` (${selSubmittable})` : ''}
+                </Button>
+              </Tooltip>
+            )}
+          </Space>
+        </div>
+      )}
+
+      <Modal
+        open={returning}
+        title="Return plan codes for correction"
+        okText="Return for correction"
+        okButtonProps={{ danger: true, disabled: !returnReason.trim() }}
+        onCancel={() => setReturning(false)}
+        onOk={() => {
+          const n = setStatusForSelected('returned', ['for-approval'], returnReason.trim() || 'Returned for correction')
+          setReturning(false)
+          setReturnReason('')
+          message.warning(`Returned ${n} plan code(s) to the AMT Associate for correction.`)
+        }}
+      >
+        <Input.TextArea
+          rows={3}
+          placeholder="Reason for return"
+          value={returnReason}
+          onChange={(e) => setReturnReason(e.target.value)}
+        />
+      </Modal>
 
       {/* ---- Full manual capture form ---- */}
       <Modal
