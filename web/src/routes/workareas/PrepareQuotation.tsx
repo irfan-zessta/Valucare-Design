@@ -101,9 +101,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
   const q = c.quotation
   const [tab, setTab] = useState('requirements')
   const [issuing, setIssuing] = useState(false)
-  const [clarifyAsk, setClarifyAsk] = useState(false)
-  const [clarifyText, setClarifyText] = useState('')
-  const [answerText, setAnswerText] = useState('')
   const [viewDoc, setViewDoc] = useState<string | null>(null)
   const [viewSheetId, setViewSheetId] = useState<string | null>(null)
   // Return a rate sheet version to Actuarial for a new version (with a comment).
@@ -129,8 +126,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
     !!requirements.find((r) => r.key === 'masterlist')?.fileName ||
     !!c.franchise.documents?.find((d) => d.slot === 'masterlist')
   const rr = q.rateRequest ?? {}
-  const clarifications = q.clarifications ?? []
-  const openClarification = clarifications.find((x) => !x.answer)
 
   // Rate-request form state (local until submitted).
   const [form, setForm] = useState({
@@ -339,38 +334,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
     // The AAT handler now waits on Actuarial — move them to the Clarifications &
     // rate sheets tab, where they hold until a rate sheet is received.
     setTab('sheets')
-  }
-
-  // Admin plays Actuarial: raise a clarification.
-  function askClarification() {
-    patchQ((prev) => ({
-      ...prev,
-      quotation: {
-        ...prev.quotation,
-        status: 'clarification',
-        clarifications: [
-          ...(prev.quotation.clarifications ?? []),
-          { question: clarifyText.trim(), askedAt: new Date().toISOString() },
-        ],
-      },
-    }))
-    setClarifyAsk(false)
-    setClarifyText('')
-    message.info('Clarification raised by Actuarial (simulated).')
-  }
-  function answerClarification() {
-    patchQ((prev) => ({
-      ...prev,
-      quotation: {
-        ...prev.quotation,
-        status: 'submitted',
-        clarifications: (prev.quotation.clarifications ?? []).map((x) =>
-          !x.answer ? { ...x, answer: answerText.trim(), answeredAt: new Date().toISOString() } : x,
-        ),
-      },
-    }))
-    setAnswerText('')
-    message.success('Answer sent; the request is back with Actuarial.')
   }
 
   // Admin plays Actuarial: issue a rate sheet.
@@ -754,54 +717,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
 
   const sheetsTab = (
     <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-      {(clarifications.length > 0 || (awaitingClarification && openClarification)) && (
-      <section>
-        <Typography.Title level={5} style={{ marginTop: 0 }}>Clarifications</Typography.Title>
-        {clarifications.length > 0 && (
-          <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
-            {clarifications.map((cl, i) => (
-              <Alert
-                key={i}
-                type={cl.answer ? 'success' : 'warning'}
-                title={
-                  <strong>
-                    {cl.raisedBy === 'Sales' ? 'Sales returned a rate concern: ' : 'Actuarial asked: '}
-                    {cl.question}
-                  </strong>
-                }
-                description={
-                  cl.answer
-                    ? `Answered: ${cl.answer}`
-                    : cl.raisedBy === 'Sales'
-                      ? 'Actuarial to review and re-issue the rate sheet.'
-                      : 'Awaiting the AAT handler’s answer.'
-                }
-              />
-            ))}
-          </Space>
-        )}
-        {awaitingClarification && openClarification && (
-          <div style={{ marginTop: 12 }}>
-            <Input.TextArea
-              rows={2}
-              placeholder="Answer Actuarial’s question"
-              value={answerText}
-              onChange={(e) => setAnswerText(e.target.value)}
-            />
-            <Button
-              type="primary"
-              size="small"
-              style={{ marginTop: 8 }}
-              disabled={!answerText.trim()}
-              onClick={answerClarification}
-            >
-              Send answer
-            </Button>
-          </div>
-        )}
-      </section>
-      )}
-
       <section>
         <Typography.Title level={5}>Rate sheet versions ({sheets.length})</Typography.Title>
         {sheets.length === 0 ? (
@@ -995,26 +910,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
           Prototype: Actuarial computes rates outside HMS and imports a structured rate sheet. This issues
           a sample rate sheet (v{(q.rateSheets?.length ?? 0) + 1}) and notifies the AAT handler (simulated email).
         </Typography.Paragraph>
-      </Modal>
-
-      {/* ---- Ask clarification dialog --------------------------------------- */}
-      <Modal
-        open={clarifyAsk}
-        title="Return for information (Actuarial)"
-        okText="Raise clarification"
-        okButtonProps={{ disabled: !clarifyText.trim() }}
-        onOk={askClarification}
-        onCancel={() => setClarifyAsk(false)}
-      >
-        <Typography.Paragraph type="secondary">
-          Prototype: Actuarial asks the AAT handler for missing information. The request returns here for an answer.
-        </Typography.Paragraph>
-        <Input.TextArea
-          rows={3}
-          value={clarifyText}
-          onChange={(e) => setClarifyText(e.target.value)}
-          placeholder="e.g. Please confirm the dependent age cap."
-        />
       </Modal>
 
       {/* ---- Return rate sheet to Actuarial (ask for a new version) --------- */}
