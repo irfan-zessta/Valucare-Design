@@ -1405,15 +1405,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
             Cancel
           </Button>,
           <Button
-            key="return"
-            danger
-            type={review?.intent === 'return' ? 'primary' : 'default'}
-            disabled={!reviewRemarks.trim()}
-            onClick={() => decide('return')}
-          >
-            Return to AAT handler
-          </Button>,
-          <Button
             key="approve"
             type={review?.intent === 'return' ? 'default' : 'primary'}
             onClick={() => decide('approve')}
