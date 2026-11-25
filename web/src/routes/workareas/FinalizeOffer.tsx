@@ -364,6 +364,17 @@ export function FinalizeOffer({ c }: { c: Case }) {
       rateSheetCheckedAt: p.rateSheetCheckedAt ?? new Date().toISOString(),
     }))
 
+    // Seed the client's TOR benefits so the comparison has a baseline to read
+    // against — otherwise "Compare proposed benefits" stays on the "TOR attached
+    // but not yet captured" state. Only when none were captured in Prepare
+    // Quotation yet, so re-clicking doesn't overwrite real data.
+    if (!(c.quotation.torLines ?? []).some((t) => t.benefit?.trim())) {
+      patchCase(c.id, (prev) => ({
+        ...prev,
+        quotation: { ...prev.quotation, torLines: SAMPLE_TOR.map((t) => ({ ...t })) },
+      }))
+    }
+
     // Seed a representative SOB so the SOB-vs-TOR comparison shows a real mix
     // (unchanged / changed / added / not-in-SOB), not an all-empty diff. Only
     // when the builder has no benefit lines yet, so re-clicking doesn't duplicate.
