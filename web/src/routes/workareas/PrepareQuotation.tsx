@@ -590,6 +590,27 @@ export function PrepareQuotation({ c }: { c: Case }) {
   const fmtAge = (n: number) => (Number.isFinite(n) ? n.toFixed(3) : '—')
   const memberTab = (
     <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+      <Space wrap style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <Button size="small" onClick={validateMemberData}>
+          {c.memberData.importProcessed ? 'Re-validate sample data' : 'Validate sample Member Data'}
+        </Button>
+        <Upload
+          showUploadList={false}
+          beforeUpload={(file) => {
+            reuploadMasterlist(file.name)
+            return false
+          }}
+        >
+          <Button size="small" icon={<CloudUploadOutlined />}>
+            {masterlistAttached ? 'Re-upload master list' : 'Upload master list'}
+          </Button>
+        </Upload>
+        {(c.memberData.importProcessed || masterlistAttached) && (
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={removeMemberData}>
+            Remove
+          </Button>
+        )}
+      </Space>
       {(c.memberData.importProcessed || masterlistAttached) && (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -837,29 +858,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
           )}
         </div>
         <div className="app-form-floatbar__actions">
-          {tab === 'members' && (
-            <>
-              <Button size="small" onClick={validateMemberData}>
-                {c.memberData.importProcessed ? 'Re-validate sample data' : 'Validate sample Member Data'}
-              </Button>
-              <Upload
-                showUploadList={false}
-                beforeUpload={(file) => {
-                  reuploadMasterlist(file.name)
-                  return false
-                }}
-              >
-                <Button size="small" icon={<CloudUploadOutlined />}>
-                  {masterlistAttached ? 'Re-upload master list' : 'Upload master list'}
-                </Button>
-              </Upload>
-              {(c.memberData.importProcessed || masterlistAttached) && (
-                <Button size="small" danger icon={<DeleteOutlined />} onClick={removeMemberData}>
-                  Remove
-                </Button>
-              )}
-            </>
-          )}
           {assembling && tab === 'rates' && (
             <Tooltip title={canSubmit ? '' : `Complete ${submitBlockers.join(', ')} to submit.`}>
               <Button type="primary" icon={<SendOutlined />} disabled={!canSubmit} onClick={submitRateRequest}>
