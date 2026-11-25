@@ -20,7 +20,6 @@ import {
   Card,
   Collapse,
   Empty,
-  Segmented,
   Space,
   Statistic,
   Table,
@@ -74,17 +73,6 @@ const STATUS_ICON: Record<CompareStatus, ReactNode> = {
   unchanged: <MinusOutlined />,
 }
 
-type FilterKey = 'all' | 'needs-review' | 'enhancements' | 'unchanged'
-
-// Three honest buckets over the seven comparison states. "Needs review" is every
-// state flagged for attention (reduced / missing / mixed / review) so no concern
-// is hidden; enhancements are improvements + additions; the rest are unchanged.
-function groupOf(s: CompareStatus): Exclude<FilterKey, 'all'> {
-  if (STATUS_META[s].attention) return 'needs-review'
-  if (s === 'unchanged') return 'unchanged'
-  return 'enhancements'
-}
-
 const fmtPeso = (n: number) => `Php ${n.toLocaleString()}`
 
 function statusTag(s: CompareStatus) {
@@ -108,35 +96,25 @@ export function ProposalReviewWorkspace({
   sobVersion: number
   onPrintPdf: () => void
 }) {
-  const [filter, setFilter] = useState<FilterKey>('all')
-
   const { rows } = useMemo(
     () => buildComparison(c.quotation.torLines, sob),
     [c.quotation.torLines, sob],
   )
 
-  const counts = useMemo(() => {
-    const acc = { 'needs-review': 0, enhancements: 0, unchanged: 0 }
-    rows.forEach((r) => {
-      acc[groupOf(r.status)] += 1
-    })
-    return acc
-  }, [rows])
-
   // Concerns float to the top; everything else keeps its document order (stable).
-  const visibleRows = useMemo(() => {
-    const subset = filter === 'all' ? rows : rows.filter((r) => groupOf(r.status) === filter)
-    return subset
-      .map((r, i) => ({ r, i }))
-      .sort(
-        (a, b) =>
-          Number(STATUS_META[b.r.status].attention) - Number(STATUS_META[a.r.status].attention) ||
-          a.i - b.i,
-      )
-      .map((x) => x.r)
-  }, [rows, filter])
+  const sortedRows = useMemo(
+    () =>
+      rows
+        .map((r, i) => ({ r, i }))
+        .sort(
+          (a, b) =>
+            Number(STATUS_META[b.r.status].attention) - Number(STATUS_META[a.r.status].attention) ||
+            a.i - b.i,
+        )
+        .map((x) => x.r),
+    [rows],
+  )
 
-  const inter = c.company.businessSource !== 'Direct'
   const statusMeta = PROPOSAL_STATUS[proposal.status]
 
   // ---- Table cells ---------------------------------------------------------
@@ -430,59 +408,9 @@ export function ProposalReviewWorkspace({
             styles={{ body: { padding: 20 } }}
           >
             <Typography.Paragraph type="secondary" style={{ marginTop: -4 }}>
-              Client requirements (TOR) vs. the proposed Summary of Benefits (SOB).
+              Client requirements (TOR) vs. the proposed Summary of Benefits (SOB). Benefits needing review are
+              listed first.
             </Typography.Paragraph>
-
-            {/* Overview tiles — each is a filter shortcut. */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-              {([
-                ['needs-review', 'Needs review', 'Missing & reduced benefits', STATUS_META.missing.hex, counts['needs-review']],
-                ['enhancements', 'Enhancements', 'Improved & added benefits', STATUS_META.improved.hex, counts.enhancements],
-                ['unchanged', 'Unchanged', 'Matching the client requirement', STATUS_META.unchanged.hex, counts.unchanged],
-              ] as const).map(([key, label, desc, hex, count]) => {
-                const active = filter === key
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setFilter(active ? 'all' : key)}
-                    style={{
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      background: '#fff',
-                      border: `1px solid ${active ? hex : BORDER}`,
-                      boxShadow: active ? `inset 0 0 0 1px ${hex}` : 'none',
-                      borderRadius: 8,
-                      padding: '12px 16px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 2, background: hex, flex: 'none' }} />
-                      <span style={{ fontSize: 24, fontWeight: 600, color: TEXT }}>{count}</span>
-                    </div>
-                    <div style={{ fontWeight: 500, color: TEXT, marginTop: 4 }}>{label}</div>
-                    <div style={{ fontSize: 12, color: TEXT_2 }}>{desc}</div>
-                  </button>
-                )
-              })}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-              <Segmented
-                value={filter}
-                onChange={(v) => setFilter(v as FilterKey)}
-                options={[
-                  { value: 'all', label: `All (${rows.length})` },
-                  { value: 'needs-review', label: `Needs review (${counts['needs-review']})` },
-                  { value: 'enhancements', label: `Enhancements (${counts.enhancements})` },
-                  { value: 'unchanged', label: `Unchanged (${counts.unchanged})` },
-                ]}
-              />
-              <Typography.Text type="secondary" style={{ fontSize: 13 }} aria-live="polite">
-                Showing {visibleRows.length} of {rows.length} benefits
-              </Typography.Text>
-            </div>
 
             {rows.length === 0 ? (
               <Empty
@@ -492,7 +420,7 @@ export function ProposalReviewWorkspace({
             ) : (
               <Table<CompareRow>
                 rowKey="key"
-                dataSource={visibleRows}
+                dataSource={sortedRows}
                 columns={columns}
                 pagination={false}
                 size="middle"
