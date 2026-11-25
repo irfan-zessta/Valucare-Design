@@ -223,6 +223,9 @@ export function FinalizeOffer({ c }: { c: Case }) {
   const [returning, setReturning] = useState(false)
   const [returnConcern, setReturnConcern] = useState('')
   const [viewRates, setViewRates] = useState(false)
+  // Controlled workarea tab. null until first render resolves the lifecycle
+  // default; sending the proposal jumps it to the negotiation tab.
+  const [activeTab, setActiveTab] = useState<string | null>(null)
   // SOB document preview (formal, client-facing layout) + print.
   const [sobPreview, setSobPreview] = useState(false)
   const previewFrameRef = useRef<HTMLIFrameElement>(null)
@@ -594,6 +597,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
   function sendProposal() {
     patchProposal((p) => ({ ...p, status: 'sent', sentAt: new Date().toISOString(), sentTo: recipient }))
     setSending(false)
+    // Once sent, move the workarea to the negotiation & acceptance tab.
+    setActiveTab('negotiation')
     message.success(`Proposal sent to ${recipient} (simulated email).`)
   }
 
@@ -906,7 +911,8 @@ export function FinalizeOffer({ c }: { c: Case }) {
           />
         ) : (
         <Tabs
-          defaultActiveKey={defaultTab}
+          activeKey={activeTab ?? defaultTab}
+          onChange={setActiveTab}
           size="small"
           items={[
             {
