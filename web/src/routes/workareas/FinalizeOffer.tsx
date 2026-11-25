@@ -437,10 +437,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
     message.success('Sample data filled in.')
   }
 
-  // Build a printable proposal document and open the browser print dialog
-  // (Save as PDF) via a hidden iframe — no external PDF library needed.
-  function generateProposalPdf() {
-    if (!proposal) return
+  // Build the proposal as a self-contained HTML document — used both for the
+  // internal reviewer's read-only document view and for Print / Save as PDF.
+  function buildProposalDocHtml(): string {
+    if (!proposal) return ''
     const esc = (s: unknown) =>
       String(s ?? '').replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch] as string)
     const code = proposal.code ?? proposalCode(c)
@@ -473,7 +473,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
         : (sob?.lines ?? [])
             .map((l) => `<tr><td>${esc(l.benefit)}</td><td>${esc(l.mark ?? '')}</td><td>${esc(l.limit)}</td></tr>`)
             .join('')
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(code)}</title>
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(code)}</title>
       <style>
         body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a;margin:40px;}
         h1{font-size:20px;margin:0 0 4px;} h2{font-size:14px;margin:24px 0 8px;border-bottom:1px solid #ddd;padding-bottom:4px;}
@@ -498,6 +498,12 @@ export function FinalizeOffer({ c }: { c: Case }) {
       <h2>Compare proposed benefits</h2>
       ${cmpRows ? `<table><thead><tr><th>Benefit</th><th>Client TOR</th><th>Created SOB</th><th>Difference / impact</th></tr></thead><tbody>${cmpRows}</tbody></table>` : '<div class="field">No TOR captured for this case.</div>'}
       </body></html>`
+  }
+
+  // Print / Save as PDF via a hidden iframe — no external PDF library needed.
+  function generateProposalPdf() {
+    const html = buildProposalDocHtml()
+    if (!html) return
     const iframe = document.createElement('iframe')
     iframe.style.position = 'fixed'
     iframe.style.right = '0'
@@ -515,6 +521,14 @@ export function FinalizeOffer({ c }: { c: Case }) {
     iframe.contentWindow?.print()
     window.setTimeout(() => document.body.removeChild(iframe), 1000)
   }
+
+  // Reviewers (checkers) read the proposal as a document, not an editable form —
+  // built only for them so makers keep the normal preparation cards.
+  const proposalDocHtml = useMemo(
+    () => (isProposalMaker ? '' : buildProposalDocHtml()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isProposalMaker, proposal, sob, c],
+  )
 
   // Flatten the SOB (rich sections + nested lines, or simple lines) to a list
   // of { benefit name, detail } for the TOR comparison.
@@ -891,7 +905,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
             {
               key: 'prep',
               label: 'Proposal preparation',
-              children: (
+              children: isProposalMaker ? (
                 <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
 
         {/* ---- Activity 1 · Rate sheet checking ----------------------------- */}
@@ -1050,6 +1064,48 @@ export function FinalizeOffer({ c }: { c: Case }) {
         </Card>
 
                 </Space>
+              ) : (
+                // ---- Internal reviewer view: read-only proposal document ----
+                <Card
+                  title={
+                    <Space>
+                      <FileTextOutlined />
+                      <span>Proposal document</span>
+                      <Tag>v{proposal.version}</Tag>
+                      <Tag
+                        color={
+                          proposal.status === 'accepted'
+                            ? 'green'
+                            : proposal.status === 'in-review'
+                              ? 'blue'
+                              : 'default'
+                        }
+                      >
+                        {proposal.status}
+                      </Tag>
+                    </Space>
+                  }
+                  extra={
+                    <Button size="small" icon={<DownloadOutlined />} onClick={generateProposalPdf}>
+                      Print / Save as PDF
+                    </Button>
+                  }
+                  styles={{ body: { padding: 0 } }}
+                >
+                  {proposalDocHtml ? (
+                    <iframe
+                      title="Proposal document"
+                      srcDoc={proposalDocHtml}
+                      style={{ width: '100%', height: '75vh', border: 0, background: '#f0f0f0' }}
+                    />
+                  ) : (
+                    <div style={{ padding: 24 }}>
+                      <Typography.Text type="secondary">
+                        The proposal document isn't ready to preview yet.
+                      </Typography.Text>
+                    </div>
+                  )}
+                </Card>
               ),
             },
             {
