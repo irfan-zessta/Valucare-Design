@@ -692,9 +692,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
                 onChange={(e) => setForm({ ...form, specialRequirements: e.target.value })}
               />
             </div>
-            <Checkbox checked={form.jumbo} onChange={(e) => setForm({ ...form, jumbo: e.target.checked })}>
-              Jumbo account
-            </Checkbox>
           </div>
         ) : (
           <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
@@ -704,7 +701,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
             <Descriptions.Item label="Dependent coverage">{rr.dependentCoverage || '—'}</Descriptions.Item>
             <Descriptions.Item label="Target rates">{rr.targetRates || '—'}</Descriptions.Item>
             <Descriptions.Item label="Payment modes">{(rr.paymentModes ?? []).join(', ') || '—'}</Descriptions.Item>
-            <Descriptions.Item label="Jumbo">{rr.jumbo ? 'Yes' : 'No'}</Descriptions.Item>
             <Descriptions.Item label="Submitted">
               {rr.submittedAt ? dayjs(rr.submittedAt).format('YYYY-MM-DD HH:mm') : '—'}
             </Descriptions.Item>
