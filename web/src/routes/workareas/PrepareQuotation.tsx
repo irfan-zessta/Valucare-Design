@@ -66,18 +66,26 @@ const SAMPLE_TOR: TorLine[] = [
 ]
 
 // Sample member roster for initial data gathering — the raw list captured from
-// the master list. Prototype: a representative sample of the full membership.
-const SAMPLE_MEMBERS: { companyId: string; dob: string; gender: 'Male' | 'Female' }[] = [
-  { companyId: 'EMP-0001', dob: '1986-03-14', gender: 'Female' },
-  { companyId: 'EMP-0002', dob: '1979-11-02', gender: 'Male' },
-  { companyId: 'EMP-0003', dob: '1992-07-21', gender: 'Female' },
-  { companyId: 'EMP-0004', dob: '1984-01-09', gender: 'Male' },
-  { companyId: 'EMP-0005', dob: '1998-05-30', gender: 'Female' },
-  { companyId: 'EMP-0006', dob: '1975-09-17', gender: 'Male' },
-  { companyId: 'EMP-0007', dob: '1990-12-05', gender: 'Female' },
-  { companyId: 'EMP-0008', dob: '1988-08-23', gender: 'Male' },
-  { companyId: 'EMP-0009', dob: '1995-02-11', gender: 'Female' },
-  { companyId: 'EMP-0010', dob: '1982-06-28', gender: 'Male' },
+// the master list. Prototype: a representative sample of the full membership,
+// split into principals (employees) and their dependents (spouses/children).
+type SampleMember = { companyId: string; dob: string; gender: 'Male' | 'Female'; relation: 'Principal' | 'Dependent' }
+const SAMPLE_MEMBERS: SampleMember[] = [
+  { companyId: 'EMP-0001', dob: '1986-03-14', gender: 'Female', relation: 'Principal' },
+  { companyId: 'EMP-0002', dob: '1979-11-02', gender: 'Male', relation: 'Principal' },
+  { companyId: 'EMP-0003', dob: '1992-07-21', gender: 'Female', relation: 'Principal' },
+  { companyId: 'EMP-0004', dob: '1984-01-09', gender: 'Male', relation: 'Principal' },
+  { companyId: 'EMP-0005', dob: '1998-05-30', gender: 'Female', relation: 'Principal' },
+  { companyId: 'EMP-0006', dob: '1975-09-17', gender: 'Male', relation: 'Principal' },
+  { companyId: 'EMP-0007', dob: '1990-12-05', gender: 'Female', relation: 'Principal' },
+  { companyId: 'EMP-0008', dob: '1988-08-23', gender: 'Male', relation: 'Principal' },
+  { companyId: 'EMP-0009', dob: '1995-02-11', gender: 'Female', relation: 'Principal' },
+  { companyId: 'EMP-0010', dob: '1982-06-28', gender: 'Male', relation: 'Principal' },
+  { companyId: 'DEP-0001', dob: '1990-04-10', gender: 'Female', relation: 'Dependent' },
+  { companyId: 'DEP-0002', dob: '2012-09-01', gender: 'Male', relation: 'Dependent' },
+  { companyId: 'DEP-0003', dob: '2015-03-22', gender: 'Female', relation: 'Dependent' },
+  { companyId: 'DEP-0004', dob: '2018-11-30', gender: 'Male', relation: 'Dependent' },
+  { companyId: 'DEP-0005', dob: '1988-07-19', gender: 'Male', relation: 'Dependent' },
+  { companyId: 'DEP-0006', dob: '2020-01-05', gender: 'Female', relation: 'Dependent' },
 ]
 
 
@@ -251,6 +259,26 @@ export function PrepareQuotation({ c }: { c: Case }) {
     const total = (c.franchise.estimatedPrincipals || 0) + (c.franchise.estimatedDependents || 0) || 440
     const rejected = Math.max(0, Math.round(total * 0.01))
     return { total, accepted: total - rejected, rejected }
+  })()
+  // Member Data summary stats (mirrors the Actuarial desk's five-stat row).
+  // Principal/dependent head counts come from the franchise estimates (the full
+  // membership); the average ages are the arithmetic mean of the representative
+  // sample roster, split by relation, to three decimals.
+  const memberStats = (() => {
+    const principals = c.franchise.estimatedPrincipals || Math.round(memberPreview.total * 0.6)
+    const dependents = c.franchise.estimatedDependents || memberPreview.total - principals
+    const meanAge = (rel: 'Principal' | 'Dependent') => {
+      const rows = SAMPLE_MEMBERS.filter((m) => m.relation === rel)
+      if (!rows.length) return NaN
+      return rows.reduce((sum, m) => sum + dayjs().diff(m.dob, 'year', true), 0) / rows.length
+    }
+    return {
+      principals,
+      dependents,
+      total: principals + dependents,
+      avgPrincipalAge: meanAge('Principal'),
+      avgDependentAge: meanAge('Dependent'),
+    }
   })()
   // Remove the member data and detach the master list everywhere, so the
   // Member Data requirement goes back to outstanding (symmetric with upload).
@@ -559,27 +587,65 @@ export function PrepareQuotation({ c }: { c: Case }) {
     </Space>
   )
 
+  const fmtAge = (n: number) => (Number.isFinite(n) ? n.toFixed(3) : '—')
   const memberTab = (
     <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
       {(c.memberData.importProcessed || masterlistAttached) && (
-        <div>
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Source: Sales endorsement · member master list · v1
+            </Typography.Text>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(5, 1fr)',
+              gap: 12,
+            }}
+          >
+            {[
+              { value: formatCount(memberStats.principals), label: 'Principals' },
+              { value: formatCount(memberStats.dependents), label: 'Dependents' },
+              { value: formatCount(memberStats.total), label: 'Total members' },
+              { value: fmtAge(memberStats.avgPrincipalAge), label: 'Avg principal age' },
+              { value: fmtAge(memberStats.avgDependentAge), label: 'Avg dependent age' },
+            ].map((s) => (
+              <div
+                key={s.label}
+                style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '10px 14px' }}
+              >
+                <div style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.2 }}>{s.value}</div>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {s.label}
+                </Typography.Text>
+              </div>
+            ))}
+          </div>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Member list · initial gathering (sample of {formatCount(memberPreview.total)})
+            Average principal and dependent ages are each the arithmetic mean of valid ages (to three
+            decimals), computed separately.
           </Typography.Text>
-          <Table
-            style={{ marginTop: 6 }}
-            rowKey="companyId"
-            size="small"
-            pagination={false}
-            dataSource={SAMPLE_MEMBERS}
-            columns={[
-              { title: 'Company ID', dataIndex: 'companyId' },
-              { title: 'Date of Birth', dataIndex: 'dob', render: (v: string) => dayjs(v).format('MM-DD-YYYY') },
-              { title: 'Age', dataIndex: 'dob', key: 'age', align: 'right', render: (v: string) => dayjs().diff(v, 'year') },
-              { title: 'Gender', dataIndex: 'gender' },
-            ]}
-          />
-        </div>
+          <div>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Member list · initial gathering (sample of {formatCount(memberPreview.total)})
+            </Typography.Text>
+            <Table
+              style={{ marginTop: 6 }}
+              rowKey="companyId"
+              size="small"
+              pagination={false}
+              dataSource={SAMPLE_MEMBERS}
+              columns={[
+                { title: 'Company ID', dataIndex: 'companyId' },
+                { title: 'Relation', dataIndex: 'relation' },
+                { title: 'Date of Birth', dataIndex: 'dob', render: (v: string) => dayjs(v).format('MM-DD-YYYY') },
+                { title: 'Age', dataIndex: 'dob', key: 'age', align: 'right', render: (v: string) => dayjs().diff(v, 'year') },
+                { title: 'Gender', dataIndex: 'gender' },
+              ]}
+            />
+          </div>
+        </>
       )}
     </Space>
   )
