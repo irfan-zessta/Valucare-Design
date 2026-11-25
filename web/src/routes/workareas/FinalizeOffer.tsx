@@ -207,7 +207,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
   }, [proposal?.id, proposal?.version, proposal?.status])
 
   // Dialog state.
-  const [review, setReview] = useState<null | { stage: 'first' | 'second' }>(null)
+  const [review, setReview] = useState<null | { stage: 'first' | 'second'; intent: 'approve' | 'return' }>(null)
   const [reviewRemarks, setReviewRemarks] = useState('')
   const [sending, setSending] = useState(false)
   const [accepting, setAccepting] = useState(false)
@@ -1344,12 +1344,21 @@ export function FinalizeOffer({ c }: { c: Case }) {
             </>
           )}
           {proposal.status === 'in-review' && !fullyApproved && (
-            <Button
-              type="primary"
-              onClick={() => setReview({ stage: firstApproved ? 'second' : 'first' })}
-            >
-              {firstApproved ? 'Second-level pricing approval' : 'First-level pricing review'}
-            </Button>
+            <>
+              <Button
+                danger
+                icon={<RollbackOutlined />}
+                onClick={() => setReview({ stage: firstApproved ? 'second' : 'first', intent: 'return' })}
+              >
+                Return to AAT handler
+              </Button>
+              <Button
+                type="primary"
+                onClick={() => setReview({ stage: firstApproved ? 'second' : 'first', intent: 'approve' })}
+              >
+                {firstApproved ? 'Second-level pricing approval' : 'First-level pricing review'}
+              </Button>
+            </>
           )}
           {proposal.status === 'in-review' && fullyApproved && (
             <Button type="primary" icon={<SendOutlined />} onClick={() => setSending(true)}>
@@ -1380,7 +1389,13 @@ export function FinalizeOffer({ c }: { c: Case }) {
       {/* ---- Pricing decision dialog --------------------------------------- */}
       <Modal
         open={review !== null}
-        title={review?.stage === 'first' ? 'First-level pricing review' : 'Second-level pricing approval'}
+        title={
+          review?.intent === 'return'
+            ? 'Return to AAT handler'
+            : review?.stage === 'first'
+              ? 'First-level pricing review'
+              : 'Second-level pricing approval'
+        }
         onCancel={() => {
           setReview(null)
           setReviewRemarks('')
@@ -1392,12 +1407,17 @@ export function FinalizeOffer({ c }: { c: Case }) {
           <Button
             key="return"
             danger
+            type={review?.intent === 'return' ? 'primary' : 'default'}
             disabled={!reviewRemarks.trim()}
             onClick={() => decide('return')}
           >
             Return to AAT handler
           </Button>,
-          <Button key="approve" type="primary" onClick={() => decide('approve')}>
+          <Button
+            key="approve"
+            type={review?.intent === 'return' ? 'default' : 'primary'}
+            onClick={() => decide('approve')}
+          >
             Approve
           </Button>,
         ]}
