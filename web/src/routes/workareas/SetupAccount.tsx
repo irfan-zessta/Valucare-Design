@@ -48,6 +48,8 @@ import type {
   SetupTaskId,
 } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
+import { useActiveUser } from '../../state/ActiveUserProvider'
+import { ROLES } from '../../domain/access'
 import { RemarksField } from '../../components/comments/RemarksField'
 import { useRemarkComment } from '../../components/comments/useRemarkComment'
 import { SETUP_TASK_ORDER, makeInitialSetup, setupTaskMeta } from '../../domain/setup'
@@ -109,6 +111,10 @@ export function SetupAccount({ c }: { c: Case }) {
   const { message, modal } = App.useApp()
   const navigate = useNavigate()
   const postRemark = useRemarkComment()
+  const { role } = useActiveUser()
+  // AAT (Sales teams) own internal alignment and hand over to AMT; AMT (Account
+  // Services) owns the Contract & KYC and Onboarding work that follows.
+  const isAAT = ROLES[role].department === 'Sales'
 
   // Comment-to-departments composer (Billing & Collections + MDA) on the
   // internal alignment step.
@@ -143,9 +149,16 @@ export function SetupAccount({ c }: { c: Case }) {
   // Fall back if a persisted active task was removed from the flow (e.g. the old
   // Legal-review step), so we never try to render a panel that no longer exists.
   const rawActive = setup.activeTask ?? 'internal-alignment'
-  const activeId: SetupTaskId = SETUP_TASK_ORDER.includes(rawActive)
-    ? rawActive
-    : SETUP_TASK_ORDER.find((t) => !setup.completedTasks.includes(t)) ?? 'internal-alignment'
+  // Tasks this role is allowed to work on: AAT only internal alignment, AMT the
+  // rest. The active task is clamped into this set so each role lands on (and
+  // renders) a panel that belongs to them — never the other team's screen.
+  const roleTasks = SETUP_TASK_ORDER.filter((t) =>
+    isAAT ? t === 'internal-alignment' : t !== 'internal-alignment',
+  )
+  const activeId: SetupTaskId =
+    SETUP_TASK_ORDER.includes(rawActive) && roleTasks.includes(rawActive)
+      ? rawActive
+      : roleTasks.find((t) => !setup.completedTasks.includes(t)) ?? roleTasks[0]
 
   function openTask(id: SetupTaskId) {
     patchSetup((s) => ({ ...s, activeTask: id }))
@@ -189,9 +202,11 @@ export function SetupAccount({ c }: { c: Case }) {
 
   // ---- Tabs (grouped tasks) + per-tab sub-navigation ------------------------
   // The AAT user's responsibility ends at internal alignment — once they hand
-  // over to AMT, AMT owns Contract & KYC and Onboarding. So AAT only ever sees
-  // the Internal alignment tab.
-  const visibleGroups = TAB_GROUPS.filter((g) => g.key === 'alignment')
+  // over to AMT, AMT owns Contract & KYC and Onboarding. So AAT only sees the
+  // Internal alignment tab, while AMT picks up the Contract & Onboarding tabs.
+  const visibleGroups = TAB_GROUPS.filter((g) =>
+    isAAT ? g.key === 'alignment' : g.key !== 'alignment',
+  )
   const activeGroup = visibleGroups.find((g) => g.tasks.includes(activeId)) ?? visibleGroups[0]
   const groupReachable = (g: SetupTabGroup) => SETUP_TASK_ORDER.indexOf(g.tasks[0]) <= maxReachable
 
