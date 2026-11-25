@@ -106,7 +106,7 @@ const TAB_GROUPS: SetupTabGroup[] = [
 
 export function SetupAccount({ c }: { c: Case }) {
   const { patchCase } = useCases()
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const navigate = useNavigate()
   const postRemark = useRemarkComment()
 
@@ -188,7 +188,11 @@ export function SetupAccount({ c }: { c: Case }) {
   }
 
   // ---- Tabs (grouped tasks) + per-tab sub-navigation ------------------------
-  const activeGroup = TAB_GROUPS.find((g) => g.tasks.includes(activeId)) ?? TAB_GROUPS[0]
+  // The AAT user's responsibility ends at internal alignment — once they hand
+  // over to AMT, AMT owns Contract & KYC and Onboarding. So AAT only ever sees
+  // the Internal alignment tab.
+  const visibleGroups = TAB_GROUPS.filter((g) => g.key === 'alignment')
+  const activeGroup = visibleGroups.find((g) => g.tasks.includes(activeId)) ?? visibleGroups[0]
   const groupReachable = (g: SetupTabGroup) => SETUP_TASK_ORDER.indexOf(g.tasks[0]) <= maxReachable
 
   function openGroup(g: SetupTabGroup) {
@@ -205,7 +209,7 @@ export function SetupAccount({ c }: { c: Case }) {
         const g = TAB_GROUPS.find((x) => x.key === k)
         if (g) openGroup(g)
       }}
-      items={TAB_GROUPS.map((g) => ({
+      items={visibleGroups.map((g) => ({
         key: g.key,
         label: g.label,
         disabled: !groupReachable(g),
@@ -298,24 +302,26 @@ export function SetupAccount({ c }: { c: Case }) {
         { caseId: c.id, caseName: c.company.name, label: 'Handover to AMT' },
         'Internal alignment complete and documents shared. Handing over to AMT to start the contract and KYC process through to activation and handover.',
       )
-      patchSetup((s) => {
-        const done = s.completedTasks.includes('internal-alignment')
+      // Mark alignment complete but keep the AAT on this tab — the remaining
+      // Contract & KYC / Onboarding work now belongs to AMT.
+      patchSetup((s) => ({
+        ...s,
+        alignment: {
+          ...s.alignment,
+          billing: { ...s.alignment.billing, status: 'completed', updatedAt: new Date().toISOString() },
+          mda: { ...s.alignment.mda, status: 'completed', updatedAt: new Date().toISOString() },
+        },
+        completedTasks: s.completedTasks.includes('internal-alignment')
           ? s.completedTasks
-          : [...s.completedTasks, 'internal-alignment']
-        const next = SETUP_TASK_ORDER[SETUP_TASK_ORDER.indexOf('internal-alignment') + 1]
-        return {
-          ...s,
-          alignment: {
-            ...s.alignment,
-            billing: { ...s.alignment.billing, status: 'completed', updatedAt: new Date().toISOString() },
-            mda: { ...s.alignment.mda, status: 'completed', updatedAt: new Date().toISOString() },
-          },
-          completedTasks: done,
-          activeTask: next ?? s.activeTask,
-          completed: done.length === SETUP_TASK_ORDER.length,
-        }
+          : [...s.completedTasks, 'internal-alignment'],
+        activeTask: 'internal-alignment',
+      }))
+      modal.success({
+        title: 'Handed over to AMT',
+        content:
+          'Internal alignment is complete and the case has been handed over to AMT. AMT will now take over the contract, KYC, and onboarding process through to activation. Your part of the workflow is complete.',
+        okText: 'Done',
       })
-      message.success('Handed over to AMT — contract & KYC process can begin.')
     }
 
     // Post a free-text comment to both the Billing & Collections and MDA teams
@@ -457,18 +463,28 @@ export function SetupAccount({ c }: { c: Case }) {
         </FormSection>
 
         <div className="app-form-floatbar" style={{ marginTop: 16 }}>
-          <Typography.Text type="secondary">
-            {sharedCount > 0
-              ? 'Documents shared — hand over to AMT to start the contract and KYC process.'
-              : 'Share the documents above with Billing & Collections and MDA, then hand over to AMT.'}
-          </Typography.Text>
-          <div className="app-form-floatbar__actions">
-            <Tooltip title={sharedCount > 0 ? '' : 'Share at least one document before handing over to AMT.'}>
-              <Button type="primary" icon={<SendOutlined />} disabled={sharedCount === 0} onClick={handoverToAMT}>
-                Handover to AMT
-              </Button>
-            </Tooltip>
-          </div>
+          {completed('internal-alignment') ? (
+            <Typography.Text type="success">
+              <CheckCircleFilled style={{ marginRight: 6 }} />
+              Handed over to AMT — your part of the workflow is complete. AMT now owns the contract, KYC,
+              and onboarding process.
+            </Typography.Text>
+          ) : (
+            <>
+              <Typography.Text type="secondary">
+                {sharedCount > 0
+                  ? 'Documents shared — hand over to AMT to start the contract and KYC process.'
+                  : 'Share the documents above with Billing & Collections and MDA, then hand over to AMT.'}
+              </Typography.Text>
+              <div className="app-form-floatbar__actions">
+                <Tooltip title={sharedCount > 0 ? '' : 'Share at least one document before handing over to AMT.'}>
+                  <Button type="primary" icon={<SendOutlined />} disabled={sharedCount === 0} onClick={handoverToAMT}>
+                    Handover to AMT
+                  </Button>
+                </Tooltip>
+              </div>
+            </>
+          )}
         </div>
 
         <Modal
