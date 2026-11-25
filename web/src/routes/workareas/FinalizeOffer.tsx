@@ -1077,10 +1077,10 @@ export function FinalizeOffer({ c }: { c: Case }) {
             4,
             'SOB creation',
             <Space>
-              <Button size="small" type="primary" icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>
+              <Button size="small" type="text" icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>
                 Preview document
               </Button>
-              <Button size="small" icon={<DownloadOutlined />} onClick={downloadSobTemplate}>
+              <Button size="small" type="text" icon={<DownloadOutlined />} onClick={downloadSobTemplate}>
                 Download template
               </Button>
               <Upload
@@ -1093,7 +1093,7 @@ export function FinalizeOffer({ c }: { c: Case }) {
                   return false
                 }}
               >
-                <Button size="small" icon={<CloudUploadOutlined />}>
+                <Button size="small" type="text" icon={<CloudUploadOutlined />}>
                   Upload SOB template
                 </Button>
               </Upload>
