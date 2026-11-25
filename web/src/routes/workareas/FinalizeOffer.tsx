@@ -1184,6 +1184,13 @@ export function FinalizeOffer({ c }: { c: Case }) {
                     </Typography.Text>
                   )}
 
+                  {/* Log a negotiation round — top-right of this tab. */}
+                  {(proposal.status === 'sent' || proposal.status === 'feedback') && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button onClick={() => setRoundOpen(true)}>Log negotiation round</Button>
+                    </div>
+                  )}
+
                   {/* ---- Negotiation rounds --------------------------------- */}
                   {['sent', 'feedback', 'accepted'].includes(proposal.status) && (
                     <Card>
@@ -1293,13 +1300,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
                         ]}
                       />
                     </Card>
-                  )}
-
-                  {/* Log a negotiation round — bottom-right of this tab. */}
-                  {(proposal.status === 'sent' || proposal.status === 'feedback') && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                      <Button onClick={() => setRoundOpen(true)}>Log negotiation round</Button>
-                    </div>
                   )}
 
                 </Space>
