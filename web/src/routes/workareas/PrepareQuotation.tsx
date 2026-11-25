@@ -329,7 +329,9 @@ export function PrepareQuotation({ c }: { c: Case }) {
       },
     }))
     message.success('Rate request submitted to Actuarial.')
-    setTab('rates')
+    // The AAT handler now waits on Actuarial — move them to the Clarifications &
+    // rate sheets tab, where they hold until a rate sheet is received.
+    setTab('sheets')
   }
 
   // Admin plays Actuarial: raise a clarification.
@@ -715,6 +717,14 @@ export function PrepareQuotation({ c }: { c: Case }) {
 
   const sheetsTab = (
     <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+      {submitted && sheets.length === 0 && !openClarification && (
+        <Alert
+          type="info"
+          showIcon
+          title="Request sent to Actuarial — waiting for the rate sheet"
+          description="This case is with Actuarial. You can't move it forward until a rate sheet is received. If Actuarial raises a clarification, you'll answer it here."
+        />
+      )}
       <section>
         <Typography.Title level={5} style={{ marginTop: 0 }}>Clarifications</Typography.Title>
         {clarifications.length === 0 ? (
