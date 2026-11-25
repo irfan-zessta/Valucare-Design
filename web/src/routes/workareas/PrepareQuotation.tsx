@@ -38,12 +38,15 @@ import {
   MoreOutlined,
   PaperClipOutlined,
   PlusOutlined,
+  RollbackOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Case, QuotationRequirement, RateSheet, TorLine } from '../../domain/types'
 import { useCases } from '../../state/CaseProvider'
+import { RemarksField } from '../../components/comments/RemarksField'
+import { useRemarkComment } from '../../components/comments/useRemarkComment'
 import { makeRequestRef, uid } from '../../domain/ids'
 import { formatCount } from '../../lib/format'
 import { ProposalRateSchedule, emptyRateSchedule, sampleRateSchedule } from './ProposalRateSchedule'
@@ -93,6 +96,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
   const { patchCase } = useCases()
   const { message } = App.useApp()
   const navigate = useNavigate()
+  const postRemark = useRemarkComment()
 
   const q = c.quotation
   const [tab, setTab] = useState('requirements')
@@ -102,6 +106,9 @@ export function PrepareQuotation({ c }: { c: Case }) {
   const [answerText, setAnswerText] = useState('')
   const [viewDoc, setViewDoc] = useState<string | null>(null)
   const [viewSheetId, setViewSheetId] = useState<string | null>(null)
+  // Return a rate sheet version to Actuarial for a new version (with a comment).
+  const [returnSheet, setReturnSheet] = useState<RateSheet | null>(null)
+  const [returnText, setReturnText] = useState('')
 
   const requirements = q.requirements ?? DEFAULT_REQUIREMENTS
   // A TOR document attached on the requirement — or carried over from the
@@ -408,6 +415,35 @@ export function PrepareQuotation({ c }: { c: Case }) {
     }))
     message.success('Rate sheet version selected.')
   }
+  // Return a rate sheet to Actuarial asking for a new version. Raises a Sales
+  // clarification (so Actuarial re-issues) and posts the message to the case
+  // Comments thread, notifying anyone @mentioned.
+  function returnToActuarial() {
+    if (!returnSheet) return
+    const concern = returnText.trim()
+    if (!concern) return
+    const version = returnSheet.version
+    patchQ((prev) => ({
+      ...prev,
+      quotation: {
+        ...prev.quotation,
+        status: 'clarification',
+        clarifications: [
+          ...(prev.quotation.clarifications ?? []),
+          { question: concern, askedAt: new Date().toISOString(), raisedBy: 'Sales' },
+        ],
+      },
+    }))
+    const tagged = postRemark(
+      { caseId: c.id, caseName: c.company.name, label: `Returned rate sheet v${version} to Actuarial` },
+      concern,
+    )
+    setReturnSheet(null)
+    setReturnText('')
+    const who = tagged.length ? ` — ${tagged.map((t) => `@${t.name}`).join(', ')} notified` : ''
+    message.warning(`Rate sheet v${version} returned to Actuarial for a new version${who}.`)
+  }
+
   // Move on to the Proposal work area once a rate sheet version has been chosen.
   function proceedToProposal() {
     patchQ((prev) => ({ ...prev, currentWorkArea: 'finalize-offer' }))
@@ -791,6 +827,16 @@ export function PrepareQuotation({ c }: { c: Case }) {
                   <Button size="small" icon={<EyeOutlined />} onClick={() => setViewSheetId(s.id)}>
                     View
                   </Button>
+                  <Button
+                    size="small"
+                    icon={<RollbackOutlined />}
+                    onClick={() => {
+                      setReturnSheet(s)
+                      setReturnText('')
+                    }}
+                  >
+                    Return
+                  </Button>
                   {s.status !== 'selected' && (
                     <Button size="small" type="primary" onClick={() => selectRateSheet(s.id)}>
                       Select this version
@@ -968,6 +1014,27 @@ export function PrepareQuotation({ c }: { c: Case }) {
           value={clarifyText}
           onChange={(e) => setClarifyText(e.target.value)}
           placeholder="e.g. Please confirm the dependent age cap."
+        />
+      </Modal>
+
+      {/* ---- Return rate sheet to Actuarial (ask for a new version) --------- */}
+      <Modal
+        open={returnSheet !== null}
+        title={returnSheet ? `Return rate sheet v${returnSheet.version} to Actuarial` : 'Return to Actuarial'}
+        okText="Send to Actuarial"
+        okButtonProps={{ danger: true, disabled: !returnText.trim() }}
+        onOk={returnToActuarial}
+        onCancel={() => setReturnSheet(null)}
+      >
+        <Typography.Paragraph type="secondary">
+          Ask Actuarial to review and send a new version. Your message is posted to the case Comments —
+          type <strong>@</strong> to mention a teammate and notify them.
+        </Typography.Paragraph>
+        <RemarksField
+          value={returnText}
+          onChange={setReturnText}
+          ariaLabel="Return message to Actuarial"
+          placeholder="Describe why it's returned, e.g. @Actuarial the WITH-network ward rate is above target — please re-issue."
         />
       </Modal>
     </div>
