@@ -29,6 +29,7 @@ import {
   Upload,
 } from 'antd'
 import {
+  ArrowRightOutlined,
   CheckCircleOutlined,
   CloudUploadOutlined,
   DeleteOutlined,
@@ -764,6 +765,15 @@ export function PrepareQuotation({ c }: { c: Case }) {
     { key: 'sheets', label: `Clarifications & rate sheets${sheets.length ? ` (${sheets.length})` : ''}`, children: sheetsTab },
   ]
 
+  // While assembling, the primary action walks the handler through the tabs with
+  // a Next button and only becomes the submit action ("Request Actuarial") once
+  // they reach the Rate request tab.
+  const FLOW_TABS = ['requirements', 'tor', 'members', 'rates']
+  function goNextTab() {
+    const idx = FLOW_TABS.indexOf(tab)
+    if (idx >= 0 && idx < FLOW_TABS.length - 1) setTab(FLOW_TABS[idx + 1])
+  }
+
   return (
     <div>
       <Tabs activeKey={tab} onChange={setTab} items={items} destroyOnHidden />
@@ -801,12 +811,18 @@ export function PrepareQuotation({ c }: { c: Case }) {
               )}
             </>
           )}
-          {assembling && (
+          {assembling && tab === 'rates' && (
             <Tooltip title={canSubmit ? '' : `Complete ${submitBlockers.join(', ')} to submit.`}>
               <Button type="primary" icon={<SendOutlined />} disabled={!canSubmit} onClick={submitRateRequest}>
-                Submit rate request to Actuarial
+                Request Actuarial
               </Button>
             </Tooltip>
+          )}
+          {assembling && tab !== 'rates' && FLOW_TABS.includes(tab) && (
+            <Button type="primary" onClick={goNextTab}>
+              Next
+              <ArrowRightOutlined />
+            </Button>
           )}
           {(submitted || awaitingClarification) && (
             <>
