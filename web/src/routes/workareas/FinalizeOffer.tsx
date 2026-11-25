@@ -957,9 +957,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
                   )}
                 </Space>
               ) : null}
-              <Button icon={<RollbackOutlined />} onClick={() => setReturning(true)}>
-                Return to Actuarial
-              </Button>
             </Space>
           </div>
         </Card>
