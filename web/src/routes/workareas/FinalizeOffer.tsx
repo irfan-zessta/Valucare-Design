@@ -251,13 +251,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
     patchSob((s) => ({ ...s, lines }))
   }
 
-  // Fill the builder with the reference WESUPPORT (Dependent) content so the
-  // document preview matches the supplied reference. Only on a fresh draft.
-  function loadReferenceSob() {
-    const ref = wesupportReferenceSob()
-    patchSob((s) => ({ ...s, ...ref }))
-    message.success('Reference SOB content loaded (WESUPPORT · Dependent).')
-  }
 
   // The formal SOB document HTML, rebuilt whenever the SOB changes.
   const sobDocHtml = useMemo(
@@ -1087,11 +1080,6 @@ export function FinalizeOffer({ c }: { c: Case }) {
               <Button size="small" type="primary" icon={<EyeOutlined />} onClick={() => setSobPreview(true)}>
                 Preview document
               </Button>
-              {sobEditable && (
-                <Button size="small" onClick={loadReferenceSob}>
-                  Load reference content
-                </Button>
-              )}
               <Button size="small" icon={<DownloadOutlined />} onClick={downloadSobTemplate}>
                 Download template
               </Button>
