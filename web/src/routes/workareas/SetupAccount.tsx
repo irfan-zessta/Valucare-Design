@@ -9,7 +9,7 @@
 // & DSA → Send to client → Signed/notarize/return → KYC → Onboarding SOB → COC
 // → Account-number creation → Plan-code creation/approval.
 // ===========================================================================
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   App,
@@ -20,6 +20,7 @@ import {
   Divider,
   Input,
   InputNumber,
+  Modal,
   Select,
   Space,
   Tabs,
@@ -36,6 +37,7 @@ import {
   EyeOutlined,
   FileTextOutlined,
   ImportOutlined,
+  MessageOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -107,6 +109,11 @@ export function SetupAccount({ c }: { c: Case }) {
   const { message } = App.useApp()
   const navigate = useNavigate()
   const postRemark = useRemarkComment()
+
+  // Comment-to-departments composer (Billing & Collections + MDA) on the
+  // internal alignment step.
+  const [deptCommentOpen, setDeptCommentOpen] = useState(false)
+  const [deptComment, setDeptComment] = useState('')
 
   // Create the setup state on first entry (carry-forward from the accepted case).
   useEffect(() => {
@@ -296,6 +303,24 @@ export function SetupAccount({ c }: { c: Case }) {
       completeTask('internal-alignment')
     }
 
+    // Post a free-text comment to both the Billing & Collections and MDA teams
+    // (mirrored into the case Comments thread; @mentions notify teammates).
+    const submitDeptComment = () => {
+      const text = deptComment.trim()
+      if (!text) return
+      const tagged = postRemark(
+        { caseId: c.id, caseName: c.company.name, label: 'Note to Billing & Collections and MDA' },
+        text,
+      )
+      setDeptComment('')
+      setDeptCommentOpen(false)
+      message.success(
+        tagged.length
+          ? `Comment sent to Billing & Collections and MDA. ${tagged.map((t) => `@${t.name}`).join(', ')} notified.`
+          : 'Comment sent to Billing & Collections and MDA.',
+      )
+    }
+
     // ---- Documents Sales shares with Billing & Collections and MDA ----------
     const shared = a.sharedDocs ?? []
     const setSharedDocs = (next: typeof shared) =>
@@ -364,6 +389,9 @@ export function SetupAccount({ c }: { c: Case }) {
                   Upload &amp; share
                 </Button>
               </Upload>
+              <Button size="small" icon={<MessageOutlined />} onClick={() => setDeptCommentOpen(true)}>
+                Comments
+              </Button>
             </Space>
           }
           wide
@@ -423,6 +451,27 @@ export function SetupAccount({ c }: { c: Case }) {
             </Button>
           </div>
         </div>
+
+        <Modal
+          open={deptCommentOpen}
+          title="Comment to Billing & Collections and MDA"
+          okText="Send comment"
+          okButtonProps={{ disabled: !deptComment.trim() }}
+          onOk={submitDeptComment}
+          onCancel={() => setDeptCommentOpen(false)}
+        >
+          <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
+            This note is shared with both the Billing &amp; Collections and MDA teams and recorded in
+            the case Comments.
+          </Typography.Paragraph>
+          <RemarksField
+            minRows={3}
+            value={deptComment}
+            onChange={setDeptComment}
+            placeholder="Add a comment for both teams — type @ to mention a teammate"
+            ariaLabel="Comment to Billing and MDA"
+          />
+        </Modal>
       </Space>
     )
   }
