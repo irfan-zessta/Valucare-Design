@@ -14,17 +14,14 @@ import {
   Input,
   InputNumber,
   Modal,
-  Segmented,
   Select,
   Space,
   Table,
   Tag,
-  Tooltip,
   Typography,
   Upload,
 } from 'antd'
 import {
-  CheckCircleOutlined,
   DownloadOutlined,
   ImportOutlined,
   PlusOutlined,
@@ -203,13 +200,8 @@ export function PlanCodes({
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [submitted, setSubmitted] = useState(false)
-  const [returning, setReturning] = useState(false)
-  const [returnReason, setReturnReason] = useState('')
   const [importing, setImporting] = useState(false)
   const [importText, setImportText] = useState('')
-  // Maker-checker role: AAT (handler) requests approval; AMT (manager) approves.
-  const [actingAs, setActingAs] = useState<'AAT' | 'AMT'>('AAT')
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
 
   function setCodes(next: PlanCode[]) {
     const allApproved = next.length > 0 && next.every((p) => p.status === 'approved')
@@ -379,29 +371,6 @@ export function PlanCodes({
     message.success(notes.join(' '))
   }
 
-  // Apply a status change to the selected rows whose current status is allowed.
-  function setStatusForSelected(to: PlanCodeStatus, allowedFrom: PlanCodeStatus[], reason?: string) {
-    const ids = new Set(selectedKeys)
-    let changed = 0
-    const next = codes.map((p) => {
-      if (ids.has(p.id) && allowedFrom.includes(p.status ?? 'draft')) {
-        changed++
-        return { ...p, status: to, returnReason: to === 'returned' ? reason : undefined }
-      }
-      return p
-    })
-    setCodes(next)
-    setSelectedKeys([])
-    return changed
-  }
-
-  // Selected rows broken down by what the current role can act on.
-  const selectedCodes = codes.filter((p) => selectedKeys.includes(p.id))
-  const selReviewable = selectedCodes.filter((p) => (p.status ?? 'draft') === 'draft' || p.status === 'returned').length
-  const selInReview = selectedCodes.filter((p) => p.status === 'for-approval').length
-  // AMT can approve both requested (for-approval) and their own drafts/returned.
-  const selApprovable = selectedCodes.filter((p) => p.status !== 'approved').length
-
   // ---- Manual-form field renderer ------------------------------------------
   const renderField = (f: SetupField) => {
     const val = form[f.key]
@@ -496,11 +465,6 @@ export function PlanCodes({
           dataSource={codes}
           pagination={false}
           scroll={{ x: 'max-content' }}
-          rowSelection={{
-            selectedRowKeys: selectedKeys,
-            onChange: (keys) => setSelectedKeys(keys.map(String)),
-            getCheckboxProps: (r) => ({ disabled: r.status === 'approved' }),
-          }}
           locale={{ emptyText: 'No plan codes yet — generate from the SOB, add one, or bulk import.' }}
           columns={[
             { title: 'Plan code', dataIndex: 'code', fixed: 'left', render: (v: string) => <strong>{v}</strong> },
@@ -531,97 +495,6 @@ export function PlanCodes({
           ]}
         />
       </FormSection>
-
-      {codes.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 12,
-            padding: '12px 16px',
-            marginTop: 8,
-            background: '#fafafa',
-            border: '1px solid #f0f0f0',
-            borderRadius: 8,
-          }}
-        >
-          <Space size="middle" wrap>
-            <Space size={6}>
-              <Typography.Text type="secondary">Acting as</Typography.Text>
-              <Segmented
-                value={actingAs}
-                onChange={(v) => setActingAs(v as 'AAT' | 'AMT')}
-                options={[
-                  { label: 'AAT (handler)', value: 'AAT' },
-                  { label: 'AMT (manager)', value: 'AMT' },
-                ]}
-              />
-            </Space>
-            <Typography.Text type="secondary">
-              {selectedKeys.length
-                ? `${selectedKeys.length} selected · `
-                : ''}
-              {codes.filter((p) => p.status === 'approved').length}/{codes.length} approved
-            </Typography.Text>
-          </Space>
-          <Space wrap>
-            {actingAs === 'AAT' ? (
-              <Tooltip title={selReviewable ? '' : 'Select draft or returned plan codes to send.'}>
-                <Button type="primary" disabled={!selReviewable} onClick={() => {
-                  const n = setStatusForSelected('for-approval', ['draft', 'returned'])
-                  message.success(`Requested AMT approval for ${n} plan code(s).`)
-                }}>
-                  Request approval from AMT{selReviewable ? ` (${selReviewable})` : ''}
-                </Button>
-              </Tooltip>
-            ) : (
-              <>
-                {selInReview > 0 && (
-                  <Button danger onClick={() => setReturning(true)}>
-                    Return ({selInReview})
-                  </Button>
-                )}
-                <Tooltip title={selApprovable ? '' : 'Select plan codes to approve.'}>
-                  <Button
-                    type="primary"
-                    icon={<CheckCircleOutlined />}
-                    disabled={!selApprovable}
-                    onClick={() => {
-                      const n = setStatusForSelected('approved', ['draft', 'returned', 'for-approval'])
-                      message.success(`Approved ${n} plan code(s).`)
-                    }}
-                  >
-                    Approve selected{selApprovable ? ` (${selApprovable})` : ''}
-                  </Button>
-                </Tooltip>
-              </>
-            )}
-          </Space>
-        </div>
-      )}
-
-      <Modal
-        open={returning}
-        title="Return plan codes for correction"
-        okText="Return for correction"
-        okButtonProps={{ danger: true, disabled: !returnReason.trim() }}
-        onCancel={() => setReturning(false)}
-        onOk={() => {
-          const n = setStatusForSelected('returned', ['for-approval'], returnReason.trim() || 'Returned for correction')
-          setReturning(false)
-          setReturnReason('')
-          message.warning(`Returned ${n} plan code(s) for correction.`)
-        }}
-      >
-        <Input.TextArea
-          rows={3}
-          placeholder="Reason for return"
-          value={returnReason}
-          onChange={(e) => setReturnReason(e.target.value)}
-        />
-      </Modal>
 
       {/* ---- Full manual capture form ---- */}
       <Modal
