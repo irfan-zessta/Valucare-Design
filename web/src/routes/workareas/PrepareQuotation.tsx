@@ -408,8 +408,8 @@ export function PrepareQuotation({ c }: { c: Case }) {
     }))
     message.success('Rate sheet version selected.')
   }
-  function selectAndFinalize(sheetId: string) {
-    selectRateSheet(sheetId)
+  // Move on to the Proposal work area once a rate sheet version has been chosen.
+  function proceedToProposal() {
     patchQ((prev) => ({ ...prev, currentWorkArea: 'finalize-offer' }))
     navigate(`/cases/${c.id}/finalize-offer`)
   }
@@ -659,6 +659,7 @@ export function PrepareQuotation({ c }: { c: Case }) {
   )
 
   const sheets = useMemo(() => [...(q.rateSheets ?? [])].sort((a, b) => b.version - a.version), [q.rateSheets])
+  const selectedSheet = sheets.find((s) => s.status === 'selected')
   const ratesTab = (
     <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
       <section>
@@ -844,6 +845,11 @@ export function PrepareQuotation({ c }: { c: Case }) {
               {c.memberData.importProcessed ? 'Re-validate sample data' : 'Validate sample Member Data'}
             </Button>
           )}
+          {tab === 'sheets' && (submitted || awaitingClarification || responded) && (
+            <Button size="small" onClick={() => setIssuing(true)}>
+              Load sample rate sheet
+            </Button>
+          )}
         </div>
         <div className="app-form-floatbar__actions">
           {assembling && tab === 'rates' && (
@@ -859,15 +865,17 @@ export function PrepareQuotation({ c }: { c: Case }) {
               <ArrowRightOutlined />
             </Button>
           )}
-          {(submitted || awaitingClarification) && (
-            <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setIssuing(true)}>
-              Load sample rate sheet
-            </Button>
-          )}
           {responded && (
-            <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => selectAndFinalize(sheets[0].id)}>
-              Select latest rate sheet & finalize
-            </Button>
+            <Tooltip title={selectedSheet ? '' : 'Choose a rate sheet version to continue.'}>
+              <Button
+                type="primary"
+                icon={<ArrowRightOutlined />}
+                disabled={!selectedSheet}
+                onClick={proceedToProposal}
+              >
+                Proceed to proposal
+              </Button>
+            </Tooltip>
           )}
         </div>
       </div>
