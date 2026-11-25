@@ -518,14 +518,6 @@ export function PrepareQuotation({ c }: { c: Case }) {
           </Button>
         </Upload>
       </Space>
-      {torAttached && q.torLines === undefined && (
-        <Alert
-          type="info"
-          showIcon
-          title="Loaded from the attached TOR document"
-          description="These lines were pre-filled from the TOR on file. Review and adjust them before quoting."
-        />
-      )}
       {torLines.length === 0 ? (
         <Alert type="info" showIcon title="No TOR lines yet. Add lines or load a sample set." />
       ) : (
