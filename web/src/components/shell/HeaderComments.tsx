@@ -3,8 +3,9 @@
 // opens a right-side drawer that is the full comment feature:
 //   • Thread  — the comments on the case you're viewing, with a composer so you
 //               can @mention a teammate and post a new comment.
-//   • Sent    — comments you've written, across every case.
-//   • Unread  — comments that tag you and you haven't read yet (also the badge).
+//   • Sent     — comments you've written, across every case.
+//   • Received — comments that tag you, across every case (read or unread).
+//   • Unread   — comments that tag you and you haven't read yet (also the badge).
 // ===========================================================================
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -16,12 +17,12 @@ import { useComments, type Comment } from '../../state/CommentsProvider'
 import { useCases } from '../../state/CaseProvider'
 import { MENTION_OPTIONS, extractMentions, renderCommentBody } from '../comments/mentionUtils'
 
-type View = 'thread' | 'sent' | 'unread'
+type View = 'thread' | 'sent' | 'received' | 'unread'
 
 export function HeaderComments() {
   const { user } = useActiveUser()
   const { getCase } = useCases()
-  const { forCase, sentBy, unreadFor, unreadCountFor, add, markRead, markAllReadFor, markCaseReadFor } = useComments()
+  const { forCase, sentBy, receivedFor, unreadFor, unreadCountFor, add, markRead, markAllReadFor, markCaseReadFor } = useComments()
   const navigate = useNavigate()
   const { message } = App.useApp()
   const location = useLocation()
@@ -40,6 +41,7 @@ export function HeaderComments() {
   const unread = unreadCountFor(user.id)
   const thread = currentCaseId ? forCase(currentCaseId) : []
   const sent = sentBy(user.id)
+  const received = receivedFor(user.id)
   const unreadList = unreadFor(user.id)
 
   const tip = `Comments${unread > 0 ? `, ${unread} unread` : ''}`
@@ -115,6 +117,12 @@ export function HeaderComments() {
       }
       return <div className="cmt-list cmt-list--drawer">{sent.map((c) => commentCard(c, { showCase: true, onClick: () => openCase(c) }))}</div>
     }
+    if (view === 'received') {
+      if (received.length === 0) {
+        return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No comments mention you yet." style={{ padding: '32px 0' }} />
+      }
+      return <div className="cmt-list cmt-list--drawer">{received.map((c) => commentCard(c, { showCase: true, unread: unreadList.some((u) => u.id === c.id), onClick: () => openCase(c) }))}</div>
+    }
     // unread
     if (unreadList.length === 0) {
       return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="You're all caught up." style={{ padding: '32px 0' }} />
@@ -157,6 +165,7 @@ export function HeaderComments() {
             options={[
               { value: 'thread', label: 'Thread' },
               { value: 'sent', label: `Sent${sent.length ? ` ${sent.length}` : ''}` },
+              { value: 'received', label: `Received${received.length ? ` ${received.length}` : ''}` },
               { value: 'unread', label: `Unread${unread ? ` ${unread}` : ''}` },
             ]}
           />

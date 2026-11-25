@@ -38,6 +38,8 @@ interface CommentsContextValue {
   forCase: (caseId: string) => Comment[]
   /** Comments a user authored, newest first. */
   sentBy: (userId: string) => Comment[]
+  /** Comments that tag a user (not their own), read or unread, newest first. */
+  receivedFor: (userId: string) => Comment[]
   /** Comments that tag a user, unread and not their own, newest first. */
   unreadFor: (userId: string) => Comment[]
   unreadCountFor: (userId: string) => number
@@ -80,6 +82,13 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
   )
   const sentBy = useCallback(
     (userId: string) => comments.filter((c) => c.authorId === userId).sort(newest),
+    [comments],
+  )
+  const receivedFor = useCallback(
+    (userId: string) =>
+      comments
+        .filter((c) => c.authorId !== userId && c.tagged.some((t) => t.id === userId))
+        .sort(newest),
     [comments],
   )
   const isUnread = (c: Comment, userId: string) =>
@@ -125,8 +134,8 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo<CommentsContextValue>(
-    () => ({ comments, forCase, sentBy, unreadFor, unreadCountFor, add, markRead, markAllReadFor, markCaseReadFor }),
-    [comments, forCase, sentBy, unreadFor, unreadCountFor, add, markRead, markAllReadFor, markCaseReadFor],
+    () => ({ comments, forCase, sentBy, receivedFor, unreadFor, unreadCountFor, add, markRead, markAllReadFor, markCaseReadFor }),
+    [comments, forCase, sentBy, receivedFor, unreadFor, unreadCountFor, add, markRead, markAllReadFor, markCaseReadFor],
   )
 
   return <CommentsContext.Provider value={value}>{children}</CommentsContext.Provider>
