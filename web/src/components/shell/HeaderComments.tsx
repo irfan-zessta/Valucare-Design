@@ -15,6 +15,7 @@ import dayjs from 'dayjs'
 import { useActiveUser } from '../../state/ActiveUserProvider'
 import { useComments, type Comment } from '../../state/CommentsProvider'
 import { useCases } from '../../state/CaseProvider'
+import { useRenewals } from '../../state/RenewalProvider'
 import { MENTION_OPTIONS, extractMentions, renderCommentBody } from '../comments/mentionUtils'
 
 type View = 'thread' | 'sent' | 'received' | 'unread'
@@ -22,6 +23,7 @@ type View = 'thread' | 'sent' | 'received' | 'unread'
 export function HeaderComments() {
   const { user } = useActiveUser()
   const { getCase } = useCases()
+  const { getCase: getRenewal } = useRenewals()
   const { forCase, sentBy, receivedFor, unreadFor, unreadCountFor, add, markRead, markAllReadFor, markCaseReadFor } = useComments()
   const navigate = useNavigate()
   const { message } = App.useApp()
@@ -31,12 +33,18 @@ export function HeaderComments() {
   const [view, setView] = useState<View>('thread')
   const [draft, setDraft] = useState('')
 
-  // Which case (if any) is on screen right now — the composer posts here.
+  // Which case (if any) is on screen right now — the composer posts here. Handles
+  // both New Business (/cases/:id) and Corporate Renewal (/sales/renewals/:id).
   const currentCaseId = useMemo(() => {
     const m = location.pathname.match(/\/cases\/([^/]+)/)
-    return m ? m[1] : null
+    if (m) return m[1]
+    const r = location.pathname.match(/\/sales\/renewals\/([^/]+)/)
+    return r ? r[1] : null
   }, [location.pathname])
-  const currentCase = currentCaseId ? getCase(currentCaseId) : undefined
+  const nbCase = currentCaseId ? getCase(currentCaseId) : undefined
+  const rnCase = currentCaseId ? getRenewal(currentCaseId) : undefined
+  // Display name for the thread header / new comments, from whichever store owns it.
+  const currentCaseName = nbCase?.company.name ?? rnCase?.name ?? currentCaseId ?? undefined
 
   const unread = unreadCountFor(user.id)
   const thread = currentCaseId ? forCase(currentCaseId) : []
@@ -58,11 +66,11 @@ export function HeaderComments() {
 
   function postComment() {
     const text = draft.trim()
-    if (!text || !currentCase) return
+    if (!text || !currentCaseId || !currentCaseName) return
     const tagged = extractMentions(text)
     add({
-      caseId: currentCase.id,
-      caseName: currentCase.company.name,
+      caseId: currentCaseId,
+      caseName: currentCaseName,
       authorId: user.id,
       author: user.name,
       text,
@@ -72,10 +80,12 @@ export function HeaderComments() {
     message.success(tagged.length ? 'Comment posted and people notified.' : 'Comment posted.')
   }
 
+  // Renewal comments carry an RN- id and open the renewal workspace; New Business
+  // comments open the case workspace.
   function openCase(c: Comment) {
     markRead(user.id, c.id)
     setOpen(false)
-    navigate(`/cases/${c.caseId}`)
+    navigate(c.caseId.startsWith('RN-') ? `/sales/renewals/${c.caseId}/review` : `/cases/${c.caseId}`)
   }
 
   const commentCard = (c: Comment, opts?: { showCase?: boolean; onClick?: () => void; unread?: boolean }) => {
@@ -169,8 +179,8 @@ export function HeaderComments() {
               { value: 'unread', label: `Unread${unread ? ` ${unread}` : ''}` },
             ]}
           />
-          {view === 'thread' && currentCase && (
-            <div className="cmt-drawer__case">{currentCase.company.name}</div>
+          {view === 'thread' && currentCaseId && currentCaseName && (
+            <div className="cmt-drawer__case">{currentCaseName}</div>
           )}
         </div>
 
