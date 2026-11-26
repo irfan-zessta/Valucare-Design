@@ -90,6 +90,8 @@ export interface DashboardConfig<T> {
     predicate: (row: T) => boolean
     /** Which column set to render; defaults to the in-progress columns. */
     columns?: 'in-progress' | 'completed'
+    /** Place this segment right after the named built-in view; defaults to the end. */
+    insertAfter?: 'all' | 'in-progress' | 'completed' | 'needs-action'
   }[]
 
   /** Min table width (px). When the content area is narrower, the table scrolls
@@ -447,15 +449,20 @@ export function DepartmentDashboard<T>({
 
   // All views live in the one Segmented (the "tab card"): the three lifecycle
   // filters plus "Needs my action" as the priority segment.
-  const lifecycleOptions = [
+  const lifecycleOptions: { value: string; label: ReactNode }[] = [
     { value: 'all', label: seg('All', ws.all) },
     { value: 'in-progress', label: seg('In progress', ws.inProgress) },
     { value: 'completed', label: seg('Completed', ws.completed) },
     { value: 'needs-action', label: needsSeg },
-    // Department-supplied extra lenses (e.g. renewals "Upcoming"). Counts come
-    // from the full dataset, like the other segments.
-    ...extraViews.map((v) => ({ value: v.value, label: seg(v.label, rows.filter(v.predicate).length) })),
   ]
+  // Splice department-supplied extra lenses (e.g. renewals "Upcoming") into the
+  // requested position. Counts come from the full dataset, like the other segments.
+  for (const v of extraViews) {
+    const option = { value: v.value, label: seg(v.label, rows.filter(v.predicate).length) }
+    const at = v.insertAfter ? lifecycleOptions.findIndex((o) => o.value === v.insertAfter) : -1
+    if (at >= 0) lifecycleOptions.splice(at + 1, 0, option)
+    else lifecycleOptions.push(option)
+  }
 
   // The Cases panel: one compact view selector + aligned toolbar, filter chips,
   // the table, and a result-count footer.
