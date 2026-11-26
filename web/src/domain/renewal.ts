@@ -66,24 +66,41 @@ export interface RenewalAccount {
 
 export type RenewalPhaseId = 'review' | 'proposal' | 'setup' | 'contract' | 'activate'
 
+/**
+ * Which team owns each phase. The renewal journey is split between two users:
+ *   • Account Services (AMT) runs Review → Proposal → Setup;
+ *   • the Account Manager (AAT) takes over at Contract → Activate.
+ * These two values are a subset of the access.ts RoleKeys, so they compare
+ * directly against the active user's role.
+ */
+export type RenewalTeam = 'account-services' | 'account-manager'
+
+export const TEAM_LABEL: Record<RenewalTeam, string> = {
+  'account-services': 'Account Services',
+  'account-manager': 'Account Manager',
+}
+
 export interface RenewalPhaseDef {
   id: RenewalPhaseId
   n: number
   label: string
   /** Short orientation line used by the stepper / next-action strip. */
   desc: string
+  /** The team responsible for this phase. */
+  owner: RenewalTeam
 }
 
 export const RENEWAL_PHASES: RenewalPhaseDef[] = [
-  { id: 'review', n: 1, label: 'Renewal Data & Pricing', desc: 'Utilization & Actuarial rates' },
-  { id: 'proposal', n: 2, label: 'Proposal & Client Decision', desc: 'Send, negotiate, record decision' },
-  { id: 'setup', n: 3, label: 'Renewal Setup, SOB & Plan Codes', desc: 'SOB, plan codes, member handoff' },
-  { id: 'contract', n: 4, label: 'Contract, KYC & Notarization', desc: 'Contract through to delivery' },
-  { id: 'activate', n: 5, label: 'Activate & Handover', desc: 'Activate the account and hand over' },
+  { id: 'review', n: 1, label: 'Renewal Data & Pricing', desc: 'Utilization & Actuarial rates', owner: 'account-services' },
+  { id: 'proposal', n: 2, label: 'Proposal & Client Decision', desc: 'Send, negotiate, record decision', owner: 'account-services' },
+  { id: 'setup', n: 3, label: 'Renewal Setup, SOB & Plan Codes', desc: 'SOB, plan codes, member handoff', owner: 'account-services' },
+  { id: 'contract', n: 4, label: 'Contract, KYC & Notarization', desc: 'Contract through to delivery', owner: 'account-manager' },
+  { id: 'activate', n: 5, label: 'Activate & Handover', desc: 'Activate the account and hand over', owner: 'account-manager' },
 ]
 export const RENEWAL_PHASE_IDS: RenewalPhaseId[] = RENEWAL_PHASES.map((p) => p.id)
 export const renewalPhase = (id: RenewalPhaseId): RenewalPhaseDef =>
   RENEWAL_PHASES.find((p) => p.id === id) ?? RENEWAL_PHASES[0]
+export const phaseOwner = (id: RenewalPhaseId): RenewalTeam => renewalPhase(id).owner
 
 // Acronyms spelled out on first use, mirroring the legacy gloss() so the copy
 // never leaks a bare code.
@@ -384,6 +401,8 @@ export interface RenewalCase {
   proposal: RenewalProposal
   setup: RenewalSetup
   contract: RenewalContractState
+  /** Account Services → Account Manager handover at the Setup → Contract boundary. */
+  amHandover?: { sent?: boolean; sentAt?: string; by?: string }
   activation?: RenewalActivation
   completed: boolean
   notRenewed: boolean
@@ -739,6 +758,9 @@ export function applyPreset(rn: RenewalCase, preset: RenewalPreset) {
     rn.setup.planReview = true
     rn.setup.memberData = sampleMemberData()
     rn.setup.mdaStatus = 'Acknowledged'
+    // Setup is done, so Account Services has handed the case to the Account
+    // Manager — Contract and Activation (the AM-owned phases) are unlocked.
+    rn.amHandover = { sent: true, sentAt: stamp(), by: 'Account Services' }
   }
   if (preset === 'completed') {
     rn.setup.coc = { previewed: true, from: rn.renewal.from, to: rn.renewal.from }
@@ -1009,6 +1031,11 @@ export function setupDone(rn: RenewalCase): boolean {
 /** The renewal contract and DSA have been sent to the client (phase 4). */
 export function contractSent(rn: RenewalCase): boolean {
   return !!rn.setup.contractRecord?.sentToClient
+}
+
+/** Account Services has handed the renewal over to the Account Manager. */
+export function amHandoverDone(rn: RenewalCase): boolean {
+  return !!rn.amHandover?.sent
 }
 
 /** Account activated and the document pack handed over to MDA (phase 5). */

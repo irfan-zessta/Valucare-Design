@@ -633,6 +633,16 @@ body {
   overflow: visible;
   line-height: 1.25;
 }
+/* Hand-off boundary: a dashed separator where ownership passes from Account
+   Services to the Account Manager (rendered on the first AM-owned step). */
+.app-stepper__item.is-handover::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 2px;
+  inset-block-end: 16px;
+  inset-inline-start: 0;
+  border-inline-start: 1px dashed #d0d0d0;
+}
 @media (max-width: 767px) {
   .app-stepper__desc {
     display: none;

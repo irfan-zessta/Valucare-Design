@@ -14,7 +14,7 @@ import { App, Button, Descriptions, Form, Input, InputNumber, Modal, Select, Tab
 import { CheckCircleOutlined, FileTextOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
-import { formatPeso, formatCount } from '../../../lib/format'
+import { formatPeso, formatCount, formatDateTime } from '../../../lib/format'
 import {
   sampleMemberData,
   type RenewalPlanCode,
@@ -24,7 +24,7 @@ import { type RenewalPhaseProps } from '../shared'
 const { Text, Paragraph } = Typography
 const now = () => new Date().toISOString()
 
-export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps) {
+export function RenewalSetup({ rn, patch, goPhase, preview, role }: RenewalPhaseProps) {
   const { message } = App.useApp()
   const s = rn.setup
   const [planModal, setPlanModal] = useState<{ index: number | null } | null>(null)
@@ -46,6 +46,21 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
     const p = index === null ? { code: '', member: 'Principal', mbl: rn.mbl, premium: 0, room: 'Private', mode: 'Annual' } : rn.planCodes[index]
     planForm.setFieldsValue(p)
     setPlanModal({ index })
+  }
+
+  // --- Account Services → Account Manager handover -------------------------
+  // Setup is the last phase Account Services owns. Once the renewal SOB version
+  // and Member Data are prepared, AS hands the case to the Account Manager, who
+  // then runs Contract, KYC and Activation.
+  const handedOver = !!rn.amHandover?.sent
+  const setupReady = !!s.sobChoice && !!s.memberData
+  const handOverToAM = () => {
+    patch((x) => {
+      x.amHandover = { sent: true, sentAt: now(), by: role }
+      x.activity.push({ at: now(), text: 'Renewal setup handed over to the Account Manager — Contract, KYC & Activation unlocked.' })
+    })
+    message.success('Handed over to the Account Manager.')
+    goPhase('contract')
   }
 
   return (
@@ -144,11 +159,25 @@ export function RenewalSetup({ rn, patch, goPhase, preview }: RenewalPhaseProps)
         )}
       </FormSection>
 
-      {/* Floating action bar — consistent with the other renewal phases. */}
+      {/* Floating action bar — hand the renewal over from Account Services to
+          the Account Manager, who owns Contract, KYC and Activation. */}
       <div className="app-form-floatbar">
-        <div />
+        <Text type="secondary">
+          {handedOver
+            ? `Handed over to the Account Manager${rn.amHandover?.sentAt ? ` on ${formatDateTime(rn.amHandover.sentAt)}` : ''}.`
+            : setupReady
+              ? 'Setup is ready — hand the renewal over to the Account Manager for Contract, KYC and Activation.'
+              : 'Create the renewal SOB version and load Member Data, then hand over to the Account Manager.'}
+        </Text>
         <div className="app-form-floatbar__actions">
-          <Button type="primary" onClick={() => goPhase('contract')}>Continue to Contract, KYC & Notarization ›</Button>
+          {handedOver ? (
+            <>
+              <Tag color="green" icon={<CheckCircleOutlined />}>Handed over to Account Manager</Tag>
+              <Button type="primary" onClick={() => goPhase('contract')}>Continue to Contract, KYC &amp; Notarization ›</Button>
+            </>
+          ) : (
+            <Button type="primary" disabled={!setupReady} onClick={handOverToAM}>Hand over to Account Manager ›</Button>
+          )}
         </div>
       </div>
 
