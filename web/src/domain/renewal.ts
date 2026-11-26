@@ -339,6 +339,8 @@ export interface RenewalActivation {
   scheduledAt?: string
   /** Document pack handed to MDA (internal announcement, masterlist, codes, SOB). */
   mdaHandover?: { sent?: boolean; sentAt?: string; docs?: { slot: string; fileName: string }[] }
+  /** Health benefit orientation — tracked separately from activation (not gating completion). */
+  orientation?: { status: 'not-scheduled' | 'scheduled' | 'completed'; date?: string }
 }
 
 export interface RenewalDocument {
