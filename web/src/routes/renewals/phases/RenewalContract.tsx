@@ -13,11 +13,17 @@ import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso } from '../../../lib/format'
 import { toneColor, type RenewalCase, type Tone } from '../../../domain/renewal'
-import { BRAND_RED } from '../../../theme'
 import { type RenewalPhaseProps } from '../shared'
 
 const { Text } = Typography
 const now = () => new Date().toISOString()
+
+// Circular primary-colour step badge + heading (shared look with the other phases).
+const numberedTitle = (n: number, text: string) => (
+  <span className="app-activity-head">
+    <span className="app-activity-badge">{n}</span> {text}
+  </span>
+)
 
 export function RenewalContract(props: RenewalPhaseProps) {
   const { rn } = props
@@ -184,7 +190,7 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
   return (
     <>
       {/* Certificate of Coverage & Commission Rate Form (merged, inline edit) */}
-      <FormSection wide title={<><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24, height: 24, padding: '0 7px', marginRight: 10, borderRadius: 6, background: BRAND_RED, color: '#fff', fontSize: 14, fontWeight: 600, verticalAlign: 'middle' }}>1</span>Certificate of Coverage (CoC) and Commission Rate Form (CRF)</>}
+      <FormSection wide title={numberedTitle(1, 'Certificate of Coverage (CoC) and Commission Rate Form (CRF)')}
         description="Prepare the CoC (optional temporary cover) together with the commission rate form inline, then generate both."
         extra={cocGenerated ? <Tag color="green" icon={<CheckCircleOutlined />}>Generated</Tag> : <Tag>Draft</Tag>}>
         {cocEditable ? (
@@ -242,7 +248,7 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
       </FormSection>
 
       {/* KYC screening (record + upload) */}
-      <FormSection wide title="4.2 · KYC screening"
+      <FormSection wide title={numberedTitle(2, 'KYC screening')}
         description="External KYC (SOLYTICS) is not connected — upload the signed form and supporting evidence, and record the screening result."
         extra={<Tag color={rn.setup.kyc === 'Screening cleared' ? 'green' : rn.setup.kyc === 'Not started' ? 'default' : 'blue'}>{rn.setup.kyc}</Tag>}>
         <Text strong style={{ fontSize: 12 }}>KYC documents</Text>
@@ -282,7 +288,7 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
       </FormSection>
 
       {/* Contract & DSA — prepare & send (signed copies and notarization are in 4.4) */}
-      <FormSection wide title="4.3 · Contract &amp; DSA"
+      <FormSection wide title={numberedTitle(3, 'Contract & DSA')}
         description="Upload the renewal contract and DSA, then send them to the client through the app."
         extra={cr.sentToClient ? <Tag color="blue">Sent to client</Tag> : <Tag>Pending</Tag>}>
         <Space orientation="vertical" size="small" style={{ display: 'flex', marginTop: 8, marginBottom: 12 }}>
@@ -324,7 +330,7 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
 
       {/* Signed & notarized milestones — recorded in order (legal/notarization
           happen outside HMS; status and the resulting document are recorded here). */}
-      <FormSection wide title="4.4 · Signed &amp; notarized milestones"
+      <FormSection wide title={numberedTitle(4, 'Signed & notarized milestones')}
         description="Notarization happens outside HMS — its status and the resulting document are recorded here."
         extra={<Tag color={cr.notarization === 'returned' ? 'green' : cr.sentToClient ? 'blue' : 'default'}>
           {cr.notarization === 'returned' ? 'Returned to client' : cr.notarization === 'notarized' ? 'Notarized' : cr.notarization === 'sent' ? 'Sent for notarization' : cr.signedContract ? 'Signed received' : 'Awaiting signed'}
