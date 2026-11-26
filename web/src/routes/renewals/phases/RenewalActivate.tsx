@@ -4,7 +4,6 @@
 //   1. Handover to MDA — attach the document pack and send it to MDA.
 //   2. Activation — schedule a go-live date & time, or activate immediately
 //      (gated until the pack has been handed over).
-//   3. Health benefit orientation — tracked separately, not gating completion.
 // Once activated and handed over, Sales completes the renewal to a read-only
 // summary. Everything here is simulated — no real policy is issued, no coverage
 // is switched on, and no external system is called.
@@ -101,11 +100,6 @@ export function RenewalActivate(props: RenewalPhaseProps) {
       x.activation = { ...(x.activation ?? {}), scheduledAt: a.activatedAt, activatedAt: undefined }
       x.activity.push({ at: now(), text: 'Moved the renewed account back to scheduled (simulated).' })
     })
-  }
-  // ---- Health benefit orientation (tracked separately) ---------------------
-  const orientation = a.orientation ?? { status: 'not-scheduled' as const }
-  const setOrientation = (next: NonNullable<typeof a.orientation>) => {
-    patch((x) => { x.activation = { ...(x.activation ?? {}), orientation: next } })
   }
   // ---- Handover to MDA (document pack) -------------------------------------
   const mda = a.mdaHandover ?? { docs: [] }
@@ -210,26 +204,6 @@ export function RenewalActivate(props: RenewalPhaseProps) {
               </Text>
             )}
             {!sentToMda && <Text type="secondary">Hand over to MDA first.</Text>}
-          </Space>
-        </FormSection>
-
-        {/* 3 · Health benefit orientation ----------------------------------- */}
-        <FormSection wide
-          title={<Space>
-            Health benefit orientation{' '}
-            <Tag color={orientation.status === 'completed' ? 'green' : orientation.status === 'scheduled' ? 'blue' : 'default'}>
-              {orientation.status === 'not-scheduled' ? 'Not scheduled' : orientation.status === 'scheduled' ? 'Scheduled' : 'Completed'}
-            </Tag>
-          </Space>}
-          description="Tracked separately from activation.">
-          <Space wrap align="center">
-            <DatePicker showTime value={orientation.date ? dayjs(orientation.date) : null}
-              onChange={(d) => setOrientation({ status: d ? 'scheduled' : 'not-scheduled', date: d ? d.toISOString() : undefined })}
-              placeholder="Schedule orientation date & time" />
-            {orientation.status === 'scheduled' && (
-              <Button onClick={() => setOrientation({ ...orientation, status: 'completed' })}>Mark completed</Button>
-            )}
-            {orientation.date && <Text type="secondary">{formatDateTime(orientation.date)}</Text>}
           </Space>
         </FormSection>
 
