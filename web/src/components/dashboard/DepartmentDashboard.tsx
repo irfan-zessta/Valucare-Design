@@ -78,6 +78,20 @@ export interface DashboardConfig<T> {
   inProgressColumns: ColumnsType<T>
   completedColumns: ColumnsType<T>
 
+  /**
+   * Extra lifecycle view segments appended to the selector, after the four
+   * built-in views (e.g. a renewals "Upcoming" lens). Each is a filtered view
+   * over the same dataset — like "Needs my action", it may overlap the others.
+   * Omit for departments that don't need it (New Business passes nothing).
+   */
+  extraViews?: {
+    value: string
+    label: string
+    predicate: (row: T) => boolean
+    /** Which column set to render; defaults to the in-progress columns. */
+    columns?: 'in-progress' | 'completed'
+  }[]
+
   /** Min table width (px). When the content area is narrower, the table scrolls
    *  horizontally within its panel (with any fixed:'right' column pinned). */
   scrollX?: number
@@ -135,8 +149,10 @@ function loadUiState(deptId: string): UiState {
           : legacy && !CASE_VIEWS.includes(legacy)
             ? legacy
             : 'cases'
+      // Accept any stored view string (it may be an extra view like 'upcoming');
+      // the component validates it against the active config's views.
       const view =
-        typeof p.view === 'string' && CASE_VIEWS.includes(p.view)
+        typeof p.view === 'string' && p.view
           ? p.view
           : legacy && CASE_VIEWS.includes(legacy)
             ? legacy
@@ -217,14 +233,27 @@ export function DepartmentDashboard<T>({
   }, [rows, config])
 
   // The active case view's rows (search/filter applied) + its workspace total.
-  const view = CASE_VIEWS.includes(ui.view) ? ui.view : 'in-progress'
+  const extraViews = config.extraViews ?? []
+  const validViews = useMemo(
+    () => new Set<string>([...CASE_VIEWS, ...extraViews.map((v) => v.value)]),
+    [extraViews],
+  )
+  const view = validViews.has(ui.view) ? ui.view : 'in-progress'
+  const activeExtraView = extraViews.find((v) => v.value === view)
   const viewRows = useMemo(() => {
+    if (activeExtraView) return filtered.filter(activeExtraView.predicate)
     if (view === 'completed') return filtered.filter((r) => config.isCompleted(r))
     if (view === 'needs-action') return filtered.filter((r) => config.needsMyAction(r))
     if (view === 'in-progress') return filtered.filter((r) => !config.isCompleted(r))
     return filtered
-  }, [filtered, view, config])
-  const viewColumns = view === 'completed' ? config.completedColumns : config.inProgressColumns
+  }, [filtered, view, config, activeExtraView])
+  const viewColumns = activeExtraView
+    ? activeExtraView.columns === 'completed'
+      ? config.completedColumns
+      : config.inProgressColumns
+    : view === 'completed'
+      ? config.completedColumns
+      : config.inProgressColumns
 
   function clearFilters() {
     setUi((s) => ({ ...s, search: '', filters: {} }))
@@ -423,6 +452,9 @@ export function DepartmentDashboard<T>({
     { value: 'in-progress', label: seg('In progress', ws.inProgress) },
     { value: 'completed', label: seg('Completed', ws.completed) },
     { value: 'needs-action', label: needsSeg },
+    // Department-supplied extra lenses (e.g. renewals "Upcoming"). Counts come
+    // from the full dataset, like the other segments.
+    ...extraViews.map((v) => ({ value: v.value, label: seg(v.label, rows.filter(v.predicate).length) })),
   ]
 
   // The Cases panel: one compact view selector + aligned toolbar, filter chips,

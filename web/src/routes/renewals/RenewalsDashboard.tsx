@@ -259,6 +259,10 @@ export default function RenewalsDashboard() {
       },
       inProgressColumns,
       completedColumns,
+      // A dedicated lens for eligible accounts with no renewal started yet.
+      extraViews: [
+        { value: 'upcoming', label: 'Upcoming renewals', predicate: (r: Row) => !r.rn },
+      ],
       scrollX: 1000,
       renderMobileCard,
       emptyText: 'No renewals yet',
