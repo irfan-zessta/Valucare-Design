@@ -16,7 +16,7 @@ import { CheckCircleFilled, CloudUploadOutlined, SendOutlined } from '@ant-desig
 import dayjs, { type Dayjs } from 'dayjs'
 import { FormSection } from '../../../components/ui/FormSection'
 import { formatDateTime } from '../../../lib/format'
-import { activationDone, contractSent } from '../../../domain/renewal'
+import { activationDone } from '../../../domain/renewal'
 import { type RenewalPhaseProps } from '../shared'
 import { RenewalSummary } from './RenewalContract'
 
@@ -35,7 +35,7 @@ const MDA_SLOTS: { key: string; label: string; hint: string }[] = [
 ]
 
 export function RenewalActivate(props: RenewalPhaseProps) {
-  const { rn, patch, goPhase } = props
+  const { rn, patch } = props
   const { message } = App.useApp()
   const navigate = useNavigate()
   const [showSuccess, setShowSuccess] = useState(false)
@@ -64,18 +64,6 @@ export function RenewalActivate(props: RenewalPhaseProps) {
   )
 
   if (rn.completed) return <>{<RenewalSummary {...props} />}{successModal}</>
-
-  if (!contractSent(rn)) {
-    return (
-      <FormSection wide>
-        <Paragraph>
-          Activation and handover open once the renewal contract and DSA have been sent to the client.{' '}
-          <Button type="link" style={{ paddingInline: 0 }} onClick={() => goPhase('contract')}>Go to Contract, KYC &amp; Notarization</Button>.
-        </Paragraph>
-        <Text type="secondary" style={{ fontSize: 12 }}>No policy is issued and no coverage is activated — this is a presentation mock.</Text>
-      </FormSection>
-    )
-  }
 
   const a = rn.activation ?? {}
   const activated = !!a.accountActivated
