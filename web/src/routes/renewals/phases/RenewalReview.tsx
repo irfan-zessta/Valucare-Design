@@ -8,7 +8,7 @@
 // ===========================================================================
 import { useState } from 'react'
 import { App, Button, Descriptions, Empty, Input, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd'
-import { CheckCircleOutlined, CloudDownloadOutlined, DownloadOutlined, EyeOutlined, FileTextOutlined, SendOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, CloudDownloadOutlined, DownloadOutlined, EyeOutlined, FileTextOutlined, RollbackOutlined, SendOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso, formatCount } from '../../../lib/format'
@@ -195,15 +195,16 @@ function RateSheetVersions({
   onSelect: (version: number) => void
 }) {
   const [viewVersion, setViewVersion] = useState<number | null>(null)
-  const [requestOpen, setRequestOpen] = useState(false)
+  // The version currently being returned to Actuarial (opens the return modal).
+  const [returnVersion, setReturnVersion] = useState<number | null>(null)
   const [reason, setReason] = useState('')
   const selected = rn.rates.response?.version
   const ordered = [...rn.rates.history].reverse() // newest first
   const viewed = ordered.find((s) => s.version === viewVersion)
 
-  function sendRequest() {
+  function sendReturn() {
     onRequest(reason)
-    setRequestOpen(false)
+    setReturnVersion(null)
     setReason('')
   }
 
@@ -211,9 +212,6 @@ function RateSheetVersions({
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 12px' }}>
         <Title level={5} style={{ margin: 0 }}>Rate sheet versions ({ordered.length})</Title>
-        <Button type="link" size="small" icon={<SendOutlined />} style={{ marginInlineStart: 'auto' }} onClick={() => setRequestOpen(true)}>
-          Request new rate sheet
-        </Button>
       </div>
       {ordered.length ? (
         <Space orientation="vertical" size="small" style={{ display: 'flex' }}>
@@ -229,6 +227,7 @@ function RateSheetVersions({
               </Space>
               <Space>
                 <Button size="small" icon={<EyeOutlined />} onClick={() => setViewVersion(s.version)}>View</Button>
+                <Button size="small" icon={<RollbackOutlined />} onClick={() => { setReturnVersion(s.version); setReason('') }}>Return</Button>
                 {s.version !== selected && (
                   <Button size="small" type="primary" onClick={() => onSelect(s.version)}>Select this version</Button>
                 )}
@@ -252,11 +251,12 @@ function RateSheetVersions({
         {viewed && <RateSheetPreview sheet={viewed} />}
       </Modal>
 
-      <Modal open={requestOpen} title="Request new rate sheet from Actuarial"
-        okText="Send request" okButtonProps={{ icon: <SendOutlined />, disabled: !reason.trim() }}
-        onOk={sendRequest} onCancel={() => { setRequestOpen(false); setReason('') }}>
+      <Modal open={returnVersion !== null}
+        title={returnVersion != null ? `Return rate sheet v${returnVersion} to Actuarial` : 'Return to Actuarial'}
+        okText="Send to Actuarial" okButtonProps={{ danger: true, icon: <SendOutlined />, disabled: !reason.trim() }}
+        onOk={sendReturn} onCancel={() => { setReturnVersion(null); setReason('') }}>
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-          Ask Actuarial to re-rate this renewal. Give the reason for the request — it's sent with the request and recorded on the returned sheet. No rating engine runs here; a representative revised sheet is returned for the demo.
+          Ask Actuarial to review and send a new version. Give the reason — it's sent with the request and recorded on the returned sheet. No rating engine runs here; a representative revised sheet is returned for the demo.
         </Text>
         <Input.TextArea rows={3} autoFocus value={reason} onChange={(e) => setReason(e.target.value)}
           placeholder="e.g. Client pushed back on the dependent uplift — requesting a softened re-rate." />
