@@ -10,7 +10,9 @@
 // ===========================================================================
 import type { ReactNode } from 'react'
 import { Alert, Typography } from 'antd'
-import { InfoCircleOutlined } from '@ant-design/icons'
+import {
+  FileTextOutlined, InfoCircleOutlined, RocketOutlined, SolutionOutlined, TagOutlined, UserAddOutlined,
+} from '@ant-design/icons'
 import type { HookAPI } from 'antd/es/modal/useModal'
 import {
   RENEWAL_PHASES, phaseStatus, recipientOf, renewalPhase,
@@ -28,7 +30,17 @@ export interface RenewalPhaseProps {
   preview: (kind: DocKind) => void
 }
 
-// --- Four-phase stepper -----------------------------------------------------
+// --- Five-phase stepper -----------------------------------------------------
+// Uses the New Business app-stepper CSS and the same icon-in-dot style as the
+// shared JourneyStepper, so the renewal journey reads identically to the case
+// journey. Each phase maps to an icon from the same set New Business uses.
+const PHASE_ICONS: Record<RenewalPhaseId, ReactNode> = {
+  review: <FileTextOutlined />,
+  proposal: <TagOutlined />,
+  setup: <UserAddOutlined />,
+  contract: <SolutionOutlined />,
+  activate: <RocketOutlined />,
+}
 
 export function RenewalStepper({
   rn, viewing, onSelect,
@@ -51,7 +63,7 @@ export function RenewalStepper({
         return (
           <button key={p.id} type="button" className={cls} onClick={() => onSelect(p.id)}
             aria-label={`Go to ${p.label}`} aria-current={viewing === p.id ? 'step' : undefined}>
-            <span className={dotCls}>{p.n}</span>
+            <span className={dotCls}>{PHASE_ICONS[p.id]}</span>
             <div className="app-stepper__label">{p.label}</div>
           </button>
         )
@@ -66,10 +78,11 @@ export function StatCards({ children }: { children: ReactNode }) {
   return <div className="rnw-cards">{children}</div>
 }
 export function StatCard({ label, value, sub }: { label: ReactNode; value: ReactNode; sub?: ReactNode }) {
+  // Value-first bordered tile — matches the New Business stat tiles exactly.
   return (
     <div className="rnw-card">
+      <span className="rnw-card-v">{value}</span>
       <span className="rnw-card-l">{label}</span>
-      <b className="rnw-card-v">{value}</b>
       {sub && <span className="rnw-card-sub">{sub}</span>}
     </div>
   )

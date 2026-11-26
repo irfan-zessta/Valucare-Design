@@ -1,55 +1,43 @@
 // ===========================================================================
-// Corporate Renewals — the dashboard and starting point. Mirrors the New
-// Business department-dashboard layout (page header, four compact statistics, a
-// work list with a search field + Filters popover) but with the two renewal
-// tabs the brief requires:
-//   • Upcoming Renewals — eligible existing accounts with no renewal started,
-//     sorted by nearest expiry. Start renewal (or Continue if a case exists).
-//   • In Progress — renewal cases underway; Continue reopens the latest task.
-// Closed renewals (completed / not renewed) stay findable in a history section.
-// Tab + search + filters are remembered across visits (sessionStorage).
+// Corporate Renewals dashboard. Rebuilt on the shared DepartmentDashboard so it
+// matches New Business (Sales) exactly: the same page header, the segmented
+// lifecycle view selector (All / In progress / Completed / Needs my action), the
+// search + Filters popover with removable filter chips, status chips, right-
+// aligned row actions, and the phone card layout.
+//
+// A "row" pairs every eligible account with its renewal case (if one exists):
+//   • No case yet        → an UPCOMING renewal; the row action starts it.
+//   • Case in progress   → Continue reopens the latest task.
+//   • Case completed / not renewed → a terminal row kept findable under Completed.
+// Everything renders clearly-labelled demo content.
 // ===========================================================================
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  App, Button, Card, Empty, Input, Popover, Select, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography,
-} from 'antd'
-import { FilterOutlined, SearchOutlined } from '@ant-design/icons'
+import { App, Button, Tag, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useRenewals } from '../../state/RenewalProvider'
 import { useInitialLoad } from '../../hooks/useInitialLoad'
-import { PageHeader } from '../../components/ui/PageHeader'
+import { DepartmentDashboard, type DashboardConfig } from '../../components/dashboard/DepartmentDashboard'
 import { formatDate } from '../../lib/format'
 import {
-  RENEWAL_ACCOUNTS, awaitingClient, expiryBucket, nextStep, progressStatus, renewalIdFor,
-  renewalPeriod, renewalPhase, timeUntil, toneColor,
+  RENEWAL_ACCOUNTS, RENEWAL_PHASES, awaitingClient, expiryBucket, nextStep, progressStatus,
+  renewalIdFor, renewalPeriod, renewalPhase, timeUntil, toneColor,
   type RenewalAccount, type RenewalCase,
 } from '../../domain/renewal'
 
-const { Link: TLink, Text } = Typography
-const UI_KEY = 'valucare-hms:renewals'
+const { Link: TLink } = Typography
 
-interface UiState {
-  tab: 'upcoming' | 'progress'
-  search: string
-  filters: Record<string, string | undefined>
-}
-
-function loadUi(): UiState {
-  try {
-    const raw = sessionStorage.getItem(UI_KEY)
-    if (raw) {
-      const p = JSON.parse(raw) as Partial<UiState>
-      return {
-        tab: p.tab === 'progress' ? 'progress' : 'upcoming',
-        search: typeof p.search === 'string' ? p.search : '',
-        filters: p.filters && typeof p.filters === 'object' ? p.filters : {},
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return { tab: 'upcoming', search: '', filters: {} }
+// Concise chip labels so the Status column reads like New Business (short words).
+// The full status + next action stays in the chip's tooltip.
+const SHORT_STATUS: Record<string, string> = {
+  'Reviewing data': 'Reviewing',
+  'Waiting for Actuarial': 'Waiting',
+  'Proposal sent': 'Proposal sent',
+  'Negotiating': 'Negotiating',
+  'Preparing renewal documents': 'Preparing',
+  'Activation & handover': 'Activating',
+  'Completed': 'Completed',
+  'Not renewed': 'Not renewed',
 }
 
 interface Row {
@@ -63,299 +51,219 @@ export default function RenewalsDashboard() {
   const navigate = useNavigate()
   const { modal, message } = App.useApp()
 
-  const [ui, setUi] = useState<UiState>(() => loadUi())
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(UI_KEY, JSON.stringify(ui))
-    } catch {
-      // ignore
-    }
-  }, [ui])
-
   // Pair every account with its renewal case (if any). `cases` in the dep array
   // keeps this live as renewals are started / advanced.
   const rows: Row[] = useMemo(
-    () => RENEWAL_ACCOUNTS.map((acct) => ({ acct, rn: getCase(renewalIdFor(acct.code)) })),
+    () =>
+      RENEWAL_ACCOUNTS.map((acct) => ({ acct, rn: getCase(renewalIdFor(acct.code)) })).sort(
+        (a, b) => a.acct.expiry.localeCompare(b.acct.expiry),
+      ),
     [getCase, cases],
   )
 
-  const upcoming = useMemo(
-    () => rows.filter((r) => !r.rn).sort((a, b) => a.acct.expiry.localeCompare(b.acct.expiry)),
-    [rows],
-  )
-  const inProgress = useMemo(() => rows.filter((r) => r.rn && !r.rn.completed && !r.rn.notRenewed), [rows])
-  const notRenewed = useMemo(() => rows.filter((r) => r.rn?.notRenewed), [rows])
-  const history = useMemo(() => rows.filter((r) => r.rn && (r.rn.completed || r.rn.notRenewed)), [rows])
+  const config = useMemo<DashboardConfig<Row>>(() => {
+    const open = (rn: RenewalCase) => navigate(`/sales/renewals/${rn.id}/${nextStep(rn).phase}`)
 
-  const stats = [
-    { key: 'upcoming', title: 'Upcoming', value: upcoming.length },
-    { key: 'in-progress', title: 'In progress', value: inProgress.length },
-    { key: 'awaiting', title: 'Awaiting client', value: inProgress.filter((r) => awaitingClient(r.rn!)).length },
-    { key: 'completed', title: 'Completed', value: history.filter((r) => r.rn!.completed).length },
-  ]
-
-  const open = (rn: RenewalCase) => navigate(`/sales/renewals/${rn.id}/${nextStep(rn).phase}`)
-
-  async function handleStart(acct: RenewalAccount) {
-    const id = renewalIdFor(acct.code)
-    const rp = renewalPeriod(acct.expiry)
-    const existing = getCase(id)
-    if (existing && !existing.completed && !existing.notRenewed) {
-      open(existing)
-      return
+    function handleStart(acct: RenewalAccount) {
+      const id = renewalIdFor(acct.code)
+      const rp = renewalPeriod(acct.expiry)
+      const existing = getCase(id)
+      if (existing && !existing.completed && !existing.notRenewed) {
+        open(existing)
+        return
+      }
+      modal.confirm({
+        title: 'Start this renewal?',
+        width: 520,
+        content: (
+          <div>
+            <div><b>{acct.name}</b> ({acct.code})</div>
+            <div>{formatDate(rp.from)} – {formatDate(rp.to)}</div>
+            <div style={{ marginTop: 12 }}>Existing account details will carry forward.</div>
+          </div>
+        ),
+        okText: 'Start renewal',
+        onOk: () => {
+          const rn = startRenewal(acct)
+          message.success('Renewal started — opening Renewal Data & Pricing.')
+          navigate(`/sales/renewals/${rn.id}/review`)
+        },
+      })
     }
-    modal.confirm({
-      title: 'Start this renewal?',
-      width: 520,
-      content: (
-        <div>
-          <div><b>{acct.name}</b> ({acct.code})</div>
-          <div>{formatDate(rp.from)} – {formatDate(rp.to)}</div>
-          <div style={{ marginTop: 12 }}>Existing account details will carry forward.</div>
+
+    // Open a started renewal, or start an upcoming one (with confirmation).
+    const openRow = (r: Row) => (r.rn ? open(r.rn) : handleStart(r.acct))
+
+    const isTerminal = (r: Row) => !!(r.rn && (r.rn.completed || r.rn.notRenewed))
+
+    // Company: name (links to open / start), with the account reference and
+    // industry beneath, then the renewal owner — the same layout as the Sales
+    // company cell so the two dashboards read identically.
+    const companyCell = (r: Row) => (
+      <div className="sales-co">
+        <TLink className="sales-co__name" onClick={(e) => { e.stopPropagation(); openRow(r) }}>
+          {r.acct.name}
+        </TLink>
+        <div className="sales-co__refs">
+          <span><span className="sales-co__reflabel">Account</span> {r.acct.code}</span>
+          <span className="sales-co__sep">·</span>
+          <span>{r.acct.industry}</span>
         </div>
-      ),
-      okText: 'Start renewal',
-      onOk: () => {
-        const rn = startRenewal(acct)
-        message.success('Renewal started — opening Renewal Data & Pricing.')
-        navigate(`/sales/renewals/${rn.id}/review`)
-      },
-    })
-  }
-
-  // --- Contextual filters (depend on the active tab) ------------------------
-  const owners = useMemo(() => [...new Set(RENEWAL_ACCOUNTS.map((a) => a.owner))], [])
-  const progressStatuses = useMemo(
-    () => [...new Set(inProgress.map((r) => progressStatus(r.rn!).label))],
-    [inProgress],
-  )
-  const q = ui.search.trim().toLowerCase()
-  const matchQ = (r: Row) => q === '' || `${r.acct.name} ${r.acct.code}`.toLowerCase().includes(q)
-
-  const shownUpcoming = useMemo(
-    () =>
-      upcoming.filter((r) => {
-        if (!matchQ(r)) return false
-        if (ui.filters.expiry && expiryBucket(r.acct.expiry) !== ui.filters.expiry) return false
-        if (ui.filters.owner && r.acct.owner !== ui.filters.owner) return false
-        return true
-      }),
-    [upcoming, ui.filters, q],
-  )
-  const shownProgress = useMemo(
-    () =>
-      inProgress.filter((r) => {
-        if (!matchQ(r)) return false
-        if (ui.filters.phase && nextStep(r.rn!).phase !== ui.filters.phase) return false
-        if (ui.filters.status && progressStatus(r.rn!).label !== ui.filters.status) return false
-        return true
-      }),
-    [inProgress, ui.filters, q],
-  )
-  const shownNotRenewed = useMemo(
-    () => notRenewed.filter((r) => matchQ(r)),
-    [notRenewed, q],
-  )
-
-  const activeFilterCount = Object.values(ui.filters).filter(Boolean).length
-  const clear = () => setUi((s) => ({ ...s, search: '', filters: {} }))
-
-  const upcomingColumns: ColumnsType<Row> = [
-    {
-      title: 'Company',
-      key: 'company',
-      render: (_, r) => (
-        <div>
-          <TLink onClick={() => handleStart(r.acct)} style={{ fontWeight: 500 }}>{r.acct.name}</TLink>
-          <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{r.acct.code} · {r.acct.industry}</div>
+        <div className="sales-co__refs">
+          <span><span className="sales-co__reflabel">Owner</span> {r.acct.owner}</span>
         </div>
-      ),
-    },
-    { title: 'Account reference', key: 'ref', render: (_, r) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{r.acct.code}</span> },
-    { title: 'Expiry date', key: 'expiry', render: (_, r) => formatDate(r.acct.expiry) },
-    { title: 'Time remaining', key: 'time', render: (_, r) => <Text type="secondary">{timeUntil(r.acct.expiry)}</Text> },
-    { title: 'Owner', key: 'owner', render: (_, r) => (<div>{r.acct.owner}<div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{r.acct.ownerRole}</div></div>) },
-    {
-      title: '', key: 'action', align: 'right',
-      render: (_, r) => <Button type="primary" size="small" onClick={() => handleStart(r.acct)}>Start renewal</Button>,
-    },
-  ]
-
-  const progressColumns: ColumnsType<Row> = [
-    {
-      title: 'Company', key: 'company',
-      render: (_, r) => (
-        <div>
-          <TLink onClick={() => open(r.rn!)} style={{ fontWeight: 500 }}>{r.acct.name}</TLink>
-          <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{r.acct.code}</div>
-        </div>
-      ),
-    },
-    { title: 'Expiry date', key: 'expiry', render: (_, r) => formatDate(r.rn!.currentContract.to) },
-    { title: 'Current phase', key: 'phase', render: (_, r) => renewalPhase(nextStep(r.rn!).phase).label },
-    {
-      title: 'Status', key: 'status',
-      render: (_, r) => { const ps = progressStatus(r.rn!); return <Tag color={toneColor(ps.tone)}>{ps.label}</Tag> },
-    },
-    {
-      title: 'Next action', key: 'next',
-      render: (_, r) => <Tooltip title={nextStep(r.rn!).sentence}><Text type="secondary" style={{ maxWidth: 220, display: 'inline-block' }} ellipsis>{nextStep(r.rn!).sentence}</Text></Tooltip>,
-    },
-    { title: '', key: 'continue', align: 'right', render: (_, r) => <Button type="link" style={{ paddingInline: 0 }} onClick={() => open(r.rn!)}>Continue</Button> },
-  ]
-
-  const historyColumns: ColumnsType<Row> = [
-    {
-      title: 'Company', key: 'company',
-      render: (_, r) => (
-        <div>
-          <TLink onClick={() => open(r.rn!)} style={{ fontWeight: 500 }}>{r.acct.name}</TLink>
-          <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{r.acct.code}</div>
-        </div>
-      ),
-    },
-    { title: 'Renewal period', key: 'period', render: (_, r) => `${formatDate(r.rn!.renewal.from)} – ${formatDate(r.rn!.renewal.to)}` },
-    { title: 'Outcome', key: 'outcome', render: (_, r) => { const ps = progressStatus(r.rn!); return <Tag color={toneColor(ps.tone)}>{ps.label}</Tag> } },
-    { title: '', key: 'open', align: 'right', render: (_, r) => <Button type="link" style={{ paddingInline: 0 }} onClick={() => open(r.rn!)}>Open</Button> },
-  ]
-
-  const filtersPopover = (
-    <div style={{ width: 240 }}>
-      <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
-        {ui.tab === 'upcoming' ? (
-          <>
-            <div>
-              <Text type="secondary" style={{ fontSize: 12 }}>Expiry period</Text>
-              <Select allowClear placeholder="Any" style={{ width: '100%', marginTop: 4 }} value={ui.filters.expiry}
-                onChange={(v) => setUi((s) => ({ ...s, filters: { ...s.filters, expiry: v } }))}
-                options={[
-                  { label: 'Overdue', value: 'overdue' },
-                  { label: 'Within 30 days', value: 'd30' },
-                  { label: 'Within 60 days', value: 'd60' },
-                  { label: 'Within 90 days', value: 'd90' },
-                  { label: 'Later', value: 'later' },
-                ]} />
-            </div>
-            <div>
-              <Text type="secondary" style={{ fontSize: 12 }}>Owner</Text>
-              <Select allowClear placeholder="Any" style={{ width: '100%', marginTop: 4 }} value={ui.filters.owner}
-                onChange={(v) => setUi((s) => ({ ...s, filters: { ...s.filters, owner: v } }))}
-                options={owners.map((o) => ({ label: o, value: o }))} />
-            </div>
-          </>
-        ) : (
-          <>
-            <div>
-              <Text type="secondary" style={{ fontSize: 12 }}>Phase</Text>
-              <Select allowClear placeholder="Any" style={{ width: '100%', marginTop: 4 }} value={ui.filters.phase}
-                onChange={(v) => setUi((s) => ({ ...s, filters: { ...s.filters, phase: v } }))}
-                options={[
-                  { label: 'Renewal Data & Pricing', value: 'review' },
-                  { label: 'Proposal & Client Decision', value: 'proposal' },
-                  { label: 'Renewal Setup, SOB & Plan Codes', value: 'setup' },
-                  { label: 'Contract, KYC & Notarization', value: 'contract' },
-                ]} />
-            </div>
-            <div>
-              <Text type="secondary" style={{ fontSize: 12 }}>Status</Text>
-              <Select allowClear placeholder="Any" style={{ width: '100%', marginTop: 4 }} value={ui.filters.status}
-                onChange={(v) => setUi((s) => ({ ...s, filters: { ...s.filters, status: v } }))}
-                options={progressStatuses.map((s) => ({ label: s, value: s }))} />
-            </div>
-          </>
-        )}
-        {activeFilterCount > 0 && (
-          <Button type="link" style={{ paddingInline: 0 }} onClick={() => setUi((s) => ({ ...s, filters: {} }))}>Clear filters</Button>
-        )}
-      </Space>
-    </div>
-  )
-
-  const toolbar = (
-    <Space wrap>
-      <Input allowClear prefix={<SearchOutlined />} placeholder="Search company or account reference"
-        value={ui.search} onChange={(e) => setUi((s) => ({ ...s, search: e.target.value }))} style={{ width: 320 }} />
-      <Popover content={filtersPopover} title="Filters" trigger="click" placement="bottomLeft">
-        <Button icon={<FilterOutlined />}>Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Button>
-      </Popover>
-      {(ui.search || activeFilterCount > 0) && <Button type="text" onClick={clear}>Clear</Button>}
-    </Space>
-  )
-
-  const emptyUpcoming = (
-    <Empty description={ui.search || activeFilterCount ? 'No matching accounts' : 'No upcoming renewals — every approaching account already has work started.'}>
-      {(ui.search || activeFilterCount) ? <Button onClick={clear}>Clear</Button> : null}
-    </Empty>
-  )
-  const emptyProgress = (
-    <Empty description={ui.search || activeFilterCount ? 'No matching renewals' : 'Nothing in progress. Start a renewal from the Upcoming Renewals tab.'}>
-      {(ui.search || activeFilterCount) ? <Button onClick={clear}>Clear</Button> : null}
-    </Empty>
-  )
-  const emptyNotRenewed = (
-    <Empty description={ui.search ? 'No matching renewals' : 'No renewals have been marked not renewed.'}>
-      {ui.search ? <Button onClick={clear}>Clear</Button> : null}
-    </Empty>
-  )
-
-  return (
-    <div className="app-page app-page--wide">
-      <PageHeader
-        title="Corporate Renewals"
-        supporting="Find upcoming renewals and continue work already started. Everything here is clearly-labelled demo content."
-      />
-
-      {/* Four compact statistics. Counts come from the records; "Upcoming" counts
-          eligible accounts with no renewal started, "Awaiting client" counts sent
-          proposals with no decision recorded, "Completed" excludes not-renewed. */}
-      <div className="app-dashboard__stats">
-        {stats.map((s) => (
-          <Card key={s.key} size="small">
-            <Statistic title={s.title} value={loading ? 0 : s.value} />
-          </Card>
-        ))}
       </div>
+    )
 
-      {error ? (
-        <Empty description={error}><Button type="primary" onClick={retry}>Retry</Button></Empty>
-      ) : (
-        <>
-          <Tabs
-            activeKey={ui.tab}
-            onChange={(k) => setUi((s) => ({ ...s, tab: k as UiState['tab'], filters: {} }))}
-            tabBarExtraContent={{ right: toolbar }}
-            items={[
-              {
-                key: 'upcoming',
-                label: `Upcoming Renewals (${upcoming.length})`,
-                children: (
-                  <Table<Row> rowKey={(r) => r.acct.code} columns={upcomingColumns} dataSource={shownUpcoming}
-                    loading={loading} pagination={{ pageSize: 10, hideOnSinglePage: true }}
-                    locale={{ emptyText: emptyUpcoming }} />
-                ),
-              },
-              {
-                key: 'progress',
-                label: `In Progress (${inProgress.length})`,
-                children: (
-                  <Table<Row> rowKey={(r) => r.rn!.id} columns={progressColumns} dataSource={shownProgress}
-                    loading={loading} pagination={{ pageSize: 10, hideOnSinglePage: true }}
-                    locale={{ emptyText: emptyProgress }} />
-                ),
-              },
-              {
-                key: 'not-renewed',
-                label: `Not renewed (${notRenewed.length})`,
-                children: (
-                  <Table<Row> rowKey={(r) => r.rn!.id} columns={historyColumns} dataSource={shownNotRenewed}
-                    loading={loading} pagination={{ pageSize: 10, hideOnSinglePage: true }}
-                    locale={{ emptyText: emptyNotRenewed }} />
-                ),
-              },
-            ]}
-          />
-        </>
-      )}
-    </div>
-  )
+    // Stage = current renewal phase (or "Not started" for an upcoming account).
+    const stageCell = (r: Row) => (
+      <div className="sales-progress__area">
+        {r.rn ? renewalPhase(nextStep(r.rn).phase).label : 'Not started'}
+      </div>
+    )
+
+    // A categorical status chip. Upcoming rows use an expiry-urgency colour; a
+    // started renewal uses its progress tone. Mirrors the Sales status chip.
+    const statusCell = (r: Row) => {
+      if (!r.rn) {
+        const bucket = expiryBucket(r.acct.expiry)
+        const color = bucket === 'overdue' ? 'red' : bucket === 'd30' ? 'gold' : 'blue'
+        return (
+          <Tooltip title={`Expiry ${formatDate(r.acct.expiry)} · ${timeUntil(r.acct.expiry)}`}>
+            <span className="sales-chip-wrap" tabIndex={0}>
+              <Tag className="sales-chip" color={color}>Upcoming</Tag>
+            </span>
+          </Tooltip>
+        )
+      }
+      const ps = progressStatus(r.rn)
+      return (
+        <Tooltip title={`${ps.label} — ${nextStep(r.rn).sentence}`}>
+          <span className="sales-chip-wrap" tabIndex={0}>
+            <Tag className="sales-chip" color={toneColor(ps.tone)}>{SHORT_STATUS[ps.label] ?? ps.label}</Tag>
+          </span>
+        </Tooltip>
+      )
+    }
+
+    // Contextual action cell: one primary link action. Stops row-click
+    // propagation so the control is independently operable.
+    const actionCell = (r: Row) => {
+      const terminal = isTerminal(r)
+      const label = !r.rn ? 'Start renewal' : terminal ? 'Open' : 'Continue'
+      return (
+        <div className="sales-action" onClick={(e) => e.stopPropagation()}>
+          <Button
+            type={terminal ? 'text' : 'link'}
+            className={`sales-action__cta${terminal ? ' sales-action__cta--subtle' : ''}`}
+            onClick={() => openRow(r)}
+          >
+            {label}
+          </Button>
+        </div>
+      )
+    }
+
+    const expiryCell = (r: Row) => formatDate(r.rn ? r.rn.currentContract.to : r.acct.expiry)
+    const ownerCell = (r: Row) => (
+      <div>
+        {r.acct.owner}
+        <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>{r.acct.ownerRole}</div>
+      </div>
+    )
+
+    // Company flexes to fill width; every other column has a fixed width and
+    // Action is pinned right so it stays visible when the table scrolls. These
+    // columns mirror the New Business (Sales) in-progress table exactly.
+    const inProgressColumns: ColumnsType<Row> = [
+      { title: 'Company', key: 'company', render: (_, r) => companyCell(r) },
+      { title: 'Expiry date', key: 'expiry', width: 120, render: (_, r) => expiryCell(r) },
+      { title: 'Stage', key: 'stage', width: 170, render: (_, r) => stageCell(r) },
+      { title: 'Status', key: 'status', width: 180, render: (_, r) => statusCell(r) },
+      { title: 'Owner', key: 'owner', width: 140, render: (_, r) => ownerCell(r) },
+      { title: 'Action', key: 'action', width: 160, align: 'right', fixed: 'right', render: (_, r) => actionCell(r) },
+    ]
+
+    const completedColumns: ColumnsType<Row> = [
+      { title: 'Company', key: 'company', render: (_, r) => companyCell(r) },
+      {
+        title: 'Renewal period', key: 'period', width: 210,
+        render: (_, r) => (r.rn ? `${formatDate(r.rn.renewal.from)} – ${formatDate(r.rn.renewal.to)}` : '—'),
+      },
+      { title: 'Outcome', key: 'outcome', width: 180, render: (_, r) => statusCell(r) },
+      { title: 'Owner', key: 'owner', width: 140, render: (_, r) => ownerCell(r) },
+      { title: 'Action', key: 'action', width: 160, align: 'right', fixed: 'right', render: (_, r) => actionCell(r) },
+    ]
+
+    // Phone card: the same company / status / action pieces as a row, plus a
+    // labelled metadata grid so nothing is an unlabelled stacked table cell.
+    const renderMobileCard = (r: Row) => (
+      <div className="case-card">
+        <div className="case-card__head">
+          {companyCell(r)}
+          {statusCell(r)}
+        </div>
+        <dl className="case-card__meta">
+          <div>
+            <dt>{isTerminal(r) ? 'Renewal period' : 'Expiry'}</dt>
+            <dd>{isTerminal(r) && r.rn ? `${formatDate(r.rn.renewal.from)} – ${formatDate(r.rn.renewal.to)}` : formatDate(r.acct.expiry)}</dd>
+          </div>
+          <div>
+            <dt>Stage</dt>
+            <dd>{r.rn ? renewalPhase(nextStep(r.rn).phase).label : 'Not started'}</dd>
+          </div>
+          <div>
+            <dt>Owner</dt>
+            <dd>{r.acct.owner}</dd>
+          </div>
+        </dl>
+        <div className="case-card__foot">{actionCell(r)}</div>
+      </div>
+    )
+
+    const owners = [...new Set(RENEWAL_ACCOUNTS.map((a) => a.owner))]
+
+    return {
+      deptId: 'renewals',
+      title: 'Corporate Renewals',
+      supportingText:
+        'Find upcoming renewals and continue work already started. Everything here is clearly-labelled demo content.',
+      rowId: (r) => r.acct.code,
+      onRowClick: openRow,
+      isCompleted: isTerminal,
+      // Needs action: an upcoming renewal to start, or an active one where the
+      // ball is in our court (not waiting on the client / an outside team).
+      needsMyAction: (r) => (r.rn ? !r.rn.completed && !r.rn.notRenewed && !awaitingClient(r.rn) : true),
+      searchText: (r) => `${r.acct.name} ${r.acct.code} ${r.acct.industry}`.toLowerCase(),
+      filters: [
+        {
+          key: 'expiry', label: 'Expiry period', options: [
+            { label: 'Overdue', value: 'overdue' },
+            { label: 'Within 30 days', value: 'd30' },
+            { label: 'Within 60 days', value: 'd60' },
+            { label: 'Within 90 days', value: 'd90' },
+            { label: 'Later', value: 'later' },
+          ],
+        },
+        { key: 'owner', label: 'Owner', options: owners.map((o) => ({ label: o, value: o })) },
+        { key: 'phase', label: 'Phase', options: RENEWAL_PHASES.map((p) => ({ label: p.label, value: p.id })) },
+      ],
+      matchesFilters: (r, s) => {
+        if (s.expiry && expiryBucket(r.acct.expiry) !== s.expiry) return false
+        if (s.owner && r.acct.owner !== s.owner) return false
+        if (s.phase) {
+          if (!r.rn) return false
+          if (nextStep(r.rn).phase !== s.phase) return false
+        }
+        return true
+      },
+      inProgressColumns,
+      completedColumns,
+      scrollX: 1000,
+      renderMobileCard,
+      emptyText: 'No renewals yet',
+    }
+  }, [navigate, getCase, startRenewal, modal, message])
+
+  return <DepartmentDashboard<Row> config={config} rows={rows} loading={loading} error={error} onRetry={retry} />
 }
