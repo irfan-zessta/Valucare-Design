@@ -13,6 +13,7 @@ import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
 import { formatDate, formatDateTime, formatPeso } from '../../../lib/format'
 import { toneColor, type RenewalCase, type Tone } from '../../../domain/renewal'
+import { BRAND_RED } from '../../../theme'
 import { type RenewalPhaseProps } from '../shared'
 
 const { Text } = Typography
@@ -183,7 +184,7 @@ function SetupHandoffCards({ rn, patch, preview }: Pick<RenewalPhaseProps, 'rn' 
   return (
     <>
       {/* Certificate of Coverage & Commission Rate Form (merged, inline edit) */}
-      <FormSection wide title="4.1 · Certificate of Coverage (CoC) and Commission Rate Form (CRF)"
+      <FormSection wide title={<><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24, height: 24, padding: '0 7px', marginRight: 10, borderRadius: 6, background: BRAND_RED, color: '#fff', fontSize: 14, fontWeight: 600, verticalAlign: 'middle' }}>1</span>Certificate of Coverage (CoC) and Commission Rate Form (CRF)</>}
         description="Prepare the CoC (optional temporary cover) together with the commission rate form inline, then generate both."
         extra={cocGenerated ? <Tag color="green" icon={<CheckCircleOutlined />}>Generated</Tag> : <Tag>Draft</Tag>}>
         {cocEditable ? (
