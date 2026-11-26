@@ -7,10 +7,12 @@
 // are in, the next action is Prepare renewal proposal.
 // ===========================================================================
 import { useState } from 'react'
-import { App, Button, Descriptions, Empty, Input, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd'
+import { App, Button, Descriptions, Empty, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import { CheckCircleOutlined, CloudDownloadOutlined, DownloadOutlined, EyeOutlined, FileTextOutlined, RollbackOutlined, SendOutlined } from '@ant-design/icons'
 import { FormSection } from '../../../components/ui/FormSection'
 import { FormActions } from '../../../components/ui/FormActions'
+import { RemarksField } from '../../../components/comments/RemarksField'
+import { useRemarkComment } from '../../../components/comments/useRemarkComment'
 import { formatDate, formatDateTime, formatPeso, formatCount } from '../../../lib/format'
 import {
   doPullAllExtracts, doRequestRates, doReviseRates, doSelectRateVersion, doUseRateResponse,
@@ -30,6 +32,7 @@ const { Text, Title } = Typography
 
 export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps) {
   const { message } = App.useApp()
+  const postRemark = useRemarkComment()
   const r = rn.reports
   const rr = rn.rates.response
 
@@ -142,7 +145,17 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
           ) : (
             <>
               <RateSheetVersions rn={rn}
-                onRequest={(reason) => { patch((x) => doReviseRates(x, false, reason)); message.success('Rate sheet request sent to Actuarial (simulated).') }}
+                onReturn={(reason, version) => {
+                  patch((x) => doReviseRates(x, false, reason))
+                  // Post the return to the case Comments thread and notify anyone
+                  // @mentioned — same behaviour as the New Business rate-sheet return.
+                  const tagged = postRemark(
+                    { caseId: rn.id, caseName: rn.name, label: `Returned rate sheet v${version} to Actuarial` },
+                    reason,
+                  )
+                  const who = tagged.length ? ` — ${tagged.map((t) => `@${t.name}`).join(', ')} notified` : ''
+                  message.warning(`Rate sheet v${version} returned to Actuarial for a new version${who}.`)
+                }}
                 onSelect={(v) => { patch((x) => doSelectRateVersion(x, v)); message.success(`Selected rate sheet v${v}.`) }} />
             </>
           )}
@@ -188,10 +201,10 @@ function RateSheetPreview({ sheet }: { sheet: RateResponse }) {
 // simulate a new Actuarial round; earlier versions stay on record and can be
 // re-selected.
 function RateSheetVersions({
-  rn, onRequest, onSelect,
+  rn, onReturn, onSelect,
 }: {
   rn: RenewalCase
-  onRequest: (reason: string) => void
+  onReturn: (reason: string, version: number) => void
   onSelect: (version: number) => void
 }) {
   const [viewVersion, setViewVersion] = useState<number | null>(null)
@@ -203,7 +216,8 @@ function RateSheetVersions({
   const viewed = ordered.find((s) => s.version === viewVersion)
 
   function sendReturn() {
-    onRequest(reason)
+    if (returnVersion == null) return
+    onReturn(reason, returnVersion)
     setReturnVersion(null)
     setReason('')
   }
@@ -256,10 +270,16 @@ function RateSheetVersions({
         okText="Send to Actuarial" okButtonProps={{ danger: true, icon: <SendOutlined />, disabled: !reason.trim() }}
         onOk={sendReturn} onCancel={() => { setReturnVersion(null); setReason('') }}>
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-          Ask Actuarial to review and send a new version. Give the reason — it's sent with the request and recorded on the returned sheet. No rating engine runs here; a representative revised sheet is returned for the demo.
+          Ask Actuarial to review and send a new version. Your message is posted to the case Comments —
+          type <strong>@</strong> to mention a teammate and notify them. A representative revised sheet is
+          returned for the demo.
         </Text>
-        <Input.TextArea rows={3} autoFocus value={reason} onChange={(e) => setReason(e.target.value)}
-          placeholder="e.g. Client pushed back on the dependent uplift — requesting a softened re-rate." />
+        <RemarksField
+          value={reason}
+          onChange={setReason}
+          ariaLabel="Return message to Actuarial"
+          placeholder="Describe why it's returned, e.g. @Actuarial the dependent uplift is above target — please re-issue."
+        />
       </Modal>
     </>
   )
