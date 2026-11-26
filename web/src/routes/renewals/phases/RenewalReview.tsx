@@ -38,7 +38,15 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
   // The phase's single forward action, surfaced in the floating bar (consistent
   // with the New Business flows). Which one shows depends on how far the case is.
   const floatAction = !ready
-    ? null // extracts are pulled from the card itself; no floating action yet
+    ? {
+        note: 'Pull the Member Data, claims and CCD extracts to begin.',
+        button: (
+          <Button type="primary" icon={<CloudDownloadOutlined />}
+            onClick={() => { patch((x) => doPullAllExtracts(x)); message.success('Pulled renewal data extracts from MDA, Claims and CCD.') }}>
+            Pull reports
+          </Button>
+        ),
+      }
     : !rn.rates.requested
     ? {
         note: '',
@@ -74,12 +82,7 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
         extra={ready ? <Tag color="green" icon={<CheckCircleOutlined />}>All extracts received</Tag> : undefined}>
         {!ready && (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="No extracts pulled yet. Use Pull reports to bring in the Member Data, claims and CCD figures.">
-            <Button type="primary" icon={<CloudDownloadOutlined />}
-              onClick={() => { patch((x) => doPullAllExtracts(x)); message.success('Pulled renewal data extracts from MDA, Claims and CCD.') }}>
-              Pull reports
-            </Button>
-          </Empty>
+            description="No extracts pulled yet. Use Pull reports below to bring in the Member Data, claims and CCD figures." />
         )}
 
         {ready ? (
