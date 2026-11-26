@@ -80,11 +80,6 @@ export function RenewalReview({ rn, patch, goPhase, preview }: RenewalPhaseProps
       <FormSection wide title="Renewal data extracts"
         description="One click pulls the Member Data, claims and CCD extracts straight from their teams — MDA, Claims and CCD. No manual ICT request, no spreadsheet assembly."
         extra={ready ? <Tag color="green" icon={<CheckCircleOutlined />}>All extracts received</Tag> : undefined}>
-        {!ready && (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="No extracts pulled yet. Use Pull reports below to bring in the Member Data, claims and CCD figures." />
-        )}
-
         {ready ? (
           <>
             <SimNote>Figures are fictional aggregates for the mock. Member identities are masked; no personal or medical information is shown.</SimNote>
