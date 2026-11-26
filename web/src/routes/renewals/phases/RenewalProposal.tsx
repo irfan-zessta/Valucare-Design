@@ -295,7 +295,6 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
         <div className="app-form-floatbar__actions">
           {!latest ? (
             <>
-              <Button icon={<FileTextOutlined />} onClick={() => preview('proposal')}>Preview proposal</Button>
               <Button icon={<DownloadOutlined />} onClick={() => { downloadDoc('proposal', rn); message.success('Proposal PDF generated (sample).') }}>Generate proposal PDF</Button>
               <Button type="primary" onClick={() => { patch((x) => doSendProposal(x)); message.success('Proposal sent to the client (simulated).') }}>Send to client</Button>
             </>
@@ -308,7 +307,6 @@ export function RenewalProposal({ rn, patch, goPhase, preview }: RenewalPhasePro
             <Button icon={<FileTextOutlined />} onClick={() => preview('advisory')}>Preview non-renewal advisory</Button>
           ) : (
             <>
-              <Button icon={<FileTextOutlined />} onClick={() => preview('proposal')}>Preview proposal</Button>
               <Button icon={<DownloadOutlined />} onClick={() => { downloadDoc('proposal', rn); message.success('Proposal PDF generated (sample).') }}>Generate proposal PDF</Button>
               <Button onClick={() => { changeForm.setFieldsValue({ comment: 'Requesting a lower principal rate and clarification on dependent room entitlement.' }); setChangesOpen(true) }}>Request pricing changes</Button>
               <Button danger onClick={() => { nrForm.setFieldsValue({ reason: 'Client consolidating cover with a group-wide provider.' }); setNotRenewOpen(true) }}>Declined (not renewing)</Button>
