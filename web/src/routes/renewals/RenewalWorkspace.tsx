@@ -8,14 +8,13 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { App, Result, Space } from 'antd'
 import { useRenewals } from '../../state/RenewalProvider'
-import { useActiveUser } from '../../state/ActiveUserProvider'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { formatDate } from '../../lib/format'
 import {
-  RENEWAL_PHASE_IDS, accountById, amHandoverDone, phaseOwner,
+  RENEWAL_PHASE_IDS, accountById,
   type RenewalCase, type RenewalPhaseId,
 } from '../../domain/renewal'
-import { RenewalStepper, PhaseOwnerBanner, HandoverGate, openDocPreview, type DocKind } from './shared'
+import { RenewalStepper, openDocPreview, type DocKind } from './shared'
 import { RenewalReview } from './phases/RenewalReview'
 import { RenewalProposal } from './phases/RenewalProposal'
 import { RenewalSetup } from './phases/RenewalSetup'
@@ -26,7 +25,6 @@ export default function RenewalWorkspace() {
   const { id = '', phase = 'review' } = useParams()
   const navigate = useNavigate()
   const { getCase, startRenewal, patchCase } = useRenewals()
-  const { role } = useActiveUser()
   const { modal } = App.useApp()
 
   // Resume from the store, or seed on a direct link to a known sample account
@@ -55,12 +53,7 @@ export default function RenewalWorkspace() {
   const patch = (recipe: (c: RenewalCase) => void) => patchCase(rn.id, recipe)
   const preview = (kind: DocKind) => openDocPreview(modal, kind, rn)
 
-  const phaseProps = { rn, patch, goPhase, preview, role }
-
-  // The Account-Manager phases (Contract, Activate) open only after Account
-  // Services has handed the renewal over. Completed cases render their summary.
-  const needsHandover =
-    phaseOwner(activePhase) === 'account-manager' && !amHandoverDone(rn) && !rn.completed
+  const phaseProps = { rn, patch, goPhase, preview }
 
   return (
     <div className="app-page app-page--wide">
@@ -77,23 +70,16 @@ export default function RenewalWorkspace() {
           />
         </div>
         <div className="app-pageheader-card app-pageheader-card--stepper">
-          <RenewalStepper rn={rn} viewing={activePhase} onSelect={goPhase} role={role} />
+          <RenewalStepper rn={rn} viewing={activePhase} onSelect={goPhase} />
         </div>
       </div>
 
       <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
-        <PhaseOwnerBanner phase={activePhase} role={role} />
-        {needsHandover ? (
-          <HandoverGate onBack={() => goPhase('setup')} />
-        ) : (
-          <>
-            {activePhase === 'review' && <RenewalReview {...phaseProps} />}
-            {activePhase === 'proposal' && <RenewalProposal {...phaseProps} />}
-            {activePhase === 'setup' && <RenewalSetup {...phaseProps} />}
-            {activePhase === 'contract' && <RenewalContract {...phaseProps} />}
-            {activePhase === 'activate' && <RenewalActivate {...phaseProps} />}
-          </>
-        )}
+        {activePhase === 'review' && <RenewalReview {...phaseProps} />}
+        {activePhase === 'proposal' && <RenewalProposal {...phaseProps} />}
+        {activePhase === 'setup' && <RenewalSetup {...phaseProps} />}
+        {activePhase === 'contract' && <RenewalContract {...phaseProps} />}
+        {activePhase === 'activate' && <RenewalActivate {...phaseProps} />}
       </Space>
     </div>
   )

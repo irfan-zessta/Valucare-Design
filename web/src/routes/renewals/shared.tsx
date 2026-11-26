@@ -9,17 +9,15 @@
 // Everything renders clearly-labelled sample data; nothing is a real file/send.
 // ===========================================================================
 import type { ReactNode } from 'react'
-import { Alert, Button, Typography } from 'antd'
+import { Alert, Typography } from 'antd'
 import {
   FileTextOutlined, InfoCircleOutlined, RocketOutlined, SolutionOutlined, TagOutlined, UserAddOutlined,
 } from '@ant-design/icons'
 import type { HookAPI } from 'antd/es/modal/useModal'
 import {
-  RENEWAL_PHASES, TEAM_LABEL, phaseOwner, phaseStatus, recipientOf, renewalPhase,
-  type RenewalCase, type RenewalPhaseId, type RenewalTeam,
+  RENEWAL_PHASES, phaseStatus, recipientOf, renewalPhase,
+  type RenewalCase, type RenewalPhaseId,
 } from '../../domain/renewal'
-import { roleLabel, type RoleKey } from '../../domain/access'
-import { FormSection } from '../../components/ui/FormSection'
 import { formatDate, formatPeso } from '../../lib/format'
 
 export interface RenewalPhaseProps {
@@ -30,49 +28,6 @@ export interface RenewalPhaseProps {
   goPhase: (p: RenewalPhaseId) => void
   /** Open a clearly-labelled sample-document preview. */
   preview: (kind: DocKind) => void
-  /** The active business user's role — used to split work across AS and AM. */
-  role: RoleKey
-}
-
-/** Friendly team name for a role (falls back to the generic role label). */
-function teamName(role: RoleKey): string {
-  return TEAM_LABEL[role as RenewalTeam] ?? roleLabel(role)
-}
-
-// --- Role division ----------------------------------------------------------
-// The renewal journey is split between two users: Account Services runs the
-// first three phases, the Account Manager the last two. This banner tells the
-// viewer whose step they are on and whether it is theirs.
-export function PhaseOwnerBanner({ phase, role }: { phase: RenewalPhaseId; role: RoleKey }) {
-  const owner = phaseOwner(phase)
-  const mine = role === owner
-  return (
-    <Alert
-      type={mine ? 'success' : 'info'}
-      showIcon
-      message={
-        mine
-          ? `${TEAM_LABEL[owner]} step — your team owns this part of the renewal.`
-          : `${TEAM_LABEL[owner]} step — handled by the ${TEAM_LABEL[owner]}. You're viewing as ${teamName(role)}.`
-      }
-    />
-  )
-}
-
-/** Shown on an Account-Manager phase before Account Services has handed over. */
-export function HandoverGate({ onBack }: { onBack: () => void }) {
-  return (
-    <FormSection wide>
-      <Typography.Paragraph>
-        This step opens once <strong>Account Services</strong> completes Renewal Setup and hands the
-        renewal over to the Account Manager.{' '}
-        <Button type="link" style={{ paddingInline: 0 }} onClick={onBack}>Go to Renewal Setup</Button>.
-      </Typography.Paragraph>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        Contract, KYC, notarization and activation are owned by the Account Manager.
-      </Typography.Text>
-    </FormSection>
-  )
 }
 
 // --- Five-phase stepper -----------------------------------------------------
@@ -88,17 +43,15 @@ const PHASE_ICONS: Record<RenewalPhaseId, ReactNode> = {
 }
 
 export function RenewalStepper({
-  rn, viewing, onSelect, role,
+  rn, viewing, onSelect,
 }: {
   rn: RenewalCase
   viewing: RenewalPhaseId
   onSelect: (p: RenewalPhaseId) => void
-  /** Active role — highlights the phases the current viewer's team owns. */
-  role?: RoleKey
 }) {
   return (
     <div className="app-stepper app-stepper--minimal">
-      {RENEWAL_PHASES.map((p, i) => {
+      {RENEWAL_PHASES.map((p) => {
         const st = phaseStatus(rn, p.id)
         const cls =
           'app-stepper__item' +
@@ -107,22 +60,11 @@ export function RenewalStepper({
           (viewing === p.id ? ' is-viewing' : '')
         const dotCls =
           'app-stepper__dot' + (st.state === 'current' ? ' is-active' : st.state === 'done' ? ' is-done' : '')
-        // Caption each step with its owning team, and mark the hand-off boundary
-        // where ownership passes from Account Services to the Account Manager.
-        const owner = p.owner
-        const prevOwner = i > 0 ? RENEWAL_PHASES[i - 1].owner : owner
-        const boundary = owner !== prevOwner
-        const mine = role ? role === owner : false
         return (
-          <button key={p.id} type="button"
-            className={cls + (boundary ? ' is-handover' : '')} onClick={() => onSelect(p.id)}
+          <button key={p.id} type="button" className={cls} onClick={() => onSelect(p.id)}
             aria-label={`Go to ${p.label}`} aria-current={viewing === p.id ? 'step' : undefined}>
             <span className={dotCls}>{PHASE_ICONS[p.id]}</span>
             <div className="app-stepper__label">{p.label}</div>
-            <div className="app-stepper__owner" style={{
-              fontSize: 10, textTransform: 'uppercase', letterSpacing: '.4px', marginTop: 2,
-              fontWeight: mine ? 700 : 500, color: mine ? '#cb0a2f' : '#8c8c8c',
-            }}>{TEAM_LABEL[owner]}</div>
           </button>
         )
       })}
