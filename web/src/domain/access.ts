@@ -27,6 +27,9 @@ export type RoleKey =
   | 'sales-supervisor'
   | 'senior-management'
   | 'actuarial'
+  | 'actuarial-analyst'
+  | 'actuarial-supervisor'
+  | 'actuarial-fa'
   | 'legal'
   | 'mda'
   | 'billing-specialist'
@@ -57,6 +60,9 @@ export const ROLES: Record<RoleKey, RoleMeta> = {
   'sales-supervisor': { key: 'sales-supervisor', label: 'Sales Supervisor', department: 'Sales' },
   'senior-management': { key: 'senior-management', label: 'Senior Management', department: 'Sales' },
   actuarial: { key: 'actuarial', label: 'Actuarial', department: 'Actuarial' },
+  'actuarial-analyst': { key: 'actuarial-analyst', label: 'Actuarial Analyst', department: 'Actuarial' },
+  'actuarial-supervisor': { key: 'actuarial-supervisor', label: 'Actuarial Supervisor', department: 'Actuarial' },
+  'actuarial-fa': { key: 'actuarial-fa', label: 'FA', department: 'Actuarial' },
   legal: { key: 'legal', label: 'Legal', department: null },
   mda: { key: 'mda', label: 'MDA', department: 'MDA' },
   'billing-specialist': { key: 'billing-specialist', label: 'Billing Specialist', department: 'Billing' },
@@ -231,6 +237,34 @@ export const rolePermissions: Record<RoleKey, Partial<Record<AreaKey, Access>>> 
     proposal: 'read',
     approvals: 'approve',
   },
+  // ---- Actuarial Analyst (preparer): works assigned requests, builds pricing
+  'actuarial-analyst': {
+    dashboard: 'edit',
+    quotation: 'read', // reads the assigned rate request (Sales submission)
+    rateSheet: 'edit', // prepares the draft rate sheet (cannot approve/release own)
+    workingCalc: 'edit', // the working calculations are Actuarial-only
+    sob: 'edit', // prepares the marked SOB
+    proposal: 'read',
+  },
+  // ---- Actuarial Supervisor: team queue, assignment, review/approve, release
+  'actuarial-supervisor': {
+    dashboard: 'edit',
+    quotation: 'read',
+    rateSheet: 'approve', // review/approve + release
+    workingCalc: 'approve',
+    sob: 'approve',
+    proposal: 'read',
+    approvals: 'approve',
+  },
+  // ---- Senior Approver (FA): reviews routed requests, approves within authority
+  'actuarial-fa': {
+    dashboard: 'read',
+    quotation: 'read',
+    rateSheet: 'read',
+    workingCalc: 'read', // may review pricing inputs to approve
+    proposal: 'read',
+    approvals: 'approve',
+  },
   // ---- Legal: contract/DSA preparation + signing/notarization records
   legal: {
     dashboard: 'read',
@@ -287,6 +321,9 @@ export const roleScreens: Record<RoleKey, string[]> = {
   // Actuarial/Legal/MDA reach a case through a handoff link, not by browsing
   // the Sales pipeline — so they see their own home, not the Sales nav.
   actuarial: ['actuarial'],
+  'actuarial-analyst': ['actuarial'],
+  'actuarial-supervisor': ['actuarial'],
+  'actuarial-fa': ['actuarial'],
   legal: [],
   mda: ['mda'],
   'billing-specialist': ['billing'],
@@ -322,6 +359,9 @@ export const roleScope: Record<RoleKey, ScopeRule> = {
   'sales-supervisor': 'team', // assigned team
   'senior-management': 'department',
   actuarial: 'assigned',
+  'actuarial-analyst': 'assigned', // only requests assigned to them
+  'actuarial-supervisor': 'department', // the whole Actuarial queue
+  'actuarial-fa': 'department', // requests routed to their approval queue
   legal: 'assigned',
   mda: 'assigned',
   'billing-specialist': 'assigned',
@@ -402,4 +442,43 @@ export const approvalControls: Record<ApprovalKey, ApprovalControl> = {
     requiresDifferentPerson: true,
     assignment: 'proposed',
   },
+}
+
+// --- Actuarial capability model ---------------------------------------------
+// Fine-grained capabilities for the Actuarial Corporate New Business module,
+// applied to routes and actions (not just button visibility). Kept separate
+// from the area-access matrix above because the Actuarial journey has its own
+// verbs (assign, submit-for-review, approve, release). PROPOSED demo defaults —
+// centrally configurable. Admin deliberately gets VIEW only: administrative
+// access must never confer quotation approval or release authority.
+
+export type ActuarialCapability =
+  | 'view' // see the Actuarial queue and open requests
+  | 'assign' // assign/reassign analysts, manage priority (Supervisor)
+  | 'work' // assess, build working data/pricing on assigned requests (Analyst)
+  | 'clarify' // raise a clarification to Sales
+  | 'submitForReview' // submit a quotation package for review
+  | 'approve' // approve within authority (Supervisor / FA)
+  | 'return' // return for correction
+  | 'release' // release the approved package to Sales (Supervisor w/ release)
+  | 'manageAssumptions' // publish authorized shared assumptions/templates
+
+const ACTUARIAL_CAPABILITIES: Partial<Record<RoleKey, ActuarialCapability[]>> = {
+  'actuarial-analyst': ['view', 'work', 'clarify', 'submitForReview'],
+  'actuarial-supervisor': ['view', 'assign', 'clarify', 'submitForReview', 'approve', 'return', 'release', 'manageAssumptions'],
+  'actuarial-fa': ['view', 'approve', 'return'],
+  // Admin can view/configure but never approve or release.
+  'system-admin': ['view'],
+  // Legacy single 'actuarial' role retains a sensible superset for any older refs.
+  actuarial: ['view', 'work', 'clarify', 'submitForReview', 'approve', 'return', 'release'],
+}
+
+/** Does this role hold the given Actuarial capability? */
+export function canActuarial(role: RoleKey, cap: ActuarialCapability): boolean {
+  return (ACTUARIAL_CAPABILITIES[role] ?? []).includes(cap)
+}
+
+/** True for any Actuarial-department role (Analyst, Supervisor, FA, legacy). */
+export function isActuarialRole(role: RoleKey): boolean {
+  return ROLES[role].department === 'Actuarial'
 }

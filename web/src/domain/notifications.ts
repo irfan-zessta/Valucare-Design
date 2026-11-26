@@ -95,14 +95,15 @@ function deriveForCase(role: RoleKey, can: CanFn, c: Case): AppNotification | nu
   }
 
   // --- Actuarial: assigned rate requests -------------------------------------
-  if (role === 'actuarial') {
+  if (roleDepartment(role) === 'Actuarial') {
+    const to = `/actuarial/requests/${c.id}`
     if (c.quotation.status === 'submitted')
       return base('review', 'Rate request received', 'A quotation is ready for pricing.', c.quotation.rateRequest?.submittedAt, {
-        label: 'Review request', to: caseRoute(c, 'prepare-quotation'),
+        label: 'Review request', to,
       })
     if (c.quotation.status === 'clarification')
       return base('pending', 'Clarification pending', 'Awaiting the handler’s response to your clarification.', c.updatedAt, {
-        label: 'View request', to: caseRoute(c, 'prepare-quotation'),
+        label: 'View request', to,
       })
     return null
   }

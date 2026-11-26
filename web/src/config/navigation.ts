@@ -106,7 +106,13 @@ export const NAV: NavDept[] = [
     to: '/actuarial',
     match: startsWith('/actuarial'),
     children: [
-      { id: 'actuarial-new', label: 'New Business', status: 'coming-soon' },
+      {
+        id: 'actuarial-new',
+        label: 'New Business',
+        status: 'available',
+        to: '/actuarial',
+        match: startsWith('/actuarial'),
+      },
       { id: 'actuarial-renewal', label: 'Renewal Business', status: 'coming-soon' },
       { id: 'actuarial-ifg-renewal', label: 'IFG Renewal Business', status: 'coming-soon' },
     ],

@@ -32,6 +32,9 @@ export function roleHomePath(role: RoleKey): string {
     case 'legal':
       return '/' // no department screen — reaches cases via handoff links
     case 'actuarial':
+    case 'actuarial-analyst':
+    case 'actuarial-supervisor':
+    case 'actuarial-fa':
       return '/actuarial'
     case 'mda':
       return '/mda'
@@ -67,9 +70,10 @@ export const DEMO_USERS: DemoUser[] = [
   // --- AMT · Account Services (two people → maker/checker within the team) --
   { id: 'u-anija', name: 'Anija', role: 'account-services', department: 'AMT · Account Services', title: 'AMT Associate' },
   { id: 'u-revanth', name: 'Revanth', role: 'account-services', department: 'AMT · Account Services', title: 'AMT Lead' },
-  // --- Actuarial -----------------------------------------------------------
-  { id: 'u-harshitha', name: 'Harshitha', role: 'actuarial', department: 'Actuarial' },
-  { id: 'u-ramya', name: 'Ramya', role: 'actuarial', department: 'Actuarial', title: 'Actuarial Reviewer' },
+  // --- Actuarial (distinct preparer + approver identities) -----------------
+  { id: 'u-harshitha', name: 'Harshitha', role: 'actuarial-analyst', department: 'Actuarial', title: 'Actuarial Analyst' },
+  { id: 'u-ramya', name: 'Ramya', role: 'actuarial-supervisor', department: 'Actuarial', title: 'Actuarial Supervisor' },
+  { id: 'u-deepak', name: 'Deepak', role: 'actuarial-fa', department: 'Actuarial', title: 'FA' },
   // --- Legal ---------------------------------------------------------------
   { id: 'u-santanu', name: 'Santanu', role: 'legal', department: 'Legal', title: 'Legal Counsel' },
   // --- MDA -----------------------------------------------------------------

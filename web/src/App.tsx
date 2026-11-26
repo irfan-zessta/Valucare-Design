@@ -24,6 +24,8 @@ import CaseWorkspace from './routes/CaseWorkspace'
 import AccountsDirectory from './routes/AccountsDirectory'
 import RenewalsDashboard from './routes/renewals/RenewalsDashboard'
 import RenewalWorkspace from './routes/renewals/RenewalWorkspace'
+import ActuarialDashboard from './routes/actuarial/ActuarialDashboard'
+import ActuarialRequestWorkspace from './routes/actuarial/ActuarialRequestWorkspace'
 import NewEnquiry from './routes/enquiries/NewEnquiry'
 import EnquiryDetail from './routes/enquiries/EnquiryDetail'
 import LeadDetail from './routes/leads/LeadDetail'
@@ -80,6 +82,10 @@ export default function App() {
                         <Route path="/sales/leads/:leadId" element={<LeadDetail />} />
                         <Route path="/cases/:caseId" element={<ResumeCase />} />
                         <Route path="/cases/:caseId/:workArea" element={<CaseWorkspace />} />
+                        {/* Actuarial — Corporate New Business: dashboard + per-request workspace. */}
+                        <Route path="/actuarial" element={<RequireScreen screen="actuarial"><ActuarialDashboard /></RequireScreen>} />
+                        <Route path="/actuarial/requests/:caseId" element={<RequireScreen screen="actuarial"><ActuarialRequestWorkspace /></RequireScreen>} />
+                        <Route path="/actuarial/requests/:caseId/:area" element={<RequireScreen screen="actuarial"><ActuarialRequestWorkspace /></RequireScreen>} />
                         <Route path="/coming-soon/:slug" element={<ComingSoon />} />
                         {/* Per-department dashboards (Actuarial, MDA, Billing, …). */}
                         <Route path="/:deptId" element={<DepartmentPlaceholderDashboard />} />

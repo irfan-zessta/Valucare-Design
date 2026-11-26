@@ -149,6 +149,28 @@ export function seedCases(): { cases: Case[]; nextSeq: number } {
     status: 'submitted',
     requestRef: makeRequestRef(6),
     rateSheets: [],
+    rateRequest: {
+      requestedPlans: 'Plan A (Private), Plan B (Semi-private), Plan C (Ward)',
+      roomBoard: 'Private / Semi-private / Ward',
+      mblOptions: '₱200,000 · ₱150,000 · ₱100,000',
+      dependentCoverage: 'Up to 3 qualified dependents per principal',
+      targetRates: 'Within ±5% of the incumbent carrier',
+      paymentModes: ['Annual', 'Semi-annual', 'Quarterly'],
+      specialRequirements: 'Maternity waiting period waived for existing members; include annual physical exam.',
+      jumbo: true,
+      submittedAt: now,
+    },
+    requirements: [
+      { key: 'member-data', label: 'Member Data (census)', status: 'Received' },
+      { key: 'tor', label: 'Current SOB / TOR', status: 'Received' },
+      { key: 'utilization', label: 'Utilization / claims experience', status: 'Not Available', note: 'No previous HMO experience — new business.' },
+    ],
+    torLines: [
+      { benefit: 'Room & board', limit: 'Up to ₱4,000/day (Private)' },
+      { benefit: 'Annual physical exam', limit: 'Once per member/year' },
+      { benefit: 'Outpatient consultations', limit: 'Unlimited (accredited network)' },
+      { benefit: 'Emergency care', limit: 'Up to MBL (accredited & non-accredited)' },
+    ],
   }
   c4.documents = [
     { id: uid('doc'), name: 'Member Data (initial).xlsx', kind: 'Member Data', version: 1, providedBy: 'Noel Villanueva', uploadedAt: now, simulated: true },

@@ -338,6 +338,72 @@ export interface MemberDataSummary {
   importProcessed: boolean
 }
 
+// --- Actuarial working record ----------------------------------------------
+// The Actuarial-facing side of a rate request. It hangs off the SAME shared
+// case as the Sales quotation (case.quotation.rateRequest / rateSheets) — no
+// separate franchise/account is ever created. These fields track assignment,
+// the five Actuarial work areas, and the submission assessment; pricing,
+// approvals and release are added in later phases.
+
+/** The five Actuarial work areas (navigation spine, mirrors New Business). */
+export type ActuarialAreaId = 'review' | 'inputs' | 'pricing' | 'approval' | 'release'
+
+export const ACTUARIAL_AREA_ORDER: ActuarialAreaId[] = ['review', 'inputs', 'pricing', 'approval', 'release']
+
+export const ACTUARIAL_AREA_LABELS: Record<ActuarialAreaId, string> = {
+  review: 'Review Request',
+  inputs: 'Inputs & Benefits',
+  pricing: 'Pricing & Rate Sheet',
+  approval: 'Review & Approval',
+  release: 'Release & Tracking',
+}
+
+export type ActuarialStatus =
+  | 'unassigned' // received from Sales, not yet assigned to an analyst
+  | 'assigned' // assigned, review not started
+  | 'in-review' // analyst assessing the submission / working
+  | 'awaiting-sales' // clarification sent back to Sales
+  | 'pricing' // building pricing & rate sheet
+  | 'for-approval' // submitted for review/approval
+  | 'approved' // approvals complete, not yet released
+  | 'released' // package released to Sales
+  | 'revision' // a revision is being worked after a prior release
+
+export type ActuarialPriority = 'normal' | 'high' | 'urgent'
+
+/** The analyst's submission assessment recorded in Review Request. */
+export interface ActuarialAssessment {
+  decision?: 'complete' | 'needs-clarification'
+  notes?: string
+  assessedBy?: string
+  assessedAt?: string
+}
+
+export interface ActuarialWork {
+  status: ActuarialStatus
+  /** Mirrors quotation.requestRef; kept here for convenience. */
+  requestRef?: string
+  /** 0 = initial quotation; 1+ = a revision round. */
+  revision: number
+  priority: ActuarialPriority
+  assignedAnalystId?: string
+  assignedAnalystName?: string
+  assignedAt?: string
+  assignedById?: string
+  /** Current position in the five-area spine. */
+  currentArea: ActuarialAreaId
+  /** Areas the analyst has marked done (remain accessible for review). */
+  completedAreas: ActuarialAreaId[]
+  /** When the request was received from Sales (rate request submitted). */
+  receivedAt?: string
+  startedReviewAt?: string
+  assessment?: ActuarialAssessment
+  /** When work last paused for a Sales clarification (awaiting-Sales clock). */
+  awaitingSalesSince?: string
+  /** Latest released rate-sheet version, when a package has been released. */
+  releasedVersion?: number
+}
+
 // --- The case ---------------------------------------------------------------
 
 export interface Company {
@@ -762,6 +828,8 @@ export interface Case {
   company: Company
   franchise: Franchise
   quotation: QuotationPackage
+  /** Actuarial working record for this request (added when Actuarial picks it up). */
+  actuarial?: ActuarialWork
   offer: OfferState
   account: AccountState
   coverage: { status: CoverageStatus; effectiveDate?: string; activatedAt?: string; scheduledFor?: string }
