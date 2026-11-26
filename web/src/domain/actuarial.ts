@@ -18,7 +18,6 @@ import type {
 } from './types'
 import { ACTUARIAL_AREA_ORDER } from './types'
 import { canActuarial, type RoleKey } from './access'
-import type { DemoUser } from './demoRoster'
 
 // --- Is this case an Actuarial request? ------------------------------------
 // A case enters the Actuarial queue once Sales submits the rate request. Once
@@ -223,7 +222,7 @@ export function withSampleActuarialRequest(c: Case): Case {
       paymentModes: ['Annual', 'Semi-annual', 'Quarterly'],
       specialRequirements: 'Maternity waiting period waived for existing members; include annual physical exam.',
       jumbo: (c.franchise.estimatedPrincipals ?? 0) + (c.franchise.estimatedDependents ?? 0) > 500,
-      submittedAt: c.quotation.rateRequest?.submittedAt ?? now,
+      submittedAt: now,
     },
     requirements:
       c.quotation.requirements ?? [

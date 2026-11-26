@@ -176,6 +176,7 @@ export default function EnquiryDetail() {
   const fu = computeFollowUp(enquiry.nextFollowUpDate)
 
   function handleCompleteFollowUp() {
+    if (!enquiry) return
     completeFollowUp(enquiry.id)
     message.success('Follow-up marked complete.')
   }

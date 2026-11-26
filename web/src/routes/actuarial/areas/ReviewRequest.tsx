@@ -128,7 +128,7 @@ export function ReviewRequest({ c, patch, goArea, role, user }: ActuarialRequest
   function continueToInputs() {
     patch((prev) => {
       const cur = ensureActuarial(prev)
-      const completedAreas = cur.completedAreas.includes('review') ? cur.completedAreas : [...cur.completedAreas, 'review']
+      const completedAreas = cur.completedAreas.includes('review') ? cur.completedAreas : [...cur.completedAreas, 'review' as const]
       return withEvent(
         {
           ...prev,

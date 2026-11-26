@@ -9,7 +9,7 @@
 // ===========================================================================
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { App, Badge, Button, Drawer, Empty, Mentions, Segmented, Tooltip, Typography } from 'antd'
+import { App, Badge, Button, Drawer, Empty, Mentions, Segmented, Tooltip } from 'antd'
 import { CommentOutlined, CheckOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useActiveUser } from '../../state/ActiveUserProvider'

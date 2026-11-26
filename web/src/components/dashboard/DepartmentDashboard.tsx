@@ -198,7 +198,6 @@ export function DepartmentDashboard<T>({
   const extraTabs = config.extraTabs ?? []
   const hasExtra = extraTabs.length > 0
   const record = hasExtra && extraTabs.some((t) => t.key === ui.record) ? ui.record : 'cases'
-  const activeExtra = extraTabs.find((t) => t.key === record)
 
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.md

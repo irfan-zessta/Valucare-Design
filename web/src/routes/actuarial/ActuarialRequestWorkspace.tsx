@@ -13,10 +13,9 @@ import { Button, Result, Space } from 'antd'
 import { useCases } from '../../state/CaseProvider'
 import { useActiveUser } from '../../state/ActiveUserProvider'
 import { AccessDenied } from '../../components/access/AccessGuards'
-import { CaseHistory } from '../../components/case/CaseHistory'
 import { PageHeader } from '../../components/ui/PageHeader'
 import {
-  ACTUARIAL_AREA_ORDER, type ActuarialAreaId,
+  ACTUARIAL_AREA_ORDER, type ActuarialAreaId, type Case,
 } from '../../domain/types'
 import { roleLabel } from '../../domain/access'
 import {
@@ -74,7 +73,7 @@ export default function ActuarialRequestWorkspace() {
 
   const activeArea = (AREAS.has(area) ? area : currentArea(c)) as ActuarialAreaId
   const goArea = (a: ActuarialAreaId) => navigate(`/actuarial/requests/${c.id}/${a}`)
-  const patch = (recipe: (prev: typeof c) => typeof c) => patchCase(c.id, recipe)
+  const patch = (recipe: (prev: Case) => Case) => patchCase(c.id, recipe)
   const areaProps = { c, patch, goArea, role, user }
 
   const analyst = assignedAnalystName(c)

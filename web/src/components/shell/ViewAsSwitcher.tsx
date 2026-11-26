@@ -160,7 +160,7 @@ export function ViewAsSwitcher({
       open={open}
       onOpenChange={setOpen}
       content={content}
-      styles={{ body: { padding: 12, width: 320 } }}
+      styles={{ root: { padding: 12, width: 320 } }}
     >
       <div
         className={`app-viewas__trigger${collapsed ? ' app-viewas__trigger--collapsed' : ''}`}
